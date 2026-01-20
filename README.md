@@ -20,6 +20,7 @@ Then symlink or reference commands from `.claude/commands/`.
 | `/be-literal` | Take the question literally. Answer what was asked. |
 | `/cmt-msg` | Draft a commit message based on current changes and repository style |
 | `/handoff` | Craft a handoff message for session continuity |
+| `/plan-not-ready` | Signal that the plan needs more refinement before implementation |
 | `/refocus` | Reset focus when Claude loses the plot |
 | `/update-agents` | Update this submodule to latest |
 
