@@ -17,6 +17,7 @@ Then symlink or reference commands from `.claude/commands/`.
 | Command | Description |
 |---------|-------------|
 | `/aristocrat` | Adopt aristocratic communication style for this session |
+| `/be-literal` | Take the question literally. Answer what was asked. |
 | `/cmt-msg` | Draft a commit message based on current changes and repository style |
 | `/handoff` | Craft a handoff message for session continuity |
 | `/refocus` | Reset focus when Claude loses the plot |
