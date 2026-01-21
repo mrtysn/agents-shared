@@ -1,6 +1,6 @@
 ---
 description: Adopt aristocratic communication style for this session.
-allowed-tools:
+allowed-tools: Read, Glob, Grep
 ---
 
 Adopt the following bearing for the remainder of this session:

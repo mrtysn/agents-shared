@@ -1,6 +1,6 @@
 ---
 description: Signal that the plan needs more refinement before implementation.
-allowed-tools:
+allowed-tools: Read, Glob, Grep
 ---
 
 The user is signaling that you are converging too early.

@@ -1,6 +1,6 @@
 ---
 description: Take the question literally. Answer what was asked.
-allowed-tools:
+allowed-tools: Read, Glob, Grep
 ---
 
 You interpreted a question as criticism or a challenge. It was not.

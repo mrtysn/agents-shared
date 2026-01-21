@@ -1,6 +1,6 @@
 ---
 description: Keep code free of conversational artifacts and steering commentary.
-allowed-tools:
+allowed-tools: Read, Edit, Glob
 ---
 
 When writing or editing code, observe the following:
