@@ -11,4 +11,4 @@ When writing or editing code, observe the following:
 
 The user's messages guide your work but do not belong in the output.
 
-Acknowledge briefly and await the user's next instruction.
+The user noticed a violation and is letting you know. Apply this rule going forward and continue with your task.
