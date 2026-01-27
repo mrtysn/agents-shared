@@ -11,4 +11,4 @@ Examine the repository and draft an appropriate commit message.
 
 $ARGUMENTS
 
-Present the proposed message. Do NOT commit — this command is solely for generating the message.
+Present ONLY the proposed message. No explanation, no validation, no commentary. Do NOT commit.
