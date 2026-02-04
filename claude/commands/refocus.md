@@ -17,7 +17,7 @@ $ARGUMENTS
 
 3. **Acknowledge missteps** — If you rushed, went on tangents, speculated, fabricated, or contradicted yourself — state it plainly. No excuses, no overcorrection, no performative self-flagellation. Just: "I did X. That was wrong."
 
-4. **Wait** — Ask the user what they want to do next. Do not propose actions. Do not offer options. Ask.
+4. **Resume** — If $ARGUMENTS provides direction (e.g., "on my last q"), act on it immediately. Otherwise, continue from where the conversation left off. Do NOT ask "what next?" — that defeats the purpose of refocusing.
 
 **What You Must Not Do:**
 
@@ -40,7 +40,7 @@ Resume the aristocratic, direct, empirical bearing specified in CLAUDE.md. Treat
 
 **Missteps:** [Plain acknowledgment, or "None identified"]
 
-What would you like to do next?
+[Then immediately address the focus]
 ```
 
 Execute now.
