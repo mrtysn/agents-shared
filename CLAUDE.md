@@ -7,12 +7,15 @@ This repository contains shared Claude Code commands for use across multiple pro
 ```
 agents-shared/
 ├── claude/
-│   └── commands/          # Slash command definitions
-│       ├── aristocrat.md  # Communication style directive
-│       ├── cmt-msg.md     # Commit message drafting
-│       ├── handoff.md     # Session continuity handoffs
-│       ├── refocus.md     # Focus reset when off-track
-│       └── update-agents.md  # Submodule self-update
+│   ├── commands/          # Slash commands (single-file format)
+│   │   ├── aristocrat.md
+│   │   ├── cmt-msg.md
+│   │   ├── handoff.md
+│   │   ├── refocus.md
+│   │   └── update-agents.md
+│   └── skills/            # Skills (directory format, supports references/templates)
+│       └── refactor/
+│           └── SKILL.md
 └── README.md
 ```
 
@@ -33,6 +36,18 @@ Command instructions here. Use $ARGUMENTS for user-provided arguments.
 - `description` — Required. Appears in `/help` and command listings.
 - `allowed-tools` — Optional. Comma-separated list restricting which tools the command can use. Omit for full access.
 
+## Adding New Skills
+
+1. Create `claude/skills/<skill-name>/SKILL.md`
+2. Add frontmatter with description
+3. Write clear, imperative instructions
+4. Optionally add supporting files (references, templates)
+5. Update README.md skills table
+
+**Naming:** Use lowercase kebab-case (e.g., `my-skill/SKILL.md` → `/my-skill`).
+
+Skills support additional features: reference files, templates, and advanced frontmatter (`context: fork`, `agent`, etc.).
+
 ## Adding New Commands
 
 1. Create `claude/commands/<command-name>.md`
@@ -41,6 +56,8 @@ Command instructions here. Use $ARGUMENTS for user-provided arguments.
 4. Update README.md command table
 
 **Naming:** Use lowercase kebab-case (e.g., `my-command.md` → `/my-command`).
+
+**Note:** Both formats create identical `/command` invocations. Use commands for simple single-file definitions; use skills when you need supporting files.
 
 ## Design Principles
 
@@ -57,7 +74,10 @@ Projects integrate via submodule at `.agents`:
 # Add to a project
 git submodule add <repo-url> .agents
 
-# Reference from .claude/commands/ via symlink or copy
+# Symlink skills
+ln -s ../../.agents/claude/skills/refactor .claude/skills/refactor
+
+# Symlink commands
 ln -s ../../.agents/claude/commands/handoff.md .claude/commands/handoff.md
 ```
 

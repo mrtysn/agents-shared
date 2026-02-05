@@ -1,6 +1,6 @@
 # agents-shared
 
-Shared Claude Code commands for use across multiple projects via git submodule.
+Shared Claude Code commands and skills for use across multiple projects via git submodule.
 
 ## Usage
 
@@ -25,6 +25,14 @@ Then symlink or reference commands from `.claude/commands/`.
 | `/plan-not-ready` | Signal that the plan needs more refinement before implementation |
 | `/refocus` | Reset focus when Claude loses the plot |
 | `/update-agents` | Update this submodule to latest |
+
+## Skills
+
+Skills are directory-based and support references/templates. Both commands and skills create `/command` — skills add optional features like supporting files.
+
+| Skill | Description |
+|-------|-------------|
+| `/refactor` | Systematic refactoring with full cleanup — maps scope, tracks progress, same standards for tests |
 
 ## Updating
 
