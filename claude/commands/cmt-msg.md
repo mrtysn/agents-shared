@@ -11,4 +11,6 @@ Examine the repository and draft an appropriate commit message.
 
 $ARGUMENTS
 
+**Format constraint:** Single line, lowercase, no trailing period. Start with a verb (add/fix/update/refactor/implement). Join multiple changes with "and" or commas.
+
 Present ONLY the proposed message. No explanation, no validation, no commentary. Do NOT commit.
