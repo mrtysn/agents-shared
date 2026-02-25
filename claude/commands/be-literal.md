@@ -1,5 +1,7 @@
 ---
 description: Take the question literally. Answer what was asked.
+argument-hint: [the question to re-answer]
+disable-model-invocation: true
 allowed-tools: Read, Glob, Grep
 ---
 

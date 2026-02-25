@@ -1,5 +1,7 @@
 ---
 description: Reset focus when Claude loses the plot. Use when rushing, going on tangents, or not following instructions.
+argument-hint: [direction, e.g. "on my last q"]
+disable-model-invocation: true
 allowed-tools: Read
 ---
 

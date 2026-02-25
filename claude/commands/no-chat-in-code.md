@@ -1,5 +1,6 @@
 ---
 description: Keep code free of conversational artifacts and steering commentary.
+disable-model-invocation: true
 allowed-tools: Read, Edit, Glob
 ---
 

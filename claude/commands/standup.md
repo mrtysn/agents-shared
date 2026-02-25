@@ -1,5 +1,6 @@
 ---
 description: Generate a daily standup summary of yesterday's work across repos.
+argument-hint: [date] [path]
 allowed-tools: Bash, Read, Grep, Glob
 ---
 

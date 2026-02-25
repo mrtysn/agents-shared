@@ -1,5 +1,6 @@
 ---
 description: Signal that the plan needs more refinement before implementation.
+disable-model-invocation: true
 allowed-tools: Read, Glob, Grep
 ---
 
