@@ -1,10 +1,9 @@
 ---
 description: Update agents-shared submodule in all consumer repos listed in consumers.local.
-argument-hint: [--commit]
 allowed-tools: Bash
 ---
 
-Broadcast the latest agents-shared changes to all consumer repositories.
+Broadcast the latest agents-shared changes to all consumer repositories. This updates submodule pointers and re-runs init.sh for symlinks. It does NOT commit — that is each repo owner's responsibility.
 
 **Steps:**
 
@@ -13,11 +12,6 @@ Broadcast the latest agents-shared changes to all consumer repositories.
 2. Run the update script:
    ```bash
    bash .agents/scripts/update-consumers.sh
-   ```
-
-   If $ARGUMENTS contains `--commit`, pass it through:
-   ```bash
-   bash .agents/scripts/update-consumers.sh --commit
    ```
 
    If running from within agents-shared itself:

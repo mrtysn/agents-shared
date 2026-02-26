@@ -2,20 +2,17 @@
 #
 # update-consumers.sh — Update the .agents submodule in all consumer repos.
 #
+# Updates submodule pointers and re-runs init.sh for symlinks.
+# Does NOT commit — that is the repo owner's responsibility.
+#
 # Usage:
-#   bash scripts/update-consumers.sh              # update only
-#   bash scripts/update-consumers.sh --commit     # update and commit submodule pointer
+#   bash scripts/update-consumers.sh
 #
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 AGENTS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONSUMERS_FILE="$AGENTS_DIR/consumers.local"
-
-COMMIT=false
-if [[ "${1:-}" == "--commit" ]]; then
-    COMMIT=true
-fi
 
 if [[ ! -f "$CONSUMERS_FILE" ]]; then
     echo "ERROR: $CONSUMERS_FILE not found."
@@ -26,7 +23,6 @@ fi
 updated=()
 failed=()
 skipped=()
-committed=()
 
 while IFS= read -r line || [[ -n "$line" ]]; do
     # skip blank lines and comments
@@ -64,17 +60,6 @@ while IFS= read -r line || [[ -n "$line" ]]; do
         if [[ -f "$repo/.agents/scripts/init.sh" ]]; then
             (cd "$repo" && bash .agents/scripts/init.sh) 2>&1 | sed 's/^/  /'
         fi
-
-        # Optionally commit the submodule pointer + new symlinks
-        if $COMMIT && [[ "$before" != "$after" ]]; then
-            if git -C "$repo" add .agents .claude/commands .claude/skills && \
-               git -C "$repo" commit -m "update agents-shared submodule"; then
-                committed+=("$repo")
-                echo "  Committed submodule update."
-            else
-                echo "  WARNING: commit failed in $repo"
-            fi
-        fi
     else
         failed+=("$repo — submodule update failed")
     fi
@@ -87,10 +72,6 @@ echo "=== Update Summary ==="
 echo "  Updated:   ${#updated[@]}"
 echo "  Failed:    ${#failed[@]}"
 echo "  Skipped:   ${#skipped[@]}"
-
-if $COMMIT; then
-    echo "  Committed: ${#committed[@]}"
-fi
 
 if [[ ${#failed[@]} -gt 0 ]]; then
     echo ""
@@ -108,7 +89,7 @@ if [[ ${#skipped[@]} -gt 0 ]]; then
     done
 fi
 
-if [[ ${#updated[@]} -gt 0 ]] && ! $COMMIT; then
+if [[ ${#updated[@]} -gt 0 ]]; then
     echo ""
-    echo "Submodule pointers updated but not committed. Run with --commit to auto-commit."
+    echo "Submodule pointers updated. Review and commit in each repo as needed."
 fi
