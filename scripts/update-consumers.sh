@@ -65,9 +65,9 @@ while IFS= read -r line || [[ -n "$line" ]]; do
             (cd "$repo" && bash .agents/scripts/init.sh) 2>&1 | sed 's/^/  /'
         fi
 
-        # Optionally commit the submodule pointer change
+        # Optionally commit the submodule pointer + new symlinks
         if $COMMIT && [[ "$before" != "$after" ]]; then
-            if git -C "$repo" add .agents && \
+            if git -C "$repo" add .agents .claude/commands .claude/skills && \
                git -C "$repo" commit -m "update agents-shared submodule"; then
                 committed+=("$repo")
                 echo "  Committed submodule update."
