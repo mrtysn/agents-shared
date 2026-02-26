@@ -9,14 +9,28 @@ agents-shared/
 ├── claude/
 │   ├── commands/          # Slash commands (single-file format)
 │   │   ├── aristocrat.md
+│   │   ├── be-literal.md
+│   │   ├── broadcast-update.md
 │   │   ├── cmt-msg.md
+│   │   ├── external-review.md
 │   │   ├── handoff.md
+│   │   ├── no-chat-in-code.md
+│   │   ├── plan-not-ready.md
 │   │   ├── refocus.md
+│   │   ├── setup-agents.md
+│   │   ├── standup.md
 │   │   └── update-agents.md
 │   └── skills/            # Skills (directory format, supports references/templates)
-│       └── refactor/
+│       ├── refactor/
+│       │   └── SKILL.md
+│       └── rpi/
 │           └── SKILL.md
-└── README.md
+├── scripts/
+│   ├── init.sh            # Bootstrap submodule and symlinks
+│   └── update-consumers.sh  # Broadcast updates to all consumer repos
+├── consumers.local        # (gitignored) Absolute paths of consumer repos
+├── README.md
+└── CLAUDE.md
 ```
 
 ## Command File Format

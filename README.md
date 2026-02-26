@@ -24,6 +24,7 @@ Then symlink or reference commands from `.claude/commands/`.
 | `/no-chat-in-code` | Keep code free of conversational artifacts and steering commentary |
 | `/plan-not-ready` | Signal that the plan needs more refinement before implementation |
 | `/refocus` | Reset focus when Claude loses the plot |
+| `/broadcast-update` | Update agents-shared submodule in all consumer repos listed in consumers.local |
 | `/update-agents` | Update this submodule to latest |
 
 ## Skills
@@ -33,6 +34,7 @@ Skills are directory-based and support references/templates. Both commands and s
 | Skill | Description |
 |-------|-------------|
 | `/refactor` | Systematic refactoring with full cleanup — maps scope, tracks progress, same standards for tests |
+| `/rpi` | Research-Plan-Implement workflow: deep investigation, written plan with annotation cycles, then full execution |
 
 ## Updating
 
