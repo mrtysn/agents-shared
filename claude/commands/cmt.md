@@ -13,7 +13,10 @@ Commit the currently staged changes.
 **Commit:**
 - Run `git diff --cached --stat` to confirm there are staged changes
 - If nothing is staged, stop and say so
-- Commit with the resolved message, appending the co-author line:
-  `Co-Authored-By: Claude <noreply@anthropic.com>`
+- Commit with the resolved message
 
-Present ONLY the `git log --oneline -1` output after committing. No explanation, no commentary.
+**Push:**
+- After committing, run `git push`
+- If push fails (e.g. no upstream), report the error
+
+Present ONLY the `git log --oneline -1` output and push result after committing. No explanation, no commentary.
