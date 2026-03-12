@@ -2,7 +2,7 @@
 description: Find which Claude Code sessions modified the currently changed files. Use when user wants to trace uncommitted changes back to specific sessions.
 user-invocable: true
 allowed-tools: Bash, Read
-argument-hint: [--all to include reads, -n 5 to limit results]
+argument-hint: [--all to include reads, -n 5 to limit, -d 7 for last week, -i for interactive]
 ---
 
 # blame-session
@@ -16,17 +16,20 @@ python3 ~/dev/personal/agents-shared/scripts/blame-session.py $ARGUMENTS
 ```
 
 **Flags:**
-- Default: only shows sessions that wrote to files (Edit, Write, Bash)
+- Default: only shows sessions that wrote to files (Edit, Write, Bash) in the last 14 days
 - `--all` / `-a`: also include sessions that only Read the files
 - `--limit N` / `-n N`: limit to N most recent sessions
+- `--days N` / `-d N`: show sessions from last N days (default: 14, 0=all time)
+- `--interactive` / `-i`: launch curses TUI with cross-highlighting (enter to resume)
+- `--resume N` / `-r N`: resume session number N from the last run
 
-Present the output to the user directly. The output shows:
-- Each session ID that touched currently changed files
-- The branch and timestamp
-- A `claude --resume <id>` command to jump back into that session
-- Which files each session modified and with which tools
+**Output modes:**
+- **Static** (default): matrix table with multi-round wrapping for wide output. Designed for both human reading and AI agent consumption.
+- **Interactive** (`-i`): curses TUI where hovering a file highlights all sessions that touched it, and hovering a session highlights all files it touched. Press Enter to resume a session. Arrow keys / hjkl to navigate, Tab to switch between file/session axis.
 
-If the output is empty or no sessions found, explain that either:
+Present the output to the user directly.
+
+If no sessions found, explain that either:
 1. The changes were made manually (not through Claude Code)
 2. The session transcripts may have been cleaned up
-3. The changes came from a different machine
+3. The changes predate the time window (suggest `--days 0`)
