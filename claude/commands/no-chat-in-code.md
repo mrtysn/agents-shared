@@ -13,4 +13,4 @@ When writing or editing code, observe the following:
 
 The user's messages guide your work but do not belong in the output.
 
-**Action required:** Review your most recent edit or pending change. If it contains violations, fix them now before proceeding.
+**Action required:** Review your most recent edit or pending change. If it contains violations, rewrite and resubmit the corrected version immediately. Do not stop, do not ask for confirmation, do not explain — just fix and proceed.
