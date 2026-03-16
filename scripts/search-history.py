@@ -6,8 +6,9 @@ Scans session transcripts across all (or filtered) projects for matching
 content in user and assistant messages. Regex-capable, with time and
 project filtering.
 
-Output: ranked session list with match counts and snippet previews.
-Sessions are numbered for quick resume via --resume N.
+Modes:
+  Default:       session-grouped text output (pipe-friendly)
+  --interactive:  TUI with browsable session list, expandable snippets, resume
 """
 
 import argparse
@@ -22,10 +23,10 @@ from pathlib import Path
 PROJECTS_DIR = Path.home() / ".claude" / "projects"
 CACHE_DIR = Path.home() / ".cache" / "search-history"
 CACHE_FILE = CACHE_DIR / "last-run.json"
-DEFAULT_DAYS = 14
+DEFAULT_DAYS = 0
 DEFAULT_LIMIT = 20
 MAX_SNIPPETS_PER_SESSION = 5
-SNIPPET_CONTEXT = 60  # chars on each side of match
+SNIPPET_CONTEXT = 100  # chars on each side of match
 
 
 # ─── Helpers (shared patterns with blame-session) ────────────────────────────
@@ -49,10 +50,43 @@ def parse_timestamp(ts_str: str) -> datetime | None:
         return None
 
 
-def _truncate_preview(text: str, max_len: int = 60) -> str:
-    line = text.split("\n")[0].strip()
-    line = re.sub(r'\*\*([^*]+)\*\*', r'\1', line)
-    return line[:max_len - 1] + "…" if len(line) > max_len else line
+def clean_markup(text: str) -> str:
+    """Strip XML/HTML tags, ANSI escapes, and markdown formatting noise."""
+    # XML/HTML tags
+    text = re.sub(r'<[^>]+>', '', text)
+    # ANSI escape codes
+    text = re.sub(r'\x1b\[[0-9;]*m', '', text)
+    # Markdown bold/italic
+    text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+    text = re.sub(r'\*([^*]+)\*', r'\1', text)
+    # Markdown headers
+    text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
+    # Code fences
+    text = re.sub(r'^```\w*\s*$', '', text, flags=re.MULTILINE)
+    # Table separators
+    text = re.sub(r'^\s*\|?[\s\-:|]+\|?\s*$', '', text, flags=re.MULTILINE)
+    # Collapse whitespace
+    text = re.sub(r'[ \t]+', ' ', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
+
+def _truncate_word(text: str, max_len: int) -> str:
+    """Truncate text at a word boundary."""
+    if len(text) <= max_len:
+        return text
+    cut = text[:max_len]
+    # Try to break at last space
+    last_space = cut.rfind(' ')
+    if last_space > max_len * 0.6:
+        cut = cut[:last_space]
+    return cut.rstrip() + "…"
+
+
+def _truncate_preview(text: str, max_len: int = 80) -> str:
+    cleaned = clean_markup(text)
+    line = cleaned.split("\n")[0].strip()
+    return _truncate_word(line, max_len)
 
 
 def save_cache(results: list[dict]):
@@ -83,6 +117,10 @@ def do_resume(number: int):
     os.execvp("claude", ["claude", "--resume", mapping[key]])
 
 
+def do_resume_session_id(session_id: str):
+    os.execvp("claude", ["claude", "--resume", session_id])
+
+
 def get_repo_root() -> str | None:
     result = subprocess.run(
         ["git", "rev-parse", "--show-toplevel"],
@@ -101,11 +139,7 @@ def get_project_dir_for_repo(repo_root: str) -> str:
 # ─── Content extraction ──────────────────────────────────────────────────────
 
 def extract_searchable_text(entry: dict) -> str | None:
-    """Extract searchable text from a user or assistant entry.
-
-    For user entries: string content or text blocks.
-    For assistant entries: text blocks only (skip tool_use, tool_result, progress).
-    """
+    """Extract searchable text from a user or assistant entry."""
     entry_type = entry.get("type")
     if entry_type not in ("user", "assistant"):
         return None
@@ -139,7 +173,7 @@ def extract_snippet(text: str, match: re.Match, context: int = SNIPPET_CONTEXT) 
     end = min(len(text), match.end() + context)
 
     snippet = text[start:end]
-    # Clean up: collapse whitespace, strip newlines
+    snippet = clean_markup(snippet)
     snippet = re.sub(r'\s+', ' ', snippet).strip()
 
     prefix = "…" if start > 0 else ""
@@ -155,7 +189,7 @@ def scan_session(session_file: Path, pattern: re.Pattern) -> dict | None:
     session_start = None
     session_branch = None
     first_message = None
-    matches = []  # list of (role, snippet)
+    matches = []
     match_count = 0
 
     try:
@@ -169,7 +203,6 @@ def scan_session(session_file: Path, pattern: re.Pattern) -> dict | None:
                 except json.JSONDecodeError:
                     continue
 
-                # Track metadata
                 if not session_branch and entry.get("gitBranch"):
                     session_branch = entry["gitBranch"]
 
@@ -177,7 +210,6 @@ def scan_session(session_file: Path, pattern: re.Pattern) -> dict | None:
                 if ts and (session_start is None or ts < session_start):
                     session_start = ts
 
-                # Extract first user message for preview
                 if first_message is None and entry.get("type") == "user":
                     msg = entry.get("message", {})
                     content = msg.get("content", "")
@@ -191,7 +223,6 @@ def scan_session(session_file: Path, pattern: re.Pattern) -> dict | None:
                                     first_message = text
                                     break
 
-                # Search content
                 text = extract_searchable_text(entry)
                 if not text:
                     continue
@@ -212,7 +243,7 @@ def scan_session(session_file: Path, pattern: re.Pattern) -> dict | None:
         "session_id": session_id,
         "branch": session_branch,
         "started": session_start,
-        "preview": _truncate_preview(first_message) if first_message else None,
+        "preview": first_message,
         "match_count": match_count,
         "snippets": matches,
     }
@@ -233,7 +264,6 @@ def discover_projects(project_filter: str | None, current_only: bool) -> list[tu
         encoded = get_project_dir_for_repo(repo_root)
         project_dir = PROJECTS_DIR / encoded
         if project_dir.exists():
-            # Derive a short name from the repo root
             name = os.path.basename(repo_root)
             return [(name, project_dir)]
         else:
@@ -244,11 +274,8 @@ def discover_projects(project_filter: str | None, current_only: bool) -> list[tu
     for d in sorted(PROJECTS_DIR.iterdir()):
         if not d.is_dir():
             continue
-        # Derive short name: last path component of the encoded dir
         parts = d.name.split("-")
-        # The name is the last meaningful segment (repo name)
         name = parts[-1] if parts else d.name
-        # Better: decode the path and take basename
         decoded = d.name.replace("-", "/")
         if decoded.startswith("/"):
             name = os.path.basename(decoded.rstrip("/"))
@@ -263,7 +290,72 @@ def discover_projects(project_filter: str | None, current_only: bool) -> list[tu
     return projects
 
 
-# ─── Rendering ────────────────────────────────────────────────────────────────
+# ─── Search engine ────────────────────────────────────────────────────────────
+
+def run_search(
+    keyword: str,
+    days: int = DEFAULT_DAYS,
+    limit: int = DEFAULT_LIMIT,
+    project_filter: str | None = None,
+    current_only: bool = False,
+    case_sensitive: bool = False,
+) -> tuple[list[dict], int, int]:
+    """Run search and return (results, n_projects_with_hits, total_found)."""
+    flags = 0 if case_sensitive else re.IGNORECASE
+    pattern = re.compile(keyword, flags)
+
+    projects = discover_projects(project_filter, current_only)
+    if not projects:
+        return [], 0, 0
+
+    mtime_cutoff = None
+    if days > 0:
+        mtime_cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).timestamp()
+
+    ts_cutoff = None
+    if days > 0:
+        ts_cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+
+    all_results = []
+    projects_with_hits = set()
+
+    for project_name, project_dir in projects:
+        session_files = list(project_dir.glob("*.jsonl"))
+
+        for sf in session_files:
+            if mtime_cutoff is not None:
+                try:
+                    if sf.stat().st_mtime < mtime_cutoff:
+                        continue
+                except OSError:
+                    continue
+
+            hit = scan_session(sf, pattern)
+            if not hit:
+                continue
+
+            if ts_cutoff:
+                ts = parse_timestamp(hit["started"])
+                if ts and ts < ts_cutoff:
+                    continue
+
+            hit["project_name"] = project_name
+            all_results.append(hit)
+            projects_with_hits.add(project_name)
+
+    all_results.sort(key=lambda r: r["started"] or "", reverse=True)
+    total_found = len(all_results)
+
+    if limit > 0:
+        all_results = all_results[:limit]
+
+    if all_results:
+        save_cache(all_results)
+
+    return all_results, len(projects_with_hits), total_found
+
+
+# ─── Text rendering (non-interactive) ────────────────────────────────────────
 
 def render_output(results: list[dict], keyword: str, n_projects: int, total_found: int):
     n_shown = len(results)
@@ -275,41 +367,299 @@ def render_output(results: list[dict], keyword: str, n_projects: int, total_foun
         print("  No matches found.")
         return
 
-    # Table header
     num_w = len(str(n_shown))
-    print(f"  {'#':>{num_w}}  {'Session':<10}  {'Date':<12}  {'Project':<22}  {'Branch':<14}  {'Hits':>4}  Preview")
-    print(f"  {'─' * num_w}  {'─' * 10}  {'─' * 12}  {'─' * 22}  {'─' * 14}  {'─' * 4}  {'─' * 30}")
+    indent = " " * (num_w + 6)
 
     for i, r in enumerate(results, 1):
         sid = r["session_id"][:8]
         date = format_timestamp(r["started"])
         project = r["project_name"]
-        if len(project) > 22:
-            project = project[:21] + "…"
+        if len(project) > 16:
+            project = project[:15] + "…"
         branch = r["branch"] or "?"
         if len(branch) > 14:
             branch = branch[:13] + "…"
         hits = r["match_count"]
-        preview = r.get("preview") or ""
-        if len(preview) > 30:
-            preview = preview[:29] + "…"
+        hit_label = f"{hits} hit" if hits == 1 else f"{hits} hits"
 
-        print(f"  {i:>{num_w}}  {sid:<10}  {date:<12}  {project:<22}  {branch:<14}  {hits:>4}  {preview}")
+        print(f"  #{i:<{num_w}}  {sid} · {date} · {project} · {branch} · {hit_label}")
 
-    # Snippets
-    print()
-    print(f"  Snippets")
-    print(f"  {'─' * 72}")
+        preview = r.get("preview")
+        if preview:
+            cleaned = _truncate_preview(preview, 120)
+            print(f"{indent}{cleaned}")
 
-    for i, r in enumerate(results, 1):
+        print(f"{indent}─")
+
         for role, snippet in r["snippets"]:
-            # Truncate long snippets
-            if len(snippet) > 100:
-                snippet = snippet[:99] + "…"
-            print(f"  {i:>{num_w}}  [{role}] {snippet}")
+            display = _truncate_word(snippet, 200)
+            print(f"{indent}[{role}] {display}")
 
-    print()
+        print()
+
     print(f"  Resume: search-history --resume N")
+
+
+# ─── Interactive TUI ─────────────────────────────────────────────────────────
+
+def run_interactive(search_opts: dict, initial_keyword: str | None = None):
+    """Launch the Textual TUI for browsing search results.
+
+    search_opts: dict with keys days, limit, project_filter, current_only, case_sensitive
+    initial_keyword: if provided, search runs immediately on launch
+    """
+    from textual.app import App, ComposeResult
+    from textual.binding import Binding
+    from textual.containers import VerticalScroll
+    from textual.widgets import Footer, Header, Input, Label, ListItem, ListView, Static
+
+    class SessionItem(ListItem):
+
+        def __init__(self, result: dict, index: int) -> None:
+            super().__init__()
+            self.result = result
+            self.index = index
+
+        def compose(self) -> ComposeResult:
+            r = self.result
+            sid = r["session_id"][:8]
+            date = format_timestamp(r["started"])
+            project = r["project_name"]
+            if len(project) > 16:
+                project = project[:15] + "…"
+            branch = r["branch"] or "?"
+            if len(branch) > 20:
+                branch = branch[:19] + "…"
+            hits = r["match_count"]
+            hit_label = f"{hits} hit" if hits == 1 else f"{hits} hits"
+
+            preview = ""
+            if r.get("preview"):
+                preview = _truncate_preview(r["preview"], 80)
+
+            yield Static(
+                f"[bold]#{self.index}[/bold]  [dim]{sid}[/dim] · {date} · "
+                f"[cyan]{project}[/cyan] · [green]{branch}[/green] · {hit_label}\n"
+                f"    [dim italic]{preview}[/dim italic]",
+                markup=True,
+            )
+
+    resume_target = {"session_id": None}
+
+    class SearchHistoryApp(App):
+        CSS = """
+        Screen {
+            background: $surface;
+        }
+        #search-input {
+            dock: top;
+            margin: 0 0 1 0;
+        }
+        #status-bar {
+            height: 1;
+            background: $primary;
+            color: $text;
+            padding: 0 1;
+        }
+        #session-list {
+            height: 1fr;
+            border: solid $primary;
+        }
+        #empty-state {
+            height: 1fr;
+            content-align: center middle;
+            color: $text-muted;
+        }
+        #detail-panel {
+            height: auto;
+            max-height: 40%;
+            border: solid $accent;
+            padding: 0 1;
+            display: none;
+        }
+        #detail-panel.visible {
+            display: block;
+        }
+        ListView > ListItem {
+            padding: 0 1;
+            height: auto;
+        }
+        ListView > ListItem.--highlight {
+            background: $boost;
+        }
+        #detail-title {
+            text-style: bold;
+            padding: 0 0 1 0;
+        }
+        """
+
+        TITLE = "search-history"
+        BINDINGS = [
+            Binding("q", "quit", "Quit", priority=True),
+            Binding("escape", "escape_pressed", "Back", show=False),
+            Binding("r", "resume_session", "Resume", priority=True),
+            Binding("/", "focus_search", "Search", priority=True),
+        ]
+
+        def __init__(self, search_opts: dict, initial_keyword: str | None):
+            super().__init__()
+            self.search_opts = search_opts
+            self.initial_keyword = initial_keyword
+            self.results: list[dict] = []
+            self.keyword = initial_keyword or ""
+            self.n_projects = 0
+            self.total_found = 0
+
+        def compose(self) -> ComposeResult:
+            yield Header()
+            yield Input(
+                placeholder="Type a search term and press Enter…",
+                value=self.initial_keyword or "",
+                id="search-input",
+            )
+            yield Label("", id="status-bar")
+            yield Static(
+                "[dim]Type a search term above and press Enter[/dim]",
+                id="empty-state",
+            )
+            yield ListView(id="session-list")
+            yield VerticalScroll(
+                Static("", id="detail-title"),
+                Static("", id="detail-content"),
+                id="detail-panel",
+            )
+            yield Footer()
+
+        def on_mount(self) -> None:
+            if self.initial_keyword:
+                self._do_search(self.initial_keyword)
+            else:
+                self.query_one("#session-list").display = False
+                self.query_one("#search-input", Input).focus()
+
+        def on_input_submitted(self, event: Input.Submitted) -> None:
+            keyword = event.value.strip()
+            if keyword:
+                self._do_search(keyword)
+
+        def _do_search(self, keyword: str) -> None:
+            self.keyword = keyword
+
+            try:
+                re.compile(keyword, 0 if self.search_opts.get("case_sensitive") else re.IGNORECASE)
+            except re.error:
+                self.query_one("#status-bar", Label).update(f" Invalid regex: {keyword}")
+                return
+
+            self.results, self.n_projects, self.total_found = run_search(
+                keyword=keyword,
+                **self.search_opts,
+            )
+
+            # Update status
+            n_shown = len(self.results)
+            shown_note = f" (showing {n_shown})" if self.total_found > n_shown else ""
+            self.query_one("#status-bar", Label).update(
+                f' "{keyword}" · {self.n_projects} projects · '
+                f"{self.total_found} matches{shown_note}"
+            )
+
+            # Update list
+            lv = self.query_one("#session-list", ListView)
+            lv.clear()
+
+            empty = self.query_one("#empty-state", Static)
+
+            if self.results:
+                empty.display = False
+                lv.display = True
+                for i, r in enumerate(self.results, 1):
+                    lv.append(SessionItem(r, i))
+                lv.focus()
+            else:
+                lv.display = False
+                empty.display = True
+                empty.update(f'[dim]No matches for "{keyword}"[/dim]')
+
+            # Close detail panel
+            self.query_one("#detail-panel").remove_class("visible")
+
+        def _get_selected_result(self) -> dict | None:
+            lv = self.query_one("#session-list", ListView)
+            if lv.index is not None and 0 <= lv.index < len(self.results):
+                return self.results[lv.index]
+            return None
+
+        def action_escape_pressed(self) -> None:
+            panel = self.query_one("#detail-panel")
+            if panel.has_class("visible"):
+                panel.remove_class("visible")
+            else:
+                self.query_one("#search-input", Input).focus()
+
+        def action_focus_search(self) -> None:
+            inp = self.query_one("#search-input", Input)
+            inp.focus()
+            inp.action_end()
+
+        def action_resume_session(self) -> None:
+            # Don't resume if the search input is focused (user is typing 'r')
+            if self.query_one("#search-input", Input).has_focus:
+                return
+            r = self._get_selected_result()
+            if r:
+                resume_target["session_id"] = r["session_id"]
+                self.exit()
+
+        def action_quit(self) -> None:
+            # Don't quit if typing in search input
+            if self.query_one("#search-input", Input).has_focus:
+                return
+            self.exit()
+
+        def on_list_view_selected(self, event: ListView.Selected) -> None:
+            r = self._get_selected_result()
+            if not r:
+                return
+
+            panel = self.query_one("#detail-panel")
+            title = self.query_one("#detail-title", Static)
+            content = self.query_one("#detail-content", Static)
+
+            sid = r["session_id"][:8]
+            date = format_timestamp(r["started"])
+            project = r["project_name"]
+            branch = r["branch"] or "?"
+            hits = r["match_count"]
+
+            title.update(
+                f"[bold]{sid}[/bold] · {date} · [cyan]{project}[/cyan] · "
+                f"[green]{branch}[/green] · {hits} hits"
+            )
+
+            lines = []
+
+            if r.get("preview"):
+                cleaned = clean_markup(r["preview"])
+                preview_lines = cleaned.split("\n")[:5]
+                preview_text = "\n".join(ln.strip() for ln in preview_lines if ln.strip())
+                lines.append(f"[dim italic]{_truncate_word(preview_text, 500)}[/dim italic]")
+                lines.append("─" * 60)
+
+            for role, snippet in r["snippets"]:
+                lines.append(f"[yellow]\\[{role}][/yellow] {snippet}")
+
+            lines.append("")
+            lines.append("[dim]Press [bold]r[/bold] to resume · [bold]Esc[/bold] to close · [bold]/[/bold] new search[/dim]")
+
+            content.update("\n".join(lines))
+            panel.add_class("visible")
+
+    app = SearchHistoryApp(search_opts, initial_keyword)
+    app.run()
+
+    if resume_target["session_id"]:
+        do_resume_session_id(resume_target["session_id"])
 
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
@@ -330,6 +680,8 @@ def main():
                         help="Filter to current project (from git repo root)")
     parser.add_argument("--case-sensitive", "-s", action="store_true",
                         help="Exact case matching")
+    parser.add_argument("--interactive", "-i", action="store_true",
+                        help="Launch interactive TUI browser")
     parser.add_argument("--resume", "-r", type=int, default=0,
                         help="Resume session N from last run")
     args = parser.parse_args()
@@ -338,76 +690,39 @@ def main():
         do_resume(args.resume)
         return
 
-    if not args.keyword:
-        parser.error("keyword is required (unless using --resume)")
+    search_opts = dict(
+        days=args.days,
+        limit=args.limit,
+        project_filter=args.project,
+        current_only=args.current,
+        case_sensitive=args.case_sensitive,
+    )
 
-    # Compile pattern
+    # Interactive mode: keyword is optional (TUI has a search input)
+    if args.interactive:
+        if args.keyword:
+            flags = 0 if args.case_sensitive else re.IGNORECASE
+            try:
+                re.compile(args.keyword, flags)
+            except re.error as e:
+                print(f"Invalid regex: {e}", file=sys.stderr)
+                sys.exit(1)
+        run_interactive(search_opts, initial_keyword=args.keyword)
+        return
+
+    # Non-interactive: keyword is required
+    if not args.keyword:
+        parser.error("keyword is required (unless using --resume or --interactive)")
+
     flags = 0 if args.case_sensitive else re.IGNORECASE
     try:
-        pattern = re.compile(args.keyword, flags)
+        re.compile(args.keyword, flags)
     except re.error as e:
         print(f"Invalid regex: {e}", file=sys.stderr)
         sys.exit(1)
 
-    # Discover projects
-    projects = discover_projects(args.project, args.current)
-    if not projects:
-        print("No matching projects found.", file=sys.stderr)
-        sys.exit(1)
-
-    # Time cutoff for mtime pre-filter
-    mtime_cutoff = None
-    if args.days > 0:
-        mtime_cutoff = (datetime.now(timezone.utc) - timedelta(days=args.days)).timestamp()
-
-    ts_cutoff = None
-    if args.days > 0:
-        ts_cutoff = datetime.now(timezone.utc) - timedelta(days=args.days)
-
-    # Scan all sessions
-    all_results = []
-    projects_with_hits = set()
-
-    for project_name, project_dir in projects:
-        session_files = list(project_dir.glob("*.jsonl"))
-
-        for sf in session_files:
-            # Pre-filter by mtime
-            if mtime_cutoff is not None:
-                try:
-                    if sf.stat().st_mtime < mtime_cutoff:
-                        continue
-                except OSError:
-                    continue
-
-            hit = scan_session(sf, pattern)
-            if not hit:
-                continue
-
-            # Post-filter by timestamp
-            if ts_cutoff:
-                ts = parse_timestamp(hit["started"])
-                if ts and ts < ts_cutoff:
-                    continue
-
-            hit["project_name"] = project_name
-            all_results.append(hit)
-            projects_with_hits.add(project_name)
-
-    # Sort by start time descending
-    all_results.sort(key=lambda r: r["started"] or "", reverse=True)
-
-    total_found = len(all_results)
-
-    # Apply limit
-    if args.limit > 0:
-        all_results = all_results[:args.limit]
-
-    # Cache for resume
-    if all_results:
-        save_cache(all_results)
-
-    render_output(all_results, args.keyword, len(projects_with_hits), total_found)
+    results, n_projects, total_found = run_search(keyword=args.keyword, **search_opts)
+    render_output(results, args.keyword, n_projects, total_found)
 
 
 if __name__ == "__main__":
