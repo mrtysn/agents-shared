@@ -9,6 +9,14 @@
 #
 set -euo pipefail
 
+# ── Guard: refuse to run inside the source repo ─────────────────────────────
+if [ -d "claude/commands" ] && [ ! -d ".agents" ]; then
+    echo "ERROR: This appears to be the agents-shared source repo."
+    echo "init.sh is for consumer repos only. The source repo uses directory symlinks"
+    echo "in .claude/ that are committed directly to git."
+    exit 1
+fi
+
 DEFAULT_URL="git@github.com:mrtysn/agents-shared.git"
 SUBMODULE_URL="${1:-$DEFAULT_URL}"
 AGENTS_DIR=".agents"
