@@ -1,59 +1,83 @@
 ---
-description: Generate a daily standup summary of yesterday's work across repos.
+description: Generate a daily standup summary, log it, and optionally backfill history.
 argument-hint: [date] [path]
-allowed-tools: Bash, Read, Grep, Glob
+allowed-tools: Bash, Read, Grep, Glob, Write, AskUserQuestion
 ---
 
-Generate a concise daily standup summary of yesterday's work.
+Daily standup: collect yesterday's work, display it, persist it, offer to backfill gaps.
 
 $ARGUMENTS
 
-## Repo discovery
+---
 
-**Default (no path argument):** check `~/.claude/standup-repos` for a list of paths (one per line, `#` comments ignored). If the file is absent or empty, tell the user to create it and stop.
+## 1. Resolve inputs
 
-**With a path argument:** if $ARGUMENTS contains a directory path, find all git repos under it:
+- **Date**: use date from $ARGUMENTS if provided, otherwise yesterday. Convert relative dates to absolute.
+- **Repos**: if $ARGUMENTS contains a directory path, discover repos under it (`find <path> -maxdepth 3 -name ".git" -type d`). Otherwise read `~/.claude/standup-repos` (one path per line, `#` comments). If missing or empty, tell the user and stop.
+
+## 2. Collect data
+
+For each repo:
 ```bash
-find <path> -maxdepth 3 -name ".git" -type d | sed 's/\/.git$//'
+git -C <path> log --since="<date> 00:00:00" --until="<next-day> 00:00:00" --format="%h %s" --all
 ```
 
-**Date argument:** if $ARGUMENTS contains a date (e.g. `2026-02-18`), use that instead of yesterday. Arguments can be combined: `/standup 2026-02-18 ~/dev/personal/godot`
-
-## Data collection
-
-For each repo, collect:
-- Commits from the target date: `git -C <path> log --since="<date> 00:00:00" --until="<next-day> 00:00:00" --format="%h %s" --all`
-- Current uncommitted changes: `git -C <path> diff --stat` and `git -C <path> status --short`
-- Skip repos with no commits and no local changes
-
-## Output format — keep it tight for a standup:
-
-```
-## Standup — <date>
-
-**Done:**
-- <bullet per meaningful commit or group of related commits>
-
-**In progress:**
-- <bullet per repo with uncommitted work, summarizing what the changes do>
+For uncommitted work (only when date is today or yesterday):
+```bash
+git -C <path> diff --stat
+git -C <path> status --short
 ```
 
-## Summary
+Skip repos with zero commits and no uncommitted changes.
 
-After the standup block, add a one-liner summary in each language:
+## 3. Display standup
 
+Output the standup directly to screen — same structure as the log file below, without the YAML frontmatter. No preamble, no sign-off.
+
+## 4. Write log file
+
+Write to `.local-logs/standup/<YYYY-MM-DD>.md`. If the file already exists, say so and skip.
+
+```markdown
+---
+date: <YYYY-MM-DD>
+repos: [<repo-name>, ...]
+---
+
+# <YYYY-MM-DD>
+
+## Done
+- <grouped narrative bullet>
+  `<hash>` `<hash>`
+- <another bullet>
+  `<hash>`
+
+## In Progress
+- **<repo-name>**: <what the uncommitted changes do>
+
+---
+**EN:** <one casual sentence covering the day's work>
+**TR:** <same in Turkish, natural spoken style>
 ```
-**Summary (EN):** <one casual sentence covering the day's work, conversational tone>
 
-**Summary (TR):** <same summary in Turkish, natural spoken style — e.g. "redis'te analytics kısmında iyileştirmeler yaptım, broadcast fonksiyonlarının üzerinden geçtim">
-```
+## 5. Backfill gaps
 
-- Write as if explaining to a teammate over coffee, not translating a commit log
-- Group by theme, not by commit
-- Keep each summary to 1–2 sentences max
+After writing the log, check for missing weekday entries between the earliest existing log and today:
+- **First run** (no logs exist): ask how far back to go (e.g. "2 weeks", "2026-03-01", "skip")
+- **Gaps found**: list missing dates, ask "backfill these? (yes/skip)"
+- **Weekends**: only count as a gap if the day has commits in any repo — skip silently otherwise
 
-## Rules
-- Group related commits into single bullets (e.g., 3 commits about alerts → one bullet)
-- Describe *what was accomplished*, not commit hashes
-- For uncommitted work, read the diff to understand intent — don't just list file names
-- No filler, no preamble, no sign-off — just the standup block and summaries
+Backfill writes log files only (no screen output per day). Omit `## In Progress` for backfilled days. Show one summary line when done: "Backfilled N days: <first> → <last>"
+
+---
+
+## Formatting rules
+
+These apply to both screen output and log files:
+
+- **Group by theme, not by commit.** Three alert commits become one bullet about the alert system.
+- **Hashes on the next line**, indented two spaces under their bullet. Multi-repo commits serving the same purpose (e.g. submodule syncs) share a bullet.
+- **`## In Progress`** appears only when there are uncommitted changes — omit the section entirely otherwise.
+- **Summaries** are conversational, 1–2 sentences, as if explaining to a teammate over coffee. Not a translation of the commit log. Turkish example tone: *"redis'te analytics kısmında iyileştirmeler yaptım, broadcast fonksiyonlarının üzerinden geçtim"*
+- **Describe what was accomplished**, not file names or commit messages verbatim.
+- For uncommitted work, **read the diff** to understand intent.
