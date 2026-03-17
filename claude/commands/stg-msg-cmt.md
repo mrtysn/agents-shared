@@ -3,14 +3,17 @@ description: Stage your changes, draft a commit message, commit, and push.
 allowed-tools: Bash, Read
 ---
 
-Stage ONLY the changes you made during this session. Leave all other staged or unstaged changes exactly as they were.
+Stage your changes, draft a commit message, then commit and push.
 
 1. Run `git log --oneline -15` to observe the commit message style
 2. Run `git status` and `git diff` to identify all current changes
-3. Determine which files and hunks you modified — stage only those using `git add` (use `git add -p` for partial files if needed)
-4. Do NOT unstage anything that was already staged before your changes
-5. Do NOT stage changes that existed before this session
-6. Run `git diff --cached` to confirm only your changes are staged
+3. Categorize each changed/untracked file:
+   - **Yours** — files you created or modified in this session (you have clear memory of changing them)
+   - **Uncertain** — files you cannot confidently attribute to yourself (modified before your session, or context was compacted)
+4. Stage all files you are confident are yours using `git add`
+5. For uncertain files: **ask the user** whether to include them. List the files and their changes briefly.
+6. Do NOT unstage anything that was already staged before your changes
+7. After the user responds (or if there are no uncertain files), run `git diff --cached` to confirm
 
 Then draft a commit message for the staged changes.
 
