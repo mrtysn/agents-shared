@@ -4,7 +4,7 @@ argument-hint: [date] [path]
 allowed-tools: Bash, Read, Grep, Glob, Write, AskUserQuestion
 ---
 
-Daily standup: collect yesterday's work, display it, persist it, offer to backfill gaps.
+Daily standup: collect the last working day's activity, display it, persist it, offer to backfill gaps.
 
 $ARGUMENTS
 
@@ -12,7 +12,7 @@ $ARGUMENTS
 
 ## 1. Resolve inputs
 
-- **Date**: use date from $ARGUMENTS if provided, otherwise yesterday. Convert relative dates to absolute.
+- **Date**: use date from $ARGUMENTS if provided (convert relative dates to absolute). If no date given, find the **last day with activity**: starting from yesterday, walk backwards day by day (up to 14 days). For each candidate date, check `git log --since="<date> 00:00:00" --until="<next-day> 00:00:00" --all` across all repos — stop at the first date that has at least one commit. If today has uncommitted changes and no prior day has commits, use today. If nothing is found within 14 days, tell the user and stop.
 - **Repos**: if $ARGUMENTS contains a directory path, discover repos under it (`find <path> -maxdepth 3 -name ".git" -type d`). Otherwise read `~/.claude/standup-repos` (one path per line, `#` comments). If missing or empty, tell the user and stop.
 
 ## 2. Collect data
