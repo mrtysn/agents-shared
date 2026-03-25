@@ -36,7 +36,7 @@ Output the standup directly to screen — same structure as the log file below, 
 
 ## 4. Write log file
 
-Write to `.local-logs/standup/<YYYY-MM-DD>.md`. If the file already exists, say so and skip.
+Write to `.local-logs/standup/<YYYY-MM-DD>.md` **relative to the project working directory** (not `~/.claude/` or any other root). If the file already exists, say so and skip.
 
 ```markdown
 ---
