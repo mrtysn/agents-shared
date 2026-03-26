@@ -28,6 +28,11 @@ git -C <path> diff --stat
 git -C <path> status --short
 ```
 
+**Untracked files and directories** (`??` in status) are invisible to `git diff`. For each untracked entry:
+- If it's a directory, list its contents and read key files (main script, query, entrypoint) to understand intent.
+- If it's a single file, read the first ~40 lines.
+- Treat untracked work with the same weight as staged/modified changes — it represents real effort that must appear in the standup.
+
 Skip repos with zero commits and no uncommitted changes.
 
 ## 3. Display standup
@@ -80,4 +85,4 @@ These apply to both screen output and log files:
 - **`## In Progress`** appears only when there are uncommitted changes — omit the section entirely otherwise.
 - **Summaries** are conversational, 1–2 sentences, as if explaining to a teammate over coffee. Not a translation of the commit log. Turkish example tone: *"redis'te analytics kısmında iyileştirmeler yaptım, broadcast fonksiyonlarının üzerinden geçtim"*
 - **Describe what was accomplished**, not file names or commit messages verbatim.
-- For uncommitted work, **read the diff** to understand intent.
+- For uncommitted work, **read the diff** (tracked files) or **read the files** (untracked) to understand intent. Never describe uncommitted work solely from file paths — understand what was built.
