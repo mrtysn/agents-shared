@@ -13,7 +13,8 @@ Stage your changes, draft a commit message, then commit and push.
 4. Stage all files you are confident are yours using `git add`
 5. For uncertain files: **ask the user** whether to include them. List the files and their changes briefly.
 6. Do NOT unstage anything that was already staged before your changes
-7. After the user responds (or if there are no uncertain files), run `git diff --cached` to confirm
+7. **NEVER use `git checkout`, `git restore`, or any destructive command to revert or clean files.** If a file has mixed changes (yours and the user's), use `git add -p` to selectively stage only your hunks. If that's not feasible, ask the user how to proceed. Uncommitted changes you didn't make are the user's work — do not touch them.
+8. After the user responds (or if there are no uncertain files), run `git diff --cached` to confirm
 
 Then draft a commit message for the staged changes.
 

@@ -50,4 +50,6 @@ Instruct your future self to adopt the following bearing:
 Godspeed.
 ```
 
+**Output this message as text in the conversation. Do NOT write it to a file.**
+
 Compose this message now, that continuity may be preserved across the void between sessions.
