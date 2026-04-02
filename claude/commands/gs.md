@@ -1,6 +1,5 @@
 ---
 description: Show git status alongside recent commits for full context.
-disable-model-invocation: true
 allowed-tools: Bash
 ---
 

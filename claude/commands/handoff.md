@@ -1,7 +1,6 @@
 ---
 description: Craft a handoff message for a new session. Use when context must survive session boundaries.
 argument-hint: [optional notes on what to emphasize]
-disable-model-invocation: true
 allowed-tools: Read, Glob, Grep
 ---
 

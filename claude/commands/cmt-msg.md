@@ -1,7 +1,6 @@
 ---
 description: Draft a commit message based on current changes and repository style.
 argument-hint: [optional context or scope]
-disable-model-invocation: true
 allowed-tools: Bash, Read
 ---
 
