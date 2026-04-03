@@ -1,7 +1,7 @@
 ---
 description: Generate a daily standup summary, log it, and optionally backfill history.
 argument-hint: [date] [path]
-allowed-tools: Bash, Read, Grep, Glob, Write, AskUserQuestion
+allowed-tools: Bash, Write, AskUserQuestion
 ---
 
 Daily standup: collect the last working day's activity, display it, persist it, offer to backfill gaps.
@@ -10,38 +10,35 @@ $ARGUMENTS
 
 ---
 
-## 1. Resolve inputs
+## 1. Collect data
 
-- **Date**: use date from $ARGUMENTS if provided (convert relative dates to absolute). If no date given, find the **last day with activity**: starting from yesterday, walk backwards day by day (up to 14 days). For each candidate date, check `git log --since="<date> 00:00:00" --until="<next-day> 00:00:00" --all` across all repos — stop at the first date that has at least one commit. If today has uncommitted changes and no prior day has commits, use today. If nothing is found within 14 days, tell the user and stop.
-- **Repos**: if $ARGUMENTS contains a directory path, discover repos under it (`find <path> -maxdepth 3 -name ".git" -type d`). Otherwise read `~/.claude/standup-repos` (one path per line, `#` comments). If missing or empty, tell the user and stop.
+Run the collection script **once** to gather all git activity:
 
-## 2. Collect data
-
-For each repo:
 ```bash
-git -C <path> log --since="<date> 00:00:00" --until="<next-day> 00:00:00" --format="%h %s" --all
+.agents/scripts/standup-collect.sh [date-if-provided]
 ```
 
-For uncommitted work (only when date is today or yesterday):
+If $ARGUMENTS contains a directory path instead of (or in addition to) a date, pass it as the second argument:
 ```bash
-git -C <path> diff --stat
-git -C <path> status --short
+.agents/scripts/standup-collect.sh [date] [path]
 ```
 
-**Untracked files and directories** (`??` in status) are invisible to `git diff`. For each untracked entry:
-- If it's a directory, list its contents and read key files (main script, query, entrypoint) to understand intent.
-- If it's a single file, read the first ~40 lines.
-- Treat untracked work with the same weight as staged/modified changes — it represents real effort that must appear in the standup.
+The script handles:
+- Finding the last day with activity (walks back up to 14 days)
+- Reading `~/.claude/standup-repos` for repo list
+- Collecting commits, diffs, status, and untracked file contents
+- Filtering stash commits
+- Checking existing log files and backfill status
 
-Skip repos with zero commits and no uncommitted changes.
+If the script exits with an error, report it and stop.
 
-## 3. Display standup
+## 2. Display standup
 
-Output the standup directly to screen — same structure as the log file below, without the YAML frontmatter. No preamble, no sign-off.
+Parse the script output and produce the standup — same structure as the log file below, without the YAML frontmatter. No preamble, no sign-off.
 
-## 4. Write log file
+## 3. Write log file
 
-Write to `.local-logs/standup/<YYYY-MM-DD>.md` **relative to the project working directory** (not `~/.claude/` or any other root). If the file already exists, say so and skip.
+If the script output shows `LOG STATUS` → `MISSING`, write to `.local-logs/standup/<YYYY-MM-DD>.md` **relative to the project working directory**. If `EXISTS`, say so and skip.
 
 ```markdown
 ---
@@ -65,12 +62,18 @@ repos: [<repo-name>, ...]
 **TR:** <same in Turkish, natural spoken style>
 ```
 
-## 5. Backfill gaps
+## 4. Backfill gaps
 
-After writing the log, check for missing weekday entries between the earliest existing log and today:
-- **First run** (no logs exist): ask how far back to go (e.g. "2 weeks", "2026-03-01", "skip")
-- **Gaps found**: list missing dates, ask "backfill these? (yes/skip)"
-- **Weekends**: only count as a gap if the day has commits in any repo — skip silently otherwise
+Based on the `BACKFILL STATUS` section of the script output:
+
+- **`NO_LOG_DIR` or `NO_EXISTING_LOGS`** (first run): ask how far back to go (e.g. "2 weeks", "2026-03-01", "skip")
+- **Gaps found** between earliest log and today: list missing weekday dates, ask "backfill these? (yes/skip)"
+- **Weekends**: only count as a gap if that date has commits — check by running the script with that date
+
+For each backfill date, run the collection script with that specific date:
+```bash
+.agents/scripts/standup-collect.sh <YYYY-MM-DD>
+```
 
 Backfill writes log files only (no screen output per day). Omit `## In Progress` for backfilled days. Show one summary line when done: "Backfilled N days: <first> → <last>"
 
@@ -85,4 +88,4 @@ These apply to both screen output and log files:
 - **`## In Progress`** appears only when there are uncommitted changes — omit the section entirely otherwise.
 - **Summaries** are conversational, 1–2 sentences, as if explaining to a teammate over coffee. Not a translation of the commit log. Turkish example tone: *"redis'te analytics kısmında iyileştirmeler yaptım, broadcast fonksiyonlarının üzerinden geçtim"*
 - **Describe what was accomplished**, not file names or commit messages verbatim.
-- For uncommitted work, **read the diff** (tracked files) or **read the files** (untracked) to understand intent. Never describe uncommitted work solely from file paths — understand what was built.
+- For uncommitted work, the script output includes diff content and untracked file contents — use these to understand intent. Never describe uncommitted work solely from file paths.
