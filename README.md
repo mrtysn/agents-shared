@@ -35,6 +35,7 @@ Skills are directory-based and support references/templates. Both commands and s
 |-------|-------------|
 | `/refactor` | Systematic refactoring with full cleanup — maps scope, tracks progress, same standards for tests |
 | `/rpi` | Research-Plan-Implement workflow: deep investigation, written plan with annotation cycles, then full execution |
+| `/board` | Show the Jira sprint board as a TUI kanban, or dive into a specific ticket with codebase research |
 
 ## Updating
 
