@@ -38,13 +38,17 @@ COLORS = {
 
 # ── Auth ────────────────────────────────────────────────────────────────────
 
-def load_env():
-    repo_root = Path(__file__).resolve().parent.parent
-    env_file = repo_root / ".env.jira"
-    if not env_file.exists():
-        print(f"ERROR: {env_file} not found. Create it with JIRA_EMAIL and JIRA_API_TOKEN.")
-        sys.exit(1)
+def _find_env_file():
+    """Walk up from cwd to find .env.jira at a repo root."""
+    current = Path.cwd()
+    for parent in [current, *current.parents]:
+        candidate = parent / ".env.jira"
+        if candidate.exists():
+            return candidate
+    return None
 
+
+def _parse_env_file(env_file):
     env = {}
     for line in env_file.read_text().strip().splitlines():
         line = line.strip()
@@ -52,11 +56,22 @@ def load_env():
             continue
         key, _, value = line.partition("=")
         env[key.strip()] = value.strip()
+    return env
 
-    email = env.get("JIRA_EMAIL") or os.environ.get("JIRA_EMAIL")
-    token = env.get("JIRA_API_TOKEN") or os.environ.get("JIRA_API_TOKEN")
+
+def load_env():
+    email = os.environ.get("JIRA_EMAIL")
+    token = os.environ.get("JIRA_API_TOKEN")
+
     if not email or not token:
-        print("ERROR: JIRA_EMAIL and JIRA_API_TOKEN must be set in .env.jira")
+        env_file = _find_env_file()
+        if env_file:
+            env = _parse_env_file(env_file)
+            email = email or env.get("JIRA_EMAIL")
+            token = token or env.get("JIRA_API_TOKEN")
+
+    if not email or not token:
+        print("ERROR: JIRA_EMAIL and JIRA_API_TOKEN must be set via environment variables or .env.jira in the repo root.")
         sys.exit(1)
     return email, token
 
