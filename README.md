@@ -36,6 +36,7 @@ Skills are directory-based and support references/templates. Both commands and s
 | `/refactor` | Systematic refactoring with full cleanup — maps scope, tracks progress, same standards for tests |
 | `/rpi` | Research-Plan-Implement workflow: deep investigation, written plan with annotation cycles, then full execution |
 | `/board` | Show the Jira sprint board as a TUI kanban, or dive into a specific ticket with codebase research |
+| `/caveman` | Ultra-compressed communication (~75% token savings). Levels: lite, full, ultra *(external)* |
 
 ## Updating
 
@@ -46,3 +47,14 @@ git submodule update --remote .agents
 ```
 
 Or use the `/update-agents` command.
+
+## External Skills
+
+Some skills are sourced from third-party repos. These have a `source.json` next to their `SKILL.md` tracking the upstream repo, file path, and pinned commit SHA.
+
+To update all external skills to latest upstream:
+
+```bash
+bash scripts/sync-external-skills.sh            # all external skills
+bash scripts/sync-external-skills.sh caveman     # specific skill only
+```

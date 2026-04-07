@@ -21,12 +21,16 @@ agents-shared/
 │   │   ├── standup.md
 │   │   └── update-agents.md
 │   └── skills/            # Skills (directory format, supports references/templates)
+│       ├── caveman/       # (external) Token-compressed communication
+│       │   ├── SKILL.md
+│       │   └── source.json
 │       ├── refactor/
 │       │   └── SKILL.md
 │       └── rpi/
 │           └── SKILL.md
 ├── scripts/
 │   ├── init.sh            # Bootstrap submodule and symlinks
+│   ├── sync-external-skills.sh  # Fetch latest from upstream repos
 │   └── update-consumers.sh  # Broadcast updates to all consumer repos
 ├── consumers.local        # (gitignored) Absolute paths of consumer repos
 ├── README.md
@@ -72,6 +76,40 @@ Skills support additional features: reference files, templates, and advanced fro
 **Naming:** Use lowercase kebab-case (e.g., `my-command.md` → `/my-command`).
 
 **Note:** Both formats create identical `/command` invocations. Use commands for simple single-file definitions; use skills when you need supporting files.
+
+## External (Third-Party) Skills
+
+Skills sourced from external repos follow a convention:
+
+```
+claude/skills/<skill-name>/
+├── SKILL.md        # Copied from upstream
+└── source.json     # Provenance tracker
+```
+
+**source.json format:**
+```json
+{
+  "repo": "owner/repo",
+  "path": "path/to/SKILL.md",
+  "commit": "<pinned SHA>",
+  "updated": "YYYY-MM-DD"
+}
+```
+
+**Adding a new external skill:**
+1. Clone the source repo, locate the SKILL.md
+2. Create `claude/skills/<name>/SKILL.md` with the content
+3. Create `claude/skills/<name>/source.json` with repo, path, and current commit SHA
+4. Update README.md skills table (mark as *(external)*)
+
+**Updating external skills:**
+```bash
+bash scripts/sync-external-skills.sh            # all
+bash scripts/sync-external-skills.sh <name>      # one
+```
+
+The script clones each source repo at HEAD, compares the commit SHA, and copies the updated file if changed.
 
 ## Design Principles
 
