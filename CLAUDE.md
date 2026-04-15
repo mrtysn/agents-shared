@@ -75,7 +75,7 @@ Skills support additional features: reference files, templates, and advanced fro
 
 **Naming:** Use lowercase kebab-case (e.g., `my-command.md` → `/my-command`).
 
-**Note:** Both formats create identical `/command` invocations. Use commands for simple single-file definitions; use skills when you need supporting files.
+**Note:** Commands and skills both create `/command` invocations. Per the [Anthropic docs](https://code.claude.com/docs/en/skills), commands are merged into skills and skills are recommended (commands are not deprecated and keep working). **New extensions here go in `claude/skills/<name>/SKILL.md`.** Existing commands stay as-is.
 
 ## External (Third-Party) Skills
 
