@@ -495,7 +495,8 @@ def run_interactive(search_opts: dict, initial_keyword: str | None = None):
 
         TITLE = "search-history"
         BINDINGS = [
-            Binding("q", "quit", "Quit", priority=True),
+            Binding("q", "quit", "Quit"),
+            Binding("ctrl+c", "quit", "Quit", priority=True, show=False),
             Binding("escape", "escape_pressed", "Back", show=False),
             Binding("r", "resume_session", "Resume", priority=True),
             Binding("/", "focus_search", "Search", priority=True),
@@ -612,9 +613,6 @@ def run_interactive(search_opts: dict, initial_keyword: str | None = None):
                 self.exit()
 
         def action_quit(self) -> None:
-            # Don't quit if typing in search input
-            if self.query_one("#search-input", Input).has_focus:
-                return
             self.exit()
 
         def on_list_view_selected(self, event: ListView.Selected) -> None:
@@ -689,6 +687,11 @@ def main():
     if args.resume:
         do_resume(args.resume)
         return
+
+    # Bare invocation on a TTY drops into the interactive browser.
+    # Piped/non-TTY callers (agents, scripts) still get the keyword-required error.
+    if not args.keyword and not args.interactive and sys.stdout.isatty():
+        args.interactive = True
 
     search_opts = dict(
         days=args.days,
