@@ -64,8 +64,9 @@ Only create what is missing; never overwrite existing files without asking.
 
 - **`.gitignore`** — pick sensible defaults for the detected stack (look at file extensions, package manifests, lockfiles). Keep it minimal. If unsure, ask.
 - **`README.md`** — one short paragraph describing what the project is. Draw from existing project files; do not invent features.
+- **`LICENSE`** — default to AGPL-3.0 (see "License" section below for rationale and command). Always confirm with the user before adding; the choice is a deliberate decision per project, not a reflex.
 
-Ask the user before adding anything beyond these two.
+Ask the user before adding anything beyond these three.
 
 ### 4. First commit
 
@@ -93,6 +94,16 @@ gh repo create <repo-name> \
 Swap `--private` for `--public` only after explicit user confirmation in this turn (a prior approval does not carry forward).
 
 Report the resulting URL from `gh repo create`'s stdout.
+
+## License
+
+Default: **AGPL-3.0**. Confirm with the user before writing — surface the recommendation, wait for a clear yes (or an alternative).
+
+```bash
+curl -s https://api.github.com/licenses/agpl-3.0 | jq -r .body > LICENSE
+```
+
+AGPL-3.0 text is verbatim — no substitution. For other SPDX ids that have `[year]` / `[fullname]` placeholders (MIT, BSD), substitute with `git config user.name` and `date +%Y`; never hardcode identity.
 
 ## Flags reference
 
