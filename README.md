@@ -37,6 +37,7 @@ Skills are directory-based and support references/templates. Both commands and s
 | `/rpi` | Research-Plan-Implement workflow: deep investigation, written plan with annotation cycles, then full execution |
 | `/board` | Show the Jira sprint board as a TUI kanban, or dive into a specific ticket with codebase research |
 | `/caveman` | Ultra-compressed communication (~75% token savings). Levels: lite, full, ultra *(external)* |
+| `/new-repo` | Create a new GitHub repo under the active `gh` account, scaffolding standard files and pushing an initial commit |
 
 ## Updating
 
