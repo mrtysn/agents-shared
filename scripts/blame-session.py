@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
-blame-session: Find which Claude Code sessions modified the currently changed files.
+blame-session: Find which Claude Code / Codex / Gemini sessions modified the currently changed files.
 
-Scans git status for staged/unstaged changes, then searches Claude Code session
-transcripts for Edit/Write/Bash tool calls that touched those files.
+Scans git status for staged/unstaged changes, then searches local session
+transcripts for Edit/Write/Bash tool calls that touched those files. Claude
+Code is scanned by default; Codex and Gemini are opt-in via --codex/--gemini
+/--all-sources.
 
 Output is file-centric: each changed file lists which sessions touched it.
 Sessions are numbered for quick resume via --resume N.
@@ -30,6 +32,18 @@ CACHE_DIR = Path.home() / ".cache" / "blame-session"
 CACHE_FILE = CACHE_DIR / "last-run.json"
 DEFAULT_DAYS = 14
 
+CODEX_SESSIONS_ROOT = Path.home() / ".codex" / "sessions"
+GEMINI_ROOT = Path.home() / ".gemini"
+GEMINI_PROJECTS_INDEX = GEMINI_ROOT / "projects.json"
+
+SOURCE_LABELS = {"claude": "Claude", "codex": "Codex", "gemini": "Gemini"}
+SOURCE_LABEL_WIDTH = max(len(lbl) for lbl in SOURCE_LABELS.values())
+RESUME_COMMANDS = {
+    "claude": lambda sid: ["claude", "--resume", sid],
+    "codex":  lambda sid: ["codex",  "resume",  sid],
+    "gemini": lambda sid: ["gemini", "--resume", sid],
+}
+
 
 # ─── Data gathering ──────────────────────────────────────────────────────────
 
@@ -39,7 +53,7 @@ def get_changed_files(repo_root: str) -> set[str]:
         capture_output=True, text=True, cwd=repo_root
     )
     files = set()
-    for line in result.stdout.strip().splitlines():
+    for line in result.stdout.splitlines():
         if not line:
             continue
         path = line[3:].strip()
@@ -49,10 +63,53 @@ def get_changed_files(repo_root: str) -> set[str]:
     return files
 
 
-def get_claude_project_dir(repo_root: str) -> Path | None:
+def get_claude_sessions_for_repo(repo_root: str) -> list[Path]:
     encoded = repo_root.replace("/", "-")
     project_dir = Path.home() / ".claude" / "projects" / encoded
-    return project_dir if project_dir.exists() else None
+    if not project_dir.exists():
+        return []
+    return list(project_dir.glob("*.jsonl"))
+
+
+def get_codex_sessions_for_repo(repo_root: str) -> list[Path]:
+    if not CODEX_SESSIONS_ROOT.exists():
+        return []
+    repo_prefix = repo_root.rstrip("/") + "/"
+    matching = []
+    for f in CODEX_SESSIONS_ROOT.rglob("rollout-*.jsonl"):
+        try:
+            with open(f, "r") as fp:
+                first = fp.readline()
+            if not first.strip():
+                continue
+            entry = json.loads(first)
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+            continue
+        if entry.get("type") != "session_meta":
+            continue
+        cwd = (entry.get("payload") or {}).get("cwd", "")
+        if cwd == repo_root or cwd.startswith(repo_prefix):
+            matching.append(f)
+    return matching
+
+
+def get_gemini_sessions_for_repo(repo_root: str) -> list[Path]:
+    if not GEMINI_PROJECTS_INDEX.exists():
+        return []
+    try:
+        index = json.loads(GEMINI_PROJECTS_INDEX.read_text())
+    except (OSError, json.JSONDecodeError):
+        return []
+    projects = index.get("projects") if isinstance(index, dict) else None
+    if not isinstance(projects, dict):
+        return []
+    slug = projects.get(repo_root)
+    if not slug:
+        return []
+    chats_dir = GEMINI_ROOT / "tmp" / slug / "chats"
+    if not chats_dir.exists():
+        return []
+    return list(chats_dir.glob("session-*.json"))
 
 
 def extract_file_paths_from_tool(name: str, tool_input: dict) -> list[str]:
@@ -68,7 +125,7 @@ def extract_file_paths_from_tool(name: str, tool_input: dict) -> list[str]:
     return [os.path.normpath(p) for p in paths if p.startswith("/")]
 
 
-def scan_session(session_file: Path, changed_files: set[str]) -> dict | None:
+def scan_claude_session(session_file: Path, changed_files: set[str], repo_root: str) -> dict | None:
     session_id = session_file.stem
     touched_files = defaultdict(list)
     session_start = None
@@ -130,12 +187,202 @@ def scan_session(session_file: Path, changed_files: set[str]) -> dict | None:
         return None
 
     return {
+        "source": "claude",
         "session_id": session_id,
         "branch": session_branch,
         "started": session_start,
         "preview": _truncate_preview(first_message) if first_message else None,
         "files": dict(touched_files),
     }
+
+
+# ─── Codex session scanning ──────────────────────────────────────────────────
+
+def scan_codex_session(session_file: Path, changed_files: set[str], repo_root: str) -> dict | None:
+    touched_files = defaultdict(list)
+    session_id = None
+    session_start = None
+    session_branch = None
+    first_message = None
+
+    try:
+        with open(session_file, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+
+                etype = entry.get("type")
+                payload = entry.get("payload")
+                if not isinstance(payload, dict):
+                    continue
+                ptype = payload.get("type")
+                ts = entry.get("timestamp")
+
+                if etype == "session_meta":
+                    if not session_id:
+                        session_id = payload.get("id")
+                    if not session_start:
+                        session_start = payload.get("timestamp") or ts
+                    if not session_branch:
+                        git = payload.get("git")
+                        if isinstance(git, dict):
+                            session_branch = git.get("branch")
+                    continue
+
+                if etype == "event_msg" and ptype == "user_message":
+                    if first_message is None:
+                        msg = payload.get("message", "")
+                        if isinstance(msg, str) and msg.strip():
+                            first_message = msg.strip()
+                    continue
+
+                if etype == "response_item" and ptype == "function_call":
+                    if payload.get("name") != "exec_command":
+                        continue
+                    args_raw = payload.get("arguments", "")
+                    cmd = ""
+                    if isinstance(args_raw, str):
+                        try:
+                            parsed = json.loads(args_raw)
+                            if isinstance(parsed, dict):
+                                cmd = parsed.get("cmd", "") or ""
+                        except json.JSONDecodeError:
+                            cmd = ""
+                    for fp in extract_file_paths_from_tool("Bash", {"command": cmd}):
+                        if fp in changed_files:
+                            touched_files[fp].append(("Bash", ts or ""))
+                    continue
+
+                if etype == "event_msg" and ptype == "patch_apply_end":
+                    if not payload.get("success"):
+                        continue
+                    changes = payload.get("changes")
+                    if not isinstance(changes, dict):
+                        continue
+                    for path, change in changes.items():
+                        if not isinstance(change, dict):
+                            continue
+                        ctype = change.get("type")
+                        tool = "Write" if ctype == "add" else "Edit"
+                        for p in (path, change.get("move_path")):
+                            if not p:
+                                continue
+                            norm = os.path.normpath(p)
+                            if norm in changed_files:
+                                touched_files[norm].append((tool, ts or ""))
+                    continue
+    except (OSError, UnicodeDecodeError):
+        return None
+
+    if not touched_files or not session_id:
+        return None
+
+    return {
+        "source": "codex",
+        "session_id": session_id,
+        "branch": session_branch,
+        "started": session_start,
+        "preview": _truncate_preview(first_message) if first_message else None,
+        "files": dict(touched_files),
+    }
+
+
+# ─── Gemini session scanning ─────────────────────────────────────────────────
+
+_GEMINI_TOOL_NAMES = {
+    "replace": "Edit",
+    "write_file": "Write",
+    "run_shell_command": "Bash",
+    "read_file": "Read",
+}
+
+
+def scan_gemini_session(session_file: Path, changed_files: set[str], repo_root: str) -> dict | None:
+    try:
+        with open(session_file, "r") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
+
+    if not isinstance(data, dict):
+        return None
+
+    session_id = data.get("sessionId")
+    session_start = data.get("startTime")
+    messages = data.get("messages")
+    if not isinstance(messages, list):
+        return None
+
+    touched_files = defaultdict(list)
+    first_message = None
+
+    for msg in messages:
+        if not isinstance(msg, dict):
+            continue
+        mtype = msg.get("type")
+        mts = msg.get("timestamp")
+
+        if first_message is None and mtype == "user":
+            content = msg.get("content")
+            if isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict):
+                        text = block.get("text", "")
+                        if isinstance(text, str) and text.strip():
+                            first_message = text.strip()
+                            break
+
+        if mtype != "gemini":
+            continue
+
+        tool_calls = msg.get("toolCalls")
+        if not isinstance(tool_calls, list):
+            continue
+        for call in tool_calls:
+            if not isinstance(call, dict):
+                continue
+            tool = _GEMINI_TOOL_NAMES.get(call.get("name", ""))
+            if not tool:
+                continue
+            args = call.get("args")
+            if not isinstance(args, dict):
+                continue
+            # Gemini stores relative paths and commands; resolve to absolute so
+            # the shared extractor (which requires leading '/') matches.
+            if tool in ("Edit", "Write", "Read"):
+                raw_path = args.get("file_path", "") or ""
+                if raw_path and not raw_path.startswith("/"):
+                    raw_path = os.path.join(repo_root, raw_path)
+                tool_input = {"file_path": raw_path}
+            else:  # Bash
+                tool_input = {"command": args.get("command", "") or ""}
+            for fp in extract_file_paths_from_tool(tool, tool_input):
+                if fp in changed_files:
+                    touched_files[fp].append((tool, mts or ""))
+
+    if not touched_files or not session_id:
+        return None
+
+    return {
+        "source": "gemini",
+        "session_id": session_id,
+        "branch": None,
+        "started": session_start,
+        "preview": _truncate_preview(first_message) if first_message else None,
+        "files": dict(touched_files),
+    }
+
+
+SOURCE_ADAPTERS = {
+    "claude": (get_claude_sessions_for_repo, scan_claude_session),
+    "codex":  (get_codex_sessions_for_repo,  scan_codex_session),
+    "gemini": (get_gemini_sessions_for_repo, scan_gemini_session),
+}
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -186,7 +433,10 @@ def filter_by_days(results: list[dict], days: int) -> list[dict]:
 
 def save_cache(results: list[dict]):
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    mapping = {str(i): r["session_id"] for i, r in enumerate(results, 1)}
+    mapping = {
+        str(i): {"source": r.get("source", "claude"), "id": r["session_id"]}
+        for i, r in enumerate(results, 1)
+    }
     CACHE_FILE.write_text(json.dumps(mapping, indent=2))
 
 
@@ -209,7 +459,14 @@ def do_resume(number: int):
         else:
             print("Run blame-session first to populate the session list.", file=sys.stderr)
         sys.exit(1)
-    os.execvp("claude", ["claude", "--resume", mapping[key]])
+    entry = mapping[key]
+    if isinstance(entry, str):
+        entry = {"source": "claude", "id": entry}
+    source = entry.get("source", "claude")
+    sid = entry["id"]
+    cmd_fn = RESUME_COMMANDS.get(source, RESUME_COMMANDS["claude"])
+    argv = cmd_fn(sid)
+    os.execvp(argv[0], argv)
 
 
 def compute_display_names(rel_paths: list[str]) -> dict[str, str]:
@@ -262,7 +519,13 @@ def render_static(results: list[dict], changed_files: set[str], repo_root: str,
     cols_per_round = max((term_width - name_width - 3) // col_width, 3)
 
     shown_note = f" (showing {n_sessions}/{total_found})" if total_found > n_sessions else ""
-    print(f"blame-session · {len(changed_files)} files · {mode}{shown_note}")
+    source_counts = Counter(r.get("source", "claude") for r in results)
+    source_note = ""
+    if len(source_counts) > 1 or "claude" not in source_counts:
+        source_note = " · " + ", ".join(
+            f"{n} {SOURCE_LABELS.get(s, s)}" for s, n in source_counts.most_common()
+        )
+    print(f"blame-session · {len(changed_files)} files · {mode}{source_note}{shown_note}")
 
     # Render matrix in rounds
     for round_start in range(0, n_sessions, cols_per_round):
@@ -304,6 +567,8 @@ def render_static(results: list[dict], changed_files: set[str], repo_root: str,
     print(f" Sessions")
     print(f" {'─' * 70}")
 
+    multi_source = any(r.get("source", "claude") != "claude" for r in results)
+
     for i, r in enumerate(results, 1):
         started = format_timestamp(r["started"])
         branch = r["branch"] or "?"
@@ -311,7 +576,11 @@ def render_static(results: list[dict], changed_files: set[str], repo_root: str,
         preview = r.get("preview") or ""
         if preview:
             preview = f"  {preview}"
-        print(f" {i:>{num_width}}  {sid}  {started:<12}  {branch}{preview}")
+        label = ""
+        if multi_source:
+            src = r.get("source", "claude")
+            label = f"{SOURCE_LABELS.get(src, src):<{SOURCE_LABEL_WIDTH}}  "
+        print(f" {i:>{num_width}}  {label}{sid}  {started:<12}  {branch}{preview}")
 
     print()
     print(f" Resume: blame-session --resume N")
@@ -426,11 +695,17 @@ def render_interactive(results: list[dict], changed_files: set[str], repo_root: 
 
             # ── Header
             title = f"blame-session · {len(changed_files)} files · {n_sessions} sessions"
+            source_counts = Counter(r.get("source", "claude") for r in results)
+            if len(source_counts) > 1 or "claude" not in source_counts:
+                title += " · " + ", ".join(
+                    f"{n} {SOURCE_LABELS.get(s, s)}" for s, n in source_counts.most_common()
+                )
             if mode == "file" and cur_file < len(all_files):
                 title += f"  │  {all_files[cur_file]}"
             elif mode == "session" and cur_session < n_sessions:
                 r = results[cur_session]
-                title += f"  │  [{cur_session+1}] {r['session_id']}  {r.get('preview') or ''}"
+                label = SOURCE_LABELS.get(r.get("source", "claude"), "?")
+                title += f"  │  [{cur_session+1}] {label} {r['session_id']}  {r.get('preview') or ''}"
             _addstr(stdscr, header_y, 0, title[:max_x - 1], curses.A_BOLD)
 
             # ── Column headers (session numbers)
@@ -515,6 +790,10 @@ def render_interactive(results: list[dict], changed_files: set[str], repo_root: 
             legend_start = min(legend_start, max(0, n_sessions - legend_count))
             legend_end = min(legend_start + legend_count, n_sessions)
 
+            multi_source = any(
+                r.get("source", "claude") != "claude" for r in results
+            )
+
             for li, si in enumerate(range(legend_start, legend_end)):
                 y = legend_y + li
                 if y >= max_y - 1:
@@ -527,7 +806,11 @@ def render_interactive(results: list[dict], changed_files: set[str], repo_root: 
                 preview = r.get("preview") or ""
                 if preview:
                     preview = f"  {preview}"
-                line = f" {si+1:>{num_width}}  {sid}  {started:<12}  {branch}{preview}"
+                label = ""
+                if multi_source:
+                    src = r.get("source", "claude")
+                    label = f"{SOURCE_LABELS.get(src, src):<{SOURCE_LABEL_WIDTH}}  "
+                line = f" {si+1:>{num_width}}  {label}{sid}  {started:<12}  {branch}{preview}"
 
                 if si in hl_sessions:
                     attr = ATTR_CURSOR if (mode == "session" and si == cur_session) else ATTR_HIGHLIGHT
@@ -576,8 +859,7 @@ def render_interactive(results: list[dict], changed_files: set[str], repo_root: 
                 # Resume the current session
                 si = cur_session
                 if 0 <= si < n_sessions:
-                    session_id = results[si]["session_id"]
-                    return session_id
+                    return results[si]
             elif key == ord('g'):
                 cur_file = 0
                 cur_session = 0
@@ -589,9 +871,13 @@ def render_interactive(results: list[dict], changed_files: set[str], repo_root: 
 
         return None
 
-    session_to_resume = curses.wrapper(run_tui)
-    if session_to_resume:
-        os.execvp("claude", ["claude", "--resume", session_to_resume])
+    resumed = curses.wrapper(run_tui)
+    if resumed:
+        source = resumed.get("source", "claude")
+        sid = resumed["session_id"]
+        cmd_fn = RESUME_COMMANDS.get(source, RESUME_COMMANDS["claude"])
+        argv = cmd_fn(sid)
+        os.execvp(argv[0], argv)
 
 
 def _addstr(stdscr, y: int, x: int, text: str, attr: int = 0):
@@ -612,7 +898,7 @@ def _addstr(stdscr, y: int, x: int, text: str, attr: int = 0):
 # ─── Main ────────────────────────────────────────────────────────────────────
 
 def main():
-    parser = argparse.ArgumentParser(description="Find which Claude sessions modified changed files")
+    parser = argparse.ArgumentParser(description="Find which Claude/Codex/Gemini sessions modified changed files")
     parser.add_argument("--all", "-a", action="store_true",
                         help="Include sessions that only Read files (default: writes only)")
     parser.add_argument("--limit", "-n", type=int, default=0,
@@ -623,6 +909,12 @@ def main():
                         help="Launch interactive TUI with cross-highlighting")
     parser.add_argument("--resume", "-r", type=int, default=0,
                         help="Resume session by number from last run")
+    parser.add_argument("--codex", action="store_true",
+                        help="Also scan Codex sessions (~/.codex/sessions)")
+    parser.add_argument("--gemini", action="store_true",
+                        help="Also scan Gemini sessions (~/.gemini/tmp)")
+    parser.add_argument("--all-sources", action="store_true",
+                        help="Scan Claude, Codex, and Gemini sessions")
     args = parser.parse_args()
 
     if args.resume:
@@ -647,24 +939,26 @@ def main():
         print("No changed files in git status.")
         return
 
-    project_dir = get_claude_project_dir(repo_root)
-    if not project_dir:
-        print(f"No Claude session directory found for {repo_root}", file=sys.stderr)
-        sys.exit(1)
-
-    session_files = sorted(project_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
+    enabled_sources = ["claude"]
+    if args.codex or args.all_sources:
+        enabled_sources.append("codex")
+    if args.gemini or args.all_sources:
+        enabled_sources.append("gemini")
 
     results = []
-    for sf in session_files:
-        hit = scan_session(sf, changed_files)
-        if hit:
-            if not args.all:
-                hit = filter_writes_only(hit)
+    for source in enabled_sources:
+        discover, scan = SOURCE_ADAPTERS[source]
+        for sf in discover(repo_root):
+            hit = scan(sf, changed_files, repo_root)
             if hit:
-                results.append(hit)
+                if not args.all:
+                    hit = filter_writes_only(hit)
+                if hit:
+                    results.append(hit)
 
     if not results:
-        print("No Claude sessions found that touched the changed files.")
+        sources_label = "/".join(SOURCE_LABELS[s] for s in enabled_sources)
+        print(f"No {sources_label} sessions found that touched the changed files.")
         if not args.all:
             print("(Try --all to include sessions that only read the files)")
         print(f"\nChanged files ({len(changed_files)}):")
