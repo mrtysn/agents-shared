@@ -307,11 +307,11 @@ def render_static(results: list[dict], changed_files: set[str], repo_root: str,
     for i, r in enumerate(results, 1):
         started = format_timestamp(r["started"])
         branch = r["branch"] or "?"
-        sid_short = r["session_id"][:8]
+        sid = r["session_id"]
         preview = r.get("preview") or ""
         if preview:
             preview = f"  {preview}"
-        print(f" {i:>{num_width}}  {sid_short}  {started:<12}  {branch}{preview}")
+        print(f" {i:>{num_width}}  {sid}  {started:<12}  {branch}{preview}")
 
     print()
     print(f" Resume: blame-session --resume N")
@@ -430,7 +430,7 @@ def render_interactive(results: list[dict], changed_files: set[str], repo_root: 
                 title += f"  │  {all_files[cur_file]}"
             elif mode == "session" and cur_session < n_sessions:
                 r = results[cur_session]
-                title += f"  │  [{cur_session+1}] {r['session_id'][:8]}  {r.get('preview') or ''}"
+                title += f"  │  [{cur_session+1}] {r['session_id']}  {r.get('preview') or ''}"
             _addstr(stdscr, header_y, 0, title[:max_x - 1], curses.A_BOLD)
 
             # ── Column headers (session numbers)
@@ -523,11 +523,11 @@ def render_interactive(results: list[dict], changed_files: set[str], repo_root: 
                 r = results[si]
                 started = format_timestamp(r["started"])
                 branch = r["branch"] or "?"
-                sid_short = r["session_id"][:8]
+                sid = r["session_id"]
                 preview = r.get("preview") or ""
                 if preview:
                     preview = f"  {preview}"
-                line = f" {si+1:>{num_width}}  {sid_short}  {started:<12}  {branch}{preview}"
+                line = f" {si+1:>{num_width}}  {sid}  {started:<12}  {branch}{preview}"
 
                 if si in hl_sessions:
                     attr = ATTR_CURSOR if (mode == "session" and si == cur_session) else ATTR_HIGHLIGHT

@@ -371,7 +371,7 @@ def render_output(results: list[dict], keyword: str, n_projects: int, total_foun
     indent = " " * (num_w + 6)
 
     for i, r in enumerate(results, 1):
-        sid = r["session_id"][:8]
+        sid = r["session_id"]
         date = format_timestamp(r["started"])
         project = r["project_name"]
         if len(project) > 16:
@@ -422,7 +422,7 @@ def run_interactive(search_opts: dict, initial_keyword: str | None = None):
 
         def compose(self) -> ComposeResult:
             r = self.result
-            sid = r["session_id"][:8]
+            sid = r["session_id"]
             date = format_timestamp(r["started"])
             project = r["project_name"]
             if len(project) > 16:
@@ -624,7 +624,7 @@ def run_interactive(search_opts: dict, initial_keyword: str | None = None):
             title = self.query_one("#detail-title", Static)
             content = self.query_one("#detail-content", Static)
 
-            sid = r["session_id"][:8]
+            sid = r["session_id"]
             date = format_timestamp(r["started"])
             project = r["project_name"]
             branch = r["branch"] or "?"
