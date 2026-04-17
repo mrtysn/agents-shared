@@ -38,6 +38,7 @@ Skills are directory-based and support references/templates. Both commands and s
 | `/board` | Show the Jira sprint board as a TUI kanban, or dive into a specific ticket with codebase research |
 | `/caveman` | Ultra-compressed communication (~75% token savings). Levels: lite, full, ultra *(external)* |
 | `/new-repo` | Create a new GitHub repo under the active `gh` account, scaffolding standard files and pushing an initial commit |
+| `/recent-sessions` | List Claude Code sessions by recency with first user prompt. Recovery aid after crashes/restarts. |
 
 ## Updating
 
