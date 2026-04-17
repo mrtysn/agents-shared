@@ -1,32 +1,38 @@
 #!/usr/bin/env python3
 """
-recent-sessions: List Claude Code sessions by recency with their first user prompt.
+recent-sessions: List Claude Code sessions by recency.
 
-Useful for recovering context after a crash or restart — shows what was
-being worked on, when, and in which project. Complements search-history.py
-(which is keyword-driven) with a time-driven view.
+Useful for recovering context after a crash or restart. Shows, for each
+session: identity, time, size, the first few user prompts, and the most-
+touched file. Complements search-history.py (keyword-driven) with a
+time-driven view.
 
-Modes:
-  Default:   table of recent sessions (id, project, mtime, size, first prompt)
-  --resume N: resume session number N from the last run (same cache as search-history)
-  --match:    filter by keyword in first prompt OR full file content
+Scope: this tool answers "what was I doing recently?". For "find the
+session that discussed X", use `/search-history`.
+
+Known limitation: sessions that pivot after opening will be labelled by
+their opening prompts. The `top-file` row is an extra discriminator for
+those cases, but no cheap heuristic catches every pivot — for deep topic
+lookup, reach for search-history.
 """
 
 import argparse
 import json
 import os
-import re
 import subprocess
 import sys
+from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
 
 PROJECTS_DIR = Path.home() / ".claude" / "projects"
 CACHE_DIR = Path.home() / ".cache" / "search-history"
 CACHE_FILE = CACHE_DIR / "last-run.json"
+HOME = str(Path.home())
 
 DEFAULT_LIMIT = 25
-DEFAULT_DAYS = 3  # 0 = all time
+DEFAULT_DAYS = 3     # 0 = all time
+DEFAULT_PROMPTS = 2  # user prompts rendered per session
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -46,9 +52,19 @@ def format_mtime(epoch: float) -> str:
 
 
 def decode_project(dirname: str) -> str:
-    """Turn `-Users-mert-dev-foo-bar` into `foo-bar` (last path segment)."""
+    """Turn `-Users-mert-dev-foo-bar` into `foo-bar` (last path segment).
+
+    Imperfect: dashes inside a real project name collide with the
+    path separator, so we keep the last token.
+    """
     stripped = dirname.lstrip("-").replace("-", "/")
     return stripped.rsplit("/", 1)[-1] if "/" in stripped else stripped
+
+
+def contract_home(path: str) -> str:
+    if path.startswith(HOME):
+        return "~" + path[len(HOME):]
+    return path
 
 
 def save_cache(sessions: list[dict]) -> None:
@@ -96,42 +112,72 @@ def current_project_dir_name() -> str | None:
     return root.replace("/", "-")
 
 
-# ─── First-prompt extraction ─────────────────────────────────────────────────
+# ─── Session content extraction ──────────────────────────────────────────────
 
-def extract_first_prompt(path: Path) -> str:
-    """Pull the first human user prompt from a session jsonl.
+def _extract_user_text(rec: dict) -> str:
+    msg = rec.get("message") or {}
+    content = msg.get("content", "")
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                t = block.get("text", "")
+                if t:
+                    return t.strip()
+    return ""
 
-    Skips command-message sidecars and local-command caveats so the result
-    reflects what the user actually typed."""
+
+def extract_session_info(path: Path, want_prompts: int) -> dict:
+    """One pass over the jsonl. Returns:
+        {
+          "prompts":   list[str]  — first N non-command user prompts
+          "top_file":  str | None — most-touched file path (by tool_use input.file_path)
+        }
+    """
+    prompts: list[str] = []
+    file_counter: Counter[str] = Counter()
+
     try:
         with path.open("r", encoding="utf-8", errors="replace") as f:
             for line in f:
-                if '"type":"user"' not in line:
+                # Quick cheap reject.
+                if '"file_path"' not in line and '"type":"user"' not in line:
                     continue
                 try:
                     rec = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                msg = rec.get("message") or {}
-                content = msg.get("content", "")
-                text = ""
-                if isinstance(content, str):
-                    text = content
-                elif isinstance(content, list):
-                    for block in content:
-                        if isinstance(block, dict) and block.get("type") == "text":
-                            text = block.get("text", "")
-                            if text:
-                                break
-                text = (text or "").strip()
-                if not text:
-                    continue
-                if text.startswith(("<local-command-caveat>", "<command-message>", "<command-name>")):
-                    continue
-                return text
+
+                # First-few user prompts.
+                if len(prompts) < want_prompts and rec.get("type") == "user":
+                    text = _extract_user_text(rec)
+                    if text and not text.startswith((
+                        "<local-command-caveat>",
+                        "<command-message>",
+                        "<command-name>",
+                    )):
+                        prompts.append(text)
+
+                # Most-touched file path — pick from any tool_use input containing file_path.
+                if rec.get("type") == "assistant":
+                    msg = rec.get("message") or {}
+                    content = msg.get("content") or []
+                    if isinstance(content, list):
+                        for block in content:
+                            if not isinstance(block, dict):
+                                continue
+                            if block.get("type") != "tool_use":
+                                continue
+                            inp = block.get("input") or {}
+                            fp = inp.get("file_path")
+                            if isinstance(fp, str) and fp:
+                                file_counter[fp] += 1
     except OSError:
-        return ""
-    return ""
+        return {"prompts": prompts, "top_file": None}
+
+    top_file = file_counter.most_common(1)[0][0] if file_counter else None
+    return {"prompts": prompts, "top_file": top_file}
 
 
 # ─── Session enumeration ─────────────────────────────────────────────────────
@@ -179,44 +225,44 @@ def collect_sessions(
     return sessions
 
 
-def file_contains(path: Path, pattern: re.Pattern[str]) -> bool:
-    try:
-        with path.open("r", encoding="utf-8", errors="replace") as f:
-            for line in f:
-                if pattern.search(line):
-                    return True
-    except OSError:
-        return False
-    return False
-
-
 # ─── Rendering ───────────────────────────────────────────────────────────────
 
-def render(sessions: list[dict], full: bool, id_len: int) -> None:
+def _truncate(text: str, width: int | None) -> str:
+    text = text.replace("\n", " ").replace("\r", " ")
+    if width is None:
+        return text
+    return text if len(text) <= width else text[: width - 1] + "…"
+
+
+def render(sessions: list[dict], full: bool) -> None:
     if not sessions:
         print("no sessions matched", file=sys.stderr)
         return
 
-    id_width = max(4, min(36, id_len))
+    id_width = 36  # always emit the full UUID; truncation would break copy-paste resume
     proj_width = min(32, max((len(s["project"]) for s in sessions), default=10))
     size_width = 5
     time_width = 11
     idx_width = len(str(len(sessions))) + 1  # "#N" style
+    header_overhead = idx_width + id_width + proj_width + size_width + time_width + 10
 
     if full:
-        prompt_width = None
+        header_prompt_width: int | None = None
+        cont_width: int | None = None
     else:
         try:
             cols = os.get_terminal_size(sys.stdout.fileno()).columns
         except OSError:
             cols = 140
-        prompt_width = max(20, cols - idx_width - id_width - proj_width - size_width - time_width - 10)
+        header_prompt_width = max(20, cols - header_overhead)
+        cont_width = max(20, cols - 6)
+
+    indent = "      "
 
     for i, s in enumerate(sessions, 1):
-        prompt = (s.get("first_prompt") or "").replace("\n", " ").replace("\r", " ")
-        if prompt_width is not None and len(prompt) > prompt_width:
-            prompt = prompt[: prompt_width - 1] + "…"
-        sid = s["session_id"][:id_width]
+        prompts = s.get("prompts") or []
+        first = prompts[0] if prompts else ""
+        sid = s["session_id"]
         proj = s["project"]
         if len(proj) > proj_width:
             proj = proj[: proj_width - 1] + "…"
@@ -224,8 +270,13 @@ def render(sessions: list[dict], full: bool, id_len: int) -> None:
         print(
             f"{idx:<{idx_width}}  {sid:<{id_width}}  {proj:<{proj_width}}  "
             f"{format_mtime(s['mtime']):<{time_width}}  "
-            f"{format_size(s['size']):>{size_width}}  {prompt}"
+            f"{format_size(s['size']):>{size_width}}  {_truncate(first, header_prompt_width)}"
         )
+        for p in prompts[1:]:
+            print(f"{indent}> {_truncate(p, cont_width)}")
+        top_file = s.get("top_file")
+        if top_file:
+            print(f"{indent}~ {_truncate(contract_home(top_file), cont_width)}")
 
     print(
         f"\n{len(sessions)} session(s). Resume with `recent-sessions --resume N` "
@@ -239,7 +290,7 @@ def render(sessions: list[dict], full: bool, id_len: int) -> None:
 def main(argv: list[str]) -> int:
     p = argparse.ArgumentParser(
         prog="recent-sessions",
-        description="List recent Claude Code sessions with their first user prompt.",
+        description="List recent Claude Code sessions with their opening prompts and primary file.",
     )
     p.add_argument("--days", "-d", type=int, default=DEFAULT_DAYS,
                    help=f"only sessions from the last N days (default: {DEFAULT_DAYS}, 0=all)")
@@ -248,12 +299,10 @@ def main(argv: list[str]) -> int:
     p.add_argument("--project", "-p", help="filter to project (substring match)")
     p.add_argument("--current", "-c", action="store_true",
                    help="filter to current project (from git repo root)")
-    p.add_argument("--match", "-m",
-                   help="filter to sessions whose first prompt or content matches this regex")
+    p.add_argument("--prompts", type=int, default=DEFAULT_PROMPTS,
+                   help=f"number of opening user prompts to show per session (default: {DEFAULT_PROMPTS})")
     p.add_argument("--full", action="store_true",
-                   help="do not truncate the first-prompt column")
-    p.add_argument("--id-len", type=int, default=36,
-                   help="session-id characters to show (default: 36, full UUID; lower for preview only)")
+                   help="do not truncate prompt / file-path columns")
     p.add_argument("--resume", "-r", type=int, metavar="N",
                    help="resume session number N from the last run")
     args = p.parse_args(argv)
@@ -272,24 +321,17 @@ def main(argv: list[str]) -> int:
         current_only=args.current,
     )
 
-    if args.match:
-        pattern = re.compile(args.match, re.IGNORECASE)
-        filtered = []
-        for s in sessions:
-            s["first_prompt"] = extract_first_prompt(Path(s["path"]))
-            if pattern.search(s["first_prompt"]) or file_contains(Path(s["path"]), pattern):
-                filtered.append(s)
-        sessions = filtered
-    else:
-        load_limit = args.limit if args.limit > 0 else len(sessions)
-        for s in sessions[:load_limit]:
-            s["first_prompt"] = extract_first_prompt(Path(s["path"]))
-
     if args.limit and args.limit > 0:
         sessions = sessions[: args.limit]
 
+    want_prompts = max(1, args.prompts)
+    for s in sessions:
+        info = extract_session_info(Path(s["path"]), want_prompts)
+        s["prompts"] = info["prompts"]
+        s["top_file"] = info["top_file"]
+
     save_cache(sessions)
-    render(sessions, full=args.full, id_len=args.id_len)
+    render(sessions, full=args.full)
     return 0
 
 
