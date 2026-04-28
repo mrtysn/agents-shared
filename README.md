@@ -39,6 +39,7 @@ Skills are directory-based and support references/templates. Both commands and s
 | `/caveman` | Ultra-compressed communication (~75% token savings). Levels: lite, full, ultra *(external)* |
 | `/new-repo` | Create a new GitHub repo under the active `gh` account, scaffolding standard files and pushing an initial commit |
 | `/recent-sessions` | List Claude Code sessions by recency with first user prompt. Recovery aid after crashes/restarts. |
+| `/new-tool` | Register a script with the toolbelt — add `# DESC:`, mark executable, symlink into `~/.local/bin` |
 
 ## Updating
 
