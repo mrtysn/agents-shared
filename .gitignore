@@ -1,3 +1,4 @@
 consumers.local
 .DS_Store
 __pycache__/
+claude/skills/*/.venv/
