@@ -13,7 +13,6 @@ agents-shared/
 │   │   ├── broadcast-update.md
 │   │   ├── cmt-msg.md
 │   │   ├── external-review.md
-│   │   ├── handoff.md
 │   │   ├── no-chat-in-code.md
 │   │   ├── plan-not-ready.md
 │   │   ├── refocus.md
@@ -24,6 +23,8 @@ agents-shared/
 │       ├── caveman/       # (external) Token-compressed communication
 │       │   ├── SKILL.md
 │       │   └── source.json
+│       ├── handoff/
+│       │   └── SKILL.md
 │       ├── refactor/
 │       │   └── SKILL.md
 │       └── rpi/
@@ -130,7 +131,7 @@ git submodule add <repo-url> .agents
 ln -s ../../.agents/claude/skills/refactor .claude/skills/refactor
 
 # Symlink commands
-ln -s ../../.agents/claude/commands/handoff.md .claude/commands/handoff.md
+ln -s ../../.agents/claude/commands/aristocrat.md .claude/commands/aristocrat.md
 ```
 
 ## Testing Commands
