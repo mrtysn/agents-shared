@@ -41,7 +41,7 @@ Skills are directory-based and support references/templates. Both commands and s
 | `/recent-sessions` | List Claude Code sessions by recency with first user prompt. Recovery aid after crashes/restarts. |
 | `/new-tool` | Register a script with the toolbelt — add `# DESC:`, mark executable, symlink into `~/.local/bin` |
 | `/slack-gif-creator` | Constraints, validators, and animation concepts for building Slack-sized animated GIFs from scratch *(external)* |
-| `/rewind` | Rewind a drifted conversation. Identifies the earliest message whose edit bypasses all subsequent drift and emits the exact replacement text. |
+| `/go-back` | Rewind a drifted conversation. Identifies the earliest message whose edit bypasses all subsequent drift and emits the exact replacement text. |
 
 ## Updating
 
