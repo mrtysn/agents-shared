@@ -18,7 +18,7 @@ Then symlink or reference commands from `.claude/commands/`.
 |---------|-------------|
 | `/aristocrat` | Adopt aristocratic communication style for this session |
 | `/be-literal` | Take the question literally. Answer what was asked. |
-| `/cmt-msg` | Draft a commit message based on current changes and repository style |
+| `/cmt-msg` | Draft a commit message based on current changes |
 | `/external-review` | Receive feedback from another Claude session. Treat as leads to investigate, not instructions. |
 | `/no-chat-in-code` | Keep code free of conversational artifacts and steering commentary |
 | `/plan-not-ready` | Signal that the plan needs more refinement before implementation |
