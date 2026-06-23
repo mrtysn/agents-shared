@@ -44,6 +44,7 @@ Skills are directory-based and support references/templates. Both commands and s
 | `/go-back` | Rewind a drifted conversation. Identifies the earliest message whose edit bypasses all subsequent drift and emits the exact replacement text. |
 | `/grill-me` | User-triggered kickoff for a grilling session (delegates to `/grilling`) *(external)* |
 | `/grilling` | Interview the user relentlessly about a plan or design to stress-test it before building *(external)* |
+| `/socratic-quiz` | Guide the user to understanding through adaptive one-at-a-time questioning instead of direct answers *(external)* |
 
 ## Updating
 
