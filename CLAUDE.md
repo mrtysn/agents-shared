@@ -30,7 +30,8 @@ agents-shared/
 │       └── rpi/
 │           └── SKILL.md
 ├── scripts/
-│   ├── init.sh            # Bootstrap submodule and symlinks
+│   ├── init.sh            # Bootstrap submodule + per-repo .claude/ symlinks (one consumer repo)
+│   ├── init-global.sh     # Symlink into user-level ~/.claude (every project on the machine)
 │   ├── sync-external-skills.sh  # Fetch latest from upstream repos
 │   └── update-consumers.sh  # Broadcast updates to all consumer repos
 ├── consumers.local        # (gitignored) Absolute paths of consumer repos

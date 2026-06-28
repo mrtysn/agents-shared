@@ -12,6 +12,22 @@ git submodule add <repo-url> .agents
 
 Then symlink or reference commands from `.claude/commands/`.
 
+### Install globally (one machine, every project)
+
+Instead of wiring each repo up individually, symlink everything into the
+user-level Claude dirs (`~/.claude/commands` and `~/.claude/skills`) so every
+project on the machine sees these commands and skills:
+
+```bash
+bash scripts/init-global.sh           # sync ~/.claude with this repo
+bash scripts/init-global.sh --unlink  # remove the symlinks it created
+```
+
+Idempotent — re-run after adding, renaming, or removing a command/skill. New
+sources are linked, wrong-target links repaired, orphaned links (renamed/deleted
+upstream) pruned, and real local override files left untouched. Honors
+`CLAUDE_CONFIG_DIR` if set.
+
 ## Commands
 
 | Command | Description |
