@@ -3,21 +3,26 @@ description: Stage your changes, draft a commit message, commit, and push.
 allowed-tools: Bash, Read
 ---
 
-Stage your changes, draft a commit message, then commit and push.
+Stage the appropriate changes, draft a commit message, then commit and push.
+Run `git status` and `git diff` first to see everything.
 
-1. Run `git status` and `git diff` to identify all current changes
-2. Categorize each changed/untracked file:
-   - **Yours** — files you created or modified in this session (you have clear memory of changing them)
-   - **Uncertain** — files you cannot confidently attribute to yourself (modified before your session, or context was compacted)
-3. Stage all files you are confident are yours using `git add`
-4. For uncertain files: **ask the user** whether to include them. List the files and their changes briefly.
-5. Do NOT unstage anything that was already staged before your changes
-6. **NEVER use `git checkout`, `git restore`, or any destructive command to revert or clean files.** If a file has mixed changes (yours and the user's), use `git add -p` to selectively stage only your hunks. If that's not feasible, ask the user how to proceed. Uncommitted changes you didn't make are the user's work — do not touch them.
-7. After the user responds (or if there are no uncertain files), run `git diff --cached` to confirm
+The user's instruction for this invocation (may be empty):
 
-Then draft a commit message for the staged changes.
+> $ARGUMENTS
 
-$ARGUMENTS
+## What to stage — resolve in order, stop at the first that applies
+
+1. If the instruction above gives a scope ("your changes only", "the API files", "everything"), it is authoritative: stage exactly what it names, exclude the rest, and ask nothing. Any other directive it gives also overrides the defaults below.
+2. Otherwise, stage the files you changed this session (clear memory of editing them).
+3. Only for files you cannot attribute (changed before your session, or context was compacted) **and** that no scope covers — list them briefly and ask the user whether to include them.
+
+**Safety (always):**
+- Never unstage anything that was staged before you started.
+- Never use `git checkout`, `git restore`, or any destructive command to revert or clean files — uncommitted changes you didn't make are the user's work.
+- For files with mixed (yours + theirs) hunks, use `git add -p` to stage only your hunks; if that's not feasible, ask how to proceed.
+- After staging, run `git diff --cached` to confirm.
+
+## Commit message
 
 **Style:** One short clause naming the single thing the commit accomplishes. Lowercase, no trailing period, under 50 characters, starting with a verb. Do not enumerate sub-changes or implementation details — implementation goes inside the commit body if it goes anywhere. Enumeration with "and" or commas is the exception, not the norm; use it only when two changes are genuinely inseparable.
 
@@ -28,11 +33,9 @@ Examples:
   approve team join requests if private team goes public
   improve slack messages
 
-**Commit:**
-- Commit with the drafted message
+## Commit & push
 
-**Push:**
-- After committing, run `git push`
-- If push fails (e.g. no upstream), report the error
+- Commit with the drafted message.
+- Run `git push`; if it fails (e.g. no upstream), report the error.
 
 Present ONLY the `git log --oneline -1` output and push result. No explanation, no validation, no commentary.
