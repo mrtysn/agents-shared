@@ -20,7 +20,8 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-PROJECTS_DIR = Path.home() / ".claude" / "projects"
+_config_dir = Path(os.environ.get("CLAUDE_CONFIG_DIR") or (Path.home() / ".claude"))
+PROJECTS_DIR = _config_dir / "projects"
 CACHE_DIR = Path.home() / ".cache" / "search-history"
 CACHE_FILE = CACHE_DIR / "last-run.json"
 DEFAULT_DAYS = 0
