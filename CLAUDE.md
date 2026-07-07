@@ -135,10 +135,22 @@ costs a few GETs), 3-way merges each listed file, advances `.upstream/`, refresh
 leaves markers in the working file, and does not advance the base; resolve the
 markers and re-run, or `git checkout` the skill dir to abort.
 
+After a sync, review the diff (the working files **and** `override.patch`), commit,
+and broadcast to consumers if you want the update propagated (see `/broadcast-update`).
+
 To (re)build a base + patch from the current pin without pulling HEAD:
 ```bash
 bash scripts/sync-external-skills.sh --establish-base [<name>]
 ```
+
+**Adapting an external skill locally.** To carry a deliberate local change on top of
+an upstream skill (e.g. `slack-gif-creator`'s `Environment` section), just edit the
+working file — never `.upstream/`. Fence the change with `<!-- LOCAL: … -->` /
+`<!-- LOCAL END -->` markers so it's obvious in the source, then run
+`--establish-base <name>` (or any sync) to regenerate `override.patch` from it. The
+patch is derived, not hand-maintained: it always reflects `diff(.upstream → working)`.
+On the next upstream update the merge replays your edit; only an upstream change to
+the same lines forces a conflict for you to resolve.
 
 ## Design Principles
 
