@@ -21,8 +21,10 @@ agents-shared/
 │   │   └── update-agents.md
 │   └── skills/            # Skills (directory format, supports references/templates)
 │       ├── caveman/       # (external) Token-compressed communication
-│       │   ├── SKILL.md
-│       │   └── source.json
+│       │   ├── SKILL.md    #   working copy (base + override)
+│       │   ├── source.json #   provenance + file list
+│       │   ├── .upstream/  #   pristine base (last-synced upstream)
+│       │   └── override.patch  # local deviations (absent if verbatim)
 │       ├── handoff/
 │       │   └── SKILL.md
 │       ├── refactor/
@@ -85,33 +87,58 @@ Skills sourced from external repos follow a convention:
 
 ```
 claude/skills/<skill-name>/
-├── SKILL.md        # Copied from upstream
-└── source.json     # Provenance tracker
+├── SKILL.md        # Working copy (what runs) = base + local override applied
+├── references/…    # Other vendored upstream files (multi-file skills)
+├── source.json     # Provenance tracker + file list
+├── .upstream/      # Pristine base: the last-synced upstream files, verbatim (committed)
+└── override.patch  # Auto-generated diff(base → working); absent when verbatim
 ```
+
+**Update model (borrowed from oh-my-zsh's `upgrade_oh_my_zsh_custom`).** Instead of
+blindly overwriting `SKILL.md`, a sync keeps a pristine copy of the last-synced
+upstream under `.upstream/` (the *base*) and does a 3-way merge of upstream's
+base→HEAD change into the working files. Local edits are replayed on top, not
+clobbered — the same guarantee oh-my-zsh gets from `git pull --autostash`. Every
+local deviation is recorded, human-readable, in `override.patch`, regenerated on
+each sync. A genuine conflict (upstream and local editing the same lines) is left
+as conflict markers in the working file and reported — never silently lost.
 
 **source.json format:**
 ```json
 {
   "repo": "owner/repo",
   "path": "path/to/SKILL.md",
+  "files": ["SKILL.md", "references/foo.md"],
   "commit": "<pinned SHA>",
   "updated": "YYYY-MM-DD"
 }
 ```
+- `path` — upstream-repo path of the primary file. Its dirname is the upstream skill directory.
+- `files` — optional, skill-dir-relative list of every vendored file. Defaults to `["SKILL.md"]`. List only upstream-tracked files; local-only artifacts (`.venv/`, gitignored) are never listed and never touched.
 
 **Adding a new external skill:**
-1. Clone the source repo, locate the SKILL.md
-2. Create `claude/skills/<name>/SKILL.md` with the content
-3. Create `claude/skills/<name>/source.json` with repo, path, and current commit SHA
+1. Copy the upstream skill's files into `claude/skills/<name>/`
+2. Create `source.json` with `repo`, `path`, the current `commit` SHA, and (if multi-file) `files`
+3. Establish the pristine base: `bash scripts/sync-external-skills.sh --establish-base <name>` — fetches the files at the pinned commit into `.upstream/` and captures any local edits as `override.patch`
 4. Update README.md skills table (mark as *(external)*)
 
 **Updating external skills:**
 ```bash
-bash scripts/sync-external-skills.sh            # all
+bash scripts/sync-external-skills.sh            # all → upstream HEAD
 bash scripts/sync-external-skills.sh <name>      # one
 ```
 
-The script clones each source repo at HEAD, compares the commit SHA, and copies the updated file if changed.
+The script reads each `source.json`, resolves upstream HEAD via `git ls-remote`
+(no clone — file contents come from raw.githubusercontent, so a huge upstream repo
+costs a few GETs), 3-way merges each listed file, advances `.upstream/`, refreshes
+`override.patch`, and bumps `commit`/`updated`. On conflict it stops for that skill,
+leaves markers in the working file, and does not advance the base; resolve the
+markers and re-run, or `git checkout` the skill dir to abort.
+
+To (re)build a base + patch from the current pin without pulling HEAD:
+```bash
+bash scripts/sync-external-skills.sh --establish-base [<name>]
+```
 
 ## Design Principles
 

@@ -1,0 +1,12 @@
+{
+  "repo": "shadcn/improve",
+  "path": "skills/improve/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "references/audit-playbook.md",
+    "references/closing-the-loop.md",
+    "references/plan-template.md"
+  ],
+  "commit": "03369ee6d7cafbfcecc4346539b05b3dc0a603bb",
+  "updated": "2026-07-07"
+}

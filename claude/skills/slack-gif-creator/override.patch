@@ -1,0 +1,28 @@
+--- a/SKILL.md
++++ b/SKILL.md
+@@ -7,7 +7,25 @@
+ # Slack GIF Creator
+ 
+ A toolkit providing utilities and knowledge for creating animated GIFs optimized for Slack.
++
++<!-- LOCAL: Environment section below is a local addition not in upstream. Re-add after sync if clobbered. -->
++## Environment
++
++This skill ships with a local virtualenv. **Run all Python through it**, not system `python3`. Treat this `SKILL.md`'s directory as the skill root — all paths below are relative to it.
++
++```bash
++cd "$(dirname "$0")"  # or wherever this SKILL.md lives
++.venv/bin/python your_script.py
++```
+ 
++The `core.*` imports (`core.gif_builder`, `core.validators`, etc.) resolve relative to the skill directory, so `cd` into it before invoking — or set `PYTHONPATH` to that directory.
++
++If `.venv/` is missing, bootstrap it from the skill directory:
++```bash
++python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
++```
++<!-- LOCAL END -->
++
+ ## Slack Requirements
+ 
+ **Dimensions:**

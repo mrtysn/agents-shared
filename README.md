@@ -62,6 +62,7 @@ Skills are directory-based and support references/templates. Both commands and s
 | `/grilling` | Interview the user relentlessly about a plan or design to stress-test it before building *(external)* |
 | `/socratic-quiz` | Guide the user to understanding through adaptive one-at-a-time questioning instead of direct answers *(external)* |
 | `/homelab-connect` | Fetch the node01 operator runbook (secret gist) before any Hetzner/Caddy/Docker/`*.mertyas.in` deploy work |
+| `/improve` | Survey a codebase as a senior advisor and write self-contained implementation plans for other agents to execute — read-only, never edits source *(external)* |
 
 ## Updating
 
@@ -75,11 +76,14 @@ Or use the `/update-agents` command.
 
 ## External Skills
 
-Some skills are sourced from third-party repos. These have a `source.json` next to their `SKILL.md` tracking the upstream repo, file path, and pinned commit SHA.
+Some skills are sourced from third-party repos. Each keeps a `source.json` (upstream repo, path, file list, pinned commit) alongside a `.upstream/` pristine base and, if we've adapted it, an `override.patch`.
 
-To update all external skills to latest upstream:
+Updates preserve local edits the way oh-my-zsh's `upgrade_oh_my_zsh_custom` does: rather than overwriting `SKILL.md`, the sync 3-way merges upstream's change into the working files against the stored base, replaying our edits on top. Conflicts are surfaced as markers, never silently dropped.
 
 ```bash
-bash scripts/sync-external-skills.sh            # all external skills
+bash scripts/sync-external-skills.sh            # all external skills → upstream HEAD
 bash scripts/sync-external-skills.sh caveman     # specific skill only
+bash scripts/sync-external-skills.sh --establish-base [name]  # (re)build base + patch from the pin
 ```
+
+See CLAUDE.md → *External (Third-Party) Skills* for the full model.
