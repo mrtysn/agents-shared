@@ -63,6 +63,7 @@ Skills are directory-based and support references/templates. Both commands and s
 | `/socratic-quiz` | Guide the user to understanding through adaptive one-at-a-time questioning instead of direct answers *(external)* |
 | `/homelab-connect` | Fetch the node01 operator runbook (secret gist) before any Hetzner/Caddy/Docker/`*.mertyas.in` deploy work |
 | `/improve` | Survey a codebase as a senior advisor and write self-contained implementation plans for other agents to execute — read-only, never edits source *(external)* |
+| `/i-have-adhd` | Shape output for an ADHD reader — lead with the next action, number steps, restate state, suppress tangents *(external)* |
 
 ## Updating
 
