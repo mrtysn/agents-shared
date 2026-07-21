@@ -49,7 +49,6 @@ Skills are directory-based and support references/templates. Both commands and s
 | Skill | Description |
 |-------|-------------|
 | `/refactor` | Systematic refactoring with full cleanup — maps scope, tracks progress, same standards for tests |
-| `/rpi` | Research-Plan-Implement workflow: deep investigation, written plan with annotation cycles, then full execution |
 | `/handoff` | Craft a handoff message for session continuity. Pass a session UUID to consolidate from a past session via sub-agent. |
 | `/board` | Show the Jira sprint board as a TUI kanban, or dive into a specific ticket with codebase research |
 | `/caveman` | Ultra-compressed communication (~75% token savings). Levels: lite, full, ultra *(external)* |

@@ -70,6 +70,14 @@ Command instructions here. Use $ARGUMENTS for user-provided arguments.
 
 Skills support additional features: reference files, templates, and advanced frontmatter (`context: fork`, `agent`, etc.).
 
+**Do not run `scripts/init-global.sh`.** It writes symlinks into `~/.claude/`,
+outside every repo, and makes skills machine-wide. That duplicates the
+project-scope symlinks each consumer already has: the same skill is then listed
+twice in the system prompt, and a repo's `.agents-ignore` cannot suppress the
+user-scope copy. Adding a skill here is finished at step 5 — the next
+`/broadcast-update` distributes it. `init-global.sh` is a user-run machine setup
+command; leave it to the user.
+
 ## Adding New Commands
 
 1. Create `claude/commands/<command-name>.md`
