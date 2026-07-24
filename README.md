@@ -28,6 +28,22 @@ sources are linked, wrong-target links repaired, orphaned links (renamed/deleted
 upstream) pruned, and real local override files left untouched. Honors
 `CLAUDE_CONFIG_DIR` if set.
 
+### Install local-only (per project, no repo footprint)
+
+Symlink chosen skills from a standalone clone and hide them via
+`.git/info/exclude` — no submodule, nothing in git status:
+
+```bash
+mkdir -p <repo>/.claude/skills
+ln -s <clone>/claude/skills/handoff <repo>/.claude/skills/handoff
+echo ".claude/skills/handoff" >> <repo>/.git/info/exclude
+```
+
+`git pull` in the clone updates all such repos at once. Exclude links by name,
+not all of `.claude/`, so committed skills can coexist. Machine-local — for a
+setup that travels with the repo, use the submodule. Not automated by the
+scripts.
+
 ## Commands
 
 | Command | Description |
