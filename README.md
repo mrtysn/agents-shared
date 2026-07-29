@@ -80,6 +80,43 @@ Skills are directory-based and support references/templates. Both commands and s
 | `/improve` | Survey a codebase as a senior advisor and write self-contained implementation plans for other agents to execute — read-only, never edits source *(external)* |
 | `/i-have-adhd` | Shape output for an ADHD reader — lead with the next action, number steps, restate state, suppress tangents *(external)* |
 
+## Hooks
+
+Not skills — shell scripts wired into `~/.claude/settings.json` by hand.
+
+| Hook | Event | Description |
+|------|-------|-------------|
+| `hooks/block-submodule-writes.sh` | PreToolUse | Refuses edits to files inside `.agents/` — submodules are edited in their source repo |
+| `hooks/focus-policy.sh` | SessionStart | Tells the session whether this machine tolerates a window stealing keyboard focus |
+
+### focus-policy.sh
+
+Agents open windows: a Godot capture, a browser, a simulator. On a machine the
+user is working on, that grabs focus mid-sentence, and an iteration loop does it
+repeatedly. Whether it is acceptable depends on the **machine**, not the task, so
+the answer belongs in the environment rather than in each session's judgement.
+
+```bash
+hooks/focus-policy.sh            # SessionStart — injects the verdict + guidance
+hooks/focus-policy.sh --verdict  # "allow" | "deny"
+hooks/focus-policy.sh --check    # exit 0 = allowed, 1 = denied
+```
+
+**Fails closed.** An unknown machine is `deny`: forgetting to allow one costs a
+little convenience, forgetting to deny one costs the user their attention. The
+allow-list is a glob list at the top of the script; override per machine with
+`~/.claude/focus-allow` (one hostname or glob per line, `#` comments ignored —
+the file *replaces* the built-in list, so an empty file denies everywhere).
+
+Wire it up in `~/.claude/settings.json`:
+
+```json
+{ "type": "command", "command": "<abs-path>/hooks/focus-policy.sh", "timeout": 5 }
+```
+
+The matching standing rule lives in the user-level `CLAUDE.md` — the hook
+reports the verdict, the rule says what to do about it.
+
 ## Updating
 
 From any project using this submodule:
