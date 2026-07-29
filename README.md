@@ -82,7 +82,8 @@ Skills are directory-based and support references/templates. Both commands and s
 
 ## Hooks
 
-Not skills — shell scripts wired into `~/.claude/settings.json` by hand.
+Not skills — shell scripts wired by hand into the `settings.json` of the Claude
+config dir (`$CLAUDE_CONFIG_DIR`, else `~/.claude`).
 
 | Hook | Event | Description |
 |------|-------|-------------|
@@ -103,12 +104,14 @@ hooks/focus-policy.sh --check    # exit 0 = allowed, 1 = denied
 ```
 
 **Fails closed.** An unknown machine is `deny`: forgetting to allow one costs a
-little convenience, forgetting to deny one costs the user their attention. The
-allow-list is a glob list at the top of the script; override per machine with
-`~/.claude/focus-allow` (one hostname or glob per line, `#` comments ignored —
-the file *replaces* the built-in list, so an empty file denies everywhere).
+little convenience, forgetting to deny one costs the user their attention.
 
-Wire it up in `~/.claude/settings.json`:
+The allow-list is `focus-allow` in the Claude config dir (`$CLAUDE_CONFIG_DIR`,
+else `~/.claude`) — one hostname or glob per line, `#` comments ignored. There is
+no list in the script: machine names are local configuration, not shared source,
+so a missing or empty file denies everywhere.
+
+Wire it up in that same directory's `settings.json`:
 
 ```json
 { "type": "command", "command": "<abs-path>/hooks/focus-policy.sh", "timeout": 5 }

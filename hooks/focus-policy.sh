@@ -13,9 +13,10 @@
 #   focus-policy.sh --check    # exit 0 = allowed, 1 = denied
 #   focus-policy.sh --verdict  # prints "allow" or "deny"
 #
-# The allow-list lives outside this repository, in ~/.claude/focus-allow: one
-# hostname or glob per line, '#' comments ignored. Machine names are local
-# configuration, not shared source. Absent or empty file means deny everywhere.
+# The allow-list lives outside this repository, as `focus-allow` in the Claude
+# config dir ($CLAUDE_CONFIG_DIR, else ~/.claude): one hostname or glob per line,
+# '#' comments ignored. Machine names are local configuration, not shared source.
+# Absent or empty file means deny everywhere.
 #
 # FOCUS_POLICY_HOST overrides the detected name, for testing the matching.
 
