@@ -178,7 +178,10 @@ def classify():
 
         if uuids:
             sid = uuids[-1]
-            claimed.add(sid)
+            # claim every uuid in this dead tab's text, not just the last: the
+            # earlier ones are this tab's session ancestry and must not be
+            # handed to another tab by the inference pass
+            claimed.update(uuids)
             info = transcripts[sid]
             entry["session"] = sid
             entry.update(transcript_meta(info["path"]))
@@ -216,6 +219,38 @@ def classify():
                 entry["transcript"] = transcripts[u]["path"]
                 entry["config"] = transcripts[u]["config"]
                 break
+
+    # inference pass: a dead tab titled "<project>: ..." whose uuid scrolled off
+    # can still be resolved if exactly one unclaimed transcript in that project
+    # was active shortly before the restart killed it. Zero or several
+    # candidates stay unresolved — with no screen evidence, uniqueness is the
+    # only safe assignment.
+    infer_floor = started - 30 * 60
+    for entry in list(out["unresolved"]):
+        m = re.match(r"[^\w.-]*([\w.-]+):", entry["name"])
+        if not m:
+            continue
+        project = m.group(1)
+        cands = []
+        for u, v in transcripts.items():
+            if not infer_floor <= v["mtime"] < started or u in claimed:
+                continue
+            if not os.path.dirname(v["path"]).endswith(f"-{project}"):
+                continue
+            meta = transcript_meta(v["path"])
+            if meta["cwd"] and os.path.basename(meta["cwd"]) == project:
+                cands.append((u, meta))
+        if len(cands) == 1:
+            u, meta = cands[0]
+            claimed.add(u)
+            entry["session"] = u
+            entry.update(meta)
+            entry["last_active"] = transcripts[u]["mtime"]
+            entry["transcript"] = transcripts[u]["path"]
+            entry["config"] = transcripts[u]["config"]
+            entry["inferred"] = True
+            out["unresolved"].remove(entry)
+            out["ended"].append(entry)
     return out
 
 
@@ -230,6 +265,8 @@ def print_table(data):
             cfg = r.get("config")
             if cfg and cfg != DEFAULT_CONFIG_DIR:
                 extra += f"  ({os.path.basename(cfg)})"
+            if r.get("inferred"):
+                extra += "  (inferred)"
             cwd = r.get("cwd") or ""
             print(f"  {r['tab']:<7} {sid:<36} {cwd}{extra}  [{r['name']}]")
         print()

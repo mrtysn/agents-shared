@@ -46,6 +46,6 @@ Output the block(s) as text for the user to paste into a fresh session. Never wr
 
 ## Known limitations
 
-- AppleScript exposes only the visible screen per tab, not scrollback. Dead sessions whose UUID scrolled off land in `UNRESOLVED` — cross-check those with `/recent-sessions`, or scroll the tab up and re-run. Full-scrollback support would require iTerm2's Python API (Settings → API), not currently used.
+- AppleScript exposes only the visible screen per tab, not scrollback. A dead tab whose UUID scrolled off is resolved by inference when exactly one unclaimed transcript in the tab's project died within 30 minutes of the restart — shown as `(inferred)`. Zero or several candidates land in `UNRESOLVED`: cross-check those with `/recent-sessions`, or scroll the tab up and re-run. Full-scrollback support would require iTerm2's Python API (Settings → API), not currently used.
 - Live sessions with no on-screen UUID and no `--resume` in argv are matched by project-name heuristic and may show `?` — the process is confirmed alive either way.
 - The moved-on filter is heuristic (post-restart transcript mtime, or typed commands after the last claude block). When in doubt a session lands in `ENDED` rather than being silently skipped.
