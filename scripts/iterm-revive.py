@@ -23,8 +23,7 @@ import re
 import subprocess
 import sys
 
-UUID_RE = re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b")
-DEFAULT_CONFIG_DIR = os.path.expanduser("~/.claude")
+from claude_dirs import DEFAULT_CONFIG_DIR, UUID_RE, config_dirs
 # tab-name prefixes that only a claude statusline sets
 CLAUDE_NAME_RE = re.compile(r"(: done|: ready|needs approval|✳|●)")
 # commands that precede launching claude rather than indicating new work
@@ -95,18 +94,6 @@ def dump_tabs():
     for t in tabs:
         t["text"] = "\n".join(t.pop("lines"))
     return tabs
-
-
-def config_dirs():
-    """Every claude config dir holding transcripts: ~/.claude* plus any
-    CLAUDE_CONFIG_DIR found in the environment of a running claude process."""
-    dirs = {d for d in glob.glob(os.path.expanduser("~/.claude*")) if os.path.isdir(f"{d}/projects")}
-    for pid in subprocess.run(["pgrep", "-x", "claude"], capture_output=True, text=True).stdout.split():
-        env = subprocess.run(["ps", "eww", "-o", "command=", "-p", pid], capture_output=True, text=True).stdout
-        m = re.search(r"CLAUDE_CONFIG_DIR=(\S+)", env)
-        if m and os.path.isdir(f"{m.group(1)}/projects"):
-            dirs.add(m.group(1))
-    return sorted(dirs)
 
 
 def index_transcripts():

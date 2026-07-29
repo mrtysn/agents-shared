@@ -1,5 +1,5 @@
 ---
-description: Recap the current session — what got done, what remains outstanding, and where each item stands. Use when the user asks "any outstanding tasks?", "are there any outstanding tasks we have not covered / finished yet?", "any outstanding work we haven't covered?", "remind me what's left", "where were we", "recap what you did", or "did it work or not".
+description: Recap the current session — what got done, what remains outstanding, and where each item stands. Use when the user asks "any outstanding tasks?", "are there any outstanding tasks we have not covered / finished yet?", "any outstanding work we haven't covered?", "remind me what's left", "where were we", "recap what you did", or "did it work or not". Scope is this session only — for sessions killed by an iTerm relaunch, point the user at /iterm-revive instead.
 argument-hint: [optional scope hint, e.g. "just code" or "include deploy"]
 user-invocable: true
 allowed-tools: Bash, Read, Glob, Grep

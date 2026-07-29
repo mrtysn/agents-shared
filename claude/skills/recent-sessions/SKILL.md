@@ -9,7 +9,7 @@ argument-hint: [-d 3 for last 3 days, -n 25 to limit, -c for current project, -p
 
 List recent Claude Code sessions across all projects, sorted by mtime. For each session renders:
 
-- header row: `#N | session UUID | project | mtime | size | first user prompt`
+- header row: `#N | session UUID | project | mtime | size | live marker | first user prompt` — `live` means the session is running in another tab (from a `claude --resume` argv), `live?` means probably running (transcript actively written while a claude process sits in that project); projects from a non-default config dir carry a `[<config>]` tag
 - `> …` lines: the next few user prompts (catches sessions that pivot after opening)
 - `~ path` line: the most-touched file in the session (another discriminator when the prose is ambiguous)
 
@@ -28,7 +28,7 @@ python3 ~/dev/personal/agents-shared/scripts/recent-sessions.py $ARGUMENTS
 - `--current` / `-c`: filter to current project (from git repo root)
 - `--prompts N`: number of opening user prompts to show per session (default: 2)
 - `--full`: do not truncate prompt / file-path columns
-- `--resume N` / `-r N`: resume session number N from the last run
+- `--resume N` / `-r N`: resume session number N from the last run — runs in the session's own cwd and config dir, and asks for confirmation if the session looks live in another tab
 
 **Typical flows:**
 - "What was I working on before the restart?" → `recent-sessions -d 1`

@@ -25,7 +25,14 @@ from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
 
-PROJECTS_DIR = Path.home() / ".claude" / "projects"
+from claude_dirs import (
+    DEFAULT_CONFIG_DIR,
+    config_dirs,
+    find_transcript,
+    live_claude_cwds,
+    live_resume_uuids,
+)
+
 CACHE_DIR = Path.home() / ".cache" / "search-history"
 CACHE_FILE = CACHE_DIR / "last-run.json"
 HOME = str(Path.home())
@@ -82,6 +89,23 @@ def load_cache() -> dict:
         return {}
 
 
+def _session_cwd(path: str) -> str | None:
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if '"cwd"' not in line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if rec.get("cwd"):
+                    return rec["cwd"]
+    except OSError:
+        pass
+    return None
+
+
 def do_resume(number: int) -> None:
     mapping = load_cache()
     key = str(number)
@@ -92,7 +116,28 @@ def do_resume(number: int) -> None:
         else:
             print("Run recent-sessions (or search-history) first to populate the list.", file=sys.stderr)
         sys.exit(1)
-    os.execvp("claude", ["claude", "--resume", mapping[key]])
+    sid = mapping[key]
+
+    path, config = find_transcript(sid)
+    cwd = _session_cwd(path) if path else None
+
+    # refuse to double-resume a session that is already running in another tab
+    live = sid in live_resume_uuids() or (
+        path and datetime.now().timestamp() - os.path.getmtime(path) < 300
+        and cwd in live_claude_cwds()
+    )
+    if live:
+        answer = input(f"Session {sid} appears to be running in another tab. Resume anyway? [y/N] ")
+        if answer.strip().lower() != "y":
+            sys.exit(1)
+
+    # resume in the session's own cwd and config, so the right project and
+    # transcript store are picked up regardless of where this runs from
+    if cwd and os.path.isdir(cwd):
+        os.chdir(cwd)
+    if config and config != DEFAULT_CONFIG_DIR:
+        os.environ["CLAUDE_CONFIG_DIR"] = config
+    os.execvp("claude", ["claude", "--resume", sid])
 
 
 def get_repo_root() -> str | None:
@@ -187,39 +232,39 @@ def collect_sessions(
     project_filter: str | None,
     current_only: bool,
 ) -> list[dict]:
-    if not PROJECTS_DIR.exists():
-        return []
-
     current_dir_name = current_project_dir_name() if current_only else None
     sessions: list[dict] = []
 
-    for project_dir in PROJECTS_DIR.iterdir():
-        if not project_dir.is_dir():
-            continue
-        if current_only:
-            if current_dir_name is None or project_dir.name != current_dir_name:
+    for config in config_dirs():
+        for project_dir in (Path(config) / "projects").iterdir():
+            if not project_dir.is_dir():
                 continue
-        label = decode_project(project_dir.name)
-        if project_filter and project_filter.lower() not in label.lower():
-            continue
+            if current_only:
+                if current_dir_name is None or project_dir.name != current_dir_name:
+                    continue
+            label = decode_project(project_dir.name)
+            if project_filter and project_filter.lower() not in label.lower():
+                continue
 
-        # Top-level .jsonl only — skip subagents/, tool-results/, etc.
-        for entry in project_dir.iterdir():
-            if not entry.is_file() or entry.suffix != ".jsonl":
-                continue
-            try:
-                stat = entry.stat()
-            except OSError:
-                continue
-            if cutoff is not None and stat.st_mtime < cutoff:
-                continue
-            sessions.append({
-                "session_id": entry.stem,
-                "project": label,
-                "path": str(entry),
-                "mtime": stat.st_mtime,
-                "size": stat.st_size,
-            })
+            # Top-level .jsonl only — skip subagents/, tool-results/, etc.
+            for entry in project_dir.iterdir():
+                if not entry.is_file() or entry.suffix != ".jsonl":
+                    continue
+                try:
+                    stat = entry.stat()
+                except OSError:
+                    continue
+                if cutoff is not None and stat.st_mtime < cutoff:
+                    continue
+                sessions.append({
+                    "session_id": entry.stem,
+                    "project": label,
+                    "dirname": project_dir.name,
+                    "config": config,
+                    "path": str(entry),
+                    "mtime": stat.st_mtime,
+                    "size": stat.st_size,
+                })
 
     sessions.sort(key=lambda s: s["mtime"], reverse=True)
     return sessions
@@ -243,8 +288,9 @@ def render(sessions: list[dict], full: bool) -> None:
     proj_width = min(32, max((len(s["project"]) for s in sessions), default=10))
     size_width = 5
     time_width = 11
+    live_width = 5
     idx_width = len(str(len(sessions))) + 1  # "#N" style
-    header_overhead = idx_width + id_width + proj_width + size_width + time_width + 10
+    header_overhead = idx_width + id_width + proj_width + size_width + time_width + live_width + 12
 
     if full:
         header_prompt_width: int | None = None
@@ -270,7 +316,8 @@ def render(sessions: list[dict], full: bool) -> None:
         print(
             f"{idx:<{idx_width}}  {sid:<{id_width}}  {proj:<{proj_width}}  "
             f"{format_mtime(s['mtime']):<{time_width}}  "
-            f"{format_size(s['size']):>{size_width}}  {_truncate(first, header_prompt_width)}"
+            f"{format_size(s['size']):>{size_width}}  "
+            f"{s.get('live') or '':<{live_width}} {_truncate(first, header_prompt_width)}"
         )
         for p in prompts[1:]:
             print(f"{indent}> {_truncate(p, cont_width)}")
@@ -323,6 +370,20 @@ def main(argv: list[str]) -> int:
 
     if args.limit and args.limit > 0:
         sessions = sessions[: args.limit]
+
+    # liveness: definite from a --resume argv, probable when the transcript is
+    # actively written and a running claude's cwd matches the project
+    argv_live = live_resume_uuids()
+    live_dirnames = {c.replace("/", "-") for c in live_claude_cwds()}
+    now = datetime.now().timestamp()
+    for s in sessions:
+        if s["session_id"] in argv_live:
+            s["live"] = "live"
+        elif s["dirname"] in live_dirnames and now - s["mtime"] < 300:
+            s["live"] = "live?"
+        if s["config"] != DEFAULT_CONFIG_DIR:
+            tag = os.path.basename(s["config"]).removeprefix(".claude").lstrip("-") or "?"
+            s["project"] += f" [{tag}]"
 
     want_prompts = max(1, args.prompts)
     for s in sessions:

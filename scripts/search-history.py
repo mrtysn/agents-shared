@@ -20,8 +20,8 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-_config_dir = Path(os.environ.get("CLAUDE_CONFIG_DIR") or (Path.home() / ".claude"))
-PROJECTS_DIR = _config_dir / "projects"
+from claude_dirs import config_dirs
+
 CACHE_DIR = Path.home() / ".cache" / "search-history"
 CACHE_FILE = CACHE_DIR / "last-run.json"
 DEFAULT_DAYS = 0
@@ -254,7 +254,8 @@ def scan_session(session_file: Path, pattern: re.Pattern) -> dict | None:
 
 def discover_projects(project_filter: str | None, current_only: bool) -> list[tuple[str, Path]]:
     """Return list of (project_name, project_dir) tuples."""
-    if not PROJECTS_DIR.exists():
+    projects_roots = [Path(cfg) / "projects" for cfg in config_dirs()]
+    if not projects_roots:
         return []
 
     if current_only:
@@ -263,30 +264,30 @@ def discover_projects(project_filter: str | None, current_only: bool) -> list[tu
             print("Error: --current requires a git repository", file=sys.stderr)
             sys.exit(1)
         encoded = get_project_dir_for_repo(repo_root)
-        project_dir = PROJECTS_DIR / encoded
-        if project_dir.exists():
-            name = os.path.basename(repo_root)
-            return [(name, project_dir)]
-        else:
-            print(f"No Claude session directory found for {repo_root}", file=sys.stderr)
-            sys.exit(1)
+        name = os.path.basename(repo_root)
+        found = [(name, root / encoded) for root in projects_roots if (root / encoded).exists()]
+        if found:
+            return found
+        print(f"No Claude session directory found for {repo_root}", file=sys.stderr)
+        sys.exit(1)
 
     projects = []
-    for d in sorted(PROJECTS_DIR.iterdir()):
-        if not d.is_dir():
-            continue
-        parts = d.name.split("-")
-        name = parts[-1] if parts else d.name
-        decoded = d.name.replace("-", "/")
-        if decoded.startswith("/"):
-            name = os.path.basename(decoded.rstrip("/"))
-        else:
-            name = d.name
+    for root in projects_roots:
+        for d in sorted(root.iterdir()):
+            if not d.is_dir():
+                continue
+            parts = d.name.split("-")
+            name = parts[-1] if parts else d.name
+            decoded = d.name.replace("-", "/")
+            if decoded.startswith("/"):
+                name = os.path.basename(decoded.rstrip("/"))
+            else:
+                name = d.name
 
-        if project_filter and project_filter.lower() not in d.name.lower():
-            continue
+            if project_filter and project_filter.lower() not in d.name.lower():
+                continue
 
-        projects.append((name, d))
+            projects.append((name, d))
 
     return projects
 
