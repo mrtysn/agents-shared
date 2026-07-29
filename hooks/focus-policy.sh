@@ -1,57 +1,48 @@
 #!/bin/bash
-# Decides whether an agent on THIS machine may open a window that steals focus.
+# Decides whether an agent on this machine may open a window that steals focus.
 #
-# Some machines are shared with real work happening on the same screen — a
-# Godot capture or a browser launch that grabs focus mid-sentence is a genuine
-# interruption there. Others are personal and nobody cares. The difference is
-# the machine, not the task, so the answer belongs in the environment rather
-# than in each agent's judgement.
+# Some machines are shared with work happening on the same screen, where a game
+# engine, browser, or simulator taking focus mid-keystroke is an interruption.
+# Others are personal. The answer depends on the machine rather than the task,
+# so it belongs in the environment instead of each session's judgement.
 #
-# Fails closed: an unknown machine is DENY. Adding a machine is a deliberate
-# act; forgetting to add one costs a little convenience, forgetting to deny one
-# costs the user their attention.
+# Fails closed: an unlisted machine is DENY. Allowing one is a deliberate act.
 #
 # Usage:
-#   focus-policy.sh            # SessionStart hook — emits JSON additionalContext
-#   focus-policy.sh --check    # exit 0 = allowed, 1 = denied (for scripts)
+#   focus-policy.sh            # SessionStart hook: emits JSON additionalContext
+#   focus-policy.sh --check    # exit 0 = allowed, 1 = denied
 #   focus-policy.sh --verdict  # prints "allow" or "deny"
 #
-# Override the built-in list per machine with ~/.claude/focus-allow — one
-# hostname or glob per line, '#' comments ignored. The file REPLACES the
-# built-in list, so an empty file means deny everywhere.
+# The allow-list lives outside this repository, in ~/.claude/focus-allow: one
+# hostname or glob per line, '#' comments ignored. Machine names are local
+# configuration, not shared source. Absent or empty file means deny everywhere.
+#
+# FOCUS_POLICY_HOST overrides the detected name, for testing the matching.
 
 set -uo pipefail
 
-HOST="$(scutil --get ComputerName 2>/dev/null || hostname -s)"
+# scutil first: `hostname -s` can return a DHCP-derived name that has nothing to
+# do with the configured one. The fallback covers non-macOS hosts.
+HOST="${FOCUS_POLICY_HOST:-$(scutil --get ComputerName 2>/dev/null || hostname -s)}"
 HOST="${HOST%%.*}"
 
-# Machines where a window may take focus. Globs, matched case-insensitively.
-DEFAULT_ALLOW=(
-	"*m2max*"   # home machine — nobody else is looking at this screen
-)
-
-OVERRIDE="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/focus-allow"
-
-allow_list() {
-	if [ -f "$OVERRIDE" ]; then
-		grep -vE '^\s*(#|$)' "$OVERRIDE" 2>/dev/null
-		return
-	fi
-	printf '%s\n' "${DEFAULT_ALLOW[@]}"
-}
+ALLOW_FILE="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/focus-allow"
 
 verdict() {
-	local host_lc pattern_lc
+	[ -f "$ALLOW_FILE" ] || { echo "deny"; return; }
+	local host_lc pattern pattern_lc
 	host_lc="$(printf '%s' "$HOST" | tr '[:upper:]' '[:lower:]')"
 	while IFS= read -r pattern; do
+		pattern="${pattern%%#*}"
+		pattern="$(printf '%s' "$pattern" | tr -d '[:space:]')"
 		[ -z "$pattern" ] && continue
 		pattern_lc="$(printf '%s' "$pattern" | tr '[:upper:]' '[:lower:]')"
-		# shellcheck disable=SC2053 — glob match is the point
+		# shellcheck disable=SC2053
 		if [[ "$host_lc" == $pattern_lc ]]; then
 			echo "allow"
 			return
 		fi
-	done < <(allow_list)
+	done < "$ALLOW_FILE"
 	echo "deny"
 }
 
@@ -68,22 +59,22 @@ case "${1:-}" in
 esac
 
 if [ "$VERDICT" = "allow" ]; then
-	CONTEXT="Focus policy: ALLOW (host ${HOST}). Opening a GUI window is fine here."
+	CONTEXT="Focus policy: ALLOW. Opening a GUI window is fine on this machine."
 else
-	# Not `CONTEXT=$(cat <<EOF ...)` — macOS ships bash 3.2, whose parser
-	# mishandles a heredoc inside command substitution and dies at EOF.
-	IFS= read -r -d '' CONTEXT <<EOF || true
-Focus policy: DENY (host ${HOST}). Do NOT run anything that opens a window and
-takes keyboard focus — the user is working on this screen and a window stealing
-focus interrupts them mid-sentence.
+	# Assigned via `read`, not `$(cat <<EOF)`: bash 3.2, which macOS ships,
+	# mishandles a heredoc inside command substitution.
+	IFS= read -r -d '' CONTEXT <<-EOF || true
+Focus policy: DENY. Do NOT run anything that opens a window and takes keyboard
+focus — the user is working on this screen, and a window stealing focus
+interrupts them mid-sentence.
 
-- Use the headless/offscreen mode of whatever you are running. For Godot that is
-  \`--headless\`, which covers parse checks, the test suite, and any probe whose
-  output is printed rather than drawn.
-- When the task genuinely needs rendered pixels (a frame capture, a browser
-  screenshot), say so and ask first. Then do it in ONE batched run rather than
-  iterating, and push the window off the working display with the tool's own
-  flags (Godot: \`--screen N\` / \`--position X,Y\`).
+- Use the headless or offscreen mode of whatever you are running. For Godot that
+  is \`--headless\`, which covers parse checks, the test suite, and any probe
+  whose output is printed rather than drawn.
+- When the task genuinely needs rendered pixels (a frame capture, a screenshot),
+  say so and ask first. Then do it in ONE batched run rather than iterating, and
+  push the window off the working display with the tool's own flags (Godot:
+  \`--screen N\` / \`--position X,Y\`).
 - Never re-run a windowed command "just to check". Print the state instead.
 EOF
 fi
