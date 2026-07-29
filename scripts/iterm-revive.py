@@ -62,14 +62,22 @@ def iterm_start_time():
 
 
 def live_claude_ttys():
-    """tty -> argv for every running claude process."""
-    ps = subprocess.run(["ps", "-axo", "tty=,command="], capture_output=True, text=True).stdout
+    """tty -> {pid, argv} for every running claude process."""
+    ps = subprocess.run(["ps", "-axo", "pid=,tty=,command="], capture_output=True, text=True).stdout
     ttys = {}
     for line in ps.splitlines():
-        parts = line.strip().split(None, 1)
-        if len(parts) == 2 and (parts[1] == "claude" or parts[1].startswith("claude ")):
-            ttys[parts[0]] = parts[1]
+        parts = line.strip().split(None, 2)
+        if len(parts) == 3 and (parts[2] == "claude" or parts[2].startswith("claude ")):
+            ttys[parts[1]] = {"pid": parts[0], "argv": parts[2]}
     return ttys
+
+
+def process_cwd(pid):
+    out = subprocess.run(["lsof", "-a", "-p", pid, "-d", "cwd", "-Fn"], capture_output=True, text=True).stdout
+    for line in out.splitlines():
+        if line.startswith("n"):
+            return line[1:]
+    return None
 
 
 def dump_tabs():
@@ -142,34 +150,35 @@ def classify():
     tabs = dump_tabs()
 
     out = {"iterm_started": started, "live": [], "ended": [], "moved_on": [], "unresolved": []}
+    claimed = set()
+    pending = []  # live tabs with no argv/on-screen UUID; resolved after all claims are in
     for t in tabs:
-        uuids = list(dict.fromkeys(u for u in UUID_RE.findall(t["text"]) if u in transcripts))
+        # dedupe keeping LAST occurrence order, so uuids[-1] is the uuid lowest
+        # on the screen — the statusline of whatever ran most recently, not a
+        # stray uuid printed mid-scrollback (e.g. by this very skill's output)
+        matches = [u for u in UUID_RE.findall(t["text"]) if u in transcripts]
+        uuids = list(dict.fromkeys(reversed(matches)))[::-1]
         entry = {"tab": t["tab"], "tty": t["tty"], "name": t["name"]}
 
         if t["tty"] in ttys:
-            argv = ttys[t["tty"]]
-            m = UUID_RE.search(argv)
+            proc = ttys[t["tty"]]
+            m = UUID_RE.search(proc["argv"])
             sid = m.group(0) if m else (uuids[-1] if uuids else None)
-            if sid is None:
-                # no UUID on screen or in argv: freshest transcript still being
-                # written in the project matching the process's cwd
-                cand = [(v["mtime"], u) for u, v in transcripts.items() if v["mtime"] > started]
-                for _, u in sorted(cand, reverse=True):
-                    meta = transcript_meta(transcripts[u]["path"])
-                    if meta["cwd"] and os.path.basename(meta["cwd"]) in t["name"]:
-                        sid = u
-                        break
             entry["session"] = sid
             if sid:
+                claimed.add(sid)
                 entry.update(transcript_meta(transcripts[sid]["path"]))
                 entry["last_active"] = transcripts[sid]["mtime"]
                 entry["transcript"] = transcripts[sid]["path"]
                 entry["config"] = transcripts[sid]["config"]
+            else:
+                pending.append((entry, proc["pid"]))
             out["live"].append(entry)
             continue
 
         if uuids:
             sid = uuids[-1]
+            claimed.add(sid)
             info = transcripts[sid]
             entry["session"] = sid
             entry.update(transcript_meta(info["path"]))
@@ -187,6 +196,26 @@ def classify():
         elif CLAUDE_NAME_RE.search(t["name"]):
             # dead shell, claude-flavored tab name, UUID scrolled off screen
             out["unresolved"].append(entry)
+
+    # fallback pass, after every tab's direct claim is registered: freshest
+    # transcript still being written in the process's actual cwd (per lsof),
+    # excluding transcripts already owned by another tab. Stays "?" on no match.
+    for entry, pid in pending:
+        cwd = process_cwd(pid)
+        if not cwd:
+            continue
+        cand = [(v["mtime"], u) for u, v in transcripts.items()
+                if v["mtime"] > started and u not in claimed]
+        for _, u in sorted(cand, reverse=True):
+            meta = transcript_meta(transcripts[u]["path"])
+            if meta["cwd"] == cwd:
+                claimed.add(u)
+                entry["session"] = u
+                entry.update(meta)
+                entry["last_active"] = transcripts[u]["mtime"]
+                entry["transcript"] = transcripts[u]["path"]
+                entry["config"] = transcripts[u]["config"]
+                break
     return out
 
 
