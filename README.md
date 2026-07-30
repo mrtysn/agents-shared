@@ -79,6 +79,7 @@ Skills are directory-based and support references/templates. Both commands and s
 | `/homelab-connect` | Fetch the node01 operator runbook from its private repo before any Hetzner/Caddy/Docker/self-hosted deploy work |
 | `/improve` | Survey a codebase as a senior advisor and write self-contained implementation plans for other agents to execute — read-only, never edits source *(external)* |
 | `/i-have-adhd` | Shape output for an ADHD reader — lead with the next action, number steps, restate state, suppress tangents *(external)* |
+| `/humanizer` | Strip signs of AI-generated writing and match the voice of a supplied writing sample *(external)* |
 
 ## Hooks
 
