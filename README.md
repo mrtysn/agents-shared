@@ -89,6 +89,7 @@ config dir (`$CLAUDE_CONFIG_DIR`, else `~/.claude`).
 | Hook | Event | Description |
 |------|-------|-------------|
 | `hooks/block-submodule-writes.sh` | PreToolUse | Refuses edits to files inside `.agents/` — submodules are edited in their source repo |
+| `hooks/block-tree-discard.sh` | PreToolUse | Refuses git commands that discard uncommitted work; only `git checkout -- <one tracked file>` passes |
 | `hooks/focus-policy.sh` | SessionStart | Tells the session whether this machine tolerates a window stealing keyboard focus |
 
 ### focus-policy.sh
