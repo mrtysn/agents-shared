@@ -1,7 +1,7 @@
 # agents-shared
 
-Shared Claude Code behavioural rules, skills, and commands — used across projects via git
-submodule, and machine-wide via `~/.claude/` symlinks.
+Shared Claude Code behavioural rules, skills, and commands — installed machine-wide
+via `~/.claude/` symlinks, reaching every project on the machine.
 
 **Maintaining this across several machines:** see
 [docs/MAINTAINING-RULES.md](docs/MAINTAINING-RULES.md) — new-machine setup, keeping
@@ -10,19 +10,11 @@ hook.
 
 ## Usage
 
-Add as a submodule at `.agents`:
-
-```bash
-git submodule add <repo-url> .agents
-```
-
-Then symlink or reference commands from `.claude/commands/`.
-
 ### Install globally (one machine, every project)
 
-Instead of wiring each repo up individually, symlink everything into the
-user-level Claude dirs (`~/.claude/commands`, `~/.claude/skills`, `~/.claude/rules`) so
-every project on the machine sees these commands, skills, and rules:
+Symlink everything into the user-level Claude dirs (`~/.claude/commands`,
+`~/.claude/skills`, `~/.claude/rules`) so every project on the machine sees
+these commands, skills, and rules:
 
 ```bash
 bash scripts/init-global.sh           # sync ~/.claude with this repo
@@ -46,9 +38,8 @@ echo ".claude/skills/handoff" >> <repo>/.git/info/exclude
 ```
 
 `git pull` in the clone updates all such repos at once. Exclude links by name,
-not all of `.claude/`, so committed skills can coexist. Machine-local — for a
-setup that travels with the repo, use the submodule. Not automated by the
-scripts.
+not all of `.claude/`, so committed skills can coexist. Rarely needed — the
+global install already reaches every project. Not automated by the scripts.
 
 ## Commands
 
@@ -61,8 +52,6 @@ scripts.
 | `/no-chat-in-code` | Keep code free of conversational artifacts and steering commentary |
 | `/plan-not-ready` | Signal that the plan needs more refinement before implementation |
 | `/refocus` | Reset focus when Claude loses the plot |
-| `/broadcast-update` | Update agents-shared submodule in all consumer repos listed in consumers.local |
-| `/update-agents` | Update this submodule to latest |
 
 ## Skills
 
@@ -94,7 +83,6 @@ config dir (`$CLAUDE_CONFIG_DIR`, else `~/.claude`).
 
 | Hook | Event | Description |
 |------|-------|-------------|
-| `hooks/block-submodule-writes.sh` | PreToolUse | Refuses edits to files inside `.agents/` — submodules are edited in their source repo |
 | `hooks/block-tree-discard.sh` | PreToolUse | Refuses git commands that discard uncommitted work; only `git checkout -- <one tracked file>` passes |
 | `hooks/focus-policy.sh` | SessionStart | Tells the session whether this machine tolerates a window stealing keyboard focus |
 
@@ -130,13 +118,9 @@ reports the verdict, the rule says what to do about it.
 
 ## Updating
 
-From any project using this submodule:
-
-```bash
-git submodule update --remote .agents
-```
-
-Or use the `/update-agents` command.
+`git pull` in the clone. Edits to existing files take effect immediately — the
+symlinks already point here. After a file is **added, renamed, or deleted**,
+re-run `bash scripts/init-global.sh` to sync the links.
 
 ## External Skills
 

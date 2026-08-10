@@ -1,4 +1,3 @@
-consumers.local
 .env.jira
 .DS_Store
 __pycache__/

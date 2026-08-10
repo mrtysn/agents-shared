@@ -1,7 +1,7 @@
 # CLAUDE.md
 
-This repository contains shared Claude Code rules, skills, and commands for use across
-multiple projects via git submodule, and machine-wide via `~/.claude/` symlinks.
+This repository contains shared Claude Code rules, skills, and commands, installed
+machine-wide via `~/.claude/` symlinks (`scripts/init-global.sh`).
 
 **See [docs/MAINTAINING-RULES.md](docs/MAINTAINING-RULES.md)** for how the layers fit
 together, how a new machine is set up, how machines stay in sync, and what to do when a
@@ -15,15 +15,12 @@ agents-shared/
 │   ├── commands/          # Slash commands (single-file format)
 │   │   ├── aristocrat.md
 │   │   ├── be-literal.md
-│   │   ├── broadcast-update.md
 │   │   ├── cmt-msg.md
 │   │   ├── external-review.md
 │   │   ├── no-chat-in-code.md
 │   │   ├── plan-not-ready.md
 │   │   ├── refocus.md
-│   │   ├── setup-agents.md
-│   │   ├── standup.md
-│   │   └── update-agents.md
+│   │   └── standup.md
 │   ├── rules/             # Behavioural rules (loaded at launch in EVERY session)
 │   │   ├── artifacts.md
 │   │   ├── asking-for-decisions.md
@@ -47,11 +44,8 @@ agents-shared/
 │       └── rpi/
 │           └── SKILL.md
 ├── scripts/
-│   ├── init.sh            # Bootstrap submodule + per-repo .claude/ symlinks (one consumer repo)
 │   ├── init-global.sh     # Symlink into user-level ~/.claude (every project on the machine)
-│   ├── sync-external-skills.sh  # Fetch latest from upstream repos
-│   └── update-consumers.sh  # Broadcast updates to all consumer repos
-├── consumers.local        # (gitignored) Absolute paths of consumer repos
+│   └── sync-external-skills.sh  # Fetch latest from upstream repos
 ├── README.md
 └── CLAUDE.md
 ```
@@ -85,13 +79,9 @@ Command instructions here. Use $ARGUMENTS for user-provided arguments.
 
 Skills support additional features: reference files, templates, and advanced frontmatter (`context: fork`, `agent`, etc.).
 
-**Do not run `scripts/init-global.sh`.** It writes symlinks into `~/.claude/`,
-outside every repo, and makes skills machine-wide. That duplicates the
-project-scope symlinks each consumer already has: the same skill is then listed
-twice in the system prompt, and a repo's `.agents-ignore` cannot suppress the
-user-scope copy. Adding a skill here is finished at step 5 — the next
-`/broadcast-update` distributes it. `init-global.sh` is a user-run machine setup
-command; leave it to the user.
+After adding, renaming, or deleting a skill, run `bash scripts/init-global.sh`
+so `~/.claude/` picks up the change — symlinks are per-entry, so a pure edit to
+an existing file needs no re-run, but a new or removed directory does.
 
 ## Adding New Commands
 
@@ -158,8 +148,7 @@ costs a few GETs), 3-way merges each listed file, advances `.upstream/`, refresh
 leaves markers in the working file, and does not advance the base; resolve the
 markers and re-run, or `git checkout` the skill dir to abort.
 
-After a sync, review the diff (the working files **and** `override.patch`), commit,
-and broadcast to consumers if you want the update propagated (see `/broadcast-update`).
+After a sync, review the diff (the working files **and** `override.patch`) and commit.
 
 To (re)build a base + patch from the current pin without pulling HEAD:
 ```bash
@@ -184,18 +173,10 @@ the same lines forces a conflict for you to resolve.
 
 ## Integration Pattern
 
-Projects integrate via submodule at `.agents`:
-
-```bash
-# Add to a project
-git submodule add <repo-url> .agents
-
-# Symlink skills
-ln -s ../../.agents/claude/skills/refactor .claude/skills/refactor
-
-# Symlink commands
-ln -s ../../.agents/claude/commands/aristocrat.md .claude/commands/aristocrat.md
-```
+One clone per machine; `scripts/init-global.sh` symlinks every command, skill,
+and rule into `~/.claude/`, where Claude Code's user-level config makes them
+available in every project. There is no per-repo integration — repos carry only
+their own project-specific `.claude/` content.
 
 ## Testing Commands
 

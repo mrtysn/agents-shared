@@ -104,15 +104,6 @@ point at the rule file by path rather than restating it. When a rule is deleted,
 or correct its memory on each machine — a stale memory contradicting a current rule is
 worse than no memory, because Claude may follow either.
 
-## Consumer repos
-
-Repos vendor this one as a `.agents` submodule and symlink skills/commands from it.
-**Rules do not need the submodule**: they load from `~/.claude/rules/`, which points at
-the standalone clone. Bumping `.agents` in a consumer is about that repo's skills and
-commands, not about rules taking effect.
-
-Bump consumers with `/broadcast-update` (uses `consumers.local`, gitignored).
-
 ## Checks
 
 | Question | Command |

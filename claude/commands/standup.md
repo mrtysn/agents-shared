@@ -12,15 +12,17 @@ $ARGUMENTS
 
 ## 1. Collect data
 
-Run the collection script **once** to gather all git activity:
+Run the collection script **once** to gather all git activity. It ships with
+agents-shared; resolve it through the global command symlink:
 
 ```bash
-.agents/scripts/standup-collect.sh [date-if-provided]
+SCRIPT="$(dirname "$(readlink "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/commands/standup.md")")/../../scripts/standup-collect.sh"
+"$SCRIPT" [date-if-provided]
 ```
 
 If $ARGUMENTS contains a directory path instead of (or in addition to) a date, pass it as the second argument:
 ```bash
-.agents/scripts/standup-collect.sh [date] [path]
+"$SCRIPT" [date] [path]
 ```
 
 The script handles:
@@ -72,7 +74,7 @@ Based on the `BACKFILL STATUS` section of the script output:
 
 For each backfill date, run the collection script with that specific date:
 ```bash
-.agents/scripts/standup-collect.sh <YYYY-MM-DD>
+"$SCRIPT" <YYYY-MM-DD>
 ```
 
 Backfill writes log files only (no screen output per day). Omit `## In Progress` for backfilled days. Show one summary line when done: "Backfilled N days: <first> → <last>"

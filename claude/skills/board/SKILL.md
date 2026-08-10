@@ -34,10 +34,11 @@ If neither is found, omit `-p` and let the script fall back to `JIRA_DEFAULT_PRO
 
 ## Locating the board script
 
-The `jira-board.py` script ships with agents-shared. Resolve from the repo root:
+The `jira-board.py` script ships with agents-shared. Resolve it through the
+global skill symlink:
 
 ```bash
-SCRIPT="$(git rev-parse --show-toplevel)/.agents/scripts/jira-board.py"
+SCRIPT="$(dirname "$(readlink "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/board")")/../../scripts/jira-board.py"
 ```
 
 ## Mode A: Specific ticket (URL or ticket key detected)
