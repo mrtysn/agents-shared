@@ -1,0 +1,86 @@
+# Cases for require-absolute-rm.sh — one per line: <verdict><TAB><command>
+#
+# verdict is `pass` (hook exits 0) or `block` (hook exits 2). Use \n for a
+# newline inside a command; the runner decodes it with printf %b.
+#
+# These live in a file rather than an inline shell loop for a structural reason:
+# a test suite for a deletion guard is full of deletion commands, and passing
+# them as arguments to an inline function trips the guard on the test run
+# itself. Reading them from disk keeps the command line clean.
+
+# --- absolute targets are the whole point ---
+pass	rm -rf /Users/example/project/build
+pass	rm /Users/example/project/a.md /Users/example/project/b.md
+pass	rm ~/Downloads/thing.zip
+pass	rm $HOME/Downloads/thing.zip
+pass	rm "/Users/example/my docs/file with space.txt"
+pass	rm -- /Users/example/tmp/-weird
+pass	rmdir /Users/example/project/empty
+pass	trash /Users/example/project/old.log
+
+# --- relative targets, the failure this hook exists for ---
+block	rm -rf build
+block	rm ./notes.md
+block	rm ../other/file
+block	cd /tmp && rm -rf out
+block	sudo rm -rf etc/nginx
+block	rmdir tmpdir
+block	unlink foo.sock
+block	rm -rf build /Users/example/project/dist
+
+# --- unenumerated or unverifiable targets ---
+block	rm -rf /Users/example/project/*.md
+block	rm -rf /Users/example/project/build?
+block	rm -rf $BUILD_DIR
+block	rm -rf "$(pwd)/build"
+block	rm -rf `pwd`/build
+block	ls /tmp | xargs rm -rf
+block	ls /tmp | xargs -0 rmdir
+
+# --- catastrophically shallow ---
+block	rm -rf /
+block	rm -rf /Users
+block	rm -rf /Users/
+block	rm -rf /etc
+
+# --- find, both directions ---
+pass	find /Users/example/project -name "*.tmp" -delete
+pass	find /Users/example/project -type f -exec rm -f {} +
+block	find . -name "*.log" -delete
+block	find build -type f -exec rm -f {} +
+block	find /Users/example -exec sh -c "rm build/{}" ;
+
+# --- nested shells: the text is on the command line, so it is read ---
+pass	bash -c "rm -rf /Users/example/project/build"
+pass	bash -c "ls -la"
+pass	eval "echo hello"
+block	bash -c "rm -rf build"
+block	bash -lc "rm ./notes.md"
+block	sh -c "rm -rf /Users"
+block	zsh -c "cd /tmp && rm -rf out"
+block	eval "rm -rf build"
+block	eval rm -rf build
+block	ls | xargs -I{} sh -c "rm {}"
+block	bash -c "bash -c \"rm -rf build\""
+
+# --- left alone by design: committed code establishes its own root ---
+pass	./scripts/clean.sh
+pass	make clean
+pass	npm run clean
+pass	zsh /Users/example/project/scripts/clean.sh
+
+# --- heredoc bodies are data, not commands ---
+pass	git commit -F - <<'EOF'\nMentions `rm` and `xargs rm` in prose.\nEOF
+pass	cat > /tmp/doc.md <<EOF\nUse rm carefully; rm -rf build is bad.\nEOF
+block	cat > /tmp/doc.md <<EOF\nprose about rm\nEOF\nrm -rf build
+
+# --- quoting spans lines in a real shell, so the parser must track it ---
+pass	echo "first line\nsecond line mentions | rm foo"
+pass	git commit -m "explain why\nwe avoid | rm -rf build here"
+
+# --- commands that merely mention deletion are not deletions ---
+pass	docker rm my-container
+pass	grep -rn rm /Users/example/project
+pass	ls -la && git status
+pass	echo "rm -rf build"
+pass	git rm --cached /Users/example/project/a.md
