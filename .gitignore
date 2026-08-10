@@ -1,4 +1,5 @@
 consumers.local
+.env.jira
 .DS_Store
 __pycache__/
 claude/skills/*/.venv/

@@ -6,21 +6,31 @@ allowed-tools: Bash, mcp__atlassian__getJiraIssue, Grep, Glob, Read
 
 Render the current Jira sprint as a TUI kanban board, or dive into a specific ticket.
 
-**Project**: $ARGUMENTS (default: MSB)
+**Project**: $ARGUMENTS (default: `JIRA_DEFAULT_PROJECT` from config)
+
+## Configuration
+
+Every site-specific value — cloud id, default project, workflow status names —
+lives in a `.env.jira` at the repo root, never in this skill or the script.
+`agents-shared/.env.jira.example` documents each field. If `.env.jira` is
+missing, the script exits naming the settings it needs; relay that to the user
+rather than guessing values.
+
+Read `JIRA_CLOUD_ID` from that file when a step below needs it.
 
 ## Parsing arguments
 
 Parse the arguments to extract:
-- **Jira URL** (e.g., `https://cyphergames.atlassian.net/browse/MSB-197`) — extract ticket key `MSB-197`
-- **Ticket key** (e.g., `MSB-197`, matches `[A-Z]+-\d+` case-insensitive) — extract project from prefix, pass `-p MSB --key MSB-197`
-- **Project key** (bare word without digits, e.g., `CBD`) — `-p` flag only
+- **Jira URL** (e.g., `https://<site>.atlassian.net/browse/ABC-197`) — extract ticket key `ABC-197`
+- **Ticket key** (e.g., `ABC-197`, matches `[A-Z]+-\d+` case-insensitive) — extract project from prefix, pass `-p ABC --key ABC-197`
+- **Project key** (bare word without digits, e.g., `ABC`) — `-p` flag only
 - `--me` — pass through
 - `--assignee "Name"` — pass through
 - `--json` — pass through
 - Any other flags — pass through
 
 Priority: ticket key/URL detection takes precedence over bare project key extraction.
-If no project key or ticket key is found, default to MSB.
+If neither is found, omit `-p` and let the script fall back to `JIRA_DEFAULT_PROJECT`.
 
 ## Locating the board script
 
@@ -37,8 +47,8 @@ This is the primary workflow — the user wants to understand and work on a tick
 ### Step 1: Fetch full ticket details
 
 Use the `mcp__atlassian__getJiraIssue` tool:
-- `cloudId`: `cyphergames.atlassian.net`
-- `issueIdOrKey`: the extracted ticket key (e.g., `CBD-4776`)
+- `cloudId`: the `JIRA_CLOUD_ID` value from `.env.jira`
+- `issueIdOrKey`: the extracted ticket key (e.g., `ABC-4776`)
 - `responseContentFormat`: `markdown`
 
 If the Atlassian MCP tool is not available, fall back to the board script with `--key`:
@@ -92,8 +102,8 @@ python3 "$SCRIPT" -p <PROJECT> --json [--me] [--assignee "Name"]
 
 | Status | Key | Summary |
 |--------|-----|---------|
-| In Progress | CBD-1234 | Some task |
-| Backlog | CBD-5678 | Another task |
+| In Progress | ABC-1234 | Some task |
+| Backlog | ABC-5678 | Another task |
 
 Group rows by status. If there are no issues, say so.
 
