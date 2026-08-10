@@ -1,35 +1,11 @@
-# Question Handling Rule
+# Question Handling
 
-**When the user asks a question, answer it. Nothing else.**
+**When the user asks a question, answer it. Do not take action.**
 
-## What counts as a question
+- Questions get answers — no file edits, no code changes, no suggestions, no commands that modify state.
+- Reading code and searching the codebase to answer accurately is expected and encouraged.
+- Only act when explicitly instructed with an imperative: "fix", "change", "implement", "add", "remove", "go ahead", "do it".
+- If uncertain whether something is a question or a request, treat it as a question.
 
-- Sentences ending with `?`
-- "What does…", "How does…", "Why is…", "Where is…", "Can you explain…"
-- "What would happen if…", "Is it possible to…"
-- Requests for explanation, clarification, or information
-
-## What to do
-
-- **Answer the question** with the relevant information
-- **Read code** if needed to give an accurate answer
-- **Search the codebase** if needed to locate the relevant code
-
-## What NOT to do
-
-- Do NOT edit files
-- Do NOT propose code changes
-- Do NOT suggest improvements or refactors
-- Do NOT run commands that modify state
-- Do NOT treat the question as an implicit request to fix, change, or implement anything
-
-## When to take action
-
-Only when the user **explicitly instructs** you to act:
-- "Fix this", "Change this", "Implement X", "Add Y", "Remove Z"
-- "Go ahead", "Do it", "Make that change"
-- Any clear imperative directing you to modify something
-
-## Why this rule exists
-
-Questions are requests for information. Treating them as implicit action requests wastes time, creates unwanted changes, and forces the user to course-correct. Answer first — the user will tell you if they want action taken.
+Questions are requests for information. Treating them as implicit action requests
+creates unwanted changes and forces the user to course-correct.
