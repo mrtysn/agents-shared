@@ -1,6 +1,11 @@
 # CLAUDE.md
 
-This repository contains shared Claude Code commands for use across multiple projects via git submodule.
+This repository contains shared Claude Code rules, skills, and commands for use across
+multiple projects via git submodule, and machine-wide via `~/.claude/` symlinks.
+
+**See [docs/MAINTAINING-RULES.md](docs/MAINTAINING-RULES.md)** for how the layers fit
+together, how a new machine is set up, how machines stay in sync, and what to do when a
+rule is added, edited, or deleted.
 
 ## Project Structure
 

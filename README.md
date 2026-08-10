@@ -1,6 +1,12 @@
 # agents-shared
 
-Shared Claude Code commands and skills for use across multiple projects via git submodule.
+Shared Claude Code behavioural rules, skills, and commands — used across projects via git
+submodule, and machine-wide via `~/.claude/` symlinks.
+
+**Maintaining this across several machines:** see
+[docs/MAINTAINING-RULES.md](docs/MAINTAINING-RULES.md) — new-machine setup, keeping
+machines in sync, and where a new rule belongs versus a skill, a project CLAUDE.md, or a
+hook.
 
 ## Usage
 
@@ -15,8 +21,8 @@ Then symlink or reference commands from `.claude/commands/`.
 ### Install globally (one machine, every project)
 
 Instead of wiring each repo up individually, symlink everything into the
-user-level Claude dirs (`~/.claude/commands` and `~/.claude/skills`) so every
-project on the machine sees these commands and skills:
+user-level Claude dirs (`~/.claude/commands`, `~/.claude/skills`, `~/.claude/rules`) so
+every project on the machine sees these commands, skills, and rules:
 
 ```bash
 bash scripts/init-global.sh           # sync ~/.claude with this repo
