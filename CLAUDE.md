@@ -9,46 +9,20 @@ rule is added, edited, or deleted.
 
 ## Project Structure
 
-```
-agents-shared/
-├── claude/
-│   ├── commands/          # Slash commands (single-file format)
-│   │   ├── aristocrat.md
-│   │   ├── be-literal.md
-│   │   ├── cmt-msg.md
-│   │   ├── external-review.md
-│   │   ├── no-chat-in-code.md
-│   │   ├── plan-not-ready.md
-│   │   ├── refocus.md
-│   │   └── standup.md
-│   ├── rules/             # Behavioural rules (loaded at launch in EVERY session)
-│   │   ├── artifacts.md
-│   │   ├── asking-for-decisions.md
-│   │   ├── chase-the-ideal.md
-│   │   ├── communication-style.md
-│   │   ├── no-hardcoded-paths.md
-│   │   ├── question-handling.md
-│   │   ├── shell-scripts.md
-│   │   ├── window-focus.md
-│   │   └── working-style.md
-│   └── skills/            # Skills (directory format, supports references/templates)
-│       ├── caveman/       # (external) Token-compressed communication
-│       │   ├── SKILL.md    #   working copy (base + override)
-│       │   ├── source.json #   provenance + file list
-│       │   ├── .upstream/  #   pristine base (last-synced upstream)
-│       │   └── override.patch  # local deviations (absent if verbatim)
-│       ├── handoff/
-│       │   └── SKILL.md
-│       ├── refactor/
-│       │   └── SKILL.md
-│       └── rpi/
-│           └── SKILL.md
-├── scripts/
-│   ├── init-global.sh     # Symlink into user-level ~/.claude (every project on the machine)
-│   └── sync-external-skills.sh  # Fetch latest from upstream repos
-├── README.md
-└── CLAUDE.md
-```
+One line per directory — contents are not enumerated here, because the files
+are self-describing and a hand-kept list drifts. Use `ls`.
+
+- `claude/commands/` — slash commands, one `.md` per command, description in frontmatter
+- `claude/rules/` — behavioural rules, loaded at launch in **every** session
+- `claude/skills/` — one directory per skill; `SKILL.md` frontmatter is the
+  authoritative description. External skills additionally carry `source.json`,
+  `.upstream/`, and (if locally adapted) `override.patch` — see *External
+  (Third-Party) Skills* below
+- `scripts/` — machine tooling (global symlink setup, external-skill sync,
+  session utilities); each script states its purpose in a header comment
+- `hooks/` — shell scripts wired by hand into `settings.json`, documented in README
+- `docs/` — maintainer documentation, deliberately outside `claude/rules/` so it
+  is never loaded as an instruction
 
 ## Command File Format
 
@@ -73,7 +47,6 @@ Command instructions here. Use $ARGUMENTS for user-provided arguments.
 2. Add frontmatter with description
 3. Write clear, imperative instructions
 4. Optionally add supporting files (references, templates)
-5. Update README.md skills table
 
 **Naming:** Use lowercase kebab-case (e.g., `my-skill/SKILL.md` → `/my-skill`).
 
@@ -88,7 +61,6 @@ an existing file needs no re-run, but a new or removed directory does.
 1. Create `claude/commands/<command-name>.md`
 2. Add frontmatter with description
 3. Write clear, imperative instructions
-4. Update README.md command table
 
 **Naming:** Use lowercase kebab-case (e.g., `my-command.md` → `/my-command`).
 
@@ -133,7 +105,6 @@ as conflict markers in the working file and reported — never silently lost.
 1. Copy the upstream skill's files into `claude/skills/<name>/`
 2. Create `source.json` with `repo`, `path`, the current `commit` SHA, and (if multi-file) `files`
 3. Establish the pristine base: `bash scripts/sync-external-skills.sh --establish-base <name>` — fetches the files at the pinned commit into `.upstream/` and captures any local edits as `override.patch`
-4. Update README.md skills table (mark as *(external)*)
 
 **Updating external skills:**
 ```bash
