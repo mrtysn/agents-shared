@@ -12,7 +12,7 @@ per-machine variant — that split exists for `.zshrc.<label>`,
 not for settings.json.
 
 So every path written into settings.json has to be valid on c01
-(`mert-cypher-m3max`) and c02 (`mrtysn-mbp-m2max`) at the same time. That is why
+and c02 at the same time. That is why
 the hook entries carry a two-candidate probe:
 
 ```

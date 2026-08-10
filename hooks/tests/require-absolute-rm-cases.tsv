@@ -3,10 +3,9 @@
 # verdict is `pass` (hook exits 0) or `block` (hook exits 2). Use \n for a
 # newline inside a command; the runner decodes it with printf %b.
 #
-# These live in a file rather than an inline shell loop for a structural reason:
-# a test suite for a deletion guard is full of deletion commands, and passing
-# them as arguments to an inline function trips the guard on the test run
-# itself. Reading them from disk keeps the command line clean.
+# Cases live on disk rather than in an inline shell loop: a suite for a deletion
+# guard is full of deletion commands, and passing those as arguments to an inline
+# function trips the guard on the test run itself.
 
 # --- absolute targets are the whole point ---
 pass	rm -rf /Users/example/project/build

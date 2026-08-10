@@ -19,11 +19,10 @@
 #   - `sh -c "…"`, `eval "…"`, and shells nested inside xargs/find -exec, whose
 #     command text sits right there on the command line and is re-checked
 #
-# Deliberately NOT covered: deletions inside a script file, a make target, or an
-# npm script. Those are reviewed, committed code whose relative paths are
-# relative to a root the script itself establishes — a different risk class from
-# an improvised command issued under a stale assumption about the cwd. Scanning
-# them would block nearly every clean and build path to buy almost nothing.
+# Not covered: deletions inside a script file, a make target, or an npm script.
+# Those are committed code whose relative paths are relative to a root the script
+# establishes itself, and scanning them would block nearly every clean and build
+# path.
 #
 # Bash, not zsh, to match block-tree-discard.sh beside it and to keep working
 # on Linux boxes that sync agents-shared without /bin/zsh.
