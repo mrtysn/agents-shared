@@ -73,8 +73,24 @@ directories and a GitHub topic all returned is a stronger signal than one with m
 found once.
 
 Then a one-line recommendation: best candidate, or "nothing good exists — worth writing"
-if that's the truth. Do not pad with weak matches. If a source was skipped or rate-limited,
-say which — a thin result set from four sources reads identically to one from twelve
-unless you say so.
+if that's the truth. Do not pad with weak matches.
+
+End every report — always, even when everything ran and the answer is obvious — with a
+coverage line: how many rows of the Sources table above you actually queried, out of the
+number of rows it currently has, and the name of each one you did not.
+
+```
+Sources: 12/13 · skipped: anthropics/claude-plugins-community
+Sources: 13/13
+```
+
+Count the table rows rather than trusting the number in this example — rows get added.
+The local-installed check is not one of them.
+
+This is unconditional on purpose. The earlier version fired only "if a source was skipped",
+which requires noticing the condition before obeying it, and an observed run silently
+skipped a source under exactly that wording. A line that is always present is one you can
+check for. It matters most when the verdict is "nothing good exists" — a thin sweep of four
+sources reads identically to a thorough thirteen unless the count says otherwise.
 
 Do not install anything. If the user wants one installed, they'll say so; installation target is `~/.claude/skills/<name>/` (personal) or `agents-shared/claude/skills/<name>/` (shared), copied from the source repo after reading the full skill content.
