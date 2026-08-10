@@ -19,6 +19,16 @@ agents-shared/
 │   │   ├── setup-agents.md
 │   │   ├── standup.md
 │   │   └── update-agents.md
+│   ├── rules/             # Behavioural rules (loaded at launch in EVERY session)
+│   │   ├── artifacts.md
+│   │   ├── asking-for-decisions.md
+│   │   ├── chase-the-ideal.md
+│   │   ├── communication-style.md
+│   │   ├── no-hardcoded-paths.md
+│   │   ├── question-handling.md
+│   │   ├── shell-scripts.md
+│   │   ├── window-focus.md
+│   │   └── working-style.md
 │   └── skills/            # Skills (directory format, supports references/templates)
 │       ├── caveman/       # (external) Token-compressed communication
 │       │   ├── SKILL.md    #   working copy (base + override)

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# init-global.sh — Make agents-shared commands and skills available in EVERY
+# init-global.sh — Make agents-shared commands, skills and rules available in EVERY
 # project on this machine by symlinking them into the user-level Claude dirs
-# (~/.claude/commands and ~/.claude/skills) instead of each repo's .claude/.
+# (~/.claude/commands, ~/.claude/skills, ~/.claude/rules) instead of each repo's .claude/.
 #
 # Idempotent. Re-run after adding, renaming, or removing commands/skills:
 #   • new sources are linked
@@ -22,10 +22,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SRC_COMMANDS="$REPO_DIR/claude/commands"
 SRC_SKILLS="$REPO_DIR/claude/skills"
+SRC_RULES="$REPO_DIR/claude/rules"
 
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 DST_COMMANDS="$CLAUDE_DIR/commands"
 DST_SKILLS="$CLAUDE_DIR/skills"
+DST_RULES="$CLAUDE_DIR/rules"
 
 UNLINK=0
 [ "${1:-}" = "--unlink" ] && UNLINK=1
@@ -34,7 +36,7 @@ linked=0 fixed=0 pruned=0
 skipped_local=()
 RESULT=""
 
-mkdir -p "$DST_COMMANDS" "$DST_SKILLS"
+mkdir -p "$DST_COMMANDS" "$DST_SKILLS" "$DST_RULES"
 
 # link_one <src> <dst> — point dst at src, reporting the outcome in $RESULT:
 #   linked   a new symlink was created
@@ -71,6 +73,7 @@ prune_dir() {
 if [ "$UNLINK" = 1 ]; then
     prune_dir "$DST_COMMANDS" "$SRC_COMMANDS"
     prune_dir "$DST_SKILLS"   "$SRC_SKILLS"
+    prune_dir "$DST_RULES"    "$SRC_RULES"
     printf '\n=== agents-shared global teardown ===\n'
     printf '  Target:           %s\n'   "$CLAUDE_DIR"
     printf '  Symlinks removed: %d\n\n' "$pruned"
@@ -102,15 +105,32 @@ for src in "$SRC_SKILLS"/*/; do
     skill_total=$((skill_total + 1))
 done
 
+# ── Rules: one symlink per .md ──────────────────────────────────────────────
+# Behavioural rules load at launch in EVERY session, same as ~/.claude/CLAUDE.md.
+# Keeping them here means they are version-controlled and land on a new machine
+# with one run of this script.
+rule_total=0
+for src in "$SRC_RULES"/*.md; do
+    link_one "$src" "$DST_RULES/$(basename "$src")"
+    case "$RESULT" in
+        linked) linked=$((linked + 1)) ;;
+        fixed)  fixed=$((fixed + 1)) ;;
+        skipped) skipped_local+=("$(basename "$src")"); continue ;;
+    esac
+    rule_total=$((rule_total + 1))
+done
+
 # Drop links whose source vanished (e.g. a skill renamed rewind → go-back).
 prune_dir "$DST_COMMANDS" "$SRC_COMMANDS"
 prune_dir "$DST_SKILLS"   "$SRC_SKILLS"
+prune_dir "$DST_RULES"    "$SRC_RULES"
 
 # ── Summary ─────────────────────────────────────────────────────────────────
 printf '\n=== agents-shared global setup complete ===\n'
 printf '  Target:   %s\n'                       "$CLAUDE_DIR"
 printf '  Commands: %d linked\n'                "$cmd_total"
 printf '  Skills:   %d linked\n'                "$skill_total"
+printf '  Rules:    %d linked\n'                "$rule_total"
 printf '  Changes:  +%d new, ~%d repaired, -%d pruned\n' "$linked" "$fixed" "$pruned"
 if [ ${#skipped_local[@]} -gt 0 ]; then
     printf '  Local overrides preserved: %s\n' "${skipped_local[*]}"
