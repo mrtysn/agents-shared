@@ -18,7 +18,10 @@
 #
 # <path-in-repo> is the skill's directory in the upstream repo (or its SKILL.md
 # path); every file under that directory is fetched. Name defaults to the
-# directory's basename.
+# directory's basename. Pass "." when the repo itself is one skill (SKILL.md at
+# the root, the usual shape for a standalone skill) — the whole repo is fetched
+# and the name comes from the repo, so meodai/skill.color-expert installs as
+# color-expert.
 
 set -euo pipefail
 
@@ -51,11 +54,29 @@ cmd_install() {
     [[ -n "$repo" && -n "$repo_path" ]] || usage 1
     [[ "$repo" == */* ]] || die "repo must be owner/repo, got: $repo"
 
-    # Accept either the skill directory or its SKILL.md path.
+    # Accept the skill directory, its SKILL.md path, or "." when the repo *is*
+    # one skill (SKILL.md at the root). That last shape is how standalone skills
+    # are published — only a repo collecting many of them puts each in its own
+    # subdirectory — and rejecting it turned every one of them away.
     local skill_path="$repo_path"
     [[ "$repo_path" == *.md ]] && skill_path="${repo_path:h}"
     skill_path="${skill_path%/}"
-    [[ -n "$skill_path" && "$skill_path" != "." ]] || die "path must point at a skill directory inside the repo"
+    [[ -n "$skill_path" ]] || die "path must name a skill directory, or '.' for a whole-repo skill"
+
+    # Prefix the tree listing filters on; empty means the whole repo.
+    local prefix="$skill_path/"
+    if [[ "$skill_path" == "." ]]; then
+        prefix=""
+        # No directory to take a name from, so use the repo's own, minus the
+        # decoration people put on a single-skill repo: meodai/skill.color-expert
+        # installs as color-expert.
+        if [[ -z "$name" ]]; then
+            name="${repo:t}"
+            name="${name#skill.}"
+            name="${name#skill-}"
+            name="${name%-skill}"
+        fi
+    fi
     [[ -z "$name" ]] && name="${skill_path:t}"
 
     local dst="$SKILLS_DST/$name"
@@ -78,7 +99,7 @@ cmd_install() {
         print -u2 "warning: tree listing truncated by GitHub; falling back to SKILL.md only"
         local files=("SKILL.md")
     else
-        local files=(${(f)"$(print -r -- "$tree_json" | jq -r --arg p "$skill_path/" \
+        local files=(${(f)"$(print -r -- "$tree_json" | jq -r --arg p "$prefix" \
             '.tree[] | select(.type == "blob" and (.path | startswith($p))) | .path[($p | length):]')"})
     fi
     (( ${#files} )) && [[ -n "${files[1]}" ]] || die "no files found under $skill_path in $repo"
