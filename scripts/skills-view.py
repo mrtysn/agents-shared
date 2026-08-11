@@ -216,11 +216,19 @@ def main():
     print(f"  {DIM}{'─' * min(term_width() - 4, 92)}{RST}")
     print()
 
-    # Trials, grouped by source repo. A group is one decision: eleven skills from
-    # one commit should not be eleven separate ones.
+    # Trials, sectioned by source repo — one decision per repo, since eleven
+    # skills pulled from one place are rarely eleven separate judgements. A repo
+    # with a single trial gets no section of its own; that would be ceremony
+    # around a set of one.
+    counts = {}
+    for s in trials:
+        counts[s.get("repo")] = counts.get(s.get("repo"), 0) + 1
+    sets = {r for r, n in counts.items() if r and n > 1}
+
     groups = {}
     for s in trials:
-        groups.setdefault(s.get("group"), []).append(s)
+        repo = s.get("repo")
+        groups.setdefault(repo if repo in sets else None, []).append(s)
 
     palette_for = {}
     for i, g in enumerate(sorted(k for k in groups if k)):
@@ -231,7 +239,8 @@ def main():
             return RED
         if s.get("pinned"):
             return DIM
-        return palette_for.get(s.get("group"), YELLOW)
+        repo = s.get("repo")
+        return palette_for.get(repo if repo in sets else None, YELLOW)
 
     for g in sorted(groups, key=lambda k: (k is None, k or "")):
         members = sorted(groups[g], key=lambda s: s["name"])
@@ -240,13 +249,13 @@ def main():
         if g:
             section(f"TRIALS · {g}", detail, palette_for[g])
         else:
-            section("TRIALS · ungrouped", detail, YELLOW)
+            section("TRIALS · sole install from their repo", detail, YELLOW)
         print()
         print_cards(members, color_of)
         if g:
-            print(f"  {DIM}→ trial-skill.sh rm --group {g}{RST}"
+            print(f"  {DIM}→ trial-skill.sh rm --repo {g}{RST}"
                   f"{DIM} removes all {len(members)}{RST}")
-            print(f"  {DIM}→ trial-skill.sh promote --group {g}{RST}"
+            print(f"  {DIM}→ trial-skill.sh promote --repo {g}{RST}"
                   f"{DIM} keeps them permanently{RST}")
             print()
 

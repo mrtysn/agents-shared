@@ -37,7 +37,7 @@ it loses the grouping that makes the decision obvious.
 
 The board names its own actions in the footer of each group. If the user then
 wants to act, hand off to [trial-skill](../trial-skill/SKILL.md) — `rm`,
-`rm --group`, `promote`, `promote --group`, `pin`, `unpin`, `restore`. Do not
+`rm --repo`, `promote`, `promote --repo`, `pin`, `unpin`, `restore`. Do not
 run a removal without being asked to; the view exists so the user can decide,
 not so the decision gets made for them.
 
@@ -47,5 +47,6 @@ board:
 - **Removal is cheap.** `rm` writes repo, commit and file list to a ledger
   before deleting, so `trial-skill.sh restore <name>` refetches the exact same
   bytes. Nobody needs to agonize over removing a trial.
-- **A group is one decision.** Skills installed together from one repo share a
-  group, so eleven of them come and go with one command.
+- **A repo is one decision.** Trials are sectioned by where they came from, so
+  eleven skills pulled from one repo come and go with `rm --repo <owner/repo>`
+  rather than eleven commands.

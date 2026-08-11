@@ -29,23 +29,23 @@ before use; if not, say so rather than guessing paths.
   the repo and path first (search, or ask). Read the skill's full content from
   the source repo before installing — never install unread third-party
   instructions.
-  When installing several skills from one repo in one go, pass the same
-  `--group <owner/repo>` to each. A group is removed or promoted with one
-  command later, which is the difference between one decision and eleven.
+  Skills installed from the same repo are handled as a set automatically —
+  there is no flag to pass and nothing to remember at install time.
 - **"what trials do I have" / "list"** → prefer the [skills](../skills/SKILL.md)
   board, which shows trials, managed skills, idle age and context cost together.
   `$TRIAL list` is the plain fallback; `$TRIAL list --json` is the board's data
   source, not something to show a human.
-- **"remove/delete X"** → `$TRIAL rm <name>`, or `$TRIAL rm --group <g>` for a
-  set (trials only; managed skills are agents-shared's business). Mention that
-  `restore` brings it back — removal is not a decision worth agonizing over.
+- **"remove/delete X"** → `$TRIAL rm <name>`, or `$TRIAL rm --repo <owner/repo>`
+  for everything from one source (trials only; managed skills are
+  agents-shared's business). Mention that `restore` brings it back — removal is
+  not a decision worth agonizing over.
 - **"bring back X" / "I removed X by mistake"** → `$TRIAL restore <name>`,
   which refetches at the commit recorded when it was removed.
 - **"stop nagging me about X" / "I'll want X later"** → `$TRIAL pin <name>`.
   A pinned trial never reports stale. `unpin` reverses it.
-- **"keep X" / "promote X"** → `$TRIAL promote <name>` (or `--group <g>`), then
-  remind the user the move is uncommitted in agents-shared (or commit it if
-  they've asked you to handle commits).
+- **"keep X" / "promote X"** → `$TRIAL promote <name>` (or
+  `--repo <owner/repo>`), then remind the user the move is uncommitted in
+  agents-shared (or commit it if they've asked you to handle commits).
 
 ## After install
 

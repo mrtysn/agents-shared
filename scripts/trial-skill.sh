@@ -7,9 +7,14 @@
 # init-global.sh never touches real directories, so trials coexist safely.
 #
 # Each trial carries a .trial.json (repo, path, files, commit, installed,
-# last_used, group, pinned) — a superset of the external-skill source.json, so
+# last_used, pinned) — a superset of the external-skill source.json, so
 # `promote` can convert it directly and hand off to sync-external-skills.sh
 # --establish-base.
+#
+# Skills installed from one repo are handled as a set through `repo` itself
+# rather than a group field: the provenance already in .trial.json is the only
+# grouping there has ever been evidence for, and a second field naming the same
+# thing could only ever disagree with it.
 #
 # A trial's default fate used to be "live forever", which is the wrong default
 # for something defined as temporary: nothing deleted it but the user happening
@@ -21,10 +26,10 @@
 # the pressure to clean up, not a reaper.
 #
 # Usage:
-#   trial-skill.sh install <owner/repo> <path-in-repo> [--name <name>] [--group <g>]
+#   trial-skill.sh install <owner/repo> <path-in-repo> [--name <name>]
 #   trial-skill.sh list [--json]
-#   trial-skill.sh rm <name> | --group <g>
-#   trial-skill.sh promote <name> | --group <g>
+#   trial-skill.sh rm <name> | --repo <owner/repo>
+#   trial-skill.sh promote <name> | --repo <owner/repo>
 #   trial-skill.sh pin <name> | unpin <name>
 #   trial-skill.sh restore <name>
 #   trial-skill.sh touch <name>          # hook bookkeeping; stamps last_used
@@ -95,14 +100,14 @@ frontmatter_chars() {
     awk '/^---$/{c++; next} c==1{print}' "$skill_md" | wc -c | tr -d ' '
 }
 
-# Trial directories belonging to a group, newline-separated. A group is how one
-# upstream repo's set of skills stays one unit: installing eleven skills from
-# one commit should not mean eleven separate decisions later.
-group_members() {
-    local g="$1" d
+# Trial directories installed from one repo, newline-separated. This is what
+# keeps a set one unit: installing eleven skills from one repo should not mean
+# eleven separate decisions later.
+repo_members() {
+    local repo="$1" d
     for d in "$SKILLS_DST"/*(N/); do
         [[ -f "$d/.trial.json" ]] || continue
-        [[ "$(jq -r '.group // empty' "$d/.trial.json")" == "$g" ]] && print -r -- "$d"
+        [[ "$(jq -r '.repo // empty' "$d/.trial.json")" == "$repo" ]] && print -r -- "$d"
     done
 }
 
@@ -126,11 +131,10 @@ fetch_skill() {
 # ── install ──────────────────────────────────────────────────────────────────
 cmd_install() {
     need curl; need jq; need git
-    local repo="" repo_path="" name="" group=""
+    local repo="" repo_path="" name=""
     while (( $# )); do
         case "$1" in
             --name) name="${2:?--name needs a value}"; shift 2 ;;
-            --group) group="${2:?--group needs a value}"; shift 2 ;;
             -*) die "unknown flag: $1" ;;
             *) if [[ -z "$repo" ]]; then repo="$1"; else repo_path="$1"; fi; shift ;;
         esac
@@ -194,14 +198,16 @@ cmd_install() {
     # last_used starts at the install date so a trial that is never invoked ages
     # from the moment it arrived, while one that gets used keeps resetting.
     jq -n --arg repo "$repo" --arg path "$skill_path/SKILL.md" --arg commit "$sha" \
-          --arg installed "$(today)" --arg group "$group" \
+          --arg installed "$(today)" \
           '{repo: $repo, path: $path, files: $ARGS.positional, commit: $commit,
-            installed: $installed, last_used: $installed, pinned: false}
-           + (if $group == "" then {} else {group: $group} end)' \
+            installed: $installed, last_used: $installed, pinned: false}' \
           --args "${files[@]}" > "$dst/.trial.json"
 
     print "Installed trial skill '$name' (${#files} files) → $dst"
-    [[ -n "$group" ]] && print "Group: $group — 'trial-skill.sh rm --group $group' removes the set."
+    local siblings=(${(f)"$(repo_members "$repo")"})
+    siblings=(${siblings:#})
+    (( ${#siblings} > 1 )) && \
+        print "${#siblings} trials now from $repo — 'trial-skill.sh rm --repo $repo' removes the set."
     print "Available as /$name in new sessions. Remove: trial-skill.sh rm $name — keep: trial-skill.sh promote $name"
 }
 
@@ -236,7 +242,7 @@ emit_json() {
                --argjson stale_at "$STALE_DAYS" \
                '{name: $name, kind: "trial", dir: $dir, repo: .repo, commit: .commit,
                  installed: .installed, last_used: (.last_used // .installed),
-                 group: (.group // null), pinned: (.pinned // false),
+                 pinned: (.pinned // false),
                  files: (.files | length), desc_chars: $desc, idle_days: $idle,
                  stale: ($idle >= $stale_at and (.pinned // false) == false)}' "$meta"
         else
@@ -289,8 +295,7 @@ ledger_append() {
     local meta="$1" name="$2"
     [[ -f "$meta" ]] || return 0
     jq -c --arg name "$name" --arg removed "$(today)" \
-       '{name: $name, repo, path, files, commit, installed,
-         group: (.group // null), removed: $removed}' "$meta" >> "$LEDGER"
+       '{name: $name, repo, path, files, commit, installed, removed: $removed}' "$meta" >> "$LEDGER"
 }
 
 remove_one() {
@@ -307,18 +312,18 @@ remove_one() {
 
 cmd_rm() {
     need jq
-    if [[ "${1:-}" == "--group" ]]; then
-        local g="${2:?--group needs a value}"
-        local members=(${(f)"$(group_members "$g")"})
+    if [[ "${1:-}" == "--repo" ]]; then
+        local repo="${2:?--repo needs a value}"
+        local members=(${(f)"$(repo_members "$repo")"})
         members=(${members:#})
-        (( ${#members} )) || die "no trials in group '$g'"
+        (( ${#members} )) || die "no trials installed from '$repo'"
         local d
         for d in "${members[@]}"; do remove_one "$d"; done
-        print "Removed ${#members} trials in group '$g'."
+        print "Removed ${#members} trials from $repo."
         print "Restore any of them with: trial-skill.sh restore <name>"
         return 0
     fi
-    local name="${1:?usage: trial-skill.sh rm <name> | --group <g>}"
+    local name="${1:?usage: trial-skill.sh rm <name> | --repo <owner/repo>}"
     local dst="$SKILLS_DST/$name"
     [[ -L "$dst" ]] && die "$name is a managed skill — remove it from agents-shared instead"
     [[ -d "$dst" ]] || die "no trial skill at $dst"
@@ -388,8 +393,7 @@ cmd_restore() {
     print "Restoring '$name' from $repo @ ${sha[1,7]}..."
     fetch_skill "$repo" "$sha" "$skill_path" "$dst" "${files[@]}"
     print -r -- "$entry" | jq --arg today "$(today)" \
-        '{repo, path, files, commit, installed, last_used: $today, pinned: false}
-         + (if .group == null then {} else {group: .group} end)' > "$dst/.trial.json"
+        '{repo, path, files, commit, installed, last_used: $today, pinned: false}' > "$dst/.trial.json"
     print "Restored '$name' → $dst (${#files} files, same commit as when removed)"
 }
 
@@ -404,8 +408,8 @@ promote_one() {
     [[ -e "$dst" ]] && die "$dst already exists in agents-shared"
 
     mv "$src" "$dst"
-    # last_used, group and pinned are trial bookkeeping; a managed skill does not
-    # age, so they are dropped rather than carried into source.json.
+    # last_used and pinned are trial bookkeeping; a managed skill does not age,
+    # so they are dropped rather than carried into source.json.
     jq '{repo, path, files, commit, updated: .installed}' "$dst/.trial.json" > "$dst/source.json"
     rm "$dst/.trial.json"
     print "Promoted '$name' → $dst (source.json written from trial provenance)"
@@ -415,15 +419,15 @@ promote_one() {
 cmd_promote() {
     need jq
     local -a names
-    if [[ "${1:-}" == "--group" ]]; then
-        local g="${2:?--group needs a value}"
-        local members=(${(f)"$(group_members "$g")"})
+    if [[ "${1:-}" == "--repo" ]]; then
+        local repo="${2:?--repo needs a value}"
+        local members=(${(f)"$(repo_members "$repo")"})
         members=(${members:#})
-        (( ${#members} )) || die "no trials in group '$g'"
+        (( ${#members} )) || die "no trials installed from '$repo'"
         local d
         for d in "${members[@]}"; do names+=("${d:t}"); done
     else
-        names=("${1:?usage: trial-skill.sh promote <name> | --group <g>}")
+        names=("${1:?usage: trial-skill.sh promote <name> | --repo <owner/repo>}")
     fi
 
     local n
