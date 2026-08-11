@@ -97,6 +97,27 @@ reports the verdict, the rule says what to do about it.
 symlinks already point here. After a file is **added, renamed, or deleted**,
 re-run `bash scripts/init-global.sh` to sync the links.
 
+## Trial Skills
+
+A skill worth trying is not yet a skill worth keeping. `scripts/trial-skill.sh`
+installs one temporarily into `~/.claude/skills/` as a **real directory** — the
+managed set are all symlinks, and `init-global.sh` never touches real
+directories, so trials coexist with the permanent skills and are trivially
+identifiable. Each trial carries a `.trial.json` (source repo, path, pinned
+commit, install date), a superset of `source.json`, so promotion is lossless.
+
+```bash
+scripts/trial-skill.sh install <owner/repo> <path-in-repo> [--name <n>]
+scripts/trial-skill.sh list              # every unmanaged dir, tracked or not
+scripts/trial-skill.sh rm <name>         # delete a trial
+scripts/trial-skill.sh promote <name>    # move into this repo as an external
+                                         # skill: source.json from the trial
+                                         # provenance, --establish-base, re-link
+```
+
+For a skill needed in one session only, skip installation entirely: fetch its
+SKILL.md into scratch, read it, follow it.
+
 ## External Skills
 
 Some skills are sourced from third-party repos. Each keeps a `source.json` (upstream repo, path, file list, pinned commit) alongside a `.upstream/` pristine base and, if we've adapted it, an `override.patch`.

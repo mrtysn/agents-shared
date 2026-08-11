@@ -88,7 +88,8 @@ for source_file in "$SKILLS_DIR"/*/source.json; do
     path=$(jq -r '.path' "$source_file")
     old_commit=$(jq -r '.commit' "$source_file")
     upstream_dir=$(dirname "$path")
-    mapfile -t files < <(jq -r '(.files // ["SKILL.md"])[]' "$source_file")
+    files=()
+    while IFS= read -r f; do files+=("$f"); done < <(jq -r '(.files // ["SKILL.md"])[]' "$source_file")
     base_dir="$skill_dir/.upstream"
 
     # ── Establish-base mode: rebuild base + patch from the pinned commit ──────

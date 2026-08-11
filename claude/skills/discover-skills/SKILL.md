@@ -93,4 +93,10 @@ skipped a source under exactly that wording. A line that is always present is on
 check for. It matters most when the verdict is "nothing good exists" — a thin sweep of four
 sources reads identically to a thorough thirteen unless the count says otherwise.
 
-Do not install anything. If the user wants one installed, they'll say so; installation target is `~/.claude/skills/<name>/` (personal) or `agents-shared/claude/skills/<name>/` (shared), copied from the source repo after reading the full skill content.
+Do not install anything. If the user wants one installed, they'll say so. Three targets, by commitment:
+
+- **Trial (default for a found skill):** `agents-shared/scripts/trial-skill.sh install <owner/repo> <path-in-repo>` — real directory in `~/.claude/skills/`, tracked by `.trial.json`, removable with `rm` or promotable with `promote` once it earns its keep.
+- **Single session only:** no install — fetch the SKILL.md into scratchpad, read it, follow it.
+- **Permanent from the start:** `agents-shared/claude/skills/<name>/` via the external-skill convention (`source.json` + `--establish-base`), only when the user says it's a keeper.
+
+Read the full skill content from the source repo before installing by any route.
