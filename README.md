@@ -60,6 +60,25 @@ config dir (`$CLAUDE_CONFIG_DIR`, else `~/.claude`).
 |------|-------|-------------|
 | `hooks/block-tree-discard.sh` | PreToolUse | Refuses git commands that discard uncommitted work; only `git checkout -- <one tracked file>` passes |
 | `hooks/focus-policy.sh` | SessionStart | Tells the session whether this machine tolerates a window stealing keyboard focus |
+| `hooks/trial-touch.sh` | PostToolUse (`Skill`) | Stamps a trial skill's `last_used`, so idle age means "unused for N days" rather than "installed N days ago" |
+
+### trial-touch.sh
+
+A trial skill's default fate is to live forever: nothing removes it but the user
+happening to look, and its install date says nothing about whether it earns the
+context it costs. This stamps `last_used` in `.trial.json` on every `Skill`
+call, which is what lets `skills-view.py` report a trial as stale only when it
+has genuinely gone unused.
+
+**Fails open**, unlike the PreToolUse guards above. Those refuse the tool call
+when they cannot run, because a guard that fails open is not a guard. This one
+is bookkeeping attached to someone else's tool call, so a missing `jq` or an
+unreadable `.trial.json` exits 0 having done nothing rather than surfacing as a
+failure of the work the user actually asked for.
+
+```json
+{ "matcher": "Skill", "hooks": [{ "type": "command", "command": "…/hooks/trial-touch.sh", "timeout": 5 }] }
+```
 
 ### focus-policy.sh
 
