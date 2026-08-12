@@ -5,9 +5,12 @@ description: Import freshly downloaded İş Bankası exports into Firefly III an
 
 # Finance import — monthly refresh
 
-The finance stack lives in `~/dev/finance` (local-only repo; Firefly III on
-`localhost:8083`, started via `docker compose up -d` there if down). All
-commands run with the repo's venv: `cd ~/dev/finance && ./.venv/bin/python`.
+The finance scripts live in `~/dev/finance` (local-only repo). Firefly III
+runs on node01 at `https://firefly.mertyas.in` (Authelia-gated UI; `/api`
+bypasses the gate and authenticates with the Firefly token in `.api.env`).
+All commands run with the repo's venv: `cd ~/dev/finance && ./.venv/bin/python`.
+If the remote API is unreachable, check node01 (`ssh node01 'docker ps'`) —
+see the homelab runbook.
 
 ## Steps
 
