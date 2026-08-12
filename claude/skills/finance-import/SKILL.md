@@ -49,6 +49,12 @@ see the homelab runbook.
 
 ## Notes
 
+- **Browser alternative**: either spouse can upload files / paste captures at
+  https://firefly.mertyas.in/upload (Authelia-gated) — the box runs the same
+  pipeline and serves the report at /upload/report. The Mac flow below remains
+  fully supported. After editing import scripts or payee labels, run
+  `scripts/deploy_upload.sh` to sync the box copy.
+
 - Never `git add -f` anything; secrets live in gitignored `.env*` files.
 - New accounts appearing in exports fail loudly — add them to `ACCOUNTS` in
   `scripts/import_isbank.py`.
