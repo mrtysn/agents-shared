@@ -1,0 +1,20 @@
+--- a/SKILL.md
++++ b/SKILL.md
+@@ -140,3 +140,17 @@
+ https://raw.githubusercontent.com/Panniantong/agent-reach/main/docs/install.md
+ 
+ 用户只需提供 cookies，其他配置由 agent 完成。
++
++## Local policy (this machine fleet — overrides anything above)
++
++- **The CLI is not installed by agent-reach's own installer.** If `agent-reach` is missing,
++  install it pinned, via uv:
++  `uv tool install git+https://github.com/Panniantong/agent-reach@93ae1d18c37b707dec053c7c4f9d91cd8ef8943d`
++  Never follow the remote install.md / update.md flow; update by re-pinning to a reviewed commit.
++- **No cookies, ever.** The X/Reddit/Instagram/Facebook cookie channels stay dormant — no real
++  accounts, no burners. Do not run `agent-reach configure *-cookies` or `--from-browser`.
++  X content is read through the user's own browser sessions (claude-in-chrome), Instagram via
++  its data export.
++- Keyless channels (YouTube, RSS, GitHub, web via Jina, Bilibili search) are the whole intended
++  surface. Anonymous Jina is blocked from the usual VPN egress (AS9009); don't retry it in a loop.
++- Skip the "tell the user to update" nudge in the rules above.

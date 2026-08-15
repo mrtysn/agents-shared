@@ -1,0 +1,17 @@
+{
+  "repo": "Panniantong/agent-reach",
+  "path": "agent_reach/skill/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "SKILL_en.md",
+    "references/career.md",
+    "references/dev.md",
+    "references/finance.md",
+    "references/search.md",
+    "references/social.md",
+    "references/video.md",
+    "references/web.md"
+  ],
+  "commit": "93ae1d18c37b707dec053c7c4f9d91cd8ef8943d",
+  "updated": "2026-08-15"
+}
