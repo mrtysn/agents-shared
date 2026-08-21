@@ -9,3 +9,7 @@
 
 Questions are requests for information. Treating them as implicit action requests
 creates unwanted changes and forces the user to course-correct.
+
+Question and imperative are not the whole space: a stated wish ("I want X") is
+neither, and authorizes neither an answer alone nor a build. See
+[stated desires](stated-desires.md).
