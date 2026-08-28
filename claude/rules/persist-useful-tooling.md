@@ -18,7 +18,7 @@ No new repo. Pick by *who invokes it*:
 |---|---|---|
 | Useful only inside one project | that repo's `scripts/` or `tools/` | Default. Most tools are this. |
 | Operates on Claude sessions, memory, or the agent setup | `agents-shared/scripts/` | Alongside `blame-session.py`, `search-history.py`, `standup-collect.sh`. |
-| Hand-invoked shell tool for the dev machine | `dev-env/bin/` | Synced by `dev-env`; symlinked into `~/bin`. Register with `/new-tool`. |
+| Hand-invoked shell tool for the dev machine | `dev-env/bin/` | `dev-env/import.sh` symlinks it into `~/bin` — no `/new-tool` step, and running one would double-register it. |
 
 If a tool genuinely fits none of these, say so and propose a home — do not default
 to leaving it in scratch.
