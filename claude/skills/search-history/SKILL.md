@@ -12,7 +12,7 @@ Search Claude Code session transcripts for keyword matches across all projects.
 Run the script:
 
 ```bash
-python3 ~/dev/personal/agents-shared/scripts/search-history.py $ARGUMENTS
+python3 "${AGENTS_SHARED:?run agents-shared/scripts/init-global.sh to set it}/scripts/search-history.py" $ARGUMENTS
 ```
 
 **Flags:**

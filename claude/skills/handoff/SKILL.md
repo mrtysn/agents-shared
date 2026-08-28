@@ -21,8 +21,8 @@ The transcript of a prior session must be summarized without polluting your own 
 Spawn a `general-purpose` sub-agent with a self-contained prompt instructing it to:
 
 1. Locate the transcript file at one of:
-   - `/Users/mert/.claude-personal/projects/*/<UUID>.jsonl`
-   - `/Users/mert/.claude/projects/*/<UUID>.jsonl`
+   - `~/.claude-personal/projects/*/<UUID>.jsonl`
+   - `~/.claude/projects/*/<UUID>.jsonl`
 2. Read the JSONL transcript in full (use `Read` with offset/limit if the file is large).
 3. Return a structured summary, under 800 words, covering:
    - **The Matter at Hand** — what task or investigation was in progress

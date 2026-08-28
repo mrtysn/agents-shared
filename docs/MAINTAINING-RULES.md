@@ -35,7 +35,16 @@ idempotent: re-running repairs wrong targets, links new files, and prunes symlin
 source disappeared. Real (non-symlink) files in those directories are treated as local
 overrides and never touched.
 
-Then `dev-env/import.sh` for shell, tmux, iTerm, and `~/bin` tooling.
+It also writes `~/.config/agents-shared/env.zsh`, exporting `$AGENTS_SHARED` (this
+checkout, derived from the script's own location) and `$DEV_ROOT` (its parent, unless
+`DEV_ROOT` is exported beforehand). Skills invoke `scripts/` through `$AGENTS_SHARED`
+rather than a baked-in path, so the checkout can live anywhere. The file is generated,
+never committed — the repo holds the shape, the machine holds the value.
+
+Then `dev-env/import.sh` for shell, tmux, iTerm, and `~/bin` tooling. Its `.zshrc.base`
+sources that env file, so the variables land in the next shell; order between the two
+scripts does not matter, but a skill invoked before `import.sh` has run will fail with
+`AGENTS_SHARED: run agents-shared/scripts/init-global.sh to set it`.
 
 Verify with `/context` in a session — every rule should appear under **Memory files**.
 
@@ -47,8 +56,9 @@ bash ~/dev/agents-shared/scripts/init-global.sh
 ```
 
 The pull alone is enough for *edits* to existing rules — the symlinks already point at
-the files. `init-global.sh` is only required when a rule was **added, renamed, or
-deleted**. Running it regardless is harmless and is the safe habit.
+the files. `init-global.sh` is required when a rule was **added, renamed, or deleted**,
+and after the checkout **moves** (it rewrites `env.zsh` with the new location). Running
+it regardless is harmless and is the safe habit.
 
 There is no push-based sync. A machine gets changes when you pull on it.
 

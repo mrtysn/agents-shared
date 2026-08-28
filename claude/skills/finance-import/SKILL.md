@@ -5,10 +5,10 @@ description: Import freshly downloaded İş Bankası exports into Firefly III an
 
 # Finance import — monthly refresh
 
-The finance scripts live in `~/dev/finance` (local-only repo). Firefly III
+The finance scripts live in `$DEV_ROOT/finance` (local-only repo). Firefly III
 runs on node01 at `https://firefly.mertyas.in` (Authelia-gated UI; `/api`
 bypasses the gate and authenticates with the Firefly token in `.api.env`).
-All commands run with the repo's venv: `cd ~/dev/finance && ./.venv/bin/python`.
+All commands run with the repo's venv: `cd "$DEV_ROOT/finance" && ./.venv/bin/python`.
 If the remote API is unreachable, check node01 (`ssh node01 'docker ps'`) —
 see the homelab runbook.
 
@@ -38,7 +38,7 @@ see the homelab runbook.
 3. **Regenerate the report** (dated for today, into the notebook repo):
 
    ```sh
-   ./.venv/bin/python scripts/burn_report.py --out ~/dev/notebook/$(date +%F)-burn-runway.html
+   ./.venv/bin/python scripts/burn_report.py --out "$DEV_ROOT/notebook/$(date +%F)-burn-runway.html"
    ```
 
    Then `open` the file.

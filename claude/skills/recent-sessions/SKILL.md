@@ -18,7 +18,7 @@ Scope: this tool answers *"what was I doing recently?"*. For *"find the session 
 Run the script:
 
 ```bash
-python3 ~/dev/personal/agents-shared/scripts/recent-sessions.py $ARGUMENTS
+python3 "${AGENTS_SHARED:?run agents-shared/scripts/init-global.sh to set it}/scripts/recent-sessions.py" $ARGUMENTS
 ```
 
 **Flags:**

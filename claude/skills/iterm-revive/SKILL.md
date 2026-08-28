@@ -15,7 +15,7 @@ Walks every open iTerm2 tab (read-only — no focus steal, no keystrokes), extra
 ## table (default)
 
 ```bash
-python3 ~/dev/personal/agents-shared/scripts/iterm-revive.py
+python3 "${AGENTS_SHARED:?run agents-shared/scripts/init-global.sh to set it}/scripts/iterm-revive.py"
 ```
 
 Print the output as-is. Buckets: `LIVE` (claude process on the tab's tty), `ENDED BY RESTART` (the ones worth reviving), `MOVED ON` (session exited normally or the tab was reused for other work — deliberately skipped), `UNRESOLVED` (claude-flavored tab name but the UUID scrolled off the visible screen).
@@ -23,7 +23,7 @@ Print the output as-is. Buckets: `LIVE` (claude process on the tab's tty), `ENDE
 ## resume
 
 ```bash
-python3 ~/dev/personal/agents-shared/scripts/iterm-revive.py resume
+python3 "${AGENTS_SHARED:?run agents-shared/scripts/init-global.sh to set it}/scripts/iterm-revive.py" resume
 ```
 
 Emits one `cd <cwd> && claude --resume <uuid>` line per ended session, cwd taken from the session's own transcript. Sessions from a non-default config dir get a `CLAUDE_CONFIG_DIR=<dir>` prefix. Print them verbatim in a code block — complete and copy-pasteable, never abbreviated.

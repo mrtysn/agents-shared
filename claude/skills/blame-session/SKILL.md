@@ -12,7 +12,7 @@ Identify which Claude Code sessions are responsible for the current uncommitted 
 Run the script:
 
 ```bash
-python3 ~/dev/personal/agents-shared/scripts/blame-session.py $ARGUMENTS
+python3 "${AGENTS_SHARED:?run agents-shared/scripts/init-global.sh to set it}/scripts/blame-session.py" $ARGUMENTS
 ```
 
 **Flags:**
