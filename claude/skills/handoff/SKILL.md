@@ -1,6 +1,6 @@
 ---
 description: Craft a handoff message for a new session. Use when context must survive session boundaries. Pass a session UUID to consolidate a handoff from a past session instead of the current one.
-argument-hint: [optional notes to emphasize, OR a session UUID]
+argument-hint: [optional notes on scope/length, OR a session UUID]
 allowed-tools: Read, Glob, Grep, Agent
 ---
 
@@ -20,9 +20,9 @@ The transcript of a prior session must be summarized without polluting your own 
 
 Spawn a `general-purpose` sub-agent with a self-contained prompt instructing it to:
 
-1. Locate the transcript file at one of:
+1. Locate the transcript by globbing both roots, resolving `~` at runtime:
    - `~/.claude-personal/projects/*/<UUID>.jsonl`
-   - `~/.claude/projects/*/<UUID>.jsonl`
+   - `${CLAUDE_CONFIG_DIR:-~/.claude}/projects/*/<UUID>.jsonl`
 2. Read the JSONL transcript in full (use `Read` with offset/limit if the file is large).
 3. Return a structured summary, under 800 words, covering:
    - **The Matter at Hand** — what task or investigation was in progress
@@ -36,13 +36,20 @@ Compose the final handoff message from the sub-agent's structured summary. Do no
 
 ### Current-session mode
 
-Compose the handoff from this conversation. Treat `$ARGUMENTS` as emphasis notes (or absent).
+Compose the handoff from this conversation.
+
+`$ARGUMENTS`, when present, governs **scope and length** — not merely emphasis:
+
+- "brief" / "short" / "quick" caps the body at ~200 words and licenses dropping any section that has nothing load-bearing to say.
+- A named focus ("just the export work") excludes everything outside it.
 
 ---
 
 ## Your Charge
 
-Compose a message under the heading "Message for Future Claude" that contains:
+Compose a message under the heading "Message for Future Claude". **Default ceiling: 400 words.**
+
+Draw on these sections, but include one only if omitting it would cost the next session real time. A handoff of three sections is a good handoff.
 
 1. **The Matter at Hand** — What task or investigation is in progress
 2. **What Has Been Established** — Findings, decisions made, hypotheses confirmed or refuted
@@ -50,22 +57,23 @@ Compose a message under the heading "Message for Future Claude" that contains:
 4. **The Path Forward** — Precise next steps, experiments to conduct, or questions to resolve
 5. **Contextual Notes** — Relevant constraints or context future Claude should know
 
+## What Not to Carry
+
+**Carry what is undecided, in motion, or a trap. Drop what is settled, cheap to re-derive, or enforced elsewhere.** The reasoning that produced a decision is not the decision.
+
+Specifically, leave out:
+
+- **Verified facts the next session can re-check in one command** — a config location, a binary path, a file count. Name where to look, not what you found.
+- **Concluded side questions** — a licensing answer, a comparison already settled. If it changes nothing the next session does, it does not travel.
+- **A ledger of your own errors** — what you initially got wrong is useless to a session that never made the mistake. Exception: a failed approach that would otherwise be re-attempted.
+- **Instructions already in force** — style, tone, and process rules arrive via `CLAUDE.md` and `~/.claude/rules/` at startup. Restating them is duplication.
+- **Warnings against re-litigating** — litigating a point nobody raised.
+
 ## Standards of Craft
 
 - Be direct and empirical — your future self respects evidence over assertion
 - Include specific file paths, code snippets, or commands where relevant
 - Note any blocked paths or failed approaches to prevent repeated folly
-
-## Tone & Manner — IMPORTANT
-
-Instruct your future self to adopt the following bearing:
-
-- **Aristocratic** — Dignified, composed, with refined language
-- **Direct** — State findings plainly; no hedging or excessive qualification
-- **Empirical** — Demonstrate, do not merely assert; proof over documentation
-- **Receptive to challenge** — When the user questions a claim, welcome it and investigate
-- **Honest in error** — If you overcomplicated or misspoke, admit it plainly and move on
-- **Peer to peer** — The user is technically capable; do not condescend or over-explain
 
 ## Format
 
@@ -80,8 +88,6 @@ Begin output with a suggested filename (metadata, above the body), then the hand
 
 ---
 [Your handoff content here]
-
-**Tone:** Maintain aristocratic bearing — direct, empirical, receptive to challenge, honest in error. Treat the user as a capable peer.
 
 ---
 Godspeed.
