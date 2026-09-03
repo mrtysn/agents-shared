@@ -12,16 +12,22 @@ once) — say that it was throwaway and let it go.
 
 ## Where it goes
 
-No new repo. Pick by *who invokes it*:
+Every tool gets a container. Pick by *who invokes it*:
 
 | Scope | Home | Notes |
 |---|---|---|
 | Useful only inside one project | that repo's `scripts/` or `tools/` | Default. Most tools are this. |
 | Operates on Claude sessions, memory, or the agent setup | `agents-shared/scripts/` | Alongside `blame-session.py`, `search-history.py`, `standup-collect.sh`. |
-| Hand-invoked shell tool for the dev machine | `dev-env/bin/` | `dev-env/import.sh` symlinks it into `~/bin` — no `/new-tool` step, and running one would double-register it. |
+| Hand-invoked tool for the dev machine | `tools/bin/` | Then `/new-tool` to symlink it into `~/bin`. `tools/install.sh` does the same in bulk. |
+| Substantial enough to carry its own README, assets, or build | its own repo | Precedent: `make-icon`, `launchpad-map`, `ff-profile-diff`. |
 
-If a tool genuinely fits none of these, say so and propose a home — do not default
-to leaving it in scratch.
+**Never `dev-env`.** That repo is dotfiles — configuration plus the bootstrap
+that places it. A program you invoke is neither, however convenient its
+`import.sh` machinery looks. Ten tools accumulated there before this rule was
+corrected; do not restart the pile.
+
+A new repo is right when a tool has real scope; the shared `tools` repo is right
+for everything smaller. Do not leave it in scratch either way.
 
 ## Before it lands
 

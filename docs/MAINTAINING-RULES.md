@@ -41,7 +41,8 @@ checkout, derived from the script's own location) and `$DEV_ROOT` (its parent, u
 rather than a baked-in path, so the checkout can live anywhere. The file is generated,
 never committed — the repo holds the shape, the machine holds the value.
 
-Then `dev-env/import.sh` for shell, tmux, iTerm, and `~/bin` tooling. Its `.zshrc.base`
+Then `dev-env/import.sh` for shell, tmux, and iTerm, and `tools/install.sh` for `~/bin`
+tooling. `import.sh`'s `.zshrc.base`
 sources that env file, so the variables land in the next shell; order between the two
 scripts does not matter, but a skill invoked before `import.sh` has run will fail with
 `AGENTS_SHARED: run agents-shared/scripts/init-global.sh to set it`.
@@ -122,4 +123,4 @@ worse than no memory, because Claude may follow either.
 | What is Claude's saved auto memory? | `/memory` |
 | Are the symlinks correct and complete? | `bash scripts/init-global.sh` (reports `+new ~repaired -pruned`) |
 | Any broken symlinks left behind? | `find ~/.claude/rules ~/.claude/skills ~/.claude/commands -type l ! -exec test -e {} \; -print` |
-| Are all repos current across machines? | `repo-survey ~/dev` (from `dev-env/bin`) |
+| Are all repos current across machines? | `repo-survey ~/dev` (from the `tools` repo) |

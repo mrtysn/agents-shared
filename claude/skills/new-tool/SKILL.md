@@ -20,9 +20,9 @@ Register a script with the user's `toolbelt` system. The toolbelt scans `~/bin` 
 
 ### 1. Locate or create the script
 
-If the user names an existing path, use it. For a fresh script, pick its home with the placement rule in `persist-useful-tooling` — a hand-invoked machine tool belongs in `$DEV_ROOT/dev-env/bin/`, which `dev-env` syncs to the user's other machine. Never write the source directly into `~/bin` — keep source and symlink separate so the script is editable in its natural project location and travels with its repo.
+If the user names an existing path, use it. For a fresh script, pick its home with the placement rule in `persist-useful-tooling` — a hand-invoked machine tool belongs in `$DEV_ROOT/tools/bin/`. Never put it in `dev-env`: that repo is dotfiles, and a program you invoke is not configuration. Never write the source directly into `~/bin` — keep source and symlink separate so the script is editable in its natural project location and travels with its repo.
 
-**A script already under `dev-env/bin/` needs nothing from this skill.** `import.sh` symlinks every file there into `~/bin` already; registering it again produces a second entry that shadows the first. Confirm it is missing from `~/bin` before proceeding.
+Confirm the tool is missing from `~/bin` before proceeding — registering one twice produces a second entry that shadows the first. `tools/install.sh` links everything in `tools/bin/` in bulk, so a script already placed there and installed needs nothing further.
 
 ### 2. Verify shebang and DESC line
 
@@ -30,7 +30,7 @@ Read the first 20 lines of the script:
 - Line 1 must be a `#!` shebang.
 - Somewhere in the first 20 lines there must be a `# DESC: <text>` line.
 
-If DESC is missing, insert it as **line 2** (immediately after the shebang). This is the existing convention — see `pull_of_wonders`, `toolbelt`, `blame-session`, etc.
+If DESC is missing, insert it as **line 2** (immediately after the shebang). This is the existing convention — see `toolbelt`, `repo-survey`, `ffmpeg-progress`, etc.
 
 ### 3. Make it executable
 
@@ -74,6 +74,6 @@ If the entry doesn't appear, the most likely causes are: missing `# DESC:` line,
 - **DESC line position** — `toolbelt` only scans the first 20 lines for `^#\s*DESC:`. Placement matters.
 - **Relative symlink target** — always use the absolute path. Relative targets break the symlink when invoked from a different cwd.
 - **`~/bin` not in PATH** — verify with `echo $PATH | tr ':' '\n' | grep -F "$HOME/bin"`. If absent, the symlink works but invocation-by-name doesn't; tell the user to add it to their shell rc.
-- **Extension convention** — symlinks omit `.sh` / `.py` / `.rb` (e.g., `pull_of_wonders`, not `pull_of_wonders.sh`). Source files keep their extensions. The `toolbelt` listing uses the symlink name.
+- **Extension convention** — symlinks omit `.sh` / `.py` / `.rb` (e.g., `adb-keep-awake`, not `adb-keep-awake.sh`). Source files keep their extensions. The `toolbelt` listing uses the symlink name.
 - **Don't write source into `~/bin`** — that directory is for symlinks. The source script lives in its project so it's editable in context and easy to find via `readlink`.
 - **Compiled binaries use a sidecar `.desc` file**, not a `# DESC:` line. For Mach-O / ELF executables, `toolbelt` reads `<name>.desc` (first line) from the same directory as the binary. The sidecar sits beside the binary, not beside the symlink. This skill targets scripts; binary registration is a sibling workflow.
