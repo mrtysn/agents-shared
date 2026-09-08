@@ -1,9 +1,9 @@
 ---
-name: skills
+name: skills-board
 description: Show every installed skill as a board — managed skills, trial skills grouped by source repo, how long each has gone unused, and what each costs in context. Use when the user asks what skills are installed, which are stale or unused, what the skills are costing, or wants to decide what to remove, pin, or promote.
 ---
 
-# skills
+# skills-board
 
 Run `scripts/skills-view.py` in agents-shared and show the user its output.
 Never reimplement the board inline, and never read the skills directory
@@ -16,7 +16,7 @@ No hardcoded paths. This skill directory is a symlink into the agents-shared
 clone; resolve it:
 
 ```zsh
-SKILL_DIR="$(readlink -f "$(dirname "$(readlink -f ~/.claude/skills/skills/SKILL.md)")")"
+SKILL_DIR="$(readlink -f "$(dirname "$(readlink -f ~/.claude/skills/skills-board/SKILL.md)")")"
 VIEW="$SKILL_DIR/../../../scripts/skills-view.py"
 ```
 
@@ -25,7 +25,7 @@ use; if not, say so rather than guessing paths.
 
 ## Mapping the request
 
-- **"what skills do I have" / "show the skills" / "/skills"** → `$VIEW`
+- **"what skills do I have" / "show the skills" / "/skills-board"** → `$VIEW`
 - **"what's stale" / "what am I not using"** → `$VIEW --stale`
 - **"show everything as cards"** → `$VIEW --all`
 

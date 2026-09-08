@@ -1,6 +1,6 @@
 ---
 name: trial-skill
-description: Install, remove, pin, restore, or promote trial skills — temporary skill installs kept outside agents-shared management. Use when the user wants to try a skill temporarily (e.g. one found by /discover-skills), delete or bring back a trial, stop one aging out, or promote one into agents-shared permanently. For seeing what is installed and what has gone stale, use /skills instead.
+description: Install, remove, pin, restore, or promote trial skills — temporary skill installs kept outside agents-shared management. Use when the user wants to try a skill temporarily (e.g. one found by /discover-skills), delete or bring back a trial, stop one aging out, or promote one into agents-shared permanently. For seeing what is installed and what has gone stale, use /skills-board instead.
 ---
 
 # trial-skill
@@ -31,7 +31,7 @@ before use; if not, say so rather than guessing paths.
   instructions.
   Skills installed from the same repo are handled as a set automatically —
   there is no flag to pass and nothing to remember at install time.
-- **"what trials do I have" / "list"** → prefer the [skills](../skills/SKILL.md)
+- **"what trials do I have" / "list"** → prefer the [skills-board](../skills-board/SKILL.md)
   board, which shows trials, managed skills, idle age and context cost together.
   `$TRIAL list` is the plain fallback; `$TRIAL list --json` is the board's data
   source, not something to show a human.

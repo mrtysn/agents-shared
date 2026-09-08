@@ -49,13 +49,16 @@ GROUP_PALETTE = [CYAN, GREEN, MAGENTA, BLUE]
 
 CARD_W = 24                     # inner width; 4 cards fit a standard 110-col term
 CARD_GAP = "  "
+# Without a terminal the output is being captured and pasted into a chat pane
+# whose width is unknown; two cards (54 cols) fit any pane without shearing.
+NO_TTY_WIDTH = 60
 
 
 def term_width():
     try:
         return os.get_terminal_size().columns
     except OSError:
-        return 110
+        return NO_TTY_WIDTH
 
 
 def tokens(chars):
