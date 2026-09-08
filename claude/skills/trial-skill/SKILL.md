@@ -35,15 +35,15 @@ before use; if not, say so rather than guessing paths.
   board, which shows trials, managed skills, idle age and context cost together.
   `$TRIAL list` is the plain fallback; `$TRIAL list --json` is the board's data
   source, not something to show a human.
-- **"remove/delete X"** → `$TRIAL rm <name>`, or `$TRIAL rm --repo <owner/repo>`
+- **"remove/delete X"** → `$TRIAL rm <name>...`, or `$TRIAL rm --repo <owner/repo>`
   for everything from one source (trials only; managed skills are
   agents-shared's business). Mention that `restore` brings it back — removal is
   not a decision worth agonizing over.
 - **"bring back X" / "I removed X by mistake"** → `$TRIAL restore <name>`,
   which refetches at the commit recorded when it was removed.
-- **"stop nagging me about X" / "I'll want X later"** → `$TRIAL pin <name>`.
+- **"stop nagging me about X" / "I'll want X later"** → `$TRIAL pin <name>...`.
   A pinned trial never reports stale. `unpin` reverses it.
-- **"keep X" / "promote X"** → `$TRIAL promote <name>` (or
+- **"keep X" / "promote X"** → `$TRIAL promote <name>...` (or
   `--repo <owner/repo>`), then remind the user the move is uncommitted in
   agents-shared (or commit it if they've asked you to handle commits).
 

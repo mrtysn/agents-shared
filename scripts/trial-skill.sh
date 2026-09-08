@@ -28,8 +28,8 @@
 # Usage:
 #   trial-skill.sh install <owner/repo> <path-in-repo> [--name <name>]
 #   trial-skill.sh list [--json]
-#   trial-skill.sh rm <name> | --repo <owner/repo>
-#   trial-skill.sh promote <name> | --repo <owner/repo>
+#   trial-skill.sh rm <name>... | --repo <owner/repo>
+#   trial-skill.sh promote <name>... | --repo <owner/repo>
 #   trial-skill.sh pin <name> | unpin <name>
 #   trial-skill.sh restore <name>
 #   trial-skill.sh touch <name>          # hook bookkeeping; stamps last_used
@@ -98,6 +98,26 @@ frontmatter_chars() {
     local skill_md="$1"
     [[ -f "$skill_md" ]] || { print 0; return; }
     awk '/^---$/{c++; next} c==1{print}' "$skill_md" | wc -c | tr -d ' '
+}
+
+# The description from the frontmatter: a plain value, or a folded block
+# (`>` / `>-`) joined into one line. Those are the two shapes every skill here
+# uses; a full YAML parser would be a dependency for nothing.
+frontmatter_desc() {
+    local skill_md="$1"
+    [[ -f "$skill_md" ]] || return 0
+    awk '
+        /^---$/ { c++; next }
+        c != 1 { next }
+        inblk && /^[ \t]/ { sub(/^[ \t]+/, ""); out = out (out == "" ? "" : " ") $0; next }
+        inblk { exit }
+        /^description:/ {
+            sub(/^description:[ \t]*/, "")
+            if ($0 ~ /^[>|]-?$/) { inblk = 1; next }
+            out = $0; exit
+        }
+        END { print out }
+    ' "$skill_md" | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/"
 }
 
 # Trial directories installed from one repo, newline-separated. This is what
@@ -228,8 +248,10 @@ emit_json() {
         target="$(readlink "$d")"
         jq -n --arg name "$name" --arg target "$target" \
               --argjson desc "$(frontmatter_chars "$d/SKILL.md")" \
+              --arg description "$(frontmatter_desc "$d/SKILL.md")" \
               --argjson external "$([[ -f "$target/source.json" ]] && print true || print false)" \
               '{name: $name, kind: "managed", target: $target, desc_chars: $desc,
+                description: $description,
                 external: $external, idle_days: null, stale: false, pinned: false}'
     done
     for d in "$SKILLS_DST"/*(N/); do
@@ -238,18 +260,21 @@ emit_json() {
         if [[ -f "$meta" ]]; then
             jq --arg name "$name" --arg dir "$d" \
                --argjson desc "$(frontmatter_chars "$d/SKILL.md")" \
+               --arg description "$(frontmatter_desc "$d/SKILL.md")" \
                --argjson idle "$(idle_days "$meta")" \
                --argjson stale_at "$STALE_DAYS" \
                '{name: $name, kind: "trial", dir: $dir, repo: .repo, commit: .commit,
                  installed: .installed, last_used: (.last_used // .installed),
                  pinned: (.pinned // false),
-                 files: (.files | length), desc_chars: $desc, idle_days: $idle,
+                 files: (.files | length), desc_chars: $desc, description: $description,
+                 idle_days: $idle,
                  stale: ($idle >= $stale_at and (.pinned // false) == false)}' "$meta"
         else
             jq -n --arg name "$name" --arg dir "$d" \
                   --argjson desc "$(frontmatter_chars "$d/SKILL.md")" \
+                  --arg description "$(frontmatter_desc "$d/SKILL.md")" \
                   '{name: $name, kind: "untracked", dir: $dir, desc_chars: $desc,
-                    idle_days: null, stale: false, pinned: false}'
+                    description: $description, idle_days: null, stale: false, pinned: false}'
         fi
     done
 }
@@ -323,12 +348,21 @@ cmd_rm() {
         print "Restore any of them with: trial-skill.sh restore <name>"
         return 0
     fi
-    local name="${1:?usage: trial-skill.sh rm <name> | --repo <owner/repo>}"
-    local dst="$SKILLS_DST/$name"
-    [[ -L "$dst" ]] && die "$name is a managed skill — remove it from agents-shared instead"
-    [[ -d "$dst" ]] || die "no trial skill at $dst"
-    remove_one "$dst"
-    print "Restore with: trial-skill.sh restore $name"
+    (( $# )) || die "usage: trial-skill.sh rm <name>... | --repo <owner/repo>"
+    # Validate the whole set before touching any of it, so a typo in the third
+    # name does not leave the first two removed.
+    local name dst
+    for name in "$@"; do
+        dst="$SKILLS_DST/$name"
+        [[ -L "$dst" ]] && die "$name is a managed skill — remove it from agents-shared instead"
+        [[ -d "$dst" ]] || die "no trial skill at $dst"
+    done
+    for name in "$@"; do remove_one "$SKILLS_DST/$name"; done
+    if (( $# == 1 )); then
+        print "Restore with: trial-skill.sh restore $1"
+    else
+        print "Removed $# trials. Restore any of them with: trial-skill.sh restore <name>"
+    fi
 }
 
 # ── pin / unpin ──────────────────────────────────────────────────────────────
@@ -338,16 +372,22 @@ cmd_rm() {
 cmd_pin() {
     need jq
     local want="$1"; shift
-    local name="${1:?usage: trial-skill.sh pin|unpin <name>}"
-    local meta="$SKILLS_DST/$name/.trial.json"
-    [[ -f "$meta" ]] || die "no trial skill '$name' at $SKILLS_DST (managed skills do not age)"
-    local tmp="$meta.tmp"
-    jq --argjson p "$want" '.pinned = $p' "$meta" > "$tmp" && mv "$tmp" "$meta"
-    if [[ "$want" == "true" ]]; then
-        print "Pinned '$name' — it will not be reported stale."
-    else
-        print "Unpinned '$name' — it ages from its last use again."
-    fi
+    (( $# )) || die "usage: trial-skill.sh pin|unpin <name>..."
+    local name meta tmp
+    for name in "$@"; do
+        meta="$SKILLS_DST/$name/.trial.json"
+        [[ -f "$meta" ]] || die "no trial skill '$name' at $SKILLS_DST (managed skills do not age)"
+    done
+    for name in "$@"; do
+        meta="$SKILLS_DST/$name/.trial.json"
+        tmp="$meta.tmp"
+        jq --argjson p "$want" '.pinned = $p' "$meta" > "$tmp" && mv "$tmp" "$meta"
+        if [[ "$want" == "true" ]]; then
+            print "Pinned '$name' — it will not be reported stale."
+        else
+            print "Unpinned '$name' — it ages from its last use again."
+        fi
+    done
 }
 
 # ── touch ────────────────────────────────────────────────────────────────────
@@ -427,7 +467,8 @@ cmd_promote() {
         local d
         for d in "${members[@]}"; do names+=("${d:t}"); done
     else
-        names=("${1:?usage: trial-skill.sh promote <name> | --repo <owner/repo>}")
+        (( $# )) || die "usage: trial-skill.sh promote <name>... | --repo <owner/repo>"
+        names=("$@")
     fi
 
     local n
