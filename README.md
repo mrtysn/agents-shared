@@ -61,6 +61,40 @@ config dir (`$CLAUDE_CONFIG_DIR`, else `~/.claude`).
 | `hooks/block-tree-discard.sh` | PreToolUse | Refuses git commands that discard uncommitted work; only `git checkout -- <one tracked file>` passes |
 | `hooks/focus-policy.sh` | SessionStart | Tells the session whether this machine tolerates a window stealing keyboard focus |
 | `hooks/trial-touch.sh` | PostToolUse (`Skill`) | Stamps a trial skill's `last_used`, so idle age means "unused for N days" rather than "installed N days ago" |
+| `hooks/memory-lint.sh` | PreToolUse (`Edit\|Write`) | Keeps auto-memory index lines topic-only and refuses a memory that duplicates a rule |
+| `hooks/dump-hook-stdin.sh` | any | Probe: writes the JSON a hook event receives to a file, then allows the call |
+
+### memory-lint.sh
+
+`MEMORY.md` loads into every session in its project; the memory files load only
+on recall. A fact in an index line is therefore paid for in every session and
+is where private detail leaks. On any `Edit` or `Write` under
+`<config>/projects/*/memory/` this checks the two halves a script can check:
+
+- a new or changed index line must be a topic label — no digits, no currency
+  symbol, at most 12 words after the dash. Entries whose file says
+  `type: feedback` are exempt, because a prohibition has to fire before the
+  mistake and so keeps its instruction in the line
+- a memory file being created must not share its slug with a rule in
+  `<config>/rules/`
+
+Only lines being introduced are judged, so rewriting an index that already
+carries old offenders is not blocked for them. The rule that says what to
+write is `claude/rules/memory-hygiene.md`; this refuses what it can detect.
+
+**Fails closed**, like the other PreToolUse guards. Cases in
+`hooks/tests/memory-lint-cases.tsv`, run with `hooks/tests/run-memory-lint.sh`.
+
+```json
+{ "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "…/hooks/memory-lint.sh", "timeout": 10 }] }
+```
+
+### dump-hook-stdin.sh
+
+Point any hook event at it and it writes the JSON it received to
+`$HOOK_STDIN_OUT` (else `<config>/hook-stdin.json`), then exits 0. That answers
+"what does this event actually get?" — which fields `tool_input` carries, what
+`cwd` and `permission_mode` look like — before writing a hook that depends on it.
 
 ### trial-touch.sh
 

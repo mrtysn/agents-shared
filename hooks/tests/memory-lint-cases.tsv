@@ -1,0 +1,34 @@
+# Cases for memory-lint.sh — one per line: <verdict><TAB><tool><TAB><file><TAB><text>
+#
+# verdict: pass (exit 0) | block (exit 2). tool: Write | Edit.
+# file is relative to the fixture memory dir, or "rule-dup:<name>" for a new
+# memory file whose slug is <name>. text is the content / new_string; \n allowed.
+# The fixture memory dir holds MEMORY.md with one existing offending line, a
+# `type: feedback` entry named no-curl-pipe, and a `type: project` entry named
+# finances. The fixture rules dir holds no-hardcoded-paths.md.
+#
+# --- not a memory path: always pass
+pass	Write	../../elsewhere/notes.md	- [x](x.md) — 3,316,271 TL in cash
+# --- index lines: topic-only for facts
+pass	Write	MEMORY.md	- [Finances](finances.md) — Firefly stack, burn report
+block	Write	MEMORY.md	- [Finances](finances.md) — quit job Aug 2026, zero income
+block	Write	MEMORY.md	- [Finances](finances.md) — rent is 73K TL a month
+block	Write	MEMORY.md	- [Finances](finances.md) — keeps $1,398 as an FX hedge
+block	Write	MEMORY.md	- [Finances](finances.md) — one two three four five six seven eight nine ten eleven twelve thirteen
+pass	Write	MEMORY.md	- [Finances](finances.md) — one two three four five six seven eight nine ten eleven twelve
+# --- feedback entries keep their instruction, digits and all
+pass	Write	MEMORY.md	- [No curl pipe](no-curl-pipe.md) — never curl-pipe installers, even when 3 project docs suggest them
+# --- Edit appends are checked the same way
+pass	Edit	MEMORY.md	- [Finances](finances.md) — deposit ladder decisions
+block	Edit	MEMORY.md	- [Finances](finances.md) — 39.5% on the 32-day vadeli
+# --- lines already on disk are not re-judged on a whole-file rewrite
+pass	Write	MEMORY.md	- [Old offender](old-offender.md) — 2,020,000 TL at 40.5% gross\n- [Finances](finances.md) — Firefly stack, burn report
+# --- entry with no file yet is judged as a fact
+block	Write	MEMORY.md	- [New thing](new-thing.md) — decided on 2026-09-08
+# --- new memory files: rule collision
+block	Write	rule-dup:no-hardcoded-paths	body
+block	Write	rule-dup:feedback_no_hardcoded_paths	body
+block	Write	rule-dup:No-Hardcoded-Paths	body
+pass	Write	rule-dup:no-hardcoded-defaults	body
+# --- editing an existing memory file is not a duplicate
+pass	Write	finances.md	rewritten body with 3,316,271 TL in it
