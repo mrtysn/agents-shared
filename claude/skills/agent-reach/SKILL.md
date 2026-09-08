@@ -154,3 +154,9 @@ https://raw.githubusercontent.com/Panniantong/agent-reach/main/docs/install.md
 - Keyless channels (YouTube, RSS, GitHub, web via Jina, Bilibili search) are the whole intended
   surface. Anonymous Jina is blocked from the usual VPN egress (AS9009); don't retry it in a loop.
 - Skip the "tell the user to update" nudge in the rules above.
+- **LinkedIn is never read through claude-in-chrome.** The channel is `off` and both anonymous
+  paths (Jina Reader, direct curl) return HTTP 999 — that is the expected outcome, not a cue to
+  fall back to the user's logged-in session. Driving his own Chrome to a profile registers a
+  profile view under his name, visible to the person viewed. If the CLI and Jina both fail,
+  report that and stop. The claude-in-chrome fallback in the no-cookies clause above is for
+  X only, and does not generalize.
