@@ -28,3 +28,9 @@ publishing, pushing to a remote that doesn't exist yet, sending anything to a th
 party, deleting or overwriting. Confirming these is not hedging and does not
 conflict with [chasing the ideal](chase-the-ideal.md) — but ask for that
 confirmation with the tool, not with a sentence.
+
+## Naming is always the user's call
+
+Aliases, command names, file and directory names — anything the user will type or
+read daily. Present options; never pick one unilaterally. This holds even when the
+choice looks trivial, and even mid-implementation.
