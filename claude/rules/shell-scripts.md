@@ -22,4 +22,15 @@ Say which one applies rather than defaulting to bash out of habit.
 
 - `set -euo pipefail` at the top of anything non-trivial
 - Quote expansions; `"$var"`, not `$var`
-- Keep commands paste-safe — single-line loops, no indented heredocs
+
+## Long commands go in a file, not the chat
+
+**The enemy is line length, not heredocs.** Claude Code soft-wraps long lines in
+rendered code blocks; on copy, every wrap point becomes a real newline plus gutter
+indentation. That breaks a heredoc — the terminator is no longer at column 0 — and
+breaks a single-line base64 blob just as thoroughly. "Make it one line" does not
+fix it.
+
+Write anything longer than roughly one terminal line to a file yourself, then hand
+over a short runner: `zsh /tmp/thing.sh`. Paste raw commands only when they are
+short enough never to wrap.
