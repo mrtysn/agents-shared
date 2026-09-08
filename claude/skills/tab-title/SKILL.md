@@ -5,7 +5,7 @@ disable-model-invocation: true
 argument-hint: [ignored]
 ---
 
-# tab-rename
+# tab-title
 
 Read the conversation already in context and name it. No transcript parsing — the
 chat is right here. No tools, no terminal writes: the output is a title and the
