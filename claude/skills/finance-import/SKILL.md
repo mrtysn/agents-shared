@@ -1,11 +1,11 @@
 ---
 name: finance-import
-description: Import freshly downloaded İş Bankası exports into Firefly III and refresh the burn/runway report. Use when the user says they downloaded bank files, wants the monthly finance refresh, or invokes /finance-import — typically right after the monthly Telegram reminder.
+description: Import freshly downloaded İş Bankası and Yapı Kredi exports into Firefly III and refresh the burn/runway report. Use when the user says they downloaded bank files, wants the monthly finance refresh, or invokes /finance-import — typically right after the monthly Telegram reminder.
 ---
 
 # Finance import — monthly refresh
 
-The finance scripts live in `$DEV_ROOT/finance` (local-only repo). Firefly III
+The finance scripts live in `$DEV_ROOT/finance` (its git remote is on node01). Firefly III
 runs on node01 at `https://firefly.mertyas.in` (Authelia-gated UI; `/api`
 bypasses the gate and authenticates with the Firefly token in `.api.env`).
 All commands run with the repo's venv: `cd "$DEV_ROOT/finance" && ./.venv/bin/python`.
@@ -14,21 +14,33 @@ see the homelab runbook.
 
 ## Steps
 
-1. **Sweep Downloads** — moves account `.xls` exports and card statement PDFs
-   into `import/`, renaming card PDFs by currency + kesim date:
+1. **Sweep Downloads** — moves account `.xls` exports and statement PDFs into
+   `import/`. PDFs are recognized by content, whatever they were saved as:
+   Maximiles statements are named by currency + kesim, Yapı Kredi account
+   movements by currency + date range, Worldcard statements by kesim (the
+   last two into `import/yapikredi/`):
 
    ```sh
    ./.venv/bin/python scripts/sweep_downloads.py
    ```
 
-   If it reports zero files, tell the user what to download (İş internet
-   şubesi → hesap hareketleri per account as .xls; kart → Kredi Kartı Hesap
-   Özetim → print-to-PDF per new dönem) and stop.
+   If it reports zero files, tell the user what to download and stop:
+   - İş internet şubesi → hesap hareketleri per account as .xls, **starting on
+     or before the last export's end date** (overlap by a day; a gap between
+     exports is fatal), ending today
+   - Kredi Kartı Hesap Özetim → print-to-PDF per new dönem, TL, USD and EUR
+   - Kredi Kartı Son İşlemlerim → copy-paste into a `.txt`, taken **after** the
+     newest statement (an older capture is ignored)
+   - Ecem's Yapı Kredi account PDFs and Worldcard statements, same overlap rule
 
-2. **Import** — idempotent; overlapping date ranges are safe:
+2. **Import** — idempotent. Row ids are the bank's reference (İş) or the row's
+   content (Yapı Kredi), so re-imports skip what Firefly holds; exports of one
+   account are merged; opening balances never move later than the history
+   Firefly already has, so a month-only export is safe:
 
    ```sh
    ./.venv/bin/python scripts/import_isbank.py
+   ./.venv/bin/python scripts/import_yapikredi.py   # when Yapı Kredi files arrived
    ```
 
    **Every reconciliation line must end `OK`.** On a MISMATCH, do not
@@ -58,5 +70,5 @@ see the homelab runbook.
 - Never `git add -f` anything; secrets live in gitignored `.env*` files.
 - New accounts appearing in exports fail loudly — add them to `ACCOUNTS` in
   `scripts/import_isbank.py`.
-- USD/EUR card statements are reference-only (not imported); only
-  `maximiles-tl-*` PDFs are.
+- USD/EUR card statements are imported like TL ones, from print-to-PDF or a
+  pasted `.txt`; when both cover one kesim the `.txt` wins.
