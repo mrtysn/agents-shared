@@ -6,11 +6,12 @@ description: Import freshly downloaded İş Bankası and Yapı Kredi exports int
 # Finance import — monthly refresh
 
 The finance scripts live in `$DEV_ROOT/finance` (its git remote is on node01). Firefly III
-runs on node01 at `https://firefly.mertyas.in` (Authelia-gated UI; `/api`
+runs on node01 behind the shared Caddy (Authelia-gated UI; `/api`
 bypasses the gate and authenticates with the Firefly token in `.api.env`).
 All commands run with the repo's venv: `cd "$DEV_ROOT/finance" && ./.venv/bin/python`.
-If the remote API is unreachable, check node01 (`ssh node01 'docker ps'`) —
-see the homelab runbook.
+The host name is in `.api.env` (`FIREFLY_URL`) and the private homelab runbook
+(`/homelab-connect`). If the remote API is unreachable, check node01
+(`ssh node01 'docker ps'`) — see that runbook.
 
 ## Steps
 
@@ -62,7 +63,7 @@ see the homelab runbook.
 ## Notes
 
 - **Browser alternative**: either spouse can upload files / paste captures at
-  https://firefly.mertyas.in/upload (Authelia-gated) — the box runs the same
+  the Firefly host's `/upload` page (Authelia-gated) — the box runs the same
   pipeline and serves the report at /upload/report. The Mac flow below remains
   fully supported. After editing import scripts or payee labels, run
   `scripts/deploy_upload.sh` to sync the box copy.
