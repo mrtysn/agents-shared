@@ -30,8 +30,9 @@ The host name is in `.api.env` (`FIREFLY_URL`) and the private homelab runbook
      or before the last export's end date** (overlap by a day; a gap between
      exports is fatal), ending today
    - Kredi Kartı Hesap Özetim → print-to-PDF per new dönem, TL, USD and EUR
-   - Kredi Kartı Son İşlemlerim → copy-paste into a `.txt`, taken **after** the
-     newest statement (an older capture is ignored)
+   - Kredi Kartı Son İşlemlerim → print-to-PDF per card (or copy-paste into a
+     `.txt`), taken **after** the newest statement (an older capture is ignored);
+     a card with no new transactions needs no page
    - Ecem's Yapı Kredi account PDFs and Worldcard statements, same overlap rule
 
 2. **Import** — idempotent. Row ids are the bank's reference (İş) or the row's
