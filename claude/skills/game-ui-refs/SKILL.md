@@ -35,6 +35,8 @@ anyway, return the brief in the format of `record.py render`, and end with
 - A **100% match** answers the question already. Unless the request says `fresh` (or
   "again", "re-run", "update"), return `"$REC" render <id>` verbatim, followed by
   `Earlier brief from <date> — ask for a fresh run to browse again.` and stop.
+- On a fresh run over a match, set `"supersedes": "<that id>"` in the new record. The
+  viewer then shows the new brief in its place.
 - Weaker matches do not stop the run. Name them under **More to browse** as earlier
   briefs, by id.
 
@@ -84,8 +86,9 @@ This runs against small sites, one of them a free resource maintained by one per
   to get the link of an example you will cite.
 - **Never page past the second page of a listing.** Game UI Database pages hold 50
   screens. Never sweep a category.
-- **Never download, save or copy an image**, and never pass one to an image generator.
-  View; describe in words; link.
+- **Never download or save an image yourself**, and never pass one to an image
+  generator. Record each screen's image URL as `source`; `record.py` fetches every one
+  exactly once, a second apart, into the private ledger.
 - A login wall or paywall ends that site for this request. Never read through the user's
   signed-in session.
 
@@ -108,11 +111,15 @@ coverage. On `allow`:
    `get_page_text` and `find` return text only.
 6. Close the tab when done.
 
-**Permalinks.**
-- *Game UI Database* grid anchors point at the raw image, not a screen. Click the
-  thumbnail; the tab URL gains `&autoload=<screen id>` — read it back with
-  `tabs_context_mcp`. That listing URL plus `autoload` is the example's link.
-- *Interface In Game* screens live at `/screenshots/<game-slug>-<caption-slug>/`.
+**Every screen you view becomes a `screens` entry**, in the order viewed, with two URLs:
+
+| Field | Game UI Database | Interface In Game |
+|---|---|---|
+| `url` — the screen | Click the thumbnail; the tab URL gains `&autoload=<screen id>` — read it back with `tabs_context_mcp`. The listing URL plus `autoload` is the screen's link | `/screenshots/<game-slug>-<caption-slug>/` |
+| `source` — its image | The grid anchor's href (`/uploads/…`), from `read_page` | The `img` src on the screen's card or page, from `read_page` |
+
+Take both from the page, never from pixels. When a page exposes no image URL, record
+the screen without `source` — it keeps its place in the count, just without a picture.
 
 If the extension is not connected or a tool errors twice, stop using Chrome, treat
 `chrome` sites as `links`, and say so in coverage. Do not retry in a loop.
@@ -120,8 +127,9 @@ If the extension is not connected or a tool errors twice, stop using Chrome, tre
 ## 5. Record the brief
 
 Cite only screens actually seen. A pattern needs at least three examples behind it;
-fewer is a variation. In a pattern's `n of m`, **m is the number of screens viewed**.
-Three to five examples. Every link is one you composed from the tables or read off a
+fewer is a variation. In a pattern's `n of m`, **m is the number of screens viewed** —
+the length of `screens`. Three to five examples. Point each example, and each variation
+that has one, at its screen with `"screen": <index into screens>`. Every link is one you composed from the tables or read off a
 page — never a URL reconstructed from memory.
 
 Write the record as JSON (field reference: the ledger repo's `README.md`):
@@ -130,9 +138,11 @@ Write the record as JSON (field reference: the ledger repo's `README.md`):
 {
   "query": "<$ARGUMENTS verbatim>",
   "subject": "<Subject>", "platform": "<or null>", "genre": null, "look": null,
+  "supersedes": null,
+  "screens":    [{"game": "<game>", "site": "<site>", "url": "<the screen>", "source": "<its image URL>", "note": "<what it shows, a few words>"}],
   "patterns":   [{"text": "<placement, hierarchy, what is always visible…>", "n": 9, "m": 18}],
-  "variations": [{"title": "<approach>", "text": "<what it does and what it buys; games named>"}],
-  "examples":   [{"game": "<game>", "look_at": "<the one thing it shows best>", "url": "<link>"}],
+  "variations": [{"title": "<approach>", "text": "<what it does and what it buys; games named>", "screen": 4}],
+  "examples":   [{"game": "<game>", "look_at": "<the one thing it shows best>", "url": "<link>", "screen": 0}],
   "more":       [{"url": "<filtered link or earlier brief>", "why": "<why it is worth a look>"}],
   "coverage": {
     "read":        [{"site": "<site>", "pages": 2, "note": "<filters used, fallbacks>"}],
@@ -150,15 +160,17 @@ Then:
 JSON
 ```
 
-`add` validates, commits, pushes and publishes to the viewer, printing one line per
-step and the viewer link. A `record rejected` message lists what to fix — fix the JSON
+`add` validates, saves the pictures, commits, pushes and publishes to the viewer,
+printing one line per step and the viewer link. A picture that fails to download is
+reported and skipped; the brief is kept. A `record rejected` message lists what to fix — fix the JSON
 and run `add` again. A failed push or publish leaves the record committed locally;
 report the line, do not retry.
 
 ## 6. Return
 
-Return `"$REC" render <id>` verbatim, then the status lines `add` printed (recorded,
-pushed, published, viewer link). Nothing else — the render is the brief.
+Return `"$REC" render <id>` verbatim, then the status lines `add` printed (pictures
+saved, recorded, pushed, published, viewer link). Nothing else — the render is the
+brief, and the pictures are in the viewer.
 
 ## Maintenance
 
