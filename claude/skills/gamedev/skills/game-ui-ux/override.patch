@@ -1,0 +1,13 @@
+--- a/SKILL.md
++++ b/SKILL.md
+@@ -7,7 +7,10 @@
+   neutral patterns that pair with the detected engine's UI skill. Use when the user mentions
+   HUD, health bar, main menu, pause menu, settings screen, UI layout, anchors, UI scaling,
+   aspect ratio, safe area, controller/keyboard menu navigation, or wiring UI to game state.
++disable-model-invocation: true
+ ---
++<!-- LOCAL: disable-model-invocation added above. The router skill carries the trigger
++surface for this group, so this description need not load into every session. -->
+ 
+ # Game UI/UX
+ 

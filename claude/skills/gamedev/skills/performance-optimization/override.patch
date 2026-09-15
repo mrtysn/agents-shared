@@ -1,0 +1,13 @@
+--- a/SKILL.md
++++ b/SKILL.md
+@@ -7,7 +7,10 @@
+   neutral method that pairs with each engine's profiler. Use when the user mentions performance,
+   optimize, low/dropping FPS, frame drops, stutter, lag, profiler, frame budget, draw calls,
+   batching, garbage collection/GC spikes, object pooling, or "the game runs slow".
++disable-model-invocation: true
+ ---
++<!-- LOCAL: disable-model-invocation added above. The router skill carries the trigger
++surface for this group, so this description need not load into every session. -->
+ 
+ # Performance optimization
+ 

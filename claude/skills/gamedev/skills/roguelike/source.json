@@ -1,0 +1,10 @@
+{
+  "repo": "gamedev-skills/awesome-gamedev-agent-skills",
+  "path": "skills/genres/roguelike/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "references/generation-fov-loot.md"
+  ],
+  "commit": "b105e1cf617adf0b68ed98790a716bbb60993179",
+  "updated": "2026-09-15"
+}

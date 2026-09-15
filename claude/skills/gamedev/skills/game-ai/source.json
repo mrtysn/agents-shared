@@ -1,0 +1,11 @@
+{
+  "repo": "gamedev-skills/awesome-gamedev-agent-skills",
+  "path": "skills/disciplines/game-ai/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "references/behavior-trees.md",
+    "references/pathfinding.md"
+  ],
+  "commit": "b105e1cf617adf0b68ed98790a716bbb60993179",
+  "updated": "2026-09-15"
+}

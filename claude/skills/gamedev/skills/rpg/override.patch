@@ -1,0 +1,13 @@
+--- a/SKILL.md
++++ b/SKILL.md
+@@ -3,7 +3,10 @@
+ description: >
+   Build an RPG: stats and leveling, inventory and equipment, quests, branching dialogue, save/load,
+   and combat. Use for an RPG/JRPG, or designing stat, inventory, quest, or combat systems.
++disable-model-invocation: true
+ ---
++<!-- LOCAL: disable-model-invocation added above. The router skill carries the trigger
++surface for this group, so this description need not load into every session. -->
+ 
+ # RPG
+ 

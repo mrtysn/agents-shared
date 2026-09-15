@@ -1,0 +1,13 @@
+--- a/SKILL.md
++++ b/SKILL.md
+@@ -10,7 +10,10 @@
+   utility AI, response/scoring curve, or consideration. For choosing between FSM/BT/steering
+   or for pathfinding, use game-ai; for Unreal's BehaviorTree/Blackboard assets, use
+   unreal-behavior-trees.
++disable-model-invocation: true
+ ---
++<!-- LOCAL: disable-model-invocation added above. The router skill carries the trigger
++surface for this group, so this description need not load into every session. -->
+ 
+ # Behavior Trees & Utility AI
+ 

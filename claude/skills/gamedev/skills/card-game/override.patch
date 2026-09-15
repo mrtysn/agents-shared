@@ -1,0 +1,13 @@
+--- a/SKILL.md
++++ b/SKILL.md
+@@ -3,7 +3,10 @@
+ description: >
+   Build a card game: card data, deck/hand/discard zones, draw/shuffle/reshuffle, a turn structure,
+   costs, and effect resolution. Use for a deckbuilder, TCG/CCG, or roguelike deckbuilder.
++disable-model-invocation: true
+ ---
++<!-- LOCAL: disable-model-invocation added above. The router skill carries the trigger
++surface for this group, so this description need not load into every session. -->
+ 
+ # Card Game
+ 

@@ -1,0 +1,13 @@
+--- a/SKILL.md
++++ b/SKILL.md
+@@ -6,7 +6,10 @@
+   autosave. Engine-neutral. Use when the user mentions save system, save/load,
+   game state persistence, save slots, autosave, save file corruption, or
+   migrating old saves to a new version.
++disable-model-invocation: true
+ ---
++<!-- LOCAL: disable-model-invocation added above. The router skill carries the trigger
++surface for this group, so this description need not load into every session. -->
+ 
+ # Save systems
+ 

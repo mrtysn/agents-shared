@@ -1,0 +1,13 @@
+{
+  "repo": "gamedev-skills/awesome-gamedev-agent-skills",
+  "path": "skills/disciplines/ai-behavior-trees-utility-ai/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "references/behavior-tree-core.md",
+    "references/best-practices-and-pitfalls.md",
+    "references/practical-examples.md",
+    "references/utility-ai-system.md"
+  ],
+  "commit": "b105e1cf617adf0b68ed98790a716bbb60993179",
+  "updated": "2026-09-15"
+}

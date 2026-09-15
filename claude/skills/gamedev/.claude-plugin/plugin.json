@@ -1,0 +1,8 @@
+{
+  "name": "gamedev",
+  "description": "Engine-neutral game development: a router plus discipline, genre and workflow skills (game feel, UI/UX, level design, prototyping, itch and Steam publishing).",
+  "version": "1.0.0",
+  "author": {
+    "name": "Mert Yaşin"
+  }
+}

@@ -1,0 +1,13 @@
+--- a/SKILL.md
++++ b/SKILL.md
+@@ -5,7 +5,10 @@
+   packages, upload builds with steamcmd, set a build live on a branch, and run the release
+   checklists. Use for Steam publishing, app_build.vdf/steamcmd uploads, depots, beta branches,
+   or a store page release.
++disable-model-invocation: true
+ ---
++<!-- LOCAL: disable-model-invocation added above. The router skill carries the trigger
++surface for this group, so this description need not load into every session. -->
+ 
+ # Steam Publish (Steamworks + SteamPipe)
+ 

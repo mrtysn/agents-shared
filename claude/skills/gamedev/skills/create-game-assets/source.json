@@ -1,0 +1,18 @@
+{
+  "repo": "gamedev-skills/awesome-gamedev-agent-skills",
+  "path": "skills/disciplines/create-game-assets/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "assets/art-direction-brief.md",
+    "assets/asset-manifest.json",
+    "references/art-direction.md",
+    "references/provenance.md",
+    "references/raster-pipeline.md",
+    "references/three-d-pipeline.md",
+    "scripts/asset_report.py",
+    "scripts/build_preview_sheet.py",
+    "scripts/requirements.txt"
+  ],
+  "commit": "b105e1cf617adf0b68ed98790a716bbb60993179",
+  "updated": "2026-09-15"
+}
