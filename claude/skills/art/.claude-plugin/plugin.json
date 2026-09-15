@@ -1,0 +1,8 @@
+{
+  "name": "art",
+  "description": "Game art craft: pixel art generation and review, palettes and colour theory, Blender scene building, rendering and render QA, and hand-drawn style prompts.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Mert Ya\u015fin"
+  }
+}

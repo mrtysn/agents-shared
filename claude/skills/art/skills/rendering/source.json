@@ -1,0 +1,11 @@
+{
+  "repo": "arjun988/blender-skills",
+  "path": ".claude/skills/rendering/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "references/npr-rendering.md",
+    "references/render-passes.md"
+  ],
+  "commit": "8f778d2405a214b508d4c7d80742be8e43acdd52",
+  "updated": "2026-09-15"
+}

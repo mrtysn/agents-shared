@@ -1,0 +1,19 @@
+{
+  "repo": "yang0/handraw-style",
+  "path": "handdraw-style-prompter/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "gallery/index.html",
+    "references/attribution.json",
+    "references/contact_sheet_state.json",
+    "references/model_capabilities.json",
+    "references/styles.json",
+    "scripts/build_library.py",
+    "scripts/prompt_style.py",
+    "scripts/resolve_reference.py",
+    "scripts/split_contact_sheets.py",
+    "scripts/validate_library.py"
+  ],
+  "commit": "58dee6151874c6fc381e6a0d97430f1c275c1696",
+  "updated": "2026-09-15"
+}
