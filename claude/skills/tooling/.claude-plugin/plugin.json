@@ -1,0 +1,8 @@
+{
+  "name": "tooling",
+  "description": "Claude Code working aids: visual explanations, HTML playgrounds, skill authoring with evals, and session cost reports.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Mert Yaşin"
+  }
+}

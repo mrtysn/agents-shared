@@ -1,0 +1,23 @@
+--- a/SKILL.md
++++ b/SKILL.md
+@@ -168,6 +168,10 @@
+ 
+ ### Step 1: Spawn all runs (with-skill AND baseline) in the same turn
+ 
++<!-- LOCAL: eval runs cost real tokens; consent before spawning -->
++Before spawning anything, state how many runs this step will launch (test cases × 2, plus any grader runs) and ask for explicit consent. Do not start the runs until the user says yes.
++<!-- LOCAL END -->
++
+ For each test case, spawn two subagents in the same turn — one with the skill, one without. This is important: don't spawn the with-skill runs first and then come back for baselines later. Launch everything at once so it all finishes around the same time.
+ 
+ **With-skill run:**
+@@ -374,6 +378,9 @@
+ 
+ ### Step 3: Run the optimization loop
+ 
++<!-- LOCAL: run_loop spawns many `claude -p` processes; consent before starting -->
++Before starting, tell the user how many `claude -p` runs the loop will make (queries × 3 repeats × up to 5 iterations, plus the proposal calls) and ask for explicit consent. Do not start the loop until the user says yes.
++<!-- LOCAL END -->
+ Tell the user: "This will take some time — I'll run the optimization loop in the background and check on it periodically."
+ 
+ Save the eval set to the workspace, then run in the background:

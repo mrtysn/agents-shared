@@ -1,0 +1,11 @@
+{
+  "repo": "anthropics/claude-plugins-official",
+  "path": "plugins/session-report/skills/session-report/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "analyze-sessions.mjs",
+    "template.html"
+  ],
+  "commit": "da823e86c8feef13b73b6712af11eadd38c992f6",
+  "updated": "2026-09-15"
+}

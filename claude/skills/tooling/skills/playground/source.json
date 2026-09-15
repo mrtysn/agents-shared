@@ -1,0 +1,15 @@
+{
+  "repo": "anthropics/claude-plugins-official",
+  "path": "plugins/playground/skills/playground/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "templates/code-map.md",
+    "templates/concept-map.md",
+    "templates/data-explorer.md",
+    "templates/design-playground.md",
+    "templates/diff-review.md",
+    "templates/document-critique.md"
+  ],
+  "commit": "da823e86c8feef13b73b6712af11eadd38c992f6",
+  "updated": "2026-09-15"
+}
