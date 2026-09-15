@@ -63,13 +63,34 @@ def dev_root() -> Path:
     return Path(__file__).resolve().parent.parent.parent
 
 
-def projects() -> list[dict]:
-    root = dev_root()
-    out = []
-    for p in sorted(root.iterdir()):
-        if p.is_dir() and (p / ".git").exists():
-            out.append({"name": p.name, "path": str(p)})
-    return out
+SKIP_DIRS = {"node_modules", ".venv", "venv", "__pycache__", ".git", "dist", "build", ".next", "target"}
+
+
+def git_root(path: Path) -> Path | None:
+    """The repository holding `path`, stopping at the dev root's parent."""
+    stop = dev_root().parent
+    for p in (path, *path.parents):
+        if (p / ".git").exists():
+            return p
+        if p == stop:
+            break
+    return None
+
+
+def under_dev_root(path: Path) -> bool:
+    try:
+        path.resolve().relative_to(dev_root().resolve())
+        return True
+    except ValueError:
+        return path.resolve() == dev_root().resolve()
+
+
+def subdirs(path: Path) -> list[Path]:
+    try:
+        return sorted(d for d in path.iterdir()
+                      if d.is_dir() and not d.name.startswith(".") and d.name not in SKIP_DIRS)
+    except OSError:
+        return []
 
 
 def frontmatter(text: str) -> tuple[dict, str, str]:
@@ -143,11 +164,15 @@ def collect() -> tuple[list[dict], list[dict]]:
 # ── settings ─────────────────────────────────────────────────────────────────
 
 def settings_path(scope: str, project: Path | None) -> Path | None:
+    """Where Claude Code reads each scope for a session started in `project`: the shared file
+    from that folder itself, the local file from the repository root."""
     if scope == "user":
         return CONFIG_DIR / "settings.json"
     if project is None:
         return None
-    return project / ".claude" / ("settings.json" if scope == "project" else "settings.local.json")
+    if scope == "project":
+        return project / ".claude" / "settings.json"
+    return (git_root(project) or project) / ".claude" / "settings.local.json"
 
 
 def read_json(path: Path | None) -> dict:
@@ -189,9 +214,36 @@ def state(project: Path | None) -> dict:
         k["state"], k["state_by"] = eff, src
     always_on = sum(g["tokens"] for g in groups if g["enabled"]) + sum(
         k["tokens"] for k in flat if k["state"] == "on")
-    return {"project": str(project) if project else None, "projects": projects(),
+    return {"project": str(project) if project else None, "dev_root": str(dev_root()),
             "groups": groups, "flat": flat, "always_on": always_on,
             "config_dir": str(CONFIG_DIR)}
+
+
+def folder_states(groups: list[dict], user: dict) -> callable:
+    """Effective on/off per group for a folder, from user + its own project file + its repo's local file."""
+    def for_dir(d: Path) -> dict:
+        proj = read_json(d / ".claude" / "settings.json").get("enabledPlugins", {})
+        root = git_root(d)
+        loc = read_json((root or d) / ".claude" / "settings.local.json").get("enabledPlugins", {})
+        states = {}
+        for g in groups:
+            v = user.get(g["id"])
+            v = proj.get(g["id"], v)
+            v = loc.get(g["id"], v)
+            states[g["name"]] = True if v is None else bool(v)
+        return {"name": d.name, "path": str(d), "on": states,
+                "has_project": (d / ".claude" / "settings.json").is_file(),
+                "is_repo": (d / ".git").exists(),
+                "has_children": bool(subdirs(d))}
+    return for_dir
+
+
+def dirs(path: Path) -> dict:
+    groups, _ = collect()
+    user = read_json(CONFIG_DIR / "settings.json").get("enabledPlugins", {})
+    f = folder_states(groups, user)
+    return {"path": str(path), "self": f(path), "children": [f(d) for d in subdirs(path)],
+            "group_names": [g["name"] for g in groups]}
 
 
 # ── mutations ────────────────────────────────────────────────────────────────
@@ -284,99 +336,119 @@ def set_slash_only(skill_dir: Path, slash_only: bool) -> dict:
 PAGE = r"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <title>Skill Tree</title>
 <style>
-:root{color-scheme:light dark;--bg:#f6f7f9;--card:#fff;--ink:#16181c;--ink2:#555b66;--line:#d8dbe0;--line2:#e9ebee;--focus:#2a78d6;--on:#0f7a52;--off:#8a8f98;--knob:#fff;--code:#eceef1}
-@media(prefers-color-scheme:dark){:root{--bg:#15171a;--card:#1f2226;--ink:#e6e8eb;--ink2:#a3aab4;--line:#2c3037;--line2:#262a30;--focus:#3987e5;--on:#3fbf88;--off:#6b717b;--knob:#e6e8eb;--code:#272b31}}
+:root{color-scheme:light dark;--bg:#f6f7f9;--card:#fff;--ink:#16181c;--ink2:#555b66;--line:#d8dbe0;--line2:#e9ebee;--focus:#2a78d6;--on:#0f7a52;--off:#8a8f98;--knob:#fff;--code:#eceef1;--sel:#e6eefb}
+@media(prefers-color-scheme:dark){:root{--bg:#15171a;--card:#1f2226;--ink:#e6e8eb;--ink2:#a3aab4;--line:#2c3037;--line2:#262a30;--focus:#3987e5;--on:#3fbf88;--off:#6b717b;--knob:#e6e8eb;--code:#272b31;--sel:#1f2a3a}}
 *{box-sizing:border-box}[hidden]{display:none!important}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;padding:0 0 60px}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
 .sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-.top{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:14px 28px;display:flex;gap:10px 18px;align-items:center;flex-wrap:wrap}
+.top{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:12px 24px;display:flex;gap:8px 18px;align-items:center;flex-wrap:wrap}
 h1{font-size:16px;margin:0;font-weight:600}.sum{color:var(--ink2);margin:0}
 .top label{display:inline-flex;gap:6px;align-items:center;color:var(--ink2)}
 select,input[type=search],button.plain{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:5px 10px;min-height:32px}
-input[type=search]{min-width:200px}button.plain{cursor:pointer}button.plain[aria-pressed=true]{background:var(--code)}
+input[type=search]{min-width:180px}button.plain{cursor:pointer}button.plain[aria-pressed=true]{background:var(--code)}
 @media(hover:hover){button.plain:hover{border-color:var(--ink2)}}
 .msg{margin:0;min-height:1.4em;color:var(--ink2);flex-basis:100%}.msg.err{color:#b32d1c}@media(prefers-color-scheme:dark){.msg.err{color:#ff8b74}}
-main{padding:16px 28px;max-width:60rem}
-.tree{list-style:none;margin:0;padding:0}.tree ul{list-style:none;margin:0;padding:0 0 4px 34px}
-.row{display:grid;grid-template-columns:24px 1fr auto;gap:10px;align-items:center;min-height:38px;padding:0 6px;border-radius:6px}
+.wrap{display:grid;grid-template-columns:minmax(260px,22rem) minmax(0,1fr);gap:0 32px;padding:12px 24px 60px}
+@media(max-width:900px){.wrap{grid-template-columns:1fr}}
+h2{font-size:13px;color:var(--ink2);font-weight:600;margin:14px 0 6px;display:flex;gap:10px;align-items:baseline}h2 .act{margin-left:auto;font-weight:normal;font-size:12px}
+h2 .act button{border:0;background:none;color:var(--ink2);text-decoration:underline;text-underline-offset:3px;cursor:pointer;font:inherit;font-size:12px;padding:2px 4px}
+.tree,.tree ul{list-style:none;margin:0;padding:0}.tree ul{padding-left:22px}
+.row{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:8px;align-items:center;min-height:36px;padding:0 6px 0 2px;border-radius:6px}
 @media(hover:hover){.row:hover{background:var(--card)}}
-.row.g{font-weight:600}.row.g .n{font-size:15px}
+.row.sel{background:var(--sel)}
 .tw{width:24px;height:24px;border:0;background:none;padding:0;color:var(--ink2);cursor:pointer;font-size:12px;border-radius:4px}
-.tw::before{content:"▸"}.tw[aria-expanded=true]::before{content:"▾"}
-.n{display:flex;gap:10px;align-items:baseline;min-width:0}.n .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.n .k{color:var(--ink2);font-weight:normal;font-size:13px}
-.details{color:var(--ink2);font-size:13px;line-height:1.45;padding:0 6px 10px 40px;display:grid;gap:4px;text-wrap:pretty}
-.details .sc{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.details .sc span{color:var(--ink2)}
+.tw::before{content:"▸"}.tw[aria-expanded=true]::before{content:"▾"}.tw.leaf{visibility:hidden}
+.n{display:flex;gap:8px;align-items:baseline;min-width:0}.n .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.n .k{color:var(--ink2);font-weight:normal;font-size:13px;white-space:nowrap}
+.row.g .name{font-weight:600}
+.pick{border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left;min-width:0;display:flex;gap:8px;align-items:baseline;min-height:32px}
+.dots{display:inline-flex;gap:3px;align-items:center}.dots i{width:9px;height:9px;border-radius:50%;background:var(--off);display:inline-block}.dots i.on{background:var(--on)}
+.dots i.pj{outline:2px solid var(--focus);outline-offset:1px}
+.details{color:var(--ink2);font-size:13px;line-height:1.45;padding:0 6px 10px 34px;display:grid;gap:4px;text-wrap:pretty}
+.details .sc{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .tri{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:var(--card)}
 .tri button{border:0;border-radius:0;min-height:24px;padding:1px 8px;background:none;color:var(--ink2);font:inherit;font-size:12px;cursor:pointer}
 .tri button+button{border-left:1px solid var(--line2)}.tri button[aria-pressed=true]{background:var(--code);color:var(--ink);font-weight:600}
 .sw{display:inline-flex;align-items:center;gap:8px;border:0;background:none;padding:4px;font:inherit;color:var(--ink2);cursor:pointer;border-radius:6px;min-height:32px}
 .sw i{width:34px;height:20px;border-radius:10px;background:var(--off);position:relative;display:inline-block;flex:none}
 .sw i::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--knob)}
-.sw[aria-checked=true] i{background:var(--on)}.sw[aria-checked=true] i::after{left:16px}
-.sw[aria-checked=true]{color:var(--on)}.sw:disabled{opacity:.45;cursor:default}
+.sw[aria-checked=true] i{background:var(--on)}.sw[aria-checked=true] i::after{left:16px}.sw[aria-checked=true]{color:var(--on)}
 .sw .lab{min-width:3.5em;text-align:left;font-size:13px}
 @media(prefers-reduced-motion:no-preference){.sw i,.sw i::after{transition:background-color .15s,left .15s}}
-.mixed .lab::after{content:" ·";color:var(--ink2)}
-h2{font-size:13px;color:var(--ink2);font-weight:600;margin:22px 0 6px;padding-left:40px}
-.hint{color:var(--ink2);font-size:13px;margin:18px 0 0 40px;max-width:70ch}.hint code{font-family:ui-monospace,Menlo,monospace;background:var(--code);padding:1px 6px;border-radius:3px;color:var(--ink)}
-@media(max-width:640px){.top,main{padding-left:14px;padding-right:14px}.tree ul{padding-left:18px}.sw .lab{display:none}}
+.hint{color:var(--ink2);font-size:13px;margin:18px 0 0;max-width:70ch}.hint code{font-family:ui-monospace,Menlo,monospace;background:var(--code);padding:1px 6px;border-radius:3px;color:var(--ink)}
+.legend{color:var(--ink2);font-size:12px;margin:6px 0 0 2px;display:flex;gap:10px;flex-wrap:wrap}
+@media(max-width:640px){.top,.wrap{padding-left:14px;padding-right:14px}.sw .lab{display:none}}
 </style></head><body>
 <div class="top">
  <h1>Skill Tree</h1><p class="sum" id="sum"></p>
- <label>Project <select id="project"><option value="">None (user scope only)</option></select></label>
  <label>Write to <select id="scope" aria-label="Scope that switches write to"><option value="user">user scope</option><option value="project">project scope</option><option value="local">local scope</option></select></label>
- <label class="sr" for="q">Filter skills</label><input type="search" id="q" placeholder="Filter">
+ <label class="sr" for="q">Filter skills</label><input type="search" id="q" placeholder="Filter skills">
  <button class="plain" id="details" aria-pressed="false">Show details</button>
  <p class="msg" id="msg" role="status"></p>
 </div>
-<main>
- <ul class="tree" id="tree"></ul>
- <h2>Flat skills</h2>
- <ul class="tree" id="flat"></ul>
- <p class="hint">A group switch writes <code>enabledPlugins</code> at the scope chosen above; local beats project beats user. A skill switch inside a group is global: on means Claude may invoke it, off keeps it slash-only. Open sessions pick changes up on <code>/reload-plugins</code>.</p>
-</main>
+<div class="wrap">
+ <aside>
+  <h2>Folders</h2>
+  <ul class="tree" id="folders" aria-label="Folders"></ul>
+  <p class="legend" id="legend"></p>
+ </aside>
+ <main>
+  <h2>Groups <span class="act"><button id="expand-all">Expand all</button> <button id="collapse-all">Collapse all</button></span></h2>
+  <ul class="tree" id="tree"></ul>
+  <h2>Flat skills</h2>
+  <ul class="tree" id="flat"></ul>
+  <p class="hint">Pick a folder to see what a session started there gets. A group switch writes <code>enabledPlugins</code> at the scope chosen above: project scope is that folder's own <code>.claude/settings.json</code>, local scope is its repository's <code>settings.local.json</code>; local beats project beats user. A skill switch inside a group is global: on lets Claude invoke it, off keeps it slash-only. Open sessions pick changes up on <code>/reload-plugins</code>.</p>
+ </main>
+</div>
 <script>
-const $=(s,r=document)=>r.querySelector(s);let S=null,DET=false;const fmt=t=>t>=1000?(t/1000).toFixed(1)+'k':String(t);
-let open={};try{open=JSON.parse(localStorage.getItem('open')||'{}')}catch(e){}
+const $=(s,r=document)=>r.querySelector(s);let S=null,DET=false,SEL='',GN=[];const fmt=t=>t>=1000?(t/1000).toFixed(1)+'k':String(t);
+let open={},fopen={};try{open=JSON.parse(localStorage.getItem('open')||'{}');fopen=JSON.parse(localStorage.getItem('fopen')||'{}');SEL=localStorage.getItem('sel')||''}catch(e){}
+const save=()=>{try{localStorage.setItem('open',JSON.stringify(open));localStorage.setItem('fopen',JSON.stringify(fopen));localStorage.setItem('sel',SEL)}catch(e){}};
 async function api(path,body){const r=await fetch(path,body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{});return r.json()}
-async function load(p){S=await api('/api/state'+(p!==undefined?'?project='+encodeURIComponent(p):''));render()}
 function el(tag,attrs={},...kids){const e=document.createElement(tag);for(const[k,v]of Object.entries(attrs)){if(k==='class')e.className=v;else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else if(v!==null&&v!==undefined&&v!==false)e.setAttribute(k,v===true?'':v)}for(const k of kids)e.append(k);return e}
-function sw(on,name,disabled,cb,labels=['on','off']){return el('button',{class:'sw',role:'switch','aria-checked':String(on),'aria-label':name,disabled,onclick:()=>cb(!on)},el('i'),el('span',{class:'lab'},on?labels[0]:labels[1]))}
+async function load(){S=await api('/api/state'+(SEL?'?project='+encodeURIComponent(SEL):''));if(S.error){SEL='';save();return load()}render();loadFolders()}
+function sw(on,name,cb,labels=['on','off']){return el('button',{class:'sw',role:'switch','aria-checked':String(on),'aria-label':name,onclick:()=>cb(!on)},el('i'),el('span',{class:'lab'},on?labels[0]:labels[1]))}
 function tri(cur,scope,cb){const t=el('span',{class:'tri',role:'group','aria-label':scope+' scope'});for(const[lab,val,name]of[['on',true,'on'],['–',null,'not set'],['off',false,'off']])t.append(el('button',{'aria-label':name,'aria-pressed':String(cur===val),onclick:()=>cb(val)},lab));return t}
-async function act(p,body,done){say('');const r=await api(p,body);if(!r.ok){say(r.error,'err');return}say(done);load(S.project)}
+async function act(p,body,done){say('');const r=await api(p,body);if(!r.ok){say(r.error,'err');return}say(done);load()}
 function scope(){return $('#scope').value}
+function dots(on,names){const n=names.filter(g=>on[g]).length;const d=el('span',{class:'dots',role:'img','aria-label':`${n} of ${names.length} groups on`});for(const g of names)d.append(el('i',{class:on[g]?'on':'',title:g+(on[g]?': on':': off')}));return d}
+// ── folders ──
+let ROOT=null;
+async function loadFolders(){const root=await api('/api/dirs');GN=root.group_names;ROOT=root.self;const ul=$('#folders');ul.replaceChildren();ul.append(await folderNode(root.self,root.children,true));
+ $('#legend').replaceChildren(el('span',{},'Dots, in order: '),...GN.map(g=>el('span',{class:'mono'},g)),el('span',{},'— shown where a folder differs from user scope.'))}
+async function folderNode(f,children,isRoot){const li=el('li',{'data-path':f.path});const isOpen=isRoot||!!fopen[f.path];const sel=SEL===f.path||(isRoot&&!SEL);
+ const tw=el('button',{class:'tw'+(f.has_children?'':' leaf'),'aria-expanded':String(isOpen),'aria-label':(isOpen?'Collapse ':'Expand ')+f.name,onclick:()=>{fopen[f.path]=!isOpen;save();loadFolders()}});
+ const pick=el('button',{class:'pick','aria-pressed':String(sel),onclick:()=>{SEL=isRoot?'':f.path;save();load()}},el('span',{class:'name mono'},isRoot?f.path.replace(/^\/Users\/[^/]+/,'~'):f.name),f.has_project?el('span',{class:'k',title:'Has its own .claude/settings.json'},'⚙'):'');
+ const same=!isRoot&&GN.every(g=>f.on[g]===ROOT.on[g]);
+ li.append(el('div',{class:'row'+(sel?' sel':'')},tw,pick,same?el('span',{class:'k','aria-label':'same as user scope'}):dots(f.on,GN)));
+ if(isOpen&&f.has_children){const kids=children||(await api('/api/dirs?path='+encodeURIComponent(f.path))).children;const sub=el('ul');for(const c of kids)sub.append(await folderNode(c,null,false));li.append(sub)}
+ return li}
+// ── groups ──
 function render(){
- const ps=$('#project');ps.replaceChildren(el('option',{value:''},'None (user scope only)'));
- for(const p of S.projects)ps.append(el('option',{value:p.path,selected:S.project===p.path},p.name));
  const noProj=!S.project;for(const o of $('#scope').options)o.disabled=o.value!=='user'&&noProj;if(noProj)$('#scope').value='user';
- const onG=S.groups.filter(g=>g.enabled).length;
- $('#sum').textContent=`${onG} of ${S.groups.length} groups on. About ${fmt(S.always_on)} tokens of skill descriptions load in every session${S.project?' in '+S.project.split('/').pop():''}.`;
+ const onG=S.groups.filter(g=>g.enabled).length,where=S.project?S.project.split('/').pop():'user scope';
+ $('#sum').textContent=`${where}: ${onG} of ${S.groups.length} groups on, about ${fmt(S.always_on)} tokens of skill descriptions per session.`;
  const tree=$('#tree');tree.replaceChildren();
  for(const g of S.groups){
-  const li=el('li',{'data-name':g.name,'data-desc':g.description});
-  const isOpen=!!open[g.name];
-  const tw=el('button',{class:'tw','aria-expanded':String(isOpen),'aria-label':(isOpen?'Collapse ':'Expand ')+g.name,onclick:()=>{open[g.name]=!isOpen;try{localStorage.setItem('open',JSON.stringify(open))}catch(e){}render()}});
+  const li=el('li',{'data-name':g.name,'data-desc':g.description});const isOpen=!!open[g.name];
+  const tw=el('button',{class:'tw','aria-expanded':String(isOpen),'aria-label':(isOpen?'Collapse ':'Expand ')+g.name,onclick:()=>{open[g.name]=!isOpen;save();render()}});
   const hidden=g.skills.filter(k=>k.slash_only).length;
-  const row=el('div',{class:'row g'},tw,el('span',{class:'n'},el('span',{class:'name mono'},g.name),el('span',{class:'k'},`${g.skills.length} skills`+(hidden?`, ${hidden} slash-only`:'')),el('span',{class:'k '+(g.enabled?'':'off')},g.enabled?'':'off')),
-   sw(g.enabled,`${g.name} group`,false,v=>act('/api/group',{id:g.id,scope:scope(),value:v,project:S.project},`${g.name}: ${v?'on':'off'} at ${scope()} scope`)));
-  li.append(row);
+  li.append(el('div',{class:'row g'},tw,el('span',{class:'n'},el('span',{class:'name mono'},g.name),el('span',{class:'k'},`${g.skills.length} skills`+(hidden?`, ${hidden} slash-only`:''))),
+   sw(g.enabled,`${g.name} group`,v=>act('/api/group',{id:g.id,scope:scope(),value:v,project:S.project},`${g.name}: ${v?'on':'off'} at ${scope()} scope`))));
   if(DET){const d=el('div',{class:'details'},el('div',{},g.description),el('div',{class:'sc'},el('span',{},`~${fmt(g.tokens)} tokens`),el('span',{},g.enabled_by==='default'?'no setting anywhere':'decided at '+g.enabled_by+' scope')));
    const sc=el('div',{class:'sc'});for(const s of ['user','project','local'])if(s==='user'||!noProj)sc.append(el('span',{},s),tri(g.scopes[s],s,v=>act('/api/group',{id:g.id,scope:s,value:v,project:S.project},`${g.name}: ${s} scope ${v===null?'cleared':v?'on':'off'}`)));
    d.append(sc);li.append(d)}
-  if(isOpen){const ul=el('ul');for(const k of g.skills){
-   const kli=el('li',{'data-name':k.name,'data-desc':k.description});
+  if(isOpen){const ul=el('ul');for(const k of g.skills){const kli=el('li',{'data-name':k.name,'data-desc':k.description});
    kli.append(el('div',{class:'row'},el('span'),el('span',{class:'n'},el('span',{class:'name mono',title:k.description},'/'+g.name+':'+k.name),k.has_override?el('span',{class:'k',title:'Has a local override'},'edited'):''),
-    sw(!k.slash_only,`${k.name} invocable by Claude`,false,v=>act('/api/skill',{dir:k.dir,slash_only:!v},`${k.name}: ${v?'auto':'slash-only'}`),['auto','slash'])));
+    sw(!k.slash_only,`${k.name} invocable by Claude`,v=>act('/api/skill',{dir:k.dir,slash_only:!v},`${k.name}: ${v?'auto':'slash-only'}`),['auto','slash'])));
    if(DET)kli.append(el('div',{class:'details'},el('div',{},k.description),el('div',{class:'sc'},el('span',{},`~${fmt(k.tokens)} tokens`))));
    ul.append(kli)}li.append(ul)}
   tree.append(li)}
  const fl=$('#flat');fl.replaceChildren();
- for(const k of S.flat){
-  const li=el('li',{'data-name':k.name,'data-desc':k.description});const on=k.state==='on';
-  li.append(el('div',{class:'row'},el('span'),el('span',{class:'n'},el('span',{class:'name mono',title:k.description},'/'+k.name),el('span',{class:'k '+(on?'':'off')},on?'':k.state==='off'?'off':k.state==='name-only'?'name only':'slash-only')),
-   sw(on,`${k.name}`,false,v=>act('/api/override',{name:k.name,scope:scope(),value:v?'on':'off',project:S.project},`${k.name}: ${v?'on':'off'} at ${scope()} scope`))));
+ for(const k of S.flat){const li=el('li',{'data-name':k.name,'data-desc':k.description});const on=k.state==='on';
+  li.append(el('div',{class:'row'},el('span'),el('span',{class:'n'},el('span',{class:'name mono',title:k.description},'/'+k.name),el('span',{class:'k'},on?'':k.state==='off'?'off':k.state==='name-only'?'name only':'slash-only')),
+   sw(on,k.name,v=>act('/api/override',{name:k.name,scope:scope(),value:v?'on':'off',project:S.project},`${k.name}: ${v?'on':'off'} at ${scope()} scope`))));
   if(DET){const d=el('div',{class:'details'},el('div',{},k.description),el('div',{class:'sc'},el('span',{},`~${fmt(k.tokens)} tokens`),el('span',{},k.state_by==='default'?'':'decided at '+k.state_by+' scope')));
    const sc=el('div',{class:'sc'},el('span',{},'state at '+scope()+' scope'));const seg=el('span',{class:'tri',role:'group','aria-label':'visibility for '+k.name});
    for(const[lab,val]of[['on','on'],['name only','name-only'],['slash only','user-invocable-only'],['off','off']])seg.append(el('button',{'aria-pressed':String((k.scopes[scope()]||'on')===val),onclick:()=>act('/api/override',{name:k.name,scope:scope(),value:val,project:S.project},`${k.name}: ${lab} at ${scope()} scope`)},lab));
@@ -385,10 +457,12 @@ function render(){
  filter()}
 function say(t,cls){const m=$('#msg');m.textContent=t||'';m.className='msg'+(cls?' '+cls:'')}
 function filter(){const q=$('#q').value.trim().toLowerCase();const hit=e=>!q||(e.dataset.name+' '+(e.dataset.desc||'')).toLowerCase().includes(q);
- for(const g of $('#tree').children){const gh=hit(g);let any=gh;for(const k of g.querySelectorAll('ul>li')){const h=gh||hit(k);k.hidden=!h;any=any||h}g.hidden=!any;if(q&&any&&!gh){const ul=g.querySelector('ul');if(!ul){open[g.dataset.name]=true;render();return}}}
+ for(const g of $('#tree').children){const gh=hit(g);let any=gh;for(const k of g.querySelectorAll('ul>li')){const h=gh||hit(k);k.hidden=!h;any=any||h}g.hidden=!any;if(q&&any&&!gh&&!g.querySelector('ul')){open[g.dataset.name]=true;render();return}}
  for(const k of $('#flat').children)k.hidden=!hit(k)}
-$('#project').addEventListener('change',e=>load(e.target.value));$('#scope').addEventListener('change',()=>render());$('#q').addEventListener('input',filter);
+$('#scope').addEventListener('change',()=>render());$('#q').addEventListener('input',filter);
 $('#details').addEventListener('click',e=>{DET=!DET;e.currentTarget.setAttribute('aria-pressed',DET);e.currentTarget.textContent=DET?'Hide details':'Show details';render()});
+$('#expand-all').addEventListener('click',()=>{for(const g of S.groups)open[g.name]=true;save();render()});
+$('#collapse-all').addEventListener('click',()=>{open={};save();render()});
 document.addEventListener('keydown',e=>{if(e.key==='/'&&document.activeElement!==$('#q')){e.preventDefault();$('#q').focus()}});
 load();
 </script></body></html>
@@ -414,8 +488,8 @@ class Handler(BaseHTTPRequestHandler):
         if not raw:
             return None
         p = Path(raw).expanduser()
-        if not any(p == Path(x["path"]) for x in projects()):
-            raise ValueError("unknown project")
+        if not p.is_dir() or not under_dev_root(p):
+            raise ValueError("folder must be under the dev root")
         return p
 
     def do_GET(self) -> None:
@@ -429,6 +503,14 @@ class Handler(BaseHTTPRequestHandler):
             raw = unquote(q.get("project", "")) or self.server.default_project
             try:
                 return self._json(state(self._project(raw)))
+            except ValueError as e:
+                return self._json({"error": str(e)}, 400)
+        if u.path == "/api/dirs":
+            from urllib.parse import unquote
+            q = dict(x.split("=", 1) for x in u.query.split("&") if "=" in x)
+            raw = unquote(q.get("path", "")) or str(dev_root())
+            try:
+                return self._json(dirs(self._project(raw)))
             except ValueError as e:
                 return self._json({"error": str(e)}, 400)
         self._send(404, b"not found", "text/plain")
@@ -463,7 +545,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Serve the Skill Tree page on loopback.")
     ap.add_argument("--port", type=int, default=8797)
     ap.add_argument("--no-open", action="store_true", help="do not open the browser")
-    ap.add_argument("--project", help="project to select at start (a repo under $DEV_ROOT)")
+    ap.add_argument("--project", help="folder to select at start (anywhere under $DEV_ROOT)")
     ap.add_argument("--idle-exit", type=float, metavar="MINUTES", default=0,
                     help="quit after this many minutes without a request (0 = never)")
     args = ap.parse_args()
