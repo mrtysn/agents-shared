@@ -57,10 +57,16 @@ Then decide what kind of answer it wants — it picks the sources:
 | Wants | Read first | Then |
 |---|---|---|
 | What a screen or element looks like | Game UI Database | Interface In Game |
-| How it moves | Game UI Database with `vid=1` and a `Screen Transitions` / `Looping Animations` tag | 60fps.design |
+| How it moves | Game UI Database with a `Screen Transitions` / `Looping Animations` tag | 60fps.design, easings.net for curve names |
 | A multi-screen flow, paywall or store | Game UI Database | Paywall Screens, 60fps.design; flow libraries as links |
 | Why games structure it that way | Deconstructor of Fun, Udonis, Game Developer | Game UI Database for the visuals |
 | What it must include to be accessible | Game Accessibility Guidelines, Xbox guidelines, APX | Can I Play That? menu deep dives |
+| Which games ship a given accessibility feature | Gaming Accessibility Database | Game Accessibility Nexus |
+| Platform rules — touch targets, text sizes, safe areas | Apple HIG (designing for games), Xbox guidelines | Game UI Database for how games meet them |
+| Loading screens | Video Game Loading Interface Archive | Game UI Database `Loading Screen` |
+| A mechanic's name, or how a system usually works | Gameplay Design Patterns wiki | Game UI Database for its screens |
+| A stylised, cinematic or diegetic look | HUDS+GUIS | Game UI Database with a `UI Style` or `Elements` tag |
+| Economy or pricing behind a store or offer | Game Economist Consulting, Deconstructor of Fun | Game UI Database `Monetisation` screens |
 
 ## 3. Build the URLs
 
@@ -101,7 +107,7 @@ This runs against small sites, one of them a free resource maintained by one per
 On `deny`, do not open Chrome — treat every `chrome` site as `links` and say so in
 coverage. On `allow`:
 
-1. Load the tools in one ToolSearch call: `select:mcp__claude-in-chrome__tabs_context_mcp,mcp__claude-in-chrome__tabs_create_mcp,mcp__claude-in-chrome__navigate,mcp__claude-in-chrome__computer,mcp__claude-in-chrome__browser_batch,mcp__claude-in-chrome__read_page,mcp__claude-in-chrome__get_page_text,mcp__claude-in-chrome__find,mcp__claude-in-chrome__tabs_close_mcp`
+1. Load the tools in one ToolSearch call: `select:mcp__claude-in-chrome__tabs_context_mcp,mcp__claude-in-chrome__tabs_create_mcp,mcp__claude-in-chrome__navigate,mcp__claude-in-chrome__computer,mcp__claude-in-chrome__browser_batch,mcp__claude-in-chrome__read_page,mcp__claude-in-chrome__get_page_text,mcp__claude-in-chrome__find,mcp__claude-in-chrome__javascript_tool,mcp__claude-in-chrome__tabs_close_mcp`
 2. Call `tabs_context_mcp` with `createIfEmpty: true` and work in the tab it returns.
    Call `tabs_create_mcp` only if a group already existed. Never touch the user's tabs.
 3. Batch actions with `browser_batch` — it cuts the round trips several-fold.
@@ -111,15 +117,38 @@ coverage. On `allow`:
    `get_page_text` and `find` return text only.
 6. Close the tab when done.
 
-**Every screen you view becomes a `screens` entry**, in the order viewed, with two URLs:
+**Every screen you look at becomes a `screens` entry**, in viewing order — including
+the ones you only saw in a grid. `record.py` rejects a brief whose pattern totals (`m`)
+differ from the number of screens recorded.
 
-| Field | Game UI Database | Interface In Game |
-|---|---|---|
-| `url` — the screen | Click the thumbnail; the tab URL gains `&autoload=<screen id>` — read it back with `tabs_context_mcp`. The listing URL plus `autoload` is the screen's link | `/screenshots/<game-slug>-<caption-slug>/` |
-| `source` — its image | The grid anchor's href (`/uploads/…`), from `read_page` | The `img` src on the screen's card or page, from `read_page` |
+**Game UI Database — read the listing, don't click through it.** Every grid link carries
+the screen's id, game and image. After the listing loads:
 
-Take both from the page, never from pixels. When a page exposes no image URL, record
-the screen without `source` — it keeps its place in the count, just without a picture.
+```js
+const rows = [...document.querySelectorAll('a[data-imageid][href*="uploads/"]')].map((a) => {
+  const d = document.createElement("div"); d.innerHTML = a.dataset.title || "";
+  return [a.dataset.imageid, d.textContent.trim(), new URL(a.href).pathname].join("|");
+});
+window.__rows = rows; rows.length
+```
+
+- Listings load 50 screens at a time. Scroll to the bottom and wait a few seconds to load
+  the rest — the URL gains `&scroll=<n>`, which is not a navigation. The page's
+  "<n> SCREENS" count says when all have arrived.
+- Read the rows back in chunks: `window.__rows.slice(0, 12).join("\n")`, then the next
+  12. A result over ~1,000 characters is cut off, and one containing HTML or a query
+  string is blocked outright.
+- Each row gives `url` = the listing URL plus `&autoload=<id>`, and `source` =
+  `https://www.gameuidatabase.com<path>`.
+- A `/uploads/video/….mp4` path is a video. The site refuses direct downloads of video
+  files, so record that screen without `source` and link it.
+
+**Interface In Game.** `url` is `/screenshots/<game-slug>-<caption-slug>/`; `source` is the
+`wp-content/uploads/<game>/<slug>.png` image on that screen's card, from `read_page`.
+
+Take every value from the page, never from pixels. When a page exposes no image URL,
+record the screen without `source` — it keeps its place in the count, just without a
+picture.
 
 If the extension is not connected or a tool errors twice, stop using Chrome, treat
 `chrome` sites as `links`, and say so in coverage. Do not retry in a loop.
