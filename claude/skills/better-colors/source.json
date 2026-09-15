@@ -1,0 +1,15 @@
+{
+  "repo": "jakubkrehel/skills",
+  "path": "skills/better-colors/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "color-formats.md",
+    "color-usage.md",
+    "contrast.md",
+    "palette-generation.md",
+    "palette-structure.md",
+    "token-naming.md"
+  ],
+  "commit": "267330e1adfc66a718fb65fa6918c1f06d0a689e",
+  "updated": "2026-09-14"
+}

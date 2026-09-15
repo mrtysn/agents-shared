@@ -1,0 +1,13 @@
+{
+  "repo": "jakubkrehel/skills",
+  "path": "skills/explain-interface/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "find-the-effect.md",
+    "from-an-image.md",
+    "no-browser.md",
+    "read-the-system.md"
+  ],
+  "commit": "267330e1adfc66a718fb65fa6918c1f06d0a689e",
+  "updated": "2026-09-14"
+}

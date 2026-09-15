@@ -1,0 +1,15 @@
+{
+  "repo": "jakubkrehel/skills",
+  "path": "skills/better-typography/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "choosing-fonts.md",
+    "css-cheat-sheet.md",
+    "details-and-accessibility.md",
+    "spacing-and-sizing.md",
+    "variable-fonts-and-opentype.md",
+    "wrapping-and-punctuation.md"
+  ],
+  "commit": "267330e1adfc66a718fb65fa6918c1f06d0a689e",
+  "updated": "2026-09-14"
+}
