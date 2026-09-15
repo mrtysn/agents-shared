@@ -1,0 +1,8 @@
+{
+  "name": "video",
+  "description": "Promo and devlog video: Remotion shot recipes, agent-driven ffmpeg editing, and measured shot-by-shot teardowns of reference trailers.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Mert Ya\u015fin"
+  }
+}

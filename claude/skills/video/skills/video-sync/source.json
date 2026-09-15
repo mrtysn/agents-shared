@@ -1,0 +1,17 @@
+{
+  "repo": "eternityspring/reelbench-skills",
+  "path": "skills/video-sync/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "README.md",
+    "README.en.md",
+    "references/layout.md",
+    "references/panel-style.md",
+    "scripts/panel.css",
+    "scripts/panel.html",
+    "scripts/selftest.mjs",
+    "scripts/video-sync.mjs"
+  ],
+  "commit": "18f2f63987337df0975a89973d38d50f3231ee31",
+  "updated": "2026-09-15"
+}

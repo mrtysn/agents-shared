@@ -1,0 +1,25 @@
+{
+  "repo": "browser-use/video-use",
+  "path": "skills/manim-video/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "README.md",
+    "references/animation-design-thinking.md",
+    "references/animations.md",
+    "references/camera-and-3d.md",
+    "references/decorations.md",
+    "references/equations.md",
+    "references/graphs-and-data.md",
+    "references/mobjects.md",
+    "references/paper-explainer.md",
+    "references/production-quality.md",
+    "references/rendering.md",
+    "references/scene-planning.md",
+    "references/troubleshooting.md",
+    "references/updaters-and-trackers.md",
+    "references/visual-design.md",
+    "scripts/setup.sh"
+  ],
+  "commit": "9575612f066aa517354790a645fd90f9f95a743b",
+  "updated": "2026-09-15"
+}

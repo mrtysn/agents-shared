@@ -1,0 +1,13 @@
+--- a/SKILL.md
++++ b/SKILL.md
+@@ -40,7 +40,10 @@
+   runtimes:
+     - claude-code
+     - codex
++disable-model-invocation: true
+ ---
++<!-- LOCAL: disable-model-invocation added; annotated review videos are invoked by name, not auto-triggered -->
++<!-- LOCAL END -->
+ 
+ ## video-sync
+ 

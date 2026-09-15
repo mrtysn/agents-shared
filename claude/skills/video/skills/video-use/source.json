@@ -1,0 +1,20 @@
+{
+  "repo": "browser-use/video-use",
+  "path": "SKILL.md",
+  "files": [
+    "SKILL.md",
+    "README.md",
+    "LICENSE",
+    "install.md",
+    "pyproject.toml",
+    ".env.example",
+    "helpers/grade.py",
+    "helpers/pack_transcripts.py",
+    "helpers/render.py",
+    "helpers/timeline_view.py",
+    "helpers/transcribe.py",
+    "helpers/transcribe_batch.py"
+  ],
+  "commit": "9575612f066aa517354790a645fd90f9f95a743b",
+  "updated": "2026-09-15"
+}
