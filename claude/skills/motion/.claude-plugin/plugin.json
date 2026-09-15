@@ -1,0 +1,8 @@
+{
+  "name": "motion",
+  "description": "Motion design: build, review and audit animation, with Apple-style physical interaction rules and a vocabulary of effects.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Mert Yaşin"
+  }
+}

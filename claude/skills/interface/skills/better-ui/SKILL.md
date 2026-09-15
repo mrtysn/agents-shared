@@ -43,7 +43,7 @@ Use a small fixed `translateY` rather than full height. Exits should be softer t
 
 Animate icons with `opacity`, `scale` and `blur` rather than toggling visibility. Use exactly these values: scale `0.25` to `1`, opacity `0` to `1`, blur `4px` to `0px`.
 
-With a motion library (`motion` or `framer-motion` in `package.json`), match that package's import path, or nearby imports where both exist. Use `transition: { type: "spring", duration: 0.3, bounce: 0 }`. Bounce is always `0`.
+With a motion library (`motion` or `framer-motion` in `package.json`), match that package's import path, or nearby imports where both exist. <!-- LOCAL: spring values are owned by /motion:animate -->Take the spring's duration and bounce from `/motion:animate`.<!-- LOCAL END -->
 
 Without one, keep both icons in the DOM with one absolutely positioned, and cross-fade with `cubic-bezier(0.2, 0, 0, 1)`. That gives you enter and exit with no dependency. Both recipes are in [icon-transitions.md](icon-transitions.md).
 
@@ -53,7 +53,7 @@ Give images a `1px` outline at low opacity for consistent depth. Pure black in l
 
 ## Scale on press
 
-A `scale(0.96)` on click gives a button tactile feedback. Always `0.96`; anything below `0.95` feels exaggerated. Add a `static` prop to switch it off where motion would distract. See [recipes for CSS, Tailwind and Motion](animations.md#scale-on-press).
+A slight scale-down on click gives a button tactile feedback. <!-- LOCAL: the press scale value is owned by /motion:animate -->Take the value from `/motion:animate`.<!-- LOCAL END --> Add a `static` prop to switch it off where motion would distract. See [recipes for CSS, Tailwind and Motion](animations.md#scale-on-press).
 
 ## Skip animation on page load
 
