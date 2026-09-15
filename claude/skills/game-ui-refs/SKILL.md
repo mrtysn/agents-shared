@@ -87,12 +87,16 @@ site's text search, and say which you used in the coverage note.
 This runs against small sites, one of them a free resource maintained by one person.
 
 - **At most 12 navigations per request, across all sites.** A navigation is any URL
-  load, including a filter checkbox that reloads the page. Scrolling is not one.
+  load, including a filter checkbox that reloads the page. Scrolling is not one. A
+  site's `pages` in coverage is its navigation count.
 - **At most 25 screens opened in a site's viewer.** Open one only to read it closely or
   to get the link of an example you will cite.
-- **At most 100 screens per brief** — two loads of a Game UI Database listing, which
-  arrive 50 at a time. Narrow the filter (platform, genre) rather than sweep a category;
-  every screen recorded is one picture downloaded.
+- **At most 100 screens per brief**, across all sites — every screen recorded is one
+  picture downloaded. Game UI Database listings arrive 50 at a time, sorted A–Z, so a
+  listing over 75 screens loses its tail and crowds out the second source: narrow the
+  filter first (platform, genre, a sub-category) until it fits in 75, leaving room for
+  the second source. When a listing still exceeds the cap, say in coverage which games
+  were cut.
 - **Never download or save an image yourself**, and never pass one to an image
   generator. Record each screen's image URL as `source`; `record.py` fetches every one
   exactly once, a second apart, into the private ledger.
@@ -110,7 +114,7 @@ coverage. On `allow`:
 
 1. Load the tools in one ToolSearch call: `select:mcp__claude-in-chrome__tabs_context_mcp,mcp__claude-in-chrome__tabs_create_mcp,mcp__claude-in-chrome__navigate,mcp__claude-in-chrome__computer,mcp__claude-in-chrome__browser_batch,mcp__claude-in-chrome__read_page,mcp__claude-in-chrome__get_page_text,mcp__claude-in-chrome__find,mcp__claude-in-chrome__javascript_tool,mcp__claude-in-chrome__tabs_close_mcp`
 2. Call `tabs_context_mcp` with `createIfEmpty: true` and work in the tab it returns.
-   Call `tabs_create_mcp` only if a group already existed. Never touch the user's tabs.
+   Never touch the user's tabs.
 3. Batch actions with `browser_batch` — it cuts the round trips several-fold.
 4. The window may open small, showing one card per row, and resizing may not take.
    `scroll_to` each card rather than scrolling the page; it costs no navigation.
@@ -133,14 +137,18 @@ const rows = [...document.querySelectorAll('a[data-imageid][href*="uploads/"]')]
 window.__rows = rows; rows.length
 ```
 
-- Listings load 50 screens at a time. Scroll to the bottom and wait a few seconds to load
-  the rest — the URL gains `&scroll=<n>`, which is not a navigation. The page's
-  "<n> SCREENS" count says when all have arrived.
+- Listings load 50 screens at a time. Scroll to the bottom and wait about 10 seconds for
+  the next 50 — the URL gains `&scroll=<n>`, which is not a navigation. Stop at the
+  screen cap or the page's "<n> SCREENS" total, whichever comes first.
 - Read the rows back in chunks: `window.__rows.slice(0, 12).join("\n")`, then the next
   12. A result over ~1,000 characters is cut off, and one containing HTML or a query
   string is blocked outright.
 - Each row gives `url` = the listing URL plus `&autoload=<id>`, and `source` =
   `https://www.gameuidatabase.com<path>`.
+- **To look at the screens**, the grid is too small — three cards a row. Each link's
+  `data-thumb` is a 500 px thumbnail: replace the page body with a grid of those images
+  (12 to a screen, each captioned with its row number and game) and take a screenshot per
+  screenful. That is how patterns get counted; it loads nothing the grid had not already.
 - A `/uploads/video/….mp4` path is a video. The site refuses direct downloads of video
   files, so record that screen without `source` and link it.
 
@@ -175,7 +183,7 @@ Write the record as JSON (field reference: the ledger repo's `README.md`):
   "examples":   [{"game": "<game>", "look_at": "<the one thing it shows best>", "url": "<link>", "screen": 0}],
   "more":       [{"url": "<filtered link or earlier brief>", "why": "<why it is worth a look>"}],
   "coverage": {
-    "read":        [{"site": "<site>", "pages": 2, "note": "<filters used, fallbacks>"}],
+    "read":        [{"site": "<site>", "pages": 1, "note": "<filters used, fallbacks, games cut by the cap>"}],
     "links_only":  ["<site>"],
     "unavailable": [{"site": "<site>", "reason": "<why>"}]
   }
