@@ -284,118 +284,112 @@ def set_slash_only(skill_dir: Path, slash_only: bool) -> dict:
 PAGE = r"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <title>Skill Tree</title>
 <style>
-:root{color-scheme:light dark;--bg:#f3f4f6;--panel:#fafbfc;--card:#fff;--ink:#16181c;--ink2:#555b66;--line:#d8dbe0;--line2:#e9ebee;--focus:#2a78d6;--on:#0f7a52;--off:#b32d1c;--code:#eceef1;--sel:#e4e7ec}
-@media(prefers-color-scheme:dark){:root{--bg:#15171a;--panel:#1b1e22;--card:#1f2226;--ink:#e6e8eb;--ink2:#a3aab4;--line:#2c3037;--line2:#262a30;--focus:#3987e5;--on:#4fcf95;--off:#ff8b74;--code:#272b31;--sel:#2c3138}}
+:root{color-scheme:light dark;--bg:#f6f7f9;--card:#fff;--ink:#16181c;--ink2:#555b66;--line:#d8dbe0;--line2:#e9ebee;--focus:#2a78d6;--on:#0f7a52;--off:#8a8f98;--knob:#fff;--code:#eceef1}
+@media(prefers-color-scheme:dark){:root{--bg:#15171a;--card:#1f2226;--ink:#e6e8eb;--ink2:#a3aab4;--line:#2c3037;--line2:#262a30;--focus:#3987e5;--on:#3fbf88;--off:#6b717b;--knob:#e6e8eb;--code:#272b31}}
 *{box-sizing:border-box}[hidden]{display:none!important}
-body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;padding-bottom:80px}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;padding:0 0 60px}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
 .sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-.top{position:sticky;top:0;z-index:5;background:var(--panel);border-bottom:1px solid var(--line);padding:12px 28px;display:grid;gap:10px}
-.brand{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}h1{font-size:16px;margin:0;font-weight:600}.sub{color:var(--ink2);margin:0}
-.budget{display:grid;gap:6px}.bar{height:14px;display:flex;border-radius:3px;overflow:hidden;background:var(--code)}
-.bar i{display:block;height:100%}.legend{display:flex;gap:4px 16px;flex-wrap:wrap;color:var(--ink2)}.legend b{color:var(--ink);font-weight:600}
-.tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-select,input[type=search],button{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:4px;padding:5px 10px;min-height:30px}
-input[type=search]{flex:1;min-width:220px}button{cursor:pointer}@media(hover:hover){button:hover{border-color:var(--ink2)}}
-button[aria-pressed=true]{background:var(--sel)}
-.msg{min-height:1.4em;margin:0}.msg.err{color:var(--off)}.msg.ok{color:var(--on)}
-main{padding:20px 28px;display:grid;gap:28px}
-.explain{margin:0;color:var(--ink2);max-width:72ch}.explain code{font-family:ui-monospace,Menlo,monospace;background:var(--code);padding:1px 6px;border-radius:3px;color:var(--ink)}
-section>h2{font-size:14px;margin:0 0 10px;display:flex;gap:10px;align-items:baseline}section>h2 .d{color:var(--ink2);font-weight:normal}
-.group{border:1px solid var(--line);border-radius:8px;background:var(--card);margin-bottom:16px}
-.ghead{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:6px 14px;align-items:center;padding:12px 16px;border-left:4px solid var(--line);border-radius:8px 0 0 8px}
-.group.on .ghead{border-left-color:var(--on)}.group.off .ghead{border-left-color:var(--off)}
-.ghead>*,.skill>*{min-width:0}
-.ghead .name{font-weight:600}.ghead .desc{color:var(--ink2)}
-.cost{color:var(--ink2);white-space:nowrap}.cost b{color:var(--ink);font-weight:600}
-.scopes{display:inline-flex;gap:10px;align-items:center;flex-wrap:wrap}.scopes .sc{display:inline-flex;gap:5px;align-items:center;color:var(--ink2);font-size:12px}
-.tri,.seg{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:var(--card)}
-.tri button,.seg button{border:0;border-radius:0;min-height:26px;padding:2px 9px;background:none;color:var(--ink2);font-size:12px}
-.tri button+button,.seg button+button{border-left:1px solid var(--line2)}
-.tri button[aria-pressed=true],.seg button[aria-pressed=true]{background:var(--sel);color:var(--ink);font-weight:600}
-.tri button.on[aria-pressed=true]{color:var(--on)}.tri button.off[aria-pressed=true]{color:var(--off)}
-.tri button:disabled{opacity:.4;cursor:default}
-.eff{font-size:12px;padding:2px 9px;border-radius:12px;border:1px solid var(--line);color:var(--ink2);white-space:nowrap}
-.group.on .eff{color:var(--on);border-color:var(--on)}.group.off .eff{color:var(--off);border-color:var(--off)}
-.skills{border-top:1px solid var(--line);padding:6px 16px 10px 32px}
-.skill{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:4px 14px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--line2)}
-.skill:last-child{border-bottom:0}.skill .n{font-weight:600}.skill .n .mark{color:var(--ink2);font-weight:normal;margin-left:4px}
-.skill .desc{color:var(--ink2);font-size:13px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-wrap:pretty}
-.skill.open .desc,body.expanded .skill .desc{display:block;-webkit-line-clamp:unset}
-.skill .more{border:0;background:none;padding:0;min-height:0;color:var(--ink2);font-size:12px;text-decoration:underline;text-underline-offset:3px;grid-column:2;justify-self:start}
-.skill.open .more,body.expanded .skill .more{display:none}
-.skill.hidden .cost b{color:var(--ink2);text-decoration:line-through}
-.flat .skill{grid-template-columns:auto minmax(0,1fr) auto auto auto}
-.flat select{min-height:26px;padding:2px 6px;font-size:12px}
-@media(max-width:760px){.ghead,.skill,.flat .skill{grid-template-columns:1fr}.top{padding:12px 16px}main{padding:16px}.skills{padding-left:16px}}
+.top{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:14px 28px;display:flex;gap:10px 18px;align-items:center;flex-wrap:wrap}
+h1{font-size:16px;margin:0;font-weight:600}.sum{color:var(--ink2);margin:0}
+.top label{display:inline-flex;gap:6px;align-items:center;color:var(--ink2)}
+select,input[type=search],button.plain{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:5px 10px;min-height:32px}
+input[type=search]{min-width:200px}button.plain{cursor:pointer}button.plain[aria-pressed=true]{background:var(--code)}
+@media(hover:hover){button.plain:hover{border-color:var(--ink2)}}
+.msg{margin:0;min-height:1.4em;color:var(--ink2);flex-basis:100%}.msg.err{color:#b32d1c}@media(prefers-color-scheme:dark){.msg.err{color:#ff8b74}}
+main{padding:16px 28px;max-width:60rem}
+.tree{list-style:none;margin:0;padding:0}.tree ul{list-style:none;margin:0;padding:0 0 4px 34px}
+.row{display:grid;grid-template-columns:24px 1fr auto;gap:10px;align-items:center;min-height:38px;padding:0 6px;border-radius:6px}
+@media(hover:hover){.row:hover{background:var(--card)}}
+.row.g{font-weight:600}.row.g .n{font-size:15px}
+.tw{width:24px;height:24px;border:0;background:none;padding:0;color:var(--ink2);cursor:pointer;font-size:12px;border-radius:4px}
+.tw::before{content:"▸"}.tw[aria-expanded=true]::before{content:"▾"}
+.n{display:flex;gap:10px;align-items:baseline;min-width:0}.n .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.n .k{color:var(--ink2);font-weight:normal;font-size:13px}
+.details{color:var(--ink2);font-size:13px;line-height:1.45;padding:0 6px 10px 40px;display:grid;gap:4px;text-wrap:pretty}
+.details .sc{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.details .sc span{color:var(--ink2)}
+.tri{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:var(--card)}
+.tri button{border:0;border-radius:0;min-height:24px;padding:1px 8px;background:none;color:var(--ink2);font:inherit;font-size:12px;cursor:pointer}
+.tri button+button{border-left:1px solid var(--line2)}.tri button[aria-pressed=true]{background:var(--code);color:var(--ink);font-weight:600}
+.sw{display:inline-flex;align-items:center;gap:8px;border:0;background:none;padding:4px;font:inherit;color:var(--ink2);cursor:pointer;border-radius:6px;min-height:32px}
+.sw i{width:34px;height:20px;border-radius:10px;background:var(--off);position:relative;display:inline-block;flex:none}
+.sw i::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--knob)}
+.sw[aria-checked=true] i{background:var(--on)}.sw[aria-checked=true] i::after{left:16px}
+.sw[aria-checked=true]{color:var(--on)}.sw:disabled{opacity:.45;cursor:default}
+.sw .lab{min-width:3.5em;text-align:left;font-size:13px}
+@media(prefers-reduced-motion:no-preference){.sw i,.sw i::after{transition:background-color .15s,left .15s}}
+.mixed .lab::after{content:" ·";color:var(--ink2)}
+h2{font-size:13px;color:var(--ink2);font-weight:600;margin:22px 0 6px;padding-left:40px}
+.hint{color:var(--ink2);font-size:13px;margin:18px 0 0 40px;max-width:70ch}.hint code{font-family:ui-monospace,Menlo,monospace;background:var(--code);padding:1px 6px;border-radius:3px;color:var(--ink)}
+@media(max-width:640px){.top,main{padding-left:14px;padding-right:14px}.tree ul{padding-left:18px}.sw .lab{display:none}}
 </style></head><body>
 <div class="top">
- <div class="brand"><h1>Skill Tree</h1><p class="sub" id="sub"></p></div>
- <div class="budget"><div class="bar" id="bar" role="img" aria-label="Description tokens by group"></div><div class="legend mono" id="legend"></div></div>
- <div class="tools">
-  <label>Project <select id="project"><option value="">No project (user scope only)</option></select></label>
-  <label class="sr" for="q">Filter skills</label><input type="search" id="q" placeholder="Filter skills">
-  <button id="expand" aria-pressed="false">Show full descriptions</button>
-  <p class="msg" id="msg" role="status"></p>
- </div>
+ <h1>Skill Tree</h1><p class="sum" id="sum"></p>
+ <label>Project <select id="project"><option value="">None (user scope only)</option></select></label>
+ <label>Write to <select id="scope" aria-label="Scope that switches write to"><option value="user">user scope</option><option value="project">project scope</option><option value="local">local scope</option></select></label>
+ <label class="sr" for="q">Filter skills</label><input type="search" id="q" placeholder="Filter">
+ <button class="plain" id="details" aria-pressed="false">Show details</button>
+ <p class="msg" id="msg" role="status"></p>
 </div>
 <main>
- <p class="explain">A group switch runs <code>claude plugin enable</code> or <code>disable</code> for that scope; local beats project beats user. A skill inside a group has one global setting, auto or slash-only, written to its frontmatter in agents-shared. Open sessions pick changes up on <code>/reload-plugins</code>.</p>
- <section id="groups"><h2>Groups <span class="d" id="gcount"></span></h2><div id="glist"></div></section>
- <section id="flat" class="flat"><h2>Flat skills <span class="d" id="fcount"></span></h2><div class="group"><div class="skills" id="flist"></div></div></section>
+ <ul class="tree" id="tree"></ul>
+ <h2>Flat skills</h2>
+ <ul class="tree" id="flat"></ul>
+ <p class="hint">A group switch writes <code>enabledPlugins</code> at the scope chosen above; local beats project beats user. A skill switch inside a group is global: on means Claude may invoke it, off keeps it slash-only. Open sessions pick changes up on <code>/reload-plugins</code>.</p>
 </main>
 <script>
-const $=(s,r=document)=>r.querySelector(s);let S=null;const fmt=t=>t>=1000?(t/1000).toFixed(1)+'k':String(t);
-const HUES=['#3987e5','#d95926','#199e70','#c98500','#9085e9','#c2417a','#2a9aa0','#8a6d3b'];
+const $=(s,r=document)=>r.querySelector(s);let S=null,DET=false;const fmt=t=>t>=1000?(t/1000).toFixed(1)+'k':String(t);
+let open={};try{open=JSON.parse(localStorage.getItem('open')||'{}')}catch(e){}
 async function api(path,body){const r=await fetch(path,body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{});return r.json()}
 async function load(p){S=await api('/api/state'+(p!==undefined?'?project='+encodeURIComponent(p):''));render()}
-function el(tag,attrs={},...kids){const e=document.createElement(tag);for(const[k,v]of Object.entries(attrs)){if(k==='class')e.className=v;else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else if(v!==null&&v!==undefined)e.setAttribute(k,v)}for(const k of kids)e.append(k);return e}
-function tri(cur,scope,disabled,cb){const t=el('span',{class:'tri',role:'group','aria-label':scope+' scope'});for(const[lab,val,cls,name]of[['on',true,'on','on'],['–',null,'','not set'],['off',false,'off','off']]){const b=el('button',{class:cls,'aria-label':name,'aria-pressed':String(cur===val),disabled:disabled?'':null,title:disabled?'Choose a project first':null,onclick:()=>cb(val)},lab);t.append(b)}return t}
-async function act(p,body,done){say('');const r=await api(p,body);if(!r.ok){say(r.error,'err');return}say(done,'ok');load(S.project)}
+function el(tag,attrs={},...kids){const e=document.createElement(tag);for(const[k,v]of Object.entries(attrs)){if(k==='class')e.className=v;else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else if(v!==null&&v!==undefined&&v!==false)e.setAttribute(k,v===true?'':v)}for(const k of kids)e.append(k);return e}
+function sw(on,name,disabled,cb,labels=['on','off']){return el('button',{class:'sw',role:'switch','aria-checked':String(on),'aria-label':name,disabled,onclick:()=>cb(!on)},el('i'),el('span',{class:'lab'},on?labels[0]:labels[1]))}
+function tri(cur,scope,cb){const t=el('span',{class:'tri',role:'group','aria-label':scope+' scope'});for(const[lab,val,name]of[['on',true,'on'],['–',null,'not set'],['off',false,'off']])t.append(el('button',{'aria-label':name,'aria-pressed':String(cur===val),onclick:()=>cb(val)},lab));return t}
+async function act(p,body,done){say('');const r=await api(p,body);if(!r.ok){say(r.error,'err');return}say(done);load(S.project)}
+function scope(){return $('#scope').value}
 function render(){
- const sel=$('#project');sel.replaceChildren(el('option',{value:''},'No project (user scope only)'));
- for(const p of S.projects)sel.append(el('option',{value:p.path,selected:S.project===p.path?'':null},p.name));
- const noProj=!S.project,where=S.project?' in '+S.project.split('/').pop():'';
- $('#sub').textContent=`${S.groups.length} groups, ${S.groups.reduce((a,g)=>a+g.skills.length,0)+S.flat.length} skills. About ${fmt(S.always_on)} tokens of descriptions load in every session${where}.`;
- const bar=$('#bar'),leg=$('#legend');bar.replaceChildren();leg.replaceChildren();
- const segs=[...S.groups.filter(g=>g.enabled).map(g=>({n:g.name,t:g.tokens})),{n:'flat skills',t:S.flat.filter(k=>k.state==='on').reduce((a,k)=>a+k.tokens,0)}].filter(s=>s.t>0);
- const tot=segs.reduce((a,s)=>a+s.t,0)||1;
- segs.forEach((s,i)=>{const c=HUES[i%HUES.length];bar.append(el('i',{style:`width:${100*s.t/tot}%;background:${c}`}));leg.append(el('span',{},el('b',{style:`color:${c}`},s.n),` ~${fmt(s.t)}`))});
- const gl=$('#glist');gl.replaceChildren();$('#gcount').textContent=`${S.groups.filter(g=>g.enabled).length} of ${S.groups.length} on`;
+ const ps=$('#project');ps.replaceChildren(el('option',{value:''},'None (user scope only)'));
+ for(const p of S.projects)ps.append(el('option',{value:p.path,selected:S.project===p.path},p.name));
+ const noProj=!S.project;for(const o of $('#scope').options)o.disabled=o.value!=='user'&&noProj;if(noProj)$('#scope').value='user';
+ const onG=S.groups.filter(g=>g.enabled).length;
+ $('#sum').textContent=`${onG} of ${S.groups.length} groups on. About ${fmt(S.always_on)} tokens of skill descriptions load in every session${S.project?' in '+S.project.split('/').pop():''}.`;
+ const tree=$('#tree');tree.replaceChildren();
  for(const g of S.groups){
-  const box=el('div',{class:'group '+(g.enabled?'on':'off'),'data-name':g.name,'data-desc':g.description});
-  const scopes=el('span',{class:'scopes'});
-  for(const sc of ['user','project','local'])scopes.append(el('span',{class:'sc'},sc,tri(g.scopes[sc],sc,sc!=='user'&&noProj,v=>act('/api/group',{id:g.id,scope:sc,value:v,project:S.project},`${g.name}: ${sc} scope ${v===null?'cleared':v?'on':'off'}`))));
-  box.append(el('div',{class:'ghead'},el('span',{class:'name mono'},g.name),el('span',{class:'desc'},g.description),el('span',{class:'cost mono'},el('b',{},'~'+fmt(g.tokens)),' tok'),el('span',{},scopes,' ',el('span',{class:'eff'},g.enabled?'on':'off',g.enabled_by!=='default'?', set at '+g.enabled_by:''))));
-  const list=el('div',{class:'skills'});
-  for(const k of g.skills){
-   const row=el('div',{class:'skill'+(k.slash_only?' hidden':''),'data-name':k.name,'data-desc':k.description});
-   const seg=el('span',{class:'seg',role:'group','aria-label':'invocation for '+k.name});
-   for(const[lab,val]of[['auto',false],['slash-only',true]])seg.append(el('button',{'aria-pressed':String(k.slash_only===val),onclick:()=>act('/api/skill',{dir:k.dir,slash_only:val},`${k.name}: ${lab}`)},lab));
-   const name=el('span',{class:'n mono'},'/'+g.name+':'+k.name);if(k.has_override)name.append(el('span',{class:'mark','aria-label':'has a local override',title:'Has a local override'},'✎'));
-   row.append(name,el('span',{class:'desc'},k.description),el('span',{class:'cost mono'},el('b',{},'~'+fmt(k.tokens))),seg,el('button',{class:'more',onclick:e=>{row.classList.add('open')}},'Show more'));
-   list.append(row)}
-  box.append(list);gl.append(box)}
- const fl=$('#flist');fl.replaceChildren();$('#fcount').textContent=`${S.flat.filter(k=>k.state==='on').length} of ${S.flat.length} on`;
+  const li=el('li',{'data-name':g.name,'data-desc':g.description});
+  const isOpen=!!open[g.name];
+  const tw=el('button',{class:'tw','aria-expanded':String(isOpen),'aria-label':(isOpen?'Collapse ':'Expand ')+g.name,onclick:()=>{open[g.name]=!isOpen;try{localStorage.setItem('open',JSON.stringify(open))}catch(e){}render()}});
+  const hidden=g.skills.filter(k=>k.slash_only).length;
+  const row=el('div',{class:'row g'},tw,el('span',{class:'n'},el('span',{class:'name mono'},g.name),el('span',{class:'k'},`${g.skills.length} skills`+(hidden?`, ${hidden} slash-only`:'')),el('span',{class:'k '+(g.enabled?'':'off')},g.enabled?'':'off')),
+   sw(g.enabled,`${g.name} group`,false,v=>act('/api/group',{id:g.id,scope:scope(),value:v,project:S.project},`${g.name}: ${v?'on':'off'} at ${scope()} scope`)));
+  li.append(row);
+  if(DET){const d=el('div',{class:'details'},el('div',{},g.description),el('div',{class:'sc'},el('span',{},`~${fmt(g.tokens)} tokens`),el('span',{},g.enabled_by==='default'?'no setting anywhere':'decided at '+g.enabled_by+' scope')));
+   const sc=el('div',{class:'sc'});for(const s of ['user','project','local'])if(s==='user'||!noProj)sc.append(el('span',{},s),tri(g.scopes[s],s,v=>act('/api/group',{id:g.id,scope:s,value:v,project:S.project},`${g.name}: ${s} scope ${v===null?'cleared':v?'on':'off'}`)));
+   d.append(sc);li.append(d)}
+  if(isOpen){const ul=el('ul');for(const k of g.skills){
+   const kli=el('li',{'data-name':k.name,'data-desc':k.description});
+   kli.append(el('div',{class:'row'},el('span'),el('span',{class:'n'},el('span',{class:'name mono',title:k.description},'/'+g.name+':'+k.name),k.has_override?el('span',{class:'k',title:'Has a local override'},'edited'):''),
+    sw(!k.slash_only,`${k.name} invocable by Claude`,false,v=>act('/api/skill',{dir:k.dir,slash_only:!v},`${k.name}: ${v?'auto':'slash-only'}`),['auto','slash'])));
+   if(DET)kli.append(el('div',{class:'details'},el('div',{},k.description),el('div',{class:'sc'},el('span',{},`~${fmt(k.tokens)} tokens`))));
+   ul.append(kli)}li.append(ul)}
+  tree.append(li)}
+ const fl=$('#flat');fl.replaceChildren();
  for(const k of S.flat){
-  const row=el('div',{class:'skill'+(k.state!=='on'?' hidden':''),'data-name':k.name,'data-desc':k.description});
-  const scopeSel=el('select',{'aria-label':'scope for '+k.name});for(const sc of ['user','project','local'])scopeSel.append(el('option',{value:sc,disabled:sc!=='user'&&noProj?'':null},sc+(k.scopes[sc]?': '+k.scopes[sc]:'')));
-  const seg=el('span',{class:'seg',role:'group','aria-label':'visibility for '+k.name});
-  for(const[lab,val]of[['on','on'],['name only','name-only'],['slash only','user-invocable-only'],['off','off']])seg.append(el('button',{'aria-pressed':String(k.state===val),onclick:()=>act('/api/override',{name:k.name,scope:scopeSel.value,value:val,project:S.project},`${k.name}: ${lab} at ${scopeSel.value} scope`)},lab));
-  const name=el('span',{class:'n mono'},'/'+k.name);if(k.slash_only)name.append(el('span',{class:'mark','aria-label':'slash-only in its frontmatter',title:'Slash-only in its frontmatter'},'⌘'));
-  row.append(name,el('span',{class:'desc'},k.description),el('span',{class:'cost mono'},el('b',{},'~'+fmt(k.tokens))),scopeSel,seg,el('button',{class:'more',onclick:()=>row.classList.add('open')},'Show more'));
-  fl.append(row)}
- filter();trimMore()}
-function trimMore(){document.querySelectorAll('.skill').forEach(r=>{const d=r.querySelector('.desc'),m=r.querySelector('.more');if(m)m.hidden=d.scrollHeight<=d.clientHeight+1})}
+  const li=el('li',{'data-name':k.name,'data-desc':k.description});const on=k.state==='on';
+  li.append(el('div',{class:'row'},el('span'),el('span',{class:'n'},el('span',{class:'name mono',title:k.description},'/'+k.name),el('span',{class:'k '+(on?'':'off')},on?'':k.state==='off'?'off':k.state==='name-only'?'name only':'slash-only')),
+   sw(on,`${k.name}`,false,v=>act('/api/override',{name:k.name,scope:scope(),value:v?'on':'off',project:S.project},`${k.name}: ${v?'on':'off'} at ${scope()} scope`))));
+  if(DET){const d=el('div',{class:'details'},el('div',{},k.description),el('div',{class:'sc'},el('span',{},`~${fmt(k.tokens)} tokens`),el('span',{},k.state_by==='default'?'':'decided at '+k.state_by+' scope')));
+   const sc=el('div',{class:'sc'},el('span',{},'state at '+scope()+' scope'));const seg=el('span',{class:'tri',role:'group','aria-label':'visibility for '+k.name});
+   for(const[lab,val]of[['on','on'],['name only','name-only'],['slash only','user-invocable-only'],['off','off']])seg.append(el('button',{'aria-pressed':String((k.scopes[scope()]||'on')===val),onclick:()=>act('/api/override',{name:k.name,scope:scope(),value:val,project:S.project},`${k.name}: ${lab} at ${scope()} scope`)},lab));
+   sc.append(seg);d.append(sc);li.append(d)}
+  fl.append(li)}
+ filter()}
 function say(t,cls){const m=$('#msg');m.textContent=t||'';m.className='msg'+(cls?' '+cls:'')}
 function filter(){const q=$('#q').value.trim().toLowerCase();const hit=e=>!q||(e.dataset.name+' '+(e.dataset.desc||'')).toLowerCase().includes(q);
- document.querySelectorAll('.group[data-name]').forEach(g=>{const gh=hit(g);let any=gh;g.querySelectorAll('.skill').forEach(k=>{const h=gh||hit(k);k.hidden=!h;any=any||h});g.hidden=!any});
- document.querySelectorAll('.flat .skill').forEach(k=>{k.hidden=!hit(k)})}
-$('#project').addEventListener('change',e=>load(e.target.value));$('#q').addEventListener('input',filter);
-$('#expand').addEventListener('click',e=>{const on=document.body.classList.toggle('expanded');e.currentTarget.setAttribute('aria-pressed',on);e.currentTarget.textContent=on?'Show short descriptions':'Show full descriptions'});
+ for(const g of $('#tree').children){const gh=hit(g);let any=gh;for(const k of g.querySelectorAll('ul>li')){const h=gh||hit(k);k.hidden=!h;any=any||h}g.hidden=!any;if(q&&any&&!gh){const ul=g.querySelector('ul');if(!ul){open[g.dataset.name]=true;render();return}}}
+ for(const k of $('#flat').children)k.hidden=!hit(k)}
+$('#project').addEventListener('change',e=>load(e.target.value));$('#scope').addEventListener('change',()=>render());$('#q').addEventListener('input',filter);
+$('#details').addEventListener('click',e=>{DET=!DET;e.currentTarget.setAttribute('aria-pressed',DET);e.currentTarget.textContent=DET?'Hide details':'Show details';render()});
 document.addEventListener('keydown',e=>{if(e.key==='/'&&document.activeElement!==$('#q')){e.preventDefault();$('#q').focus()}});
-addEventListener('resize',trimMore);
 load();
 </script></body></html>
 """
