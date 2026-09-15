@@ -284,59 +284,64 @@ def set_slash_only(skill_dir: Path, slash_only: bool) -> dict:
 PAGE = r"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <title>Skill Tree</title>
 <style>
-:root{color-scheme:light dark;--bg:#f3f4f6;--panel:#fafbfc;--card:#fff;--ink:#16181c;--ink2:#5f6570;--ink3:#8b919b;--line:#d8dbe0;--focus:#2a78d6;--on:#1baf7a;--off:#c8321f;--part:#eda100;--code:#eceef1}
-@media(prefers-color-scheme:dark){:root{--bg:#15171a;--panel:#1b1e22;--card:#1f2226;--ink:#e6e8eb;--ink2:#9aa1ab;--ink3:#6f7680;--line:#2c3037;--focus:#3987e5;--on:#199e70;--off:#ff7a6b;--part:#c98500;--code:#272b31}}
+:root{color-scheme:light dark;--bg:#f3f4f6;--panel:#fafbfc;--card:#fff;--ink:#16181c;--ink2:#555b66;--line:#d8dbe0;--line2:#e9ebee;--focus:#2a78d6;--on:#0f7a52;--off:#b32d1c;--code:#eceef1;--sel:#e4e7ec}
+@media(prefers-color-scheme:dark){:root{--bg:#15171a;--panel:#1b1e22;--card:#1f2226;--ink:#e6e8eb;--ink2:#a3aab4;--line:#2c3037;--line2:#262a30;--focus:#3987e5;--on:#4fcf95;--off:#ff8b74;--code:#272b31;--sel:#2c3138}}
 *{box-sizing:border-box}[hidden]{display:none!important}
-body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums;padding-bottom:80px}
-.top{position:sticky;top:0;z-index:5;background:var(--panel);border-bottom:1px solid var(--line);padding:14px 28px 12px;display:grid;gap:10px}
-.brand{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}h1{font-size:16px;margin:0}.sub{color:var(--ink2)}
-.tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-select,input[type=search],button{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:4px;padding:4px 9px}
-input[type=search]{flex:1;min-width:220px}button{cursor:pointer}button:hover{border-color:var(--ink3)}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;padding-bottom:80px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-main{padding:20px 28px;display:grid;gap:22px}
-section h2{font-size:13px;margin:0 0 8px;display:flex;gap:10px;align-items:baseline}section h2 .d{color:var(--ink2);font-weight:normal}
-.group{border:1px solid var(--line);border-radius:6px;background:var(--card);margin-bottom:10px}
-.ghead{display:grid;grid-template-columns:auto 1fr auto auto;gap:12px;align-items:center;padding:10px 14px;border-left:4px solid var(--line)}
-.group.on .ghead{border-left-color:var(--on)}.group.off .ghead{border-left-color:var(--off)}.group.mixed .ghead{border-left-color:var(--part)}
-.ghead .name{font-weight:600}.ghead .desc{color:var(--ink2);font:13px system-ui,-apple-system,sans-serif}
-.ghead .cost{color:var(--ink2);white-space:nowrap}.ghead .cost b{color:var(--ink)}
-.scopes{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap}.scopes label{color:var(--ink3);font-size:11px}
-.ghead>*,.skill>*{min-width:0}.ghead .cost,.skill .cost{white-space:normal}
-.tri{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden}
-.tri button{border:0;border-radius:0;padding:2px 8px;background:none;color:var(--ink3)}
-.tri button[aria-pressed=true]{background:var(--code);color:var(--ink)}.tri button.on[aria-pressed=true]{color:var(--on)}.tri button.off[aria-pressed=true]{color:var(--off)}
-.tri button:disabled{opacity:.35;cursor:default}
-.eff{font-size:11px;padding:1px 7px;border-radius:10px;border:1px solid var(--line);color:var(--ink2);white-space:nowrap}
+.top{position:sticky;top:0;z-index:5;background:var(--panel);border-bottom:1px solid var(--line);padding:12px 28px;display:grid;gap:10px}
+.brand{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}h1{font-size:16px;margin:0;font-weight:600}.sub{color:var(--ink2);margin:0}
+.budget{display:grid;gap:6px}.bar{height:14px;display:flex;border-radius:3px;overflow:hidden;background:var(--code)}
+.bar i{display:block;height:100%}.legend{display:flex;gap:4px 16px;flex-wrap:wrap;color:var(--ink2)}.legend b{color:var(--ink);font-weight:600}
+.tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+select,input[type=search],button{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:4px;padding:5px 10px;min-height:30px}
+input[type=search]{flex:1;min-width:220px}button{cursor:pointer}@media(hover:hover){button:hover{border-color:var(--ink2)}}
+button[aria-pressed=true]{background:var(--sel)}
+.msg{min-height:1.4em;margin:0}.msg.err{color:var(--off)}.msg.ok{color:var(--on)}
+main{padding:20px 28px;display:grid;gap:28px}
+.explain{margin:0;color:var(--ink2);max-width:72ch}.explain code{font-family:ui-monospace,Menlo,monospace;background:var(--code);padding:1px 6px;border-radius:3px;color:var(--ink)}
+section>h2{font-size:14px;margin:0 0 10px;display:flex;gap:10px;align-items:baseline}section>h2 .d{color:var(--ink2);font-weight:normal}
+.group{border:1px solid var(--line);border-radius:8px;background:var(--card);margin-bottom:16px}
+.ghead{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:6px 14px;align-items:center;padding:12px 16px;border-left:4px solid var(--line);border-radius:8px 0 0 8px}
+.group.on .ghead{border-left-color:var(--on)}.group.off .ghead{border-left-color:var(--off)}
+.ghead>*,.skill>*{min-width:0}
+.ghead .name{font-weight:600}.ghead .desc{color:var(--ink2)}
+.cost{color:var(--ink2);white-space:nowrap}.cost b{color:var(--ink);font-weight:600}
+.scopes{display:inline-flex;gap:10px;align-items:center;flex-wrap:wrap}.scopes .sc{display:inline-flex;gap:5px;align-items:center;color:var(--ink2);font-size:12px}
+.tri,.seg{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:var(--card)}
+.tri button,.seg button{border:0;border-radius:0;min-height:26px;padding:2px 9px;background:none;color:var(--ink2);font-size:12px}
+.tri button+button,.seg button+button{border-left:1px solid var(--line2)}
+.tri button[aria-pressed=true],.seg button[aria-pressed=true]{background:var(--sel);color:var(--ink);font-weight:600}
+.tri button.on[aria-pressed=true]{color:var(--on)}.tri button.off[aria-pressed=true]{color:var(--off)}
+.tri button:disabled{opacity:.4;cursor:default}
+.eff{font-size:12px;padding:2px 9px;border-radius:12px;border:1px solid var(--line);color:var(--ink2);white-space:nowrap}
 .group.on .eff{color:var(--on);border-color:var(--on)}.group.off .eff{color:var(--off);border-color:var(--off)}
-.skills{border-top:1px solid var(--line);padding:4px 14px 8px 30px}
-.skill{display:grid;grid-template-columns:auto 1fr auto auto;gap:12px;align-items:baseline;padding:5px 0;border-bottom:1px solid color-mix(in srgb,var(--line) 50%,transparent)}
-.skill:last-child{border-bottom:0}.skill .n{font-weight:600}.skill .n small{color:var(--ink3);font-weight:normal}
-.skill .desc{color:var(--ink2);font:12px/1.4 system-ui,-apple-system,sans-serif;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.skill.open .desc{-webkit-line-clamp:unset}.skill .cost{color:var(--ink3);white-space:nowrap}.skill .cost b{color:var(--ink)}
-.skill.hidden .cost b{color:var(--ink3);text-decoration:line-through}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden}
-.seg button{border:0;border-radius:0;padding:1px 7px;background:none;color:var(--ink3);font-size:11px}
-.seg button[aria-pressed=true]{background:var(--code);color:var(--ink)}
-.flat .skill{grid-template-columns:auto 1fr auto auto auto}
-.budget{display:grid;gap:4px}.bar{height:14px;display:flex;border-radius:3px;overflow:hidden;background:var(--code)}
-.bar i{display:block;height:100%}.legend{display:flex;gap:4px 16px;flex-wrap:wrap;color:var(--ink2)}.legend b{color:var(--ink)}
-.msg{color:var(--off);min-height:1.2em}code{background:var(--code);padding:1px 6px;border-radius:3px}
-.hint{color:var(--ink3);font-size:12px;margin:0}
-@media(max-width:720px){.ghead,.skill,.flat .skill{grid-template-columns:1fr}}
+.skills{border-top:1px solid var(--line);padding:6px 16px 10px 32px}
+.skill{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:4px 14px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--line2)}
+.skill:last-child{border-bottom:0}.skill .n{font-weight:600}.skill .n .mark{color:var(--ink2);font-weight:normal;margin-left:4px}
+.skill .desc{color:var(--ink2);font-size:13px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-wrap:pretty}
+.skill.open .desc,body.expanded .skill .desc{display:block;-webkit-line-clamp:unset}
+.skill .more{border:0;background:none;padding:0;min-height:0;color:var(--ink2);font-size:12px;text-decoration:underline;text-underline-offset:3px;grid-column:2;justify-self:start}
+.skill.open .more,body.expanded .skill .more{display:none}
+.skill.hidden .cost b{color:var(--ink2);text-decoration:line-through}
+.flat .skill{grid-template-columns:auto minmax(0,1fr) auto auto auto}
+.flat select{min-height:26px;padding:2px 6px;font-size:12px}
+@media(max-width:760px){.ghead,.skill,.flat .skill{grid-template-columns:1fr}.top{padding:12px 16px}main{padding:16px}.skills{padding-left:16px}}
 </style></head><body>
 <div class="top">
- <div class="brand"><h1>Skill Tree</h1><span class="sub" id="sub"></span></div>
- <div class="budget"><div class="bar" id="bar"></div><div class="legend" id="legend"></div></div>
+ <div class="brand"><h1>Skill Tree</h1><p class="sub" id="sub"></p></div>
+ <div class="budget"><div class="bar" id="bar" role="img" aria-label="Description tokens by group"></div><div class="legend mono" id="legend"></div></div>
  <div class="tools">
-  <label>project <select id="project"><option value="">(none: user scope only)</option></select></label>
-  <input type="search" id="q" placeholder="filter  ( / )">
-  <button id="expand" aria-pressed="false">full descriptions</button>
-  <span class="msg" id="msg" role="status"></span>
+  <label>Project <select id="project"><option value="">No project (user scope only)</option></select></label>
+  <label class="sr" for="q">Filter skills</label><input type="search" id="q" placeholder="Filter skills">
+  <button id="expand" aria-pressed="false">Show full descriptions</button>
+  <p class="msg" id="msg" role="status"></p>
  </div>
- <p class="hint">A group switch runs <code>claude plugin enable|disable &lt;group&gt;@skills-dir --scope …</code>; local beats project beats user. A skill inside a group is global: auto or slash-only, written to its frontmatter in agents-shared. Open sessions pick changes up on <code>/reload-plugins</code>.</p>
 </div>
 <main>
+ <p class="explain">A group switch runs <code>claude plugin enable</code> or <code>disable</code> for that scope; local beats project beats user. A skill inside a group has one global setting, auto or slash-only, written to its frontmatter in agents-shared. Open sessions pick changes up on <code>/reload-plugins</code>.</p>
  <section id="groups"><h2>Groups <span class="d" id="gcount"></span></h2><div id="glist"></div></section>
  <section id="flat" class="flat"><h2>Flat skills <span class="d" id="fcount"></span></h2><div class="group"><div class="skills" id="flist"></div></div></section>
 </main>
@@ -346,44 +351,51 @@ const HUES=['#3987e5','#d95926','#199e70','#c98500','#9085e9','#c2417a','#2a9aa0
 async function api(path,body){const r=await fetch(path,body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{});return r.json()}
 async function load(p){S=await api('/api/state'+(p!==undefined?'?project='+encodeURIComponent(p):''));render()}
 function el(tag,attrs={},...kids){const e=document.createElement(tag);for(const[k,v]of Object.entries(attrs)){if(k==='class')e.className=v;else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else if(v!==null&&v!==undefined)e.setAttribute(k,v)}for(const k of kids)e.append(k);return e}
-function tri(cur,scope,disabled,cb){const t=el('span',{class:'tri',title:scope});for(const[lab,val,cls]of[['on',true,'on'],['–',null,''],['off',false,'off']]){const b=el('button',{class:cls,'aria-pressed':String(cur===val),disabled:disabled?'':null,onclick:()=>cb(val)},lab);t.append(b)}return t}
+function tri(cur,scope,disabled,cb){const t=el('span',{class:'tri',role:'group','aria-label':scope+' scope'});for(const[lab,val,cls,name]of[['on',true,'on','on'],['–',null,'','not set'],['off',false,'off','off']]){const b=el('button',{class:cls,'aria-label':name,'aria-pressed':String(cur===val),disabled:disabled?'':null,title:disabled?'Choose a project first':null,onclick:()=>cb(val)},lab);t.append(b)}return t}
+async function act(p,body,done){say('');const r=await api(p,body);if(!r.ok){say(r.error,'err');return}say(done,'ok');load(S.project)}
 function render(){
- const sel=$('#project');sel.replaceChildren(el('option',{value:''},'(none: user scope only)'));
+ const sel=$('#project');sel.replaceChildren(el('option',{value:''},'No project (user scope only)'));
  for(const p of S.projects)sel.append(el('option',{value:p.path,selected:S.project===p.path?'':null},p.name));
- const noProj=!S.project;
- $('#sub').textContent=`${S.groups.length} groups · ${S.groups.reduce((a,g)=>a+g.skills.length,0)+S.flat.length} skills · ~${fmt(S.always_on)} tokens of descriptions in every session${S.project?' in '+S.project.split('/').pop():''}`;
+ const noProj=!S.project,where=S.project?' in '+S.project.split('/').pop():'';
+ $('#sub').textContent=`${S.groups.length} groups, ${S.groups.reduce((a,g)=>a+g.skills.length,0)+S.flat.length} skills. About ${fmt(S.always_on)} tokens of descriptions load in every session${where}.`;
  const bar=$('#bar'),leg=$('#legend');bar.replaceChildren();leg.replaceChildren();
- const segs=[...S.groups.filter(g=>g.enabled).map((g,i)=>({n:g.name,t:g.tokens})),{n:'flat',t:S.flat.filter(k=>k.state==='on').reduce((a,k)=>a+k.tokens,0)}].filter(s=>s.t>0);
+ const segs=[...S.groups.filter(g=>g.enabled).map(g=>({n:g.name,t:g.tokens})),{n:'flat skills',t:S.flat.filter(k=>k.state==='on').reduce((a,k)=>a+k.tokens,0)}].filter(s=>s.t>0);
  const tot=segs.reduce((a,s)=>a+s.t,0)||1;
- segs.forEach((s,i)=>{const c=HUES[i%HUES.length];bar.append(el('i',{style:`width:${100*s.t/tot}%;background:${c}`,title:`${s.n} ~${fmt(s.t)}`}));leg.append(el('span',{},el('b',{style:`color:${c}`},s.n),` ~${fmt(s.t)}`))});
- const gl=$('#glist');gl.replaceChildren();$('#gcount').textContent=`${S.groups.filter(g=>g.enabled).length} on`;
+ segs.forEach((s,i)=>{const c=HUES[i%HUES.length];bar.append(el('i',{style:`width:${100*s.t/tot}%;background:${c}`}));leg.append(el('span',{},el('b',{style:`color:${c}`},s.n),` ~${fmt(s.t)}`))});
+ const gl=$('#glist');gl.replaceChildren();$('#gcount').textContent=`${S.groups.filter(g=>g.enabled).length} of ${S.groups.length} on`;
  for(const g of S.groups){
   const box=el('div',{class:'group '+(g.enabled?'on':'off'),'data-name':g.name,'data-desc':g.description});
   const scopes=el('span',{class:'scopes'});
-  for(const sc of ['user','project','local'])scopes.append(el('label',{},sc),tri(g.scopes[sc],sc,sc!=='user'&&noProj,async v=>{say('');const r=await api('/api/group',{id:g.id,scope:sc,value:v,project:S.project});if(!r.ok)say(r.error);load(S.project)}));
-  box.append(el('div',{class:'ghead'},el('span',{class:'name'},g.name),el('span',{class:'desc'},g.description),el('span',{class:'cost'},el('b',{},'~'+fmt(g.tokens)),' tok'),el('span',{},scopes,' ',el('span',{class:'eff'},g.enabled?'on':'off',g.enabled_by!=='default'?' · '+g.enabled_by:''))));
+  for(const sc of ['user','project','local'])scopes.append(el('span',{class:'sc'},sc,tri(g.scopes[sc],sc,sc!=='user'&&noProj,v=>act('/api/group',{id:g.id,scope:sc,value:v,project:S.project},`${g.name}: ${sc} scope ${v===null?'cleared':v?'on':'off'}`))));
+  box.append(el('div',{class:'ghead'},el('span',{class:'name mono'},g.name),el('span',{class:'desc'},g.description),el('span',{class:'cost mono'},el('b',{},'~'+fmt(g.tokens)),' tok'),el('span',{},scopes,' ',el('span',{class:'eff'},g.enabled?'on':'off',g.enabled_by!=='default'?', set at '+g.enabled_by:''))));
   const list=el('div',{class:'skills'});
   for(const k of g.skills){
    const row=el('div',{class:'skill'+(k.slash_only?' hidden':''),'data-name':k.name,'data-desc':k.description});
-   const seg=el('span',{class:'seg'});
-   for(const[lab,val]of[['auto',false],['slash-only',true]])seg.append(el('button',{'aria-pressed':String(k.slash_only===val),onclick:async()=>{say('');const r=await api('/api/skill',{dir:k.dir,slash_only:val});if(!r.ok)say(r.error);load(S.project)}},lab));
-   row.append(el('span',{class:'n'},'/'+g.name+':'+k.name,k.has_override?el('small',{title:'carries a local override'},' ✎'):''),el('span',{class:'desc',onclick:()=>row.classList.toggle('open')},k.description),el('span',{class:'cost'},el('b',{},'~'+fmt(k.tokens))),seg);
+   const seg=el('span',{class:'seg',role:'group','aria-label':'invocation for '+k.name});
+   for(const[lab,val]of[['auto',false],['slash-only',true]])seg.append(el('button',{'aria-pressed':String(k.slash_only===val),onclick:()=>act('/api/skill',{dir:k.dir,slash_only:val},`${k.name}: ${lab}`)},lab));
+   const name=el('span',{class:'n mono'},'/'+g.name+':'+k.name);if(k.has_override)name.append(el('span',{class:'mark','aria-label':'has a local override',title:'Has a local override'},'✎'));
+   row.append(name,el('span',{class:'desc'},k.description),el('span',{class:'cost mono'},el('b',{},'~'+fmt(k.tokens))),seg,el('button',{class:'more',onclick:e=>{row.classList.add('open')}},'Show more'));
    list.append(row)}
   box.append(list);gl.append(box)}
- const fl=$('#flist');fl.replaceChildren();$('#fcount').textContent=`${S.flat.filter(k=>k.state==='on').length} on`;
+ const fl=$('#flist');fl.replaceChildren();$('#fcount').textContent=`${S.flat.filter(k=>k.state==='on').length} of ${S.flat.length} on`;
  for(const k of S.flat){
   const row=el('div',{class:'skill'+(k.state!=='on'?' hidden':''),'data-name':k.name,'data-desc':k.description});
-  const scopeSel=el('select',{title:'scope for the state below'});for(const sc of ['user','project','local'])scopeSel.append(el('option',{value:sc,disabled:sc!=='user'&&noProj?'':null},sc+(k.scopes[sc]?': '+k.scopes[sc]:'')));
-  const seg=el('span',{class:'seg'});
-  for(const[lab,val]of[['on','on'],['name only','name-only'],['slash only','user-invocable-only'],['off','off']])seg.append(el('button',{'aria-pressed':String(k.state===val),onclick:async()=>{say('');const r=await api('/api/override',{name:k.name,scope:scopeSel.value,value:val,project:S.project});if(!r.ok)say(r.error);load(S.project)}},lab));
-  row.append(el('span',{class:'n'},'/'+k.name,k.slash_only?el('small',{title:'disable-model-invocation in its frontmatter'},' ⌘'):''),el('span',{class:'desc',onclick:()=>row.classList.toggle('open')},k.description),el('span',{class:'cost'},el('b',{},'~'+fmt(k.tokens))),scopeSel,seg);
+  const scopeSel=el('select',{'aria-label':'scope for '+k.name});for(const sc of ['user','project','local'])scopeSel.append(el('option',{value:sc,disabled:sc!=='user'&&noProj?'':null},sc+(k.scopes[sc]?': '+k.scopes[sc]:'')));
+  const seg=el('span',{class:'seg',role:'group','aria-label':'visibility for '+k.name});
+  for(const[lab,val]of[['on','on'],['name only','name-only'],['slash only','user-invocable-only'],['off','off']])seg.append(el('button',{'aria-pressed':String(k.state===val),onclick:()=>act('/api/override',{name:k.name,scope:scopeSel.value,value:val,project:S.project},`${k.name}: ${lab} at ${scopeSel.value} scope`)},lab));
+  const name=el('span',{class:'n mono'},'/'+k.name);if(k.slash_only)name.append(el('span',{class:'mark','aria-label':'slash-only in its frontmatter',title:'Slash-only in its frontmatter'},'⌘'));
+  row.append(name,el('span',{class:'desc'},k.description),el('span',{class:'cost mono'},el('b',{},'~'+fmt(k.tokens))),scopeSel,seg,el('button',{class:'more',onclick:()=>row.classList.add('open')},'Show more'));
   fl.append(row)}
- filter()}
-function say(t){$('#msg').textContent=t||''}
-function filter(){const q=$('#q').value.trim().toLowerCase();document.querySelectorAll('.skill,[data-name].group').forEach(e=>{const hit=!q||(e.dataset.name+' '+(e.dataset.desc||'')).toLowerCase().includes(q);if(e.classList.contains('group')){const kids=[...e.querySelectorAll('.skill')];let any=hit;kids.forEach(k=>{const h=!q||(k.dataset.name+' '+(k.dataset.desc||'')).toLowerCase().includes(q)||hit;k.hidden=!h;any=any||h});e.hidden=!any}else if(!e.closest('[data-name].group'))e.hidden=!hit})}
+ filter();trimMore()}
+function trimMore(){document.querySelectorAll('.skill').forEach(r=>{const d=r.querySelector('.desc'),m=r.querySelector('.more');if(m)m.hidden=d.scrollHeight<=d.clientHeight+1})}
+function say(t,cls){const m=$('#msg');m.textContent=t||'';m.className='msg'+(cls?' '+cls:'')}
+function filter(){const q=$('#q').value.trim().toLowerCase();const hit=e=>!q||(e.dataset.name+' '+(e.dataset.desc||'')).toLowerCase().includes(q);
+ document.querySelectorAll('.group[data-name]').forEach(g=>{const gh=hit(g);let any=gh;g.querySelectorAll('.skill').forEach(k=>{const h=gh||hit(k);k.hidden=!h;any=any||h});g.hidden=!any});
+ document.querySelectorAll('.flat .skill').forEach(k=>{k.hidden=!hit(k)})}
 $('#project').addEventListener('change',e=>load(e.target.value));$('#q').addEventListener('input',filter);
-$('#expand').addEventListener('click',e=>{document.body.classList.toggle('expanded');const on=document.body.classList.contains('expanded');e.target.setAttribute('aria-pressed',on);document.querySelectorAll('.skill').forEach(s=>s.classList.toggle('open',on))});
+$('#expand').addEventListener('click',e=>{const on=document.body.classList.toggle('expanded');e.currentTarget.setAttribute('aria-pressed',on);e.currentTarget.textContent=on?'Show short descriptions':'Show full descriptions'});
 document.addEventListener('keydown',e=>{if(e.key==='/'&&document.activeElement!==$('#q')){e.preventDefault();$('#q').focus()}});
+addEventListener('resize',trimMore);
 load();
 </script></body></html>
 """
