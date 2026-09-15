@@ -122,7 +122,7 @@ the scene that showed it stays.
 
 ## References
 
-- `references/godot.md` — state autoload, test scenes, Movie Maker capture, GUT or gdUnit4
+- `references/godot.md` — state autoload, test scenes, SceneTree-script capture, GUT or gdUnit4
   journeys, `Performance` monitors, headless and off-screen launch flags.
 - `references/browser.md` — window state hook, scene query parameter, Playwright capture and
   journeys, `renderer.info` counters, frame-interval profiling, pixel diff gate.

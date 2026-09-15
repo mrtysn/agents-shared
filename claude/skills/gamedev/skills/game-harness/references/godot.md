@@ -59,24 +59,39 @@ godot --path . -- --scene=orbit --seed=42
 One `.tscn` per situation under `tests/scenes/`. A scene sets position, mode and loadout, and
 nothing else; the game's own systems take over from there.
 
-## 3. Headless capture: Movie Maker mode
+## 3. Capture: a SceneTree script that boots, settles, and grabs one frame
 
-`--headless` uses a dummy renderer and produces no pixels. Capture needs a rendering display
-server, so run windowed but off the working screen, and use Movie Maker mode, which advances
-the engine on a fixed step and writes numbered frames.
+`--headless` uses a dummy renderer and produces no pixels, so capture runs windowed but off
+the working screen. Do not use `--write-movie` for it: the encoder drops frames when it lags,
+so frame N of the sequence is not the frame that was asked for. A `SceneTree` script is
+exact: it adds the scene itself with the project's real autoloads, waits a fixed number of
+frames, optionally calls a method to reach a state, waits again, and saves the next frame.
 
-```bash
-godot --path . --position 4000,0 --resolution 1280x720 \
-  --write-movie tests/capture/out/orbit.png --fixed-fps 60 --quit-after 30 \
-  -- --scene=orbit --seed=42
+```gdscript
+# res://tools/capture_scene.gd — run with --script; everything after -- is its own
+extends SceneTree
+func _init() -> void:
+    var a := _args()                                  # --scene, --out, --call, --settle, --after
+    var scene: Node = load(a.scene).instantiate()
+    root.add_child(scene)
+    for i in int(a.get("settle", 60)): await process_frame
+    if a.has("call"): scene.call(a.call)
+    for i in int(a.get("after", 30)): await process_frame
+    await process_frame                                # the frame after the one just drawn
+    root.get_viewport().get_texture().get_image().save_png(a.out)
+    quit()
 ```
 
-`.png` as the movie extension writes a frame sequence; keep the last frame as the shot. The
-fixed step is what makes the pixels repeatable, provided nothing in the game reads
-`Time.get_ticks_msec()` or `Time.get_unix_time_from_system()` for animation. Search for those
-and replace them with accumulated `delta`.
+```bash
+godot --path . --position 4000,0 --resolution 540x960 \
+  --script res://tools/capture_scene.gd -- --scene res://tests/scenes/orbit.tscn \
+  --call enter_pause --out tests/capture/out/orbit_pause.png
+```
 
-Each shot is its own process, so instances never leak state into one another.
+Each shot is its own process, so instances never leak state into one another. The frame
+counts are what fix the simulation time, provided nothing in the scene reads
+`Time.get_ticks_msec()` or `Time.get_unix_time_from_system()` for animation. Search for
+those and replace them with accumulated `delta`.
 
 Diff against the accepted baseline with any per-pixel tool; a Godot-only option is
 `Image.load_png_from_buffer` on both files and comparing `get_data()` in a GUT test. Under
@@ -121,8 +136,8 @@ game promises: land, exit, walk, save, reload, board, take off, and whatever the
 
 ## 5. Measured runs: frame intervals on a fixed scene
 
-Movie Maker mode fixes the step, so it cannot measure timing. Timing comes from a normal
-windowed run of a named scene that collects `delta` for N frames and prints percentiles.
+Timing comes from a normal windowed run of a named scene that collects `delta` for N frames
+and prints percentiles.
 
 ```gdscript
 # res://tests/profile.gd — attach to a scene or trigger via -- --profile=300
