@@ -34,6 +34,7 @@ import difflib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -49,6 +50,19 @@ SCOPES = ("user", "project", "local")
 OVERRIDE_STATES = ("on", "name-only", "user-invocable-only", "off")
 LOCAL_OPEN = "<!-- LOCAL: slash-only; set from skill-tree -->"
 LOCAL_CLOSE = "<!-- LOCAL END -->"
+
+
+def claude_bin() -> str | None:
+    """The claude CLI that group switches run. PATH first; then the installer's default
+    location, which a launcher started from Spotlight does not have on its PATH."""
+    found = shutil.which("claude")
+    if found:
+        return found
+    default = Path.home() / ".local" / "bin" / "claude"
+    return str(default) if os.access(default, os.X_OK) else None
+
+
+CLAUDE = claude_bin()
 
 
 # ── discovery ────────────────────────────────────────────────────────────────
@@ -263,8 +277,14 @@ def set_group(gid: str, scope: str, value: bool | None, project: Path | None) ->
             write_json(path, data)
         return {"ok": True}
     verb = "enable" if value else "disable"
-    res = subprocess.run(["claude", "plugin", verb, gid, "--scope", scope, "--json"],
-                         cwd=str(project) if project else None, capture_output=True, text=True)
+    if not CLAUDE:
+        return {"ok": False, "error": "claude CLI not found; start skill-tree from a shell that has it"}
+    try:
+        res = subprocess.run([CLAUDE, "plugin", verb, gid, "--scope", scope, "--json"],
+                             cwd=str(project) if project else None, capture_output=True,
+                             text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError) as e:
+        return {"ok": False, "error": f"could not run {CLAUDE}: {e}"}
     if res.returncode != 0:
         return {"ok": False, "error": (res.stderr or res.stdout).strip()[:300]}
     return {"ok": True}
@@ -407,10 +427,13 @@ let open={},fopen={};try{open=JSON.parse(localStorage.getItem('open')||'{}');fop
 const save=()=>{try{localStorage.setItem('open',JSON.stringify(open));localStorage.setItem('fopen',JSON.stringify(fopen));localStorage.setItem('sel',SEL)}catch(e){}};
 async function api(path,body){const r=await fetch(path,body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{});return r.json()}
 function el(tag,attrs={},...kids){const e=document.createElement(tag);for(const[k,v]of Object.entries(attrs)){if(k==='class')e.className=v;else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else if(v!==null&&v!==undefined&&v!==false)e.setAttribute(k,v===true?'':v)}for(const k of kids)e.append(k);return e}
-async function load(){S=await api('/api/state'+(SEL?'?project='+encodeURIComponent(SEL):''));if(S.error){SEL='';save();return load()}render();loadFolders()}
+const tilde=p=>p.replace(/^\/Users\/[^/]+/,'~');
+async function load(picked){S=await api('/api/state'+(SEL?'?project='+encodeURIComponent(SEL):''));if(S.error){SEL='';save();return load()}
+ if(picked)$('#scope').value=S.project?'project':'user';render();loadFolders();
+ if(picked){say(S.project?`${S.project.split('/').pop()} selected — switches write to ${tilde(S.project)}/.claude/settings.json`:'user scope — switches write to '+tilde(S.config_dir)+'/settings.json');window.scrollTo({top:0})}}
 function sw(on,name,cb,labels=['on','off']){return el('button',{class:'sw',role:'switch','aria-checked':String(on),'aria-label':name,onclick:()=>cb(!on)},el('i'),el('span',{class:'lab'},on?labels[0]:labels[1]))}
 function tri(cur,scope,cb){const t=el('span',{class:'tri',role:'group','aria-label':scope+' scope'});for(const[lab,val,name]of[['on',true,'on'],['–',null,'not set'],['off',false,'off']])t.append(el('button',{'aria-label':name,'aria-pressed':String(cur===val),onclick:()=>cb(val)},lab));return t}
-async function act(p,body,done){say('');const r=await api(p,body);if(!r.ok){say(r.error,'err');return}say(done);load()}
+async function act(p,body,done){say('working…');let r;try{r=await api(p,body)}catch(e){say('request failed: '+e.message+' (the server log has the traceback)','err');return}if(!r.ok){say(r.error,'err');return}say(done);load()}
 function scope(){return $('#scope').value}
 function dots(on,names){const n=names.filter(g=>on[g]).length;const d=el('span',{class:'dots',role:'img','aria-label':`${n} of ${names.length} groups on`});for(const g of names)d.append(el('i',{class:on[g]?'on':'',title:g+(on[g]?': on':': off')}));return d}
 // ── folders ──
@@ -419,7 +442,7 @@ async function loadFolders(){const root=await api('/api/dirs');GN=root.group_nam
  $('#legend').replaceChildren(el('span',{},'Dots, in order: '),...GN.map(g=>el('span',{class:'mono'},g)),el('span',{},'— shown where a folder differs from user scope.'))}
 async function folderNode(f,children,isRoot){const li=el('li',{'data-path':f.path});const isOpen=isRoot||!!fopen[f.path];const sel=SEL===f.path||(isRoot&&!SEL);
  const tw=el('button',{class:'tw'+(f.has_children?'':' leaf'),'aria-expanded':String(isOpen),'aria-label':(isOpen?'Collapse ':'Expand ')+f.name,onclick:()=>{fopen[f.path]=!isOpen;save();loadFolders()}});
- const pick=el('button',{class:'pick','aria-pressed':String(sel),onclick:()=>{SEL=isRoot?'':f.path;save();load()}},el('span',{class:'name mono'},isRoot?f.path.replace(/^\/Users\/[^/]+/,'~'):f.name),f.has_project?el('span',{class:'k',title:'Has its own .claude/settings.json'},'⚙'):'');
+ const pick=el('button',{class:'pick','aria-pressed':String(sel),onclick:()=>{SEL=isRoot?'':f.path;save();load(true)}},el('span',{class:'name mono'},isRoot?f.path.replace(/^\/Users\/[^/]+/,'~'):f.name),f.has_project?el('span',{class:'k',title:'Has its own .claude/settings.json'},'⚙'):'');
  const same=!isRoot&&GN.every(g=>f.on[g]===ROOT.on[g]);
  li.append(el('div',{class:'row'+(sel?' sel':'')},tw,pick,same?el('span',{class:'k','aria-label':'same as user scope'}):dots(f.on,GN)));
  if(isOpen&&f.has_children){const kids=children||(await api('/api/dirs?path='+encodeURIComponent(f.path))).children;const sub=el('ul');for(const c of kids)sub.append(await folderNode(c,null,false));li.append(sub)}
@@ -535,6 +558,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(set_slash_only(Path(body["dir"]), bool(body.get("slash_only"))))
         except (KeyError, ValueError, json.JSONDecodeError) as e:
             return self._json({"ok": False, "error": str(e)}, 400)
+        except OSError as e:
+            return self._json({"ok": False, "error": str(e)}, 500)
         self._send(404, b"not found", "text/plain")
 
     def log_message(self, fmt: str, *args) -> None:
@@ -551,6 +576,9 @@ def main() -> int:
     args = ap.parse_args()
     if not SKILLS_DIR.is_dir():
         print(f"no skills directory at {SKILLS_DIR}", file=sys.stderr)
+        return 1
+    if not CLAUDE:
+        print("claude CLI not found on PATH or in ~/.local/bin; group switches need it", file=sys.stderr)
         return 1
     try:
         srv = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)

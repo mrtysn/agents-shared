@@ -46,7 +46,7 @@ PLIST
 cat > "$app/Contents/MacOS/skill-tree" <<RUNNER
 #!/bin/zsh
 # Spotlight launches with a bare environment; put the shims back so python3 and claude resolve.
-export PATH="\$HOME/.asdf/shims:/opt/homebrew/bin:/usr/local/bin:\$HOME/bin:/usr/bin:/bin"
+export PATH="\$HOME/.local/bin:\$HOME/.asdf/shims:/opt/homebrew/bin:/usr/local/bin:\$HOME/bin:/usr/bin:/bin"
 [[ -r "\${XDG_CONFIG_HOME:-\$HOME/.config}/agents-shared/env.zsh" ]] && source "\${XDG_CONFIG_HOME:-\$HOME/.config}/agents-shared/env.zsh"
 url="http://127.0.0.1:$port/"
 if curl -fsS --max-time 1 "\$url" >/dev/null 2>&1; then
