@@ -119,6 +119,9 @@ a real folder at `skills/<name>/SKILL.md` <!-- LOCAL: flat layout; engine sectio
 | `prototype-fast` | prototype fast, vertical slice, MVP game, greybox |
 | `steam-publish` | publish on Steam, Steamworks, store page, depot/build upload; `steam_appid.txt` |
 | `itch-publish` | publish on itch, itch.io page, `butler push`, upload build; `.itch.toml` |
+<!-- LOCAL -->
+| `game-harness` | test scene, state hook, headless capture, screenshot test, journey test, frame percentiles, "let the agent play it", "look at it yourself"; `tests/scenes/`, `tests/journeys/` |
+<!-- LOCAL END -->
 
 ## Binding gaps (be honest; do not fabricate a skill)
 

@@ -42,7 +42,16 @@
  
  ## 2. Task classification (phrasing → category)
  
-@@ -88,25 +91,15 @@
+@@ -82,31 +85,24 @@
+   words ("make a roguelike", "deckbuilder").
+ - **workflows** (process/shipping): `game-jam`, `prototype-fast`, `steam-publish`,
+   `itch-publish`. Triggered by process words ("publish on Steam", "vertical slice").
++  <!-- LOCAL: `game-harness` is a workflow added in this group. Triggered by "test scene",
++  "state hook", "headless capture", "screenshot test", "let the agent play it", a bug described
++  only in words, or a performance claim with no before/after. -->
+ 
+ File signals sharpen this: `*.yarn`/`*.ink` → `dialogue-systems`/`visual-novel`; `steam_appid.txt`
+ → `steam-publish`; `*.inputactions` → `unity-input-system`.
  
  ## 3. Routing table (task → category → skill)
  
@@ -76,7 +85,16 @@
  
  ### 3b. Disciplines — load **with** the engine skill (concept ↔ engine API)
  
-@@ -159,9 +152,11 @@
+@@ -153,15 +149,20 @@
+ `game-jam` (jam, 48-hour, Ludum Dare/GMTK) · `prototype-fast` (vertical slice, MVP, greybox) ·
+ `steam-publish` (Steam, Steamworks, depot; `steam_appid.txt`) · `itch-publish` (itch.io, butler;
+ `.itch.toml`).
++<!-- LOCAL --> · `game-harness` (state hook, named test scenes, headless capture, journey
++tests, measured runs; load before the first feature of a new game and before any
++`performance-optimization` pass so there is a repeatable scene to measure). <!-- LOCAL END -->
+ 
+ For the exhaustive per-skill trigger list and every engine binding, read
+ `references/routing-table.md`.
  
  ## 4. Read protocol (progressive disclosure)
  
@@ -91,7 +109,7 @@
     only those. Never bulk-load a whole category.
  3. **On demand:** read a skill's bundled `references/` files only when the subtask needs that
     depth (the skill body says when).
-@@ -194,8 +189,9 @@
+@@ -194,8 +195,9 @@
  2. If the task is a pure concept/genre/workflow question, route straight to the engine-agnostic
     discipline/genre/workflow skill — no engine needed ("what's a good save format?" → `save-systems`).
  3. Only if engine choice actually blocks the answer, ask **one** targeted question ("Which engine —
@@ -103,6 +121,17 @@
  4. Never invent an engine or load an engine skill on a guess.
  
  **Engine known but no skill covers the subtask:** load the closest engine skill plus the relevant
+@@ -220,6 +222,10 @@
+ | "the camera should follow my player smoothly" | (detected engine) | `camera-systems` (+ engine movement skill) |
+ | "my Unity game drops to 30 FPS, optimize it" | Unity (`Assets/`+`ProjectSettings/`) | `performance-optimization` (profile first) → engine skill |
+ | "make a cohesive pixel-art player and enemy set" | (detected engine) | `create-game-assets` → relevant engine import/rendering skill |
++<!-- LOCAL -->
++| "the planet vanishes on a shallow approach, I can't tell you more" | (detected engine) | `game-harness` (reproduce in a named scene, inspect state and capture) → `performance-optimization` if the trace points at frame cost |
++| "new game, set it up so you can test it yourself" | (detected engine) | `game-harness` first, then the genre/engine skills |
++<!-- LOCAL END -->
+ 
+ ## References
+ 
 --- a/references/engine-detection.md
 +++ b/references/engine-detection.md
 @@ -34,7 +34,7 @@
@@ -124,4 +153,14 @@
 +a real folder at `skills/<name>/SKILL.md` <!-- LOCAL: flat layout; engine sections below list skills that are not installed -->. Trigger words (`says:`) and file signals
  (`files:`) are the cues that should select each skill. `*` in a binding is filled with the
  **detected** engine (router body §1); where an engine lacks the exact skill, see "Binding gaps".
+ 
+@@ -119,6 +119,9 @@
+ | `prototype-fast` | prototype fast, vertical slice, MVP game, greybox |
+ | `steam-publish` | publish on Steam, Steamworks, store page, depot/build upload; `steam_appid.txt` |
+ | `itch-publish` | publish on itch, itch.io page, `butler push`, upload build; `.itch.toml` |
++<!-- LOCAL -->
++| `game-harness` | test scene, state hook, headless capture, screenshot test, journey test, frame percentiles, "let the agent play it", "look at it yourself"; `tests/scenes/`, `tests/journeys/` |
++<!-- LOCAL END -->
+ 
+ ## Binding gaps (be honest; do not fabricate a skill)
  
