@@ -90,8 +90,9 @@ This runs against small sites, one of them a free resource maintained by one per
   load, including a filter checkbox that reloads the page. Scrolling is not one.
 - **At most 25 screens opened in a site's viewer.** Open one only to read it closely or
   to get the link of an example you will cite.
-- **Never page past the second page of a listing.** Game UI Database pages hold 50
-  screens. Never sweep a category.
+- **At most 100 screens per brief** — two loads of a Game UI Database listing, which
+  arrive 50 at a time. Narrow the filter (platform, genre) rather than sweep a category;
+  every screen recorded is one picture downloaded.
 - **Never download or save an image yourself**, and never pass one to an image
   generator. Record each screen's image URL as `source`; `record.py` fetches every one
   exactly once, a second apart, into the private ledger.
