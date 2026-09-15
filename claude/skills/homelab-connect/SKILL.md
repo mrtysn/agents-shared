@@ -24,6 +24,7 @@ Follow the runbook's canonical steps for whatever the task is (new app deploy, C
 - Cloudflare A-records must be **DNS-only (grey cloud)** or ACME fails.
 - Generate secrets **on the box** (`openssl rand -hex 32`); never paste them into chat, and never commit them here. Keep off-box copies (host backups roll back the whole machine).
 - SSH is key-only. Host details are in the runbook — do not copy them into this file.
+- Bulk media sits on a separate Hetzner Volume, bind-mounted over app paths. It is outside Hetzner backups, and old copies can hide underneath the mounts — check `findmnt` on a path before moving, deleting, or measuring disk use there.
 
 ## Notes
 
