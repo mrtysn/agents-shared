@@ -1,0 +1,37 @@
+--- a/SKILL.md
++++ b/SKILL.md
+@@ -13,27 +13,23 @@
+ 
+ ## How It Works
+ 
+-1. Fetch the latest guidelines from the source URL below
++1. Read the guidelines from `references/command.md` in this skill's directory
+ 2. Read the specified files (or prompt user for files/pattern)
+-3. Check against all rules in the fetched guidelines
++3. Check against all rules in those guidelines
+ 4. Output findings in the terse `file:line` format
+ 
+ ## Guidelines Source
+ 
+-Fetch fresh guidelines before each review:
++<!-- LOCAL: the rules are vendored as references/command.md from vercel-labs/web-interface-guidelines at e3d624baaf29dc1fc645aff3e38f03e564d2d6b1 (2026-08-17), MIT, with its Title Case rule removed because better-writing sets sentence case; no fetch at review time -->
++Read `references/command.md` next to this file. It contains all the rules and output format instructions. Do not fetch the upstream URL.
++<!-- LOCAL END -->
+ 
+-```
+-https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/command.md
+-```
+-
+-Use WebFetch to retrieve the latest rules. The fetched content contains all the rules and output format instructions.
+-
+ ## Usage
+ 
+ When a user provides a file or pattern argument:
+-1. Fetch guidelines from the source URL above
++1. Read `references/command.md`
+ 2. Read the specified files
+-3. Apply all rules from the fetched guidelines
++3. Apply all rules from those guidelines
+ 4. Output findings using the format specified in the guidelines
+ 
+ If no files specified, ask the user which files to review.
