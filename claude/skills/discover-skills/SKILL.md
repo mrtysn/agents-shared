@@ -95,8 +95,8 @@ sources reads identically to a thorough thirteen unless the count says otherwise
 
 Do not install anything. If the user wants one installed, they'll say so. Three targets, by commitment:
 
-- **Trial (default for a found skill):** `agents-shared/scripts/trial-skill.sh install <owner/repo> <path-in-repo>` — real directory in `~/.claude/skills/`, tracked by `.trial.json`, removable with `rm` or promotable with `promote` once it earns its keep.
+- **Into a group (default for a found skill):** `agents-shared/claude/skills/<group>/skills/<name>/` via the external-skill convention (`source.json` + `--establish-base`). The group can be switched off per project with `claude plugin disable <group>@skills-dir`, so an unproven skill sits at arm's reach rather than in every session.
 - **Single session only:** no install — fetch the SKILL.md into scratchpad, read it, follow it.
-- **Permanent from the start:** `agents-shared/claude/skills/<name>/` via the external-skill convention (`source.json` + `--establish-base`), only when the user says it's a keeper.
+- **Flat, always on:** `agents-shared/claude/skills/<name>/`, same convention, for a single skill wanted in every session.
 
 Read the full skill content from the source repo before installing by any route.

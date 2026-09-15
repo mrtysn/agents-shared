@@ -68,10 +68,14 @@ an existing file needs no re-run, but a new or removed directory does.
 
 ## External (Third-Party) Skills
 
-Skills sourced from external repos follow a convention:
+Skills sourced from external repos follow a convention. A pack of them lives in a
+group — `claude/skills/<group>/` with a `.claude-plugin/plugin.json` and the skills
+under `<group>/skills/<name>/` — which Claude Code loads as the plugin `<group>@skills-dir`
+and can enable per project (see README, *Skill Groups*). A single external skill stays
+flat. Either way each skill carries:
 
 ```
-claude/skills/<skill-name>/
+claude/skills/[<group>/skills/]<skill-name>/
 ├── SKILL.md        # Working copy (what runs) = base + local override applied
 ├── references/…    # Other vendored upstream files (multi-file skills)
 ├── source.json     # Provenance tracker + file list
@@ -102,7 +106,7 @@ as conflict markers in the working file and reported — never silently lost.
 - `files` — optional, skill-dir-relative list of every vendored file. Defaults to `["SKILL.md"]`. List only upstream-tracked files; local-only artifacts (`.venv/`, gitignored) are never listed and never touched.
 
 **Adding a new external skill:**
-1. Copy the upstream skill's files into `claude/skills/<name>/`
+1. Copy the upstream skill's files into `claude/skills/<name>/`, or into `claude/skills/<group>/skills/<name>/` for a pack
 2. Create `source.json` with `repo`, `path`, the current `commit` SHA, and (if multi-file) `files`
 3. Establish the pristine base: `bash scripts/sync-external-skills.sh --establish-base <name>` — fetches the files at the pinned commit into `.upstream/` and captures any local edits as `override.patch`
 

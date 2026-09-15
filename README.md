@@ -60,7 +60,6 @@ config dir (`$CLAUDE_CONFIG_DIR`, else `~/.claude`).
 |------|-------|-------------|
 | `hooks/block-tree-discard.sh` | PreToolUse | Refuses git commands that discard uncommitted work; only `git checkout -- <one tracked file>` passes |
 | `hooks/focus-policy.sh` | SessionStart | Tells the session whether this machine tolerates a window stealing keyboard focus |
-| `hooks/trial-touch.sh` | PostToolUse (`Skill`) | Stamps a trial skill's `last_used`, so idle age means "unused for N days" rather than "installed N days ago" |
 | `hooks/memory-lint.sh` | PreToolUse (`Edit\|Write`) | Keeps auto-memory index lines topic-only and refuses a memory that duplicates a rule |
 | `hooks/dump-hook-stdin.sh` | any | Probe: writes the JSON a hook event receives to a file, then allows the call |
 
@@ -95,24 +94,6 @@ Point any hook event at it and it writes the JSON it received to
 `$HOOK_STDIN_OUT` (else `<config>/hook-stdin.json`), then exits 0. That answers
 "what does this event actually get?" — which fields `tool_input` carries, what
 `cwd` and `permission_mode` look like — before writing a hook that depends on it.
-
-### trial-touch.sh
-
-A trial skill's default fate is to live forever: nothing removes it but the user
-happening to look, and its install date says nothing about whether it earns the
-context it costs. This stamps `last_used` in `.trial.json` on every `Skill`
-call, which is what lets `skills-view.py` report a trial as stale only when it
-has genuinely gone unused.
-
-**Fails open**, unlike the PreToolUse guards above. Those refuse the tool call
-when they cannot run, because a guard that fails open is not a guard. This one
-is bookkeeping attached to someone else's tool call, so a missing `jq` or an
-unreadable `.trial.json` exits 0 having done nothing rather than surfacing as a
-failure of the work the user actually asked for.
-
-```json
-{ "matcher": "Skill", "hooks": [{ "type": "command", "command": "…/hooks/trial-touch.sh", "timeout": 5 }] }
-```
 
 ### focus-policy.sh
 
@@ -150,23 +131,28 @@ reports the verdict, the rule says what to do about it.
 symlinks already point here. After a file is **added, renamed, or deleted**,
 re-run `bash scripts/init-global.sh` to sync the links.
 
-## Trial Skills
+## Skill Groups
 
-A skill worth trying is not yet a skill worth keeping. `scripts/trial-skill.sh`
-installs one temporarily into `~/.claude/skills/` as a **real directory** — the
-managed set are all symlinks, and `init-global.sh` never touches real
-directories, so trials coexist with the permanent skills and are trivially
-identifiable. Each trial carries a `.trial.json` (source repo, path, pinned
-commit, install date), a superset of `source.json`, so promotion is lossless.
+External packs live in **groups**: a directory under `claude/skills/` holding a
+`.claude-plugin/plugin.json` and a `skills/` folder of skills. Claude Code loads
+such a directory as a plugin named `<group>@skills-dir` — discovered in place
+through the symlink, no marketplace, no install, no cache copy — and its skills
+are invoked as `/<group>:<skill>`. Grouping is what makes a pack switchable:
 
 ```bash
-scripts/trial-skill.sh install <owner/repo> <path-in-repo> [--name <n>]
-scripts/trial-skill.sh list              # every unmanaged dir, tracked or not
-scripts/trial-skill.sh rm <name>         # delete a trial
-scripts/trial-skill.sh promote <name>    # move into this repo as an external
-                                         # skill: source.json from the trial
-                                         # provenance, --establish-base, re-link
+claude plugin disable gamedev@skills-dir --scope user     # off everywhere
+claude plugin enable  gamedev@skills-dir --scope project  # on for this repo, committed
+claude plugin list                                        # what is on here
+claude plugin details gamedev@skills-dir                  # what it costs in context
 ```
+
+A disabled group costs nothing; an enabled one loads its skill descriptions like
+any other skill. Skills the machine's owner wrote stay flat under
+`claude/skills/<name>/` and keep their bare `/<name>`.
+
+Grouped skills follow the external-skill convention below, one `source.json` per
+skill under `<group>/skills/<name>/`; the sync script finds both layouts, and a
+group name as its argument syncs the whole group.
 
 For a skill needed in one session only, skip installation entirely: fetch its
 SKILL.md into scratch, read it, follow it.

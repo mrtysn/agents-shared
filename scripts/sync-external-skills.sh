@@ -23,7 +23,9 @@
 #
 # Usage:
 #   bash scripts/sync-external-skills.sh                     # sync all to upstream HEAD
-#   bash scripts/sync-external-skills.sh <name>              # sync one
+#   bash scripts/sync-external-skills.sh <name>              # sync one skill, or every
+#                                                            # skill in a group (<group>
+#                                                            # or <group>:<name>)
 #   bash scripts/sync-external-skills.sh --establish-base [<name>]
 #                                                            # (re)build .upstream +
 #                                                            # override.patch from the
@@ -78,11 +80,19 @@ regen_patch() {
     fi
 }
 
-for source_file in "$SKILLS_DIR"/*/source.json; do
+# Skills live either flat (claude/skills/<name>/) or inside a group plugin
+# (claude/skills/<group>/skills/<name>/). A filter matches a skill's own name or
+# its group's name, so one argument can sync a whole group.
+for source_file in "$SKILLS_DIR"/*/source.json "$SKILLS_DIR"/*/skills/*/source.json; do
     [[ -f "$source_file" ]] || continue
     skill_dir="$(dirname "$source_file")"
     skill_name="$(basename "$skill_dir")"
-    [[ -z "$filter" || "$skill_name" == "$filter" ]] || continue
+    group_name=""
+    if [[ "$(basename "$(dirname "$skill_dir")")" == "skills" ]]; then
+        group_name="$(basename "$(dirname "$(dirname "$skill_dir")")")"
+        skill_name="$group_name:$skill_name"
+    fi
+    [[ -z "$filter" || "$skill_name" == "$filter" || "${skill_name#*:}" == "$filter" || "$group_name" == "$filter" ]] || continue
 
     repo=$(jq -r '.repo' "$source_file")
     path=$(jq -r '.path' "$source_file")
