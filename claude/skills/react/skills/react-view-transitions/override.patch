@@ -1,0 +1,35 @@
+--- a/SKILL.md
++++ b/SKILL.md
+@@ -15,7 +15,9 @@
+ 
+ Every `<ViewTransition>` should communicate a spatial relationship or continuity. If you can't articulate what it communicates, don't add it.
+ 
+-Implement **all** applicable patterns from this list, in this order:
++<!-- LOCAL: apply only what the task needs; upstream said implement every applicable pattern -->
++Consider the patterns in this order and implement the ones the task at hand calls for:
++<!-- LOCAL END -->
+ 
+ | Priority | Pattern | What it communicates |
+ |----------|---------|---------------------|
+@@ -25,7 +27,9 @@
+ | 4 | **State change** (`enter`/`exit`) | "Something appeared/disappeared" |
+ | 5 | **Route change** (page-level) | "Going to a new place" |
+ 
+-This is an implementation order, not a "pick one" list. Implement every pattern that fits the app. Only skip a pattern if the app has no use case for it.
++<!-- LOCAL: upstream pushed implementing every fitting pattern -->
++This is a priority order, not a checklist. Add a pattern when the task asks for the relationship it communicates, and leave the rest alone.
++<!-- LOCAL END -->
+ 
+ ### Choosing Animation Style
+ 
+@@ -43,7 +47,9 @@
+ ## Availability
+ 
+ - **Next.js:** Do **not** install `react@canary` — the App Router already bundles React canary internally. `ViewTransition` works out of the box. `npm ls react` may show a stable-looking version; this is expected.
+-- **Without Next.js:** Install `react@canary react-dom@canary` (`ViewTransition` is not in stable React).
++<!-- LOCAL: removed the instruction to install react@canary outside Next.js; stay on the React the project pins -->
++- **Without Next.js:** `ViewTransition` needs a React build that ships it. Check the project's pinned React first and do not change the React channel on your own.
++<!-- LOCAL END -->
+ - Browser support: Chromium 125+ (React needs the v2 object form of `startViewTransition`), Firefox 144+, Safari 18.2+. Graceful degradation on unsupported browsers.
+ 
+ ---

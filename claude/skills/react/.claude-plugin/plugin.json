@@ -1,0 +1,8 @@
+{
+  "name": "react",
+  "description": "React and TypeScript craft: performance rules, composition patterns, view transitions and library choice.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Mert Yaşin"
+  }
+}
