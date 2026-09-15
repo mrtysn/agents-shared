@@ -150,6 +150,14 @@ A disabled group costs nothing; an enabled one loads its skill descriptions like
 any other skill. Skills the machine's owner wrote stay flat under
 `claude/skills/<name>/` and keep their bare `/<name>`.
 
+`scripts/skill-tree.py` draws all of this as one page on loopback — every group
+with its skills, the description cost, and the switches: a group per scope for
+the project you pick, a skill inside a group as auto or slash-only (a fenced
+frontmatter edit in this repo, override.patch regenerated), a flat skill through
+the four `skillOverrides` states. Symlink it into `~/bin` as `skill-tree`;
+`scripts/make-skill-tree-app.zsh` wraps it as *Skill Tree* in `~/Applications`
+for Spotlight.
+
 Grouped skills follow the external-skill convention below, one `source.json` per
 skill under `<group>/skills/<name>/`; the sync script finds both layouts, and a
 group name as its argument syncs the whole group.
