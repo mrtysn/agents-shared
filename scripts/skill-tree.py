@@ -382,8 +382,11 @@ select,input[type=search],button.plain{font:inherit;color:var(--ink);background:
 input[type=search]{min-width:160px}button.plain{cursor:pointer}button.plain[aria-pressed=true]{background:var(--code)}
 @media(hover:hover){button.plain:hover{border-color:var(--ink2)}}
 .msg{margin:0 0 0 auto;color:var(--ink2)}.msg.err{color:#b32d1c}@media(prefers-color-scheme:dark){.msg.err{color:#ff8b74}}
-.wrap{display:grid;grid-template-columns:minmax(0,1fr) 22rem;min-height:0}
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) 22rem;min-height:0;position:relative}
 body.nopane .wrap{grid-template-columns:minmax(0,1fr)}body.nopane aside{display:none}
+#pane{position:absolute;top:12px;right:calc(22rem - 13px);z-index:3;width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--ink2);font:16px/1 system-ui,sans-serif;cursor:pointer;padding:0;display:grid;place-items:center}
+body.nopane #pane{right:10px}@media(hover:hover){#pane:hover{border-color:var(--ink2);color:var(--ink)}}
+@media(max-width:860px){#pane{display:none}}
 @media(max-width:860px){.wrap{grid-template-columns:1fr;grid-template-rows:60vh auto}}
 /* canvas */
 .canvas{position:relative;overflow:hidden;background:var(--bg);cursor:grab;touch-action:none;user-select:none}
@@ -428,10 +431,10 @@ button.link{border:0;background:none;padding:0;font:inherit;color:inherit;cursor
  <h1>Skill Tree</h1>
  <label>Write to <select id="scope" aria-label="Scope that switches write to"><option value="user">user scope, every folder</option><option value="local">this repo, this machine</option><option value="project">this folder, committed</option></select></label>
  <label class="sr" for="q">Find a folder, group or skill</label><input type="search" id="q" placeholder="Find">
- <button class="plain" id="pane" aria-pressed="true" aria-controls="side">Hide pane</button>
  <p class="msg" id="msg" role="status"></p>
 </div>
 <div class="wrap">
+ <button id="pane" aria-expanded="true" aria-controls="side" aria-label="Hide the detail pane">›</button>
  <div class="canvas" id="canvas">
   <svg id="svg" aria-label="Folders, groups and skills"><g id="view"><g id="edges"></g><g id="focus-edges"></g><g id="nodes"></g></g></svg>
   <div class="fab"><button class="plain" id="fit">Fit</button><button class="plain" id="clear">Clear selection</button></div>
@@ -557,7 +560,7 @@ function side(){const a=$('#side');a.replaceChildren();const noProj=!S.project;f
   if(k.has_override)a.append(el('p',{class:'hint'},'Carries a local override in agents-shared.'))}
  a.append(el('p',{class:'hint'},'Click a node to focus it; drag to pan, wheel to zoom. Switches write at the scope chosen at the top. “This repo, this machine” is the repository’s gitignored ',el('code',{},'.claude/settings.local.json'),' and is the usual choice; “this folder, committed” is that folder’s ',el('code',{},'.claude/settings.json'),' for anything the repository’s other readers should share. Local beats project beats user. A skill switch is global: on lets Claude invoke it, off keeps it slash-only.'))}
 $('#scope').addEventListener('change',()=>{scopeTouched=true;side()});
-(()=>{let on=true;try{on=localStorage.getItem('pane')!=='off'}catch(e){}const b=$('#pane');const apply=()=>{document.body.classList.toggle('nopane',!on);b.setAttribute('aria-pressed',String(on));b.textContent=on?'Hide pane':'Show pane'};apply();b.addEventListener('click',()=>{on=!on;try{localStorage.setItem('pane',on?'on':'off')}catch(e){}apply()})})();
+(()=>{let on=true;try{on=localStorage.getItem('pane')!=='off'}catch(e){}const b=$('#pane');const apply=()=>{document.body.classList.toggle('nopane',!on);b.setAttribute('aria-expanded',String(on));b.setAttribute('aria-label',on?'Hide the detail pane':'Show the detail pane');b.textContent=on?'›':'‹'};apply();b.addEventListener('click',()=>{on=!on;try{localStorage.setItem('pane',on?'on':'off')}catch(e){}apply()})})();
 $('#clear').addEventListener('click',async()=>{SEL='';SELKIND='';CTX='';save();await fetchState();draw();side()});
 $('#q').addEventListener('input',e=>{const q=e.target.value.trim().toLowerCase();const svg=$('#svg');if(!q){highlight();return}svg.classList.add('dim');NODES.forEach((n,id)=>n.classList.toggle('lit',id.toLowerCase().includes(q)));EDGES.forEach(x=>x.el.classList.remove('lit'))});
 document.addEventListener('keydown',e=>{if(e.key==='/'&&document.activeElement!==$('#q')){e.preventDefault();$('#q').focus()}if(e.key==='Escape'&&document.activeElement!==$('#q')){SEL='';SELKIND='';save();NODES.forEach(n=>n.classList.remove('sel'));highlight();side()}});
