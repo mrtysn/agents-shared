@@ -448,14 +448,29 @@ button.link{border:0;background:none;padding:0;font:inherit;color:inherit;cursor
 .tri button{border:0;border-radius:0;min-height:22px;padding:1px 7px;background:none;color:var(--ink2);font:inherit;font-size:12px;cursor:pointer}
 .tri button+button{border-left:1px solid var(--line2)}.tri button[aria-pressed=true]{background:var(--code);color:var(--ink);font-weight:600}
 .details{color:var(--ink2);font-size:12px;display:grid;gap:4px;margin-top:4px}.details .sc{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+dialog{max-width:min(40rem,calc(100vw - 32px));border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);padding:18px 22px;font:13px/1.5 system-ui,-apple-system,sans-serif}dialog::backdrop{background:rgb(0 0 0 / .4)}dialog h2{margin:0 0 6px;font-size:14px}dialog h3{margin:14px 0 4px;font-size:12px;color:var(--ink2)}dialog p{margin:0 0 8px;text-wrap:pretty}dialog code{font-family:ui-monospace,Menlo,monospace;background:var(--code);padding:1px 5px;border-radius:3px}dialog form{margin-top:12px;text-align:right}
 .hint{color:var(--ink2);font-size:12px;margin:16px 0 0}.hint code{font-family:ui-monospace,Menlo,monospace;background:var(--code);padding:1px 5px;border-radius:3px;color:var(--ink)}
 </style></head><body>
 <div class="top">
  <h1>Skill Tree</h1>
  <label>Write to <select id="scope" aria-label="Scope that switches write to"><option value="user">user scope, every folder</option><option value="local">this repo, this machine</option><option value="project">this folder, committed</option></select></label>
  <label class="sr" for="q">Find a folder, group or skill</label><input type="search" id="q" placeholder="Find">
+ <button class="plain" id="help" aria-haspopup="dialog">Help</button>
  <p class="msg" id="msg" role="status"></p>
 </div>
+<dialog id="helpdlg" aria-labelledby="help-h">
+ <h2 id="help-h">How Skill Tree works</h2>
+ <h3>The canvas</h3>
+ <p>Folders on the left, groups in the middle, skills on the right. Click a node to focus it: its connections stay lit, the rest dims. Click it again, press Escape or use Clear selection to unfocus. Drag to pan, wheel to zoom, Fit to see everything. Arrow keys move between nodes.</p>
+ <p>A solid line means a folder has its own setting for that group. A folder without lines inherits user scope; focus it and dashed lines show what it gets.</p>
+ <h3>Where switches write</h3>
+ <p>The “Write to” selector picks the file a group switch edits. <b>User scope</b> is <code>~/.claude/settings.json</code>, the default for every folder. <b>This repo, this machine</b> is the repository’s gitignored <code>.claude/settings.local.json</code>, the usual choice for one project. <b>This folder, committed</b> is that folder’s <code>.claude/settings.json</code>, for the rare setting a repository’s other readers should share. Local beats project beats user. A session started in a subfolder reads the committed file from that subfolder, not the repository root.</p>
+ <h3>Groups and skills</h3>
+ <p>A group is a plugin; Claude Code loads it whole. Off in a folder means none of its skills exist there. A skill inside a group has two global switches. <b>Loaded</b> decides whether any session loads it; off moves its folder to <code>off/</code> inside the group. <b>Claude sees it</b> decides whether its description enters every session, auto, or only when you type its name, slash. Neither switch changes the other.</p>
+ <p>Flat skills have a per-scope visibility: on, name only, slash only, off.</p>
+ <p>Open sessions pick up changes on <code>/reload-plugins</code>. Nothing here commits; changes to committed files show up in git for you to commit.</p>
+ <form method="dialog"><button class="plain">Close</button></form>
+</dialog>
 <div class="wrap">
  <button id="pane" aria-expanded="true" aria-controls="side" aria-label="Hide the detail pane"><svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true"><path d="M3.5 1.5 7 5 3.5 8.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
  <div class="canvas" id="canvas">
@@ -581,9 +596,10 @@ function side(){const a=$('#side');a.replaceChildren();const noProj=!S.project;f
   const gOn=g.enabled,on=gOn&&k.enabled;a.append(el('p',{class:'lead'},`In ${ctxName}: `,el('b',{},on?(k.slash_only?'slash-only':'auto'):'off'),on?(k.slash_only?', loaded but hidden from Claude; works when you type its name.':`, loaded with its description, ~${fmt(k.tokens)} tokens.`):(!k.enabled?', switched off in every folder.':'')));if(!on&&k.enabled)a.lastChild.append(', because the ',link('g:'+gname,gname,'mono'),' group is off here.');
   const ul=el('ul',{class:'list'});ul.append(el('li',{},el('span',{class:'name'},'On',el('span',{class:'k'},' in every folder')),sw(k.enabled,`${k.name} on`,v=>act('/api/skill-enable',{dir:k.dir,enabled:v},`${k.name}: ${v?'on':'off'} in every folder`))));ul.append(el('li',{},el('span',{class:'name'},'Claude may invoke it',el('span',{class:'k'},' when on')),sw(!k.slash_only,`${k.name} invocable by Claude`,v=>act('/api/skill',{dir:k.dir,slash_only:!v},`${k.name}: ${v?'auto':'slash-only'}`),['auto','slash'])));a.append(ul);
   if(k.has_override)a.append(el('p',{class:'hint'},'Carries a local override in agents-shared.'))}
- a.append(el('p',{class:'hint'},'Click a node to focus it; drag to pan, wheel to zoom. Switches write at the scope chosen at the top. “This repo, this machine” is the repository’s gitignored ',el('code',{},'.claude/settings.local.json'),' and is the usual choice; “this folder, committed” is that folder’s ',el('code',{},'.claude/settings.json'),' for anything the repository’s other readers should share. Local beats project beats user. A skill in a group has two global switches: on/off decides whether any session loads it, auto/slash decides whether Claude sees its description when it is on.'))}
+}
 $('#scope').addEventListener('change',()=>{scopeTouched=true;side()});
 (()=>{let on=true;try{on=localStorage.getItem('pane')!=='off'}catch(e){}const b=$('#pane');const apply=()=>{document.body.classList.toggle('nopane',!on);b.setAttribute('aria-expanded',String(on));b.setAttribute('aria-label',on?'Hide the detail pane':'Show the detail pane')};apply();b.addEventListener('click',()=>{on=!on;try{localStorage.setItem('pane',on?'on':'off')}catch(e){}apply()})})();
+$('#help').addEventListener('click',()=>$('#helpdlg').showModal());
 $('#clear').addEventListener('click',async()=>{SEL='';SELKIND='';CTX='';save();await fetchState();draw();side()});
 $('#q').addEventListener('input',e=>{const q=e.target.value.trim().toLowerCase();const svg=$('#svg');if(!q){highlight();return}svg.classList.add('dim');NODES.forEach((n,id)=>n.classList.toggle('lit',id.toLowerCase().includes(q)));EDGES.forEach(x=>x.el.classList.remove('lit'))});
 document.addEventListener('keydown',e=>{if(e.key==='/'&&document.activeElement!==$('#q')){e.preventDefault();$('#q').focus()}if(e.key==='Escape'&&document.activeElement!==$('#q')){SEL='';SELKIND='';save();NODES.forEach(n=>n.classList.remove('sel'));highlight();side()}});
