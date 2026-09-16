@@ -479,7 +479,7 @@ function draw(){const t0=performance.now();const edges=$('#edges'),nodes=$('#nod
  const node=(id,cls,p,label,sub,extra)=>{const g=sv('g',{class:'node '+cls+(id===sel?' sel':''),transform:`translate(${p.x},${p.y})`,'data-id':id,tabindex:0,role:'button','aria-label':label+(sub?', '+sub:'')});
   g.append(sv('rect',{width:p.w,height:ROW-6}));if(extra)extra(g);const subW=sub?measure(sub,FONT_SUB)+8:0;const room=p.w-(extra?22:10)-8-subW;const shown=trunc(label,room);
   g.append(sv('text',{x:extra?22:10,y:ROW/2+1},shown));if(shown!==label)g.append(sv('title',{},label));if(sub)g.append(sv('text',{class:'sub',x:p.w-8,y:ROW/2+1,'text-anchor':'end'},sub));
-  g.addEventListener('click',e=>{if(e.target.classList.contains('tw'))return;select(id)});g.addEventListener('keydown',nodeKeys);
+  g.addEventListener('click',e=>{if(PANNED||e.target.classList.contains('tw'))return;select(id)});g.addEventListener('keydown',nodeKeys);
   g.addEventListener('pointerenter',()=>hover(id,true));g.addEventListener('pointerleave',()=>hover(id,false));
   NODES.set(id,g);nfrag.append(g);return g};
  FOLDERS.forEach(f=>{const p=pos['f:'+f.path];const n=GN.filter(g=>f.on[g]).length;
@@ -512,8 +512,9 @@ function nodeKeys(e){const id=e.currentTarget.dataset.id;if(e.key==='Enter'||e.k
  if(best)NODES.get(best)?.focus()}
 // ── pan / zoom (one transform write per frame) ──
 let viewDirty=false;function applyView(){if(viewDirty)return;viewDirty=true;requestAnimationFrame(()=>{viewDirty=false;$('#view').setAttribute('transform',`translate(${view.x},${view.y}) scale(${view.k})`)})}
-(()=>{const c=$('#canvas');let drag=null;c.addEventListener('pointerdown',e=>{if(e.target.closest('.node,.fab'))return;drag={x:e.clientX-view.x,y:e.clientY-view.y};c.classList.add('drag');c.setPointerCapture(e.pointerId)});
- c.addEventListener('pointermove',e=>{if(!drag)return;view.x=e.clientX-drag.x;view.y=e.clientY-drag.y;applyView()});
+let PANNED=false;
+(()=>{const c=$('#canvas');let drag=null;c.addEventListener('pointerdown',e=>{if(e.button!==0||e.target.closest('.fab'))return;PANNED=false;drag={x:e.clientX-view.x,y:e.clientY-view.y,sx:e.clientX,sy:e.clientY,id:e.pointerId,live:false}});
+ c.addEventListener('pointermove',e=>{if(!drag)return;if(!drag.live){if(Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)<4)return;drag.live=true;PANNED=true;c.classList.add('drag');c.setPointerCapture(drag.id)}view.x=e.clientX-drag.x;view.y=e.clientY-drag.y;applyView()});
  const end=()=>{drag=null;c.classList.remove('drag')};c.addEventListener('pointerup',end);c.addEventListener('pointercancel',end);
  c.addEventListener('wheel',e=>{e.preventDefault();const r=c.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;const dy=e.deltaMode===1?e.deltaY*16:e.deltaMode===2?e.deltaY*r.height:e.deltaY;const k=Math.min(3,Math.max(.3,view.k*Math.exp(-dy*(e.ctrlKey?.01:.0025))));view.x=mx-(mx-view.x)*k/view.k;view.y=my-(my-view.y)*k/view.k;view.k=k;applyView()},{passive:false});
  $('#fit').addEventListener('click',fit)})();
