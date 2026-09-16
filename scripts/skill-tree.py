@@ -478,13 +478,13 @@ function draw(){const t0=performance.now();const edges=$('#edges'),nodes=$('#nod
  edges.append(efrag);
  const sel=selId();const nfrag=document.createDocumentFragment();
  const node=(id,cls,p,label,sub,extra)=>{const g=sv('g',{class:'node '+cls+(id===sel?' sel':''),transform:`translate(${p.x},${p.y})`,'data-id':id,tabindex:0,role:'button','aria-label':label+(sub?', '+sub:'')});
-  g.append(sv('rect',{width:p.w,height:ROW-6}));if(extra)extra(g);const subW=sub?measure(sub,FONT_SUB)+8:0;const room=p.w-(extra?22:10)-8-subW;const shown=trunc(label,room);
+  g.append(sv('rect',{width:p.w,height:ROW-6}));if(extra)extra(g);if(cls==='folder'&&sub&&sub.includes('⚙'))g.append(sv('title',{},label+': '+sub.split(' ')[0]+' groups on; has its own settings, not inherited from user scope'));const subW=sub?measure(sub,FONT_SUB)+8:0;const room=p.w-(extra?22:10)-8-subW;const shown=trunc(label,room);
   g.append(sv('text',{x:extra?22:10,y:ROW/2+1},shown));if(shown!==label)g.append(sv('title',{},label));if(sub)g.append(sv('text',{class:'sub',x:p.w-8,y:ROW/2+1,'text-anchor':'end'},sub));
   g.addEventListener('click',e=>{if(PANNED||e.target.classList.contains('tw'))return;select(id)});g.addEventListener('keydown',nodeKeys);
   g.addEventListener('pointerenter',()=>hover(id,true));g.addEventListener('pointerleave',()=>hover(id,false));
   NODES.set(id,g);nfrag.append(g);return g};
  FOLDERS.forEach(f=>{const p=pos['f:'+f.path];const n=GN.filter(g=>f.on[g]).length;
-  node('f:'+f.path,'folder',p,f.isRoot?'~/dev':f.name,f.isRoot?'user scope':((f.has_local||f.has_project)?'⚙ own':`${n}/${GN.length}`),g=>{if(f.has_children&&!f.isRoot){const t=sv('text',{class:'tw',x:8,y:ROW/2+1,role:'button','aria-label':(f.isOpen?'Collapse ':'Expand ')+f.name},f.isOpen?'▾':'▸');t.addEventListener('click',e=>{e.stopPropagation();toggleFolder(f)});g.append(t)}else if(f.isRoot){g.append(sv('text',{class:'tw',x:8,y:ROW/2+1},'●'))}})});
+  node('f:'+f.path,'folder',p,f.isRoot?'~/dev':f.name,f.isRoot?'user scope':`${n}/${GN.length}${(f.has_local||f.has_project)?' ⚙':''}`,g=>{if(f.has_children&&!f.isRoot){const t=sv('text',{class:'tw',x:8,y:ROW/2+1,role:'button','aria-label':(f.isOpen?'Collapse ':'Expand ')+f.name},f.isOpen?'▾':'▸');t.addEventListener('click',e=>{e.stopPropagation();toggleFolder(f)});g.append(t)}else if(f.isRoot){g.append(sv('text',{class:'tw',x:8,y:ROW/2+1},'●'))}})});
  S.groups.forEach(g=>node('g:'+g.name,'group'+(g.enabled?'':' off'),pos['g:'+g.name],g.name,(g.enabled?'on':'off')+(gopen[g.name]?` · ${g.skills.length}`:''),n=>{const open=!gopen[g.name];const t=sv('text',{class:'tw',x:8,y:ROW/2+1,role:'button','aria-label':(open?'Collapse ':'Expand ')+g.name},open?'▾':'▸');t.addEventListener('click',e=>{e.stopPropagation();if(open)gopen[g.name]=true;else delete gopen[g.name];save();draw()});n.append(t)}));
  skills.forEach(({g,k})=>node('s:'+g.name+':'+k.name,'skill'+(k.slash_only?' slash':''),pos['s:'+g.name+':'+k.name],k.name,k.slash_only?'slash':''));
  nodes.append(nfrag);applyView();highlight();window.__lastDraw=performance.now()-t0}
