@@ -522,7 +522,7 @@ function draw(){const t0=performance.now();const edges=$('#edges'),nodes=$('#nod
  const node=(id,cls,p,label,sub,extra)=>{const g=sv('g',{class:'node '+cls+(id===sel?' sel':''),transform:`translate(${p.x},${p.y})`,'data-id':id,tabindex:0,role:'button','aria-label':label+(sub?', '+sub:'')});
   g.append(sv('rect',{width:p.w,height:ROW-6}));if(extra)extra(g);if(cls==='folder'&&sub&&sub.includes('⚙'))g.append(sv('title',{},label+': '+sub.split(' ').pop()+' groups on; has its own settings, not inherited from user scope'));const subW=sub?measure(sub,FONT_SUB)+8:0;const room=p.w-(extra?22:10)-8-subW;const shown=trunc(label,room);
   g.append(sv('text',{x:extra?22:10,y:ROW/2+1},shown));if(shown!==label)g.append(sv('title',{},label));if(sub)g.append(sv('text',{class:'sub',x:p.w-8,y:ROW/2+1,'text-anchor':'end'},sub));
-  g.addEventListener('click',e=>{if(PANNED||e.target.classList.contains('tw'))return;select(id)});g.addEventListener('keydown',nodeKeys);
+  g.addEventListener('click',e=>{if(PANNED||e.target.classList.contains('tw'))return;select(id)});g.addEventListener('keydown',nodeKeys);g.addEventListener('focus',()=>hover(id,true));g.addEventListener('blur',()=>hover(id,false));
   g.addEventListener('pointerenter',()=>hover(id,true));g.addEventListener('pointerleave',()=>hover(id,false));
   NODES.set(id,g);nfrag.append(g);return g};
  FOLDERS.forEach(f=>{const p=pos['f:'+f.path];const n=GN.filter(g=>f.on[g]).length;
@@ -552,10 +552,23 @@ function highlight(){const svg=$('#svg');const id=selId();const fe=$('#focus-edg
 function hover(id,on){const adj=ADJ.get(id);if(!adj)return;for(const e of adj)e.el.classList.toggle('hov',on)}
 // Keyboard: up/down walk a lane by position, left/right jump to the nearest node in the next lane.
 function nodeKeys(e){const id=e.currentTarget.dataset.id;if(e.key==='Enter'||e.key===' '){e.preventDefault();select(id);return}
- const dir={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]}[e.key];if(!dir)return;e.preventDefault();
- const p=POS[id];if(!p)return;let best=null,bd=Infinity;
- for(const[nid,q]of Object.entries(POS)){if(nid===id)continue;if(dir[0]){if(q.lane!==p.lane+dir[0])continue;const d=Math.abs(q.y-p.y);if(d<bd){bd=d;best=nid}}else{if(q.lane!==p.lane)continue;const dy=(q.y-p.y)*dir[1];if(dy>0&&dy<bd){bd=dy;best=nid}}}
- if(best)NODES.get(best)?.focus()}
+ const p=POS[id];if(!p)return;const inLane=l=>Object.entries(POS).filter(([n,q])=>q.lane===l&&n!==id);
+ let target=null;
+ if(e.key==='ArrowLeft'||e.key==='ArrowRight'){const lane=p.lane+(e.key==='ArrowRight'?1:-1);const rel=litSet(id);
+  // prefer a node this one is connected to; only when there is none, take the nearest in the lane
+  let pool=inLane(lane).filter(([n])=>rel.has(n));if(!pool.length)pool=inLane(lane);
+  let bd=Infinity;for(const[n,q]of pool){const d=Math.abs(q.y-p.y);if(d<bd){bd=d;target=n}}}
+ else if(e.key==='ArrowUp'||e.key==='ArrowDown'||e.key==='Home'||e.key==='End'){
+  // within a lane, walk the lit nodes when something is focused, otherwise every node; wrap at the ends
+  const sel=selId();let pool=inLane(p.lane).concat([[id,p]]);if(sel){const lit=litSet(sel);const litPool=pool.filter(([n])=>lit.has(n));if(litPool.length>1&&lit.has(id))pool=litPool}
+  pool.sort((a,b)=>a[1].y-b[1].y);const i=pool.findIndex(([n])=>n===id);
+  if(e.key==='Home')target=pool[0][0];else if(e.key==='End')target=pool[pool.length-1][0];
+  else target=pool[(i+(e.key==='ArrowDown'?1:-1)+pool.length)%pool.length][0]}
+ else return;
+ e.preventDefault();if(!target||target===id)return;const n=NODES.get(target);if(!n)return;n.focus();reveal(target)}
+// pan just enough to keep a keyboard-focused node inside the canvas
+function reveal(id){const p=POS[id];if(!p)return;const c=$('#canvas').getBoundingClientRect();const k=view.k;const x1=view.x+p.x*k,y1=view.y+p.y*k,x2=x1+p.w*k,y2=y1+ROW*k;const m=24;let dx=0,dy=0;
+ if(x1<m)dx=m-x1;else if(x2>c.width-m)dx=c.width-m-x2;if(y1<m)dy=m-y1;else if(y2>c.height-m)dy=c.height-m-y2;if(dx||dy){view.x+=dx;view.y+=dy;applyView()}}
 // ── pan / zoom (one transform write per frame) ──
 let viewDirty=false;function applyView(){if(viewDirty)return;viewDirty=true;requestAnimationFrame(()=>{viewDirty=false;$('#view').setAttribute('transform',`translate(${view.x},${view.y}) scale(${view.k})`)})}
 let PANNED=false;
