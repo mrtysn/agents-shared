@@ -519,7 +519,7 @@ async function toggleFolder(f){if(f.isOpen)delete fopen[f.path];else fopen[f.pat
 function selId(){return SELKIND==='folder'?'f:'+(SEL||ROOT.path):SELKIND==='group'?'g:'+SEL:SELKIND==='skill'?'s:'+SEL:''}
 // Focus is client-side: the context folder changes only when a folder is picked, and only then is
 // state refetched (it depends on the folder). Opening a closed group re-lays out without the network.
-async function select(id){const[kind,...rest]=id.split(':');const key=rest.join(':');let relayout=false;const prevCtx=CTX;
+async function select(id){if(id===selId()){SEL='';SELKIND='';save();highlight();side();return}const[kind,...rest]=id.split(':');const key=rest.join(':');let relayout=false;const prevCtx=CTX;
  if(kind==='f'){SELKIND='folder';SEL=key===ROOT.path?'':key;CTX=SEL}else if(kind==='g'){SELKIND='group';SEL=key;if(gopen[key]){delete gopen[key];relayout=true}}else{SELKIND='skill';SEL=key;const g=key.split(':')[0];if(gopen[g]){delete gopen[g];relayout=true}}
  save();const cur=selId();NODES.forEach((n,nid)=>n.classList.toggle('sel',nid===cur));
  if(relayout)draw();else highlight();
