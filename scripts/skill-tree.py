@@ -486,7 +486,7 @@ const applyView=()=>$('#view').setAttribute('transform',`translate(${view.x},${v
 (()=>{const c=$('#canvas');let drag=null;c.addEventListener('pointerdown',e=>{if(e.target.closest('.node,.fab'))return;drag={x:e.clientX-view.x,y:e.clientY-view.y};c.classList.add('drag');c.setPointerCapture(e.pointerId)});
  c.addEventListener('pointermove',e=>{if(!drag)return;view.x=e.clientX-drag.x;view.y=e.clientY-drag.y;applyView()});
  const end=()=>{drag=null;c.classList.remove('drag')};c.addEventListener('pointerup',end);c.addEventListener('pointercancel',end);
- c.addEventListener('wheel',e=>{e.preventDefault();const r=c.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;const k=Math.min(3,Math.max(.3,view.k*(e.deltaY<0?1.1:1/1.1)));view.x=mx-(mx-view.x)*k/view.k;view.y=my-(my-view.y)*k/view.k;view.k=k;applyView()},{passive:false});
+ c.addEventListener('wheel',e=>{e.preventDefault();const r=c.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;const dy=e.deltaMode===1?e.deltaY*16:e.deltaMode===2?e.deltaY*r.height:e.deltaY;const k=Math.min(3,Math.max(.3,view.k*Math.exp(-dy*(e.ctrlKey?.01:.0025))));view.x=mx-(mx-view.x)*k/view.k;view.y=my-(my-view.y)*k/view.k;view.k=k;applyView()},{passive:false});
  $('#fit').addEventListener('click',fit)})();
 function fit(){const b=$('#view').getBBox(),c=$('#canvas').getBoundingClientRect();const k=Math.min(1.25,(c.width-32)/b.width,(c.height-32)/b.height);view={k,x:16-b.x*k,y:16-b.y*k};applyView()}
 // ── detail pane ──
