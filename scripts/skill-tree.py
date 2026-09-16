@@ -257,12 +257,20 @@ def folder_states(groups: list[dict], user: dict) -> callable:
     return for_dir
 
 
-def dirs(path: Path) -> dict:
+def dirs(path: Path, open_paths: set[str] = frozenset()) -> dict:
+    """The folder at `path` with its children; a child whose path is in `open_paths` carries its
+    own children too, recursively, so one request serves the whole expanded tree."""
     groups, _ = collect()
     user = read_json(CONFIG_DIR / "settings.json").get("enabledPlugins", {})
     f = folder_states(groups, user)
-    return {"path": str(path), "self": f(path), "children": [f(d) for d in subdirs(path)],
-            "group_names": [g["name"] for g in groups]}
+
+    def node(d: Path, depth: int) -> dict:
+        rec = f(d)
+        if (depth == 0 or str(d) in open_paths) and rec["has_children"] and depth < 12:
+            rec["children"] = [node(c, depth + 1) for c in subdirs(d)]
+        return rec
+
+    return {"path": str(path), "self": node(path, 0), "group_names": [g["name"] for g in groups]}
 
 
 # ── mutations ────────────────────────────────────────────────────────────────
@@ -381,7 +389,7 @@ input[type=search]{min-width:160px}button.plain{cursor:pointer}button.plain[aria
 .canvas.drag{cursor:grabbing}
 .canvas svg{position:absolute;inset:0;width:100%;height:100%}
 .lane{font-size:11px;font-weight:600;fill:var(--ink2);letter-spacing:.02em}
-.edge{fill:none;stroke:var(--edge);stroke-width:1.2}.edge.on{stroke:var(--edge-on);stroke-width:1.6}
+.edge{fill:none;stroke:var(--edge);stroke-width:1.2}.edge.on{stroke:var(--edge-on);stroke-width:1.6}.edge.hov{stroke:var(--focus);stroke-width:2;opacity:1!important}
 .node rect{fill:var(--node);stroke:var(--node-line);stroke-width:1;rx:6}
 .node text{fill:var(--ink);font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;pointer-events:none}
 .node text.sub{fill:var(--ink2);font-size:10.5px;font-family:system-ui,-apple-system,sans-serif}
@@ -392,7 +400,7 @@ input[type=search]{min-width:160px}button.plain{cursor:pointer}button.plain[aria
 .node .tw{fill:var(--ink2);font-size:10px;font-family:system-ui,sans-serif}
 .node{cursor:pointer}
 svg.dim .node:not(.lit){opacity:.18}svg.dim .edge:not(.lit){opacity:.12}svg.dim .lane{opacity:.6}
-@media(prefers-reduced-motion:no-preference){.node,.edge{transition:opacity .15s}}
+@media(prefers-reduced-motion:no-preference){.node{transition:opacity .15s}}
 .fab{position:absolute;right:12px;bottom:12px;display:flex;gap:6px}
 /* detail */
 aside{border-left:1px solid var(--line);padding:12px 16px;overflow:auto;min-height:0}
@@ -440,49 +448,70 @@ function scope(){return $('#scope').value}
 async function act(p,body,done){say('');const r=await api(p,body);if(!r.ok){say(r.error,'err');return}say(done);load()}
 function say(t,cls){const m=$('#msg');m.textContent=t||'';m.className='msg'+(cls?' '+cls:'')}
 const folderProject=()=>CTX;
-async function load(){S=await api('/api/state'+(folderProject()?'?project='+encodeURIComponent(folderProject()):''));if(S.error){SEL='';SELKIND='';CTX='';save();return load()}
- const root=await api('/api/dirs');GN=root.group_names;ROOT=root.self;FOLDERS=[];await walk(root.self,root.children,0);draw();side()}
-async function walk(f,children,depth){const isRoot=depth===0;const isOpen=isRoot||!!fopen[f.path];FOLDERS.push({...f,depth,isOpen,isRoot});
- if(isOpen&&f.has_children){const kids=children||(await api('/api/dirs?path='+encodeURIComponent(f.path))).children;for(const c of kids)await walk(c,null,depth+1)}}
+// Data: /api/state depends on the context folder, /api/dirs on which folders are open. They are
+// fetched in parallel and only when their inputs changed; focus changes never touch the network.
+let stateFor=null,treeFor=null,TREE=null;
+async function fetchState(){const key=folderProject();if(stateFor===key&&S)return;const r=await api('/api/state'+(key?'?project='+encodeURIComponent(key):''));if(r.error){SEL='';SELKIND='';CTX='';save();return fetchState()}S=r;stateFor=key}
+async function fetchTree(force){const opened=Object.keys(fopen).filter(k=>fopen[k]);const key=JSON.stringify(opened);if(!force&&treeFor===key&&TREE)return;TREE=await api('/api/dirs?open='+encodeURIComponent(key));treeFor=key;GN=TREE.group_names;ROOT=TREE.self;FOLDERS=[];walk(TREE.self,0)}
+function walk(f,depth){const isRoot=depth===0;const isOpen=isRoot||!!fopen[f.path];FOLDERS.push({...f,children:undefined,depth,isOpen,isRoot});if(isOpen&&f.children)for(const c of f.children)walk(c,depth+1)}
+async function load(){await Promise.all([fetchState(),fetchTree(false)]);draw();side()}
+async function refresh(){stateFor=null;await Promise.all([fetchState(),fetchTree(true)]);draw();side()}
+async function act(p,body,done){say('');const r=await api(p,body);if(!r.ok){say(r.error,'err');return}say(done);refresh()}
 // ── graph ──
 const ROW=26,X0=24,XG=560,XS=800,W0=280,WG=150,WS=190;
-function draw(){const edges=$('#edges'),nodes=$('#nodes');edges.replaceChildren();nodes.replaceChildren();
+let NODES=new Map(),EDGES=[],ADJ=new Map(),POS={};
+const measure=(()=>{const c=document.createElement('canvas').getContext('2d');const cache=new Map();return(txt,font)=>{const k=font+' '+txt;let w=cache.get(k);if(w===undefined){c.font=font;w=c.measureText(txt).width;cache.set(k,w)}return w}})();
+const FONT_NODE='12px ui-monospace, SFMono-Regular, Menlo, monospace',FONT_SUB='10.5px system-ui, -apple-system, sans-serif';
+function trunc(label,room){if(measure(label,FONT_NODE)<=room)return label;let lo=1,hi=label.length;while(lo<hi){const mid=(lo+hi+1)>>1;if(measure(label.slice(0,mid)+'…',FONT_NODE)<=room)lo=mid;else hi=mid-1}return label.slice(0,lo)+'…'}
+function draw(){const t0=performance.now();const edges=$('#edges'),nodes=$('#nodes');edges.replaceChildren();nodes.replaceChildren();NODES=new Map();EDGES=[];ADJ=new Map();
  const lanes=$('#view');lanes.querySelectorAll('.lane').forEach(l=>l.remove());
  for(const[x,t]of[[X0,'folders'],[XG,'groups'],[XS,'skills']])lanes.insertBefore(sv('text',{class:'lane',x,y:14},t),edges);
- const pos={};FOLDERS.forEach((f,i)=>{pos['f:'+f.path]={x:X0+f.depth*16,y:30+i*ROW,w:W0-f.depth*16}});
- const skills=[];let gy=30;S.groups.forEach(g=>{const open=!gopen[g.name];const n=open?g.skills.length:0;const h=Math.max(1,n)*ROW;pos['g:'+g.name]={x:XG,y:gy+h/2-ROW/2,w:WG};if(open)g.skills.forEach((k,j)=>{pos['s:'+g.name+':'+k.name]={x:XS,y:gy+j*ROW,w:WS};skills.push({g,k})});gy+=h+(open?14:6)});
+ const pos=POS={};FOLDERS.forEach((f,i)=>{pos['f:'+f.path]={x:X0+f.depth*16,y:30+i*ROW,w:W0-f.depth*16,lane:0}});
+ const skills=[];let gy=30;S.groups.forEach(g=>{const open=!gopen[g.name];const n=open?g.skills.length:0;const h=Math.max(1,n)*ROW;pos['g:'+g.name]={x:XG,y:gy+h/2-ROW/2,w:WG,lane:1};if(open)g.skills.forEach((k,j)=>{pos['s:'+g.name+':'+k.name]={x:XS,y:gy+j*ROW,w:WS,lane:2};skills.push({g,k})});gy+=h+(open?14:6)});
  const path=(a,b)=>{const x1=a.x+a.w,y1=a.y+ROW/2-3,x2=b.x,y2=b.y+ROW/2-3,mx=(x1+x2)/2;return `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`};
  const E=[];
- // folder → group edges: the root (user scope) always; other folders only where they differ from the root
- FOLDERS.forEach(f=>{GN.forEach(g=>{const on=!!f.on[g];if(f.isRoot){if(on)E.push({a:'f:'+f.path,b:'g:'+g,on:true})}else if(on!==!!ROOT.on[g])E.push({a:'f:'+f.path,b:'g:'+g,on,own:true})});
- });
+ FOLDERS.forEach(f=>{GN.forEach(g=>{const on=!!f.on[g];if(f.isRoot){if(on)E.push({a:'f:'+f.path,b:'g:'+g,on:true})}else if(on!==!!ROOT.on[g])E.push({a:'f:'+f.path,b:'g:'+g,on})})});
  skills.forEach(({g,k})=>E.push({a:'g:'+g.name,b:'s:'+g.name+':'+k.name,on:g.enabled&&!k.slash_only}));
- for(const e of E){const a=pos[e.a],b=pos[e.b];if(!a||!b)continue;
-  let d;if(e.inherit){const x1=a.x,y1=a.y+ROW/2-3,x2=b.x+8,y2=b.y+ROW-2;d=`M${x1},${y1} C${x1-14},${y1} ${x2},${y2+10} ${x2},${y2}`}else d=path(a,b);
-  edges.append(sv('path',{class:'edge'+(e.on?' on':''),d,'data-a':e.a,'data-b':e.b}))}
- const node=(id,cls,p,label,sub,extra)=>{const g=sv('g',{class:'node '+cls+(id===selId()?' sel':''),transform:`translate(${p.x},${p.y})`,'data-id':id,tabindex:0,role:'button','aria-label':label+(sub?', '+sub:'')});
-  g.append(sv('rect',{width:p.w,height:ROW-6}));if(extra)extra(g);const t=sv('text',{x:extra?22:10,y:ROW/2+1},label);g.append(t);let subEl=null;if(sub){subEl=sv('text',{class:'sub',x:p.w-8,y:ROW/2+1,'text-anchor':'end'},sub);g.append(subEl)}
-  nodes.append(g);const room=p.w-(extra?22:10)-8-(subEl?subEl.getComputedTextLength()+8:0);if(t.getComputedTextLength()>room){let txt=label;while(txt.length>1&&t.getComputedTextLength()>room){txt=txt.slice(0,-1);t.textContent=txt+'…'}g.append(sv('title',{},label))}
-  g.addEventListener('click',e=>{if(e.target.classList.contains('tw'))return;select(id)});g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(id)}});return g};
+ const efrag=document.createDocumentFragment();
+ for(const e of E){const a=pos[e.a],b=pos[e.b];if(!a||!b)continue;const el_=sv('path',{class:'edge'+(e.on?' on':''),d:path(a,b)});e.el=el_;EDGES.push(e);efrag.append(el_);(ADJ.get(e.a)||ADJ.set(e.a,[]).get(e.a)).push(e);(ADJ.get(e.b)||ADJ.set(e.b,[]).get(e.b)).push(e)}
+ edges.append(efrag);
+ const sel=selId();const nfrag=document.createDocumentFragment();
+ const node=(id,cls,p,label,sub,extra)=>{const g=sv('g',{class:'node '+cls+(id===sel?' sel':''),transform:`translate(${p.x},${p.y})`,'data-id':id,tabindex:0,role:'button','aria-label':label+(sub?', '+sub:'')});
+  g.append(sv('rect',{width:p.w,height:ROW-6}));if(extra)extra(g);const subW=sub?measure(sub,FONT_SUB)+8:0;const room=p.w-(extra?22:10)-8-subW;const shown=trunc(label,room);
+  g.append(sv('text',{x:extra?22:10,y:ROW/2+1},shown));if(shown!==label)g.append(sv('title',{},label));if(sub)g.append(sv('text',{class:'sub',x:p.w-8,y:ROW/2+1,'text-anchor':'end'},sub));
+  g.addEventListener('click',e=>{if(e.target.classList.contains('tw'))return;select(id)});g.addEventListener('keydown',nodeKeys);
+  g.addEventListener('pointerenter',()=>hover(id,true));g.addEventListener('pointerleave',()=>hover(id,false));
+  NODES.set(id,g);nfrag.append(g);return g};
  FOLDERS.forEach(f=>{const p=pos['f:'+f.path];const n=GN.filter(g=>f.on[g]).length;
-  node('f:'+f.path,'folder',p,f.isRoot?'~/dev':f.name,f.isRoot?'user scope':((f.has_local||f.has_project)?'⚙ own':`${n}/${GN.length}`),g=>{if(f.has_children&&!f.isRoot){const t=sv('text',{class:'tw',x:8,y:ROW/2+1,role:'button','aria-label':(f.isOpen?'Collapse ':'Expand ')+f.name},f.isOpen?'▾':'▸');t.addEventListener('click',e=>{e.stopPropagation();fopen[f.path]=!f.isOpen;save();load()});g.append(t)}else if(f.isRoot){g.append(sv('text',{class:'tw',x:8,y:ROW/2+1},'●'))}})});
- S.groups.forEach(g=>node('g:'+g.name,'group'+(g.enabled?'':' off'),pos['g:'+g.name],g.name,(g.enabled?'on':'off')+(gopen[g.name]?` · ${g.skills.length}`:''),n=>{const open=!gopen[g.name];const t=sv('text',{class:'tw',x:8,y:ROW/2+1,role:'button','aria-label':(open?'Collapse ':'Expand ')+g.name},open?'▾':'▸');t.addEventListener('click',e=>{e.stopPropagation();gopen[g.name]=open;save();draw()});n.append(t)}));
+  node('f:'+f.path,'folder',p,f.isRoot?'~/dev':f.name,f.isRoot?'user scope':((f.has_local||f.has_project)?'⚙ own':`${n}/${GN.length}`),g=>{if(f.has_children&&!f.isRoot){const t=sv('text',{class:'tw',x:8,y:ROW/2+1,role:'button','aria-label':(f.isOpen?'Collapse ':'Expand ')+f.name},f.isOpen?'▾':'▸');t.addEventListener('click',e=>{e.stopPropagation();toggleFolder(f)});g.append(t)}else if(f.isRoot){g.append(sv('text',{class:'tw',x:8,y:ROW/2+1},'●'))}})});
+ S.groups.forEach(g=>node('g:'+g.name,'group'+(g.enabled?'':' off'),pos['g:'+g.name],g.name,(g.enabled?'on':'off')+(gopen[g.name]?` · ${g.skills.length}`:''),n=>{const open=!gopen[g.name];const t=sv('text',{class:'tw',x:8,y:ROW/2+1,role:'button','aria-label':(open?'Collapse ':'Expand ')+g.name},open?'▾':'▸');t.addEventListener('click',e=>{e.stopPropagation();if(open)gopen[g.name]=true;else delete gopen[g.name];save();draw()});n.append(t)}));
  skills.forEach(({g,k})=>node('s:'+g.name+':'+k.name,'skill'+(k.slash_only?' slash':''),pos['s:'+g.name+':'+k.name],k.name,k.slash_only?'slash':''));
- applyView();highlight()}
+ nodes.append(nfrag);applyView();highlight();window.__lastDraw=performance.now()-t0}
+async function toggleFolder(f){if(f.isOpen)delete fopen[f.path];else fopen[f.path]=true;save();await fetchTree(false);draw()}
 function selId(){return SELKIND==='folder'?'f:'+(SEL||ROOT.path):SELKIND==='group'?'g:'+SEL:SELKIND==='skill'?'s:'+SEL:''}
-function select(id){const[kind,...rest]=id.split(':');const key=rest.join(':');if(kind==='f'){SELKIND='folder';SEL=key===ROOT.path?'':key;CTX=SEL}else if(kind==='g'){SELKIND='group';SEL=key;delete gopen[key]}else{SELKIND='skill';SEL=key;delete gopen[key.split(':')[0]]}save();load()}
-function highlight(){const svg=$('#svg');const id=selId();const lit=new Set();if(!id){svg.classList.remove('dim');return}
- const E=[...$('#edges').children].map(e=>({a:e.dataset.a,b:e.dataset.b,el:e}));lit.add(id);
- const kind=id[0];const groupsOn=new Set(S.groups.filter(g=>g.enabled).map(g=>'g:'+g.name));
- if(kind==='f'){const f=FOLDERS.find(x=>'f:'+x.path===id);GN.forEach(g=>{if(f&&f.on[g])lit.add('g:'+g)});
-  for(const g of S.groups)if(f&&f.on[g.name])g.skills.forEach(k=>{if(!k.slash_only)lit.add('s:'+g.name+':'+k.name)});
-  if(f&&!f.isRoot&&!(f.has_local||f.has_project))lit.add('f:'+ROOT.path)}
+// Focus is client-side: the context folder changes only when a folder is picked, and only then is
+// state refetched (it depends on the folder). Opening a closed group re-lays out without the network.
+async function select(id){const[kind,...rest]=id.split(':');const key=rest.join(':');let relayout=false;const prevCtx=CTX;
+ if(kind==='f'){SELKIND='folder';SEL=key===ROOT.path?'':key;CTX=SEL}else if(kind==='g'){SELKIND='group';SEL=key;if(gopen[key]){delete gopen[key];relayout=true}}else{SELKIND='skill';SEL=key;const g=key.split(':')[0];if(gopen[g]){delete gopen[g];relayout=true}}
+ save();const cur=selId();NODES.forEach((n,nid)=>n.classList.toggle('sel',nid===cur));
+ if(relayout)draw();else highlight();
+ if(CTX!==prevCtx){await fetchState();draw()}side()}
+function litSet(id){const lit=new Set([id]);const kind=id[0];
+ if(kind==='f'){const f=FOLDERS.find(x=>'f:'+x.path===id);if(f){GN.forEach(g=>{if(f.on[g])lit.add('g:'+g)});for(const g of S.groups)if(f.on[g.name])g.skills.forEach(k=>{if(!k.slash_only)lit.add('s:'+g.name+':'+k.name)});if(!f.isRoot&&!(f.has_local||f.has_project))lit.add('f:'+ROOT.path)}}
  else if(kind==='g'){const gname=id.slice(2);FOLDERS.forEach(f=>{if(f.on[gname])lit.add('f:'+f.path)});const g=S.groups.find(x=>x.name===gname);g&&g.skills.forEach(k=>lit.add('s:'+gname+':'+k.name))}
  else{const [gname]=id.slice(2).split(':');lit.add('g:'+gname);FOLDERS.forEach(f=>{if(f.on[gname])lit.add('f:'+f.path)})}
- svg.classList.add('dim');$('#nodes').querySelectorAll('.node').forEach(n=>n.classList.toggle('lit',lit.has(n.dataset.id)));
- E.forEach(e=>e.el.classList.toggle('lit',lit.has(e.a)&&lit.has(e.b)))}
-// ── pan / zoom ──
-const applyView=()=>$('#view').setAttribute('transform',`translate(${view.x},${view.y}) scale(${view.k})`);
+ return lit}
+function highlight(){const svg=$('#svg');const id=selId();if(!id){svg.classList.remove('dim');NODES.forEach(n=>n.classList.remove('lit'));EDGES.forEach(e=>e.el.classList.remove('lit'));return}
+ const lit=litSet(id);svg.classList.add('dim');NODES.forEach((n,nid)=>n.classList.toggle('lit',lit.has(nid)));EDGES.forEach(e=>e.el.classList.toggle('lit',lit.has(e.a)&&lit.has(e.b)))}
+function hover(id,on){const adj=ADJ.get(id);if(!adj)return;for(const e of adj)e.el.classList.toggle('hov',on)}
+// Keyboard: up/down walk a lane by position, left/right jump to the nearest node in the next lane.
+function nodeKeys(e){const id=e.currentTarget.dataset.id;if(e.key==='Enter'||e.key===' '){e.preventDefault();select(id);return}
+ const dir={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]}[e.key];if(!dir)return;e.preventDefault();
+ const p=POS[id];if(!p)return;let best=null,bd=Infinity;
+ for(const[nid,q]of Object.entries(POS)){if(nid===id)continue;if(dir[0]){if(q.lane!==p.lane+dir[0])continue;const d=Math.abs(q.y-p.y);if(d<bd){bd=d;best=nid}}else{if(q.lane!==p.lane)continue;const dy=(q.y-p.y)*dir[1];if(dy>0&&dy<bd){bd=dy;best=nid}}}
+ if(best)NODES.get(best)?.focus()}
+// ── pan / zoom (one transform write per frame) ──
+let viewDirty=false;function applyView(){if(viewDirty)return;viewDirty=true;requestAnimationFrame(()=>{viewDirty=false;$('#view').setAttribute('transform',`translate(${view.x},${view.y}) scale(${view.k})`)})}
 (()=>{const c=$('#canvas');let drag=null;c.addEventListener('pointerdown',e=>{if(e.target.closest('.node,.fab'))return;drag={x:e.clientX-view.x,y:e.clientY-view.y};c.classList.add('drag');c.setPointerCapture(e.pointerId)});
  c.addEventListener('pointermove',e=>{if(!drag)return;view.x=e.clientX-drag.x;view.y=e.clientY-drag.y;applyView()});
  const end=()=>{drag=null;c.classList.remove('drag')};c.addEventListener('pointerup',end);c.addEventListener('pointercancel',end);
@@ -522,9 +551,9 @@ function side(){const a=$('#side');a.replaceChildren();const noProj=!S.project;f
  a.append(el('p',{class:'hint'},'Click a node to focus it; drag to pan, wheel to zoom. Switches write at the scope chosen at the top. “This repo, this machine” is the repository’s gitignored ',el('code',{},'.claude/settings.local.json'),' and is the usual choice; “this folder, committed” is that folder’s ',el('code',{},'.claude/settings.json'),' for anything the repository’s other readers should share. Local beats project beats user. A skill switch is global: on lets Claude invoke it, off keeps it slash-only.'))}
 $('#scope').addEventListener('change',()=>{scopeTouched=true;side()});
 $('#details').addEventListener('click',e=>{DET=!DET;e.currentTarget.setAttribute('aria-pressed',DET);e.currentTarget.textContent=DET?'Hide details':'Show details';side()});
-$('#clear').addEventListener('click',()=>{SEL='';SELKIND='';CTX='';save();load()});
-$('#q').addEventListener('input',e=>{const q=e.target.value.trim().toLowerCase();const svg=$('#svg');if(!q){highlight();return}svg.classList.add('dim');$('#nodes').querySelectorAll('.node').forEach(n=>n.classList.toggle('lit',n.dataset.id.toLowerCase().includes(q)));$('#edges').querySelectorAll('.edge').forEach(x=>x.classList.remove('lit'))});
-document.addEventListener('keydown',e=>{if(e.key==='/'&&document.activeElement!==$('#q')){e.preventDefault();$('#q').focus()}if(e.key==='Escape'&&document.activeElement!==$('#q')){SEL='';SELKIND='';save();load()}});
+$('#clear').addEventListener('click',async()=>{SEL='';SELKIND='';CTX='';save();await fetchState();draw();side()});
+$('#q').addEventListener('input',e=>{const q=e.target.value.trim().toLowerCase();const svg=$('#svg');if(!q){highlight();return}svg.classList.add('dim');NODES.forEach((n,id)=>n.classList.toggle('lit',id.toLowerCase().includes(q)));EDGES.forEach(x=>x.el.classList.remove('lit'))});
+document.addEventListener('keydown',e=>{if(e.key==='/'&&document.activeElement!==$('#q')){e.preventDefault();$('#q').focus()}if(e.key==='Escape'&&document.activeElement!==$('#q')){SEL='';SELKIND='';save();NODES.forEach(n=>n.classList.remove('sel'));highlight();side()}});
 let first=true;const _draw=draw;draw=function(){_draw();if(first){first=false;fit()}};
 load();
 </script></body></html>
@@ -572,8 +601,9 @@ class Handler(BaseHTTPRequestHandler):
             q = dict(x.split("=", 1) for x in u.query.split("&") if "=" in x)
             raw = unquote(q.get("path", "")) or str(dev_root())
             try:
-                return self._json(dirs(self._project(raw)))
-            except ValueError as e:
+                opened = json.loads(unquote(q.get("open", "") or "[]"))
+                return self._json(dirs(self._project(raw), set(map(str, opened))))
+            except (ValueError, TypeError) as e:
                 return self._json({"error": str(e)}, 400)
         self._send(404, b"not found", "text/plain")
 
