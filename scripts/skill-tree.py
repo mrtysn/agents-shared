@@ -498,7 +498,7 @@ async function select(id){const[kind,...rest]=id.split(':');const key=rest.join(
  if(relayout)draw();else highlight();
  if(CTX!==prevCtx){await fetchState();draw()}side()}
 function litSet(id){const lit=new Set([id]);const kind=id[0];
- if(kind==='f'){const f=FOLDERS.find(x=>'f:'+x.path===id);if(f){GN.forEach(g=>{if(f.on[g])lit.add('g:'+g)});for(const g of S.groups)if(f.on[g.name])g.skills.forEach(k=>{if(!k.slash_only)lit.add('s:'+g.name+':'+k.name)});if(!f.isRoot&&!(f.has_local||f.has_project))lit.add('f:'+ROOT.path)}}
+ if(kind==='f'){const f=FOLDERS.find(x=>'f:'+x.path===id);if(f){GN.forEach(g=>{if(f.on[g])lit.add('g:'+g)});for(const g of S.groups)if(f.on[g.name])g.skills.forEach(k=>{if(!k.slash_only)lit.add('s:'+g.name+':'+k.name)})}}
  else if(kind==='g'){const gname=id.slice(2);FOLDERS.forEach(f=>{if(f.on[gname])lit.add('f:'+f.path)});const g=S.groups.find(x=>x.name===gname);g&&g.skills.forEach(k=>lit.add('s:'+gname+':'+k.name))}
  else{const [gname]=id.slice(2).split(':');lit.add('g:'+gname);FOLDERS.forEach(f=>{if(f.on[gname])lit.add('f:'+f.path)})}
  return lit}
