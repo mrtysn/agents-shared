@@ -427,7 +427,7 @@ h2{font-size:12px;color:var(--ink2);font-weight:600;margin:10px 0 4px;letter-spa
   <ul class="tree" id="tree"></ul>
   <h2>Flat skills</h2>
   <ul class="tree" id="flat"></ul>
-  <p class="hint">A group switch writes <code>enabledPlugins</code> at the scope chosen at the top: project scope is the selected folder's own <code>.claude/settings.json</code>, local scope is its repository's <code>settings.local.json</code>; local beats project beats user. A session started in a subfolder reads the project file from that subfolder, not the repository root. A skill switch inside a group is global: on lets Claude invoke it, off keeps it slash-only. Open sessions pick changes up on <code>/reload-plugins</code>.</p>
+  <p class="hint">A group switch writes <code>enabledPlugins</code> at the scope chosen at the top. Picking a folder selects local scope: its repository's <code>settings.local.json</code>, ignored by git, so skill config stays on this machine. Project scope is the folder's own committed <code>.claude/settings.json</code>, for the rare setting a repo should carry everywhere. Local beats project beats user. A session started in a subfolder reads the project file from that subfolder, not the repository root. A skill switch inside a group is global: on lets Claude invoke it, off keeps it slash-only. Open sessions pick changes up on <code>/reload-plugins</code>.</p>
  </main>
 </div>
 <script>
@@ -436,17 +436,19 @@ let open={},fopen={};try{open=JSON.parse(localStorage.getItem('open')||'{}');fop
 const save=()=>{try{localStorage.setItem('open',JSON.stringify(open));localStorage.setItem('fopen',JSON.stringify(fopen));localStorage.setItem('sel',SEL)}catch(e){}};
 async function api(path,body){const r=await fetch(path,body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{});return r.json()}
 function el(tag,attrs={},...kids){const e=document.createElement(tag);for(const[k,v]of Object.entries(attrs)){if(k==='class')e.className=v;else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else if(v!==null&&v!==undefined&&v!==false)e.setAttribute(k,v===true?'':v)}for(const k of kids)e.append(k);return e}
-async function load(){S=await api('/api/state'+(SEL?'?project='+encodeURIComponent(SEL):''));if(S.error){SEL='';save();return load()}render();loadFolders()}
+async function load(picked){S=await api('/api/state'+(SEL?'?project='+encodeURIComponent(SEL):''));if(S.error){SEL='';save();return load()}
+ if(picked)$('#scope').value=S.project?'local':'user';render();loadFolders();
+ if(picked)say(S.project?`${S.project.split('/').pop()}: switches write to its repository's .claude/settings.local.json, which stays on this machine`:'user scope: switches write to ~/.claude/settings.json')}
 function sw(on,name,cb,labels=['on','off']){return el('button',{class:'sw',role:'switch','aria-checked':String(on),'aria-label':name,onclick:()=>cb(!on)},el('i'),el('span',{class:'lab'},on?labels[0]:labels[1]))}
 function tri(cur,scope,cb){const t=el('span',{class:'tri',role:'group','aria-label':scope+' scope'});for(const[lab,val,name]of[['on',true,'on'],['–',null,'not set'],['off',false,'off']])t.append(el('button',{'aria-label':name,'aria-pressed':String(cur===val),onclick:()=>cb(val)},lab));return t}
-async function act(p,body,done){say('');const r=await api(p,body);if(!r.ok){say(r.error,'err');return}say(done);load()}
+async function act(p,body,done){say('working…');let r;try{r=await api(p,body)}catch(e){say('request failed: '+e.message+' (the server log has the traceback)','err');return}if(!r.ok){say(r.error,'err');return}say(done);load()}
 function scope(){return $('#scope').value}
 function strip(on){const n=GN.filter(g=>on[g]).length;const d=el('span',{class:'strip',role:'img','aria-label':`${n} of ${GN.length} groups on`});for(const g of GN)d.append(el('i',{class:on[g]?'on':'',title:g+(on[g]?': on':': off')}));return d}
 // ── folder tree ──
 async function loadFolders(){const root=await api('/api/dirs');GN=root.group_names;ROOT=root.self;const ul=$('#folders');ul.replaceChildren(await folderNode(root.self,root.children,true));ul.querySelector('.frow.sel')?.scrollIntoView({block:'nearest'})}
 async function folderNode(f,children,isRoot){const li=el('li',{'data-path':f.path});const isOpen=isRoot||!!fopen[f.path];const sel=SEL===f.path||(isRoot&&!SEL);
  const tw=el('button',{class:'tw'+(f.has_children?'':' leaf'),'aria-expanded':String(isOpen),'aria-label':(isOpen?'Collapse ':'Expand ')+f.name,onclick:()=>{fopen[f.path]=!isOpen;save();loadFolders()}});
- const pick=el('button',{class:'pick','aria-current':sel?'true':null,onclick:()=>{SEL=isRoot?'':f.path;save();load()}},el('span',{class:'name mono'},isRoot?'~/dev':f.name),f.has_project?el('span',{class:'k',title:'Has its own committed .claude/settings.json'},'⚙'):'');
+ const pick=el('button',{class:'pick','aria-current':sel?'true':null,onclick:()=>{SEL=isRoot?'':f.path;save();load(true)}},el('span',{class:'name mono'},isRoot?'~/dev':f.name),f.has_project?el('span',{class:'k',title:'Has its own committed .claude/settings.json'},'⚙'):'');
  li.append(el('div',{class:'frow'+(sel?' sel':'')},tw,pick,strip(f.on)));
  if(isOpen&&f.has_children){const kids=children||(await api('/api/dirs?path='+encodeURIComponent(f.path))).children;const sub=el('ul');for(const c of kids)sub.append(await folderNode(c,null,false));li.append(sub)}
  return li}
