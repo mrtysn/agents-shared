@@ -94,9 +94,10 @@ counts are what fix the simulation time, provided nothing in the scene reads
 those and replace them with accumulated `delta`.
 
 Diff against the accepted baseline with any per-pixel tool; a Godot-only option is
-`Image.load_png_from_buffer` on both files and comparing `get_data()` in a GUT test. Under
-`window-focus` DENY on a shared machine, this is the run that needs asking first: batch every
-shot into one launch script rather than one process per question.
+`Image.load_png_from_buffer` on both files and comparing `get_data()` in a GUT test. This is the
+run that opens windows: launch each shot through `quiet-open` (see the `window-focus` rule) so
+the engine never becomes the active app, and batch every shot into one launch script rather
+than one process per question. Only when `quiet-open` is absent does the batch become an ask.
 
 ## 4. Journey tests: drive the real actions
 
@@ -162,5 +163,6 @@ resolution, same quality settings before and after, or the comparison is void.
 ## Off-screen and focus
 
 `--position` far off the working display and `--resolution` small keep the window out of the
-way. On a machine under `window-focus` DENY, journeys and state dumps still run fully headless;
-only capture and profiling need a window, and those are asked for once and batched.
+way but do not stop the engine activating; `quiet-open` does (see the `window-focus` rule).
+Journeys and state dumps run fully headless; only capture and profiling need a window, and
+those go through `quiet-open` in one batch, or are asked for once when it is unavailable.

@@ -13,6 +13,13 @@
 #   focus-policy.sh --check    # exit 0 = allowed, 1 = denied
 #   focus-policy.sh --verdict  # prints "allow" or "deny"
 #
+# The session-start line also says whether `quiet-open` is on PATH — the command
+# that launches a windowed app without it ever becoming active (open -g plus an
+# injected AppKit shim; see the window-focus rule). The verdict is a tolerance
+# for the interruption, not a licence: under either verdict a windowed launch
+# goes through quiet-open first, and only an app it cannot quiet becomes an ask.
+# --check and --verdict are consumed by scripts and stay exactly as they were.
+#
 # The allow-list lives outside this repository, as `focus-allow` in the Claude
 # config dir ($CLAUDE_CONFIG_DIR, else ~/.claude): one hostname or glob per line,
 # '#' comments ignored. Machine names are local configuration, not shared source.
@@ -59,23 +66,34 @@ case "${1:-}" in
 		;;
 esac
 
+QUIET_OPEN="$(command -v quiet-open 2>/dev/null || true)"
+if [ -n "$QUIET_OPEN" ]; then
+	QUIET_NOTE=" · quiet-open: $QUIET_OPEN"
+else
+	QUIET_NOTE=" · quiet-open: not installed"
+fi
+
 if [ "$VERDICT" = "allow" ]; then
-	CONTEXT="Focus policy: ALLOW. Opening a GUI window is fine on this machine."
+	CONTEXT="Focus policy: ALLOW${QUIET_NOTE}. The interruption is tolerated here, but a window that activates still hides a hotkey terminal: launch windowed apps through quiet-open (exit 0 + 'quiet: loaded' = focus untouched); an app it cannot quiet needs one ask per batch, stating the process count."
 else
 	# Assigned via `read`, not `$(cat <<EOF)`: bash 3.2, which macOS ships,
 	# mishandles a heredoc inside command substitution.
 	IFS= read -r -d '' CONTEXT <<-EOF || true
-Focus policy: DENY. Do NOT run anything that opens a window and takes keyboard
-focus — the user is working on this screen, and a window stealing focus
-interrupts them mid-sentence.
+Focus policy: DENY${QUIET_NOTE}. Do NOT run anything that opens a window and
+becomes the active app — the user is working on this screen, and a window
+stealing focus interrupts them mid-sentence.
 
 - Use the headless or offscreen mode of whatever you are running. For Godot that
   is \`--headless\`, which covers parse checks, the test suite, and any probe
   whose output is printed rather than drawn.
 - When the task genuinely needs rendered pixels (a frame capture, a screenshot),
-  say so and ask first. Then do it in ONE batched run rather than iterating, and
-  push the window off the working display with the tool's own flags (Godot:
-  \`--screen N\` / \`--position X,Y\`).
+  launch through \`quiet-open <App.app> [args…]\`: exit 0 with 'quiet: loaded'
+  in its output means the app never activated and no ask is needed. Off-screen
+  \`--position\` and a small \`--resolution\` are not stealth; they do not stop
+  activation.
+- If quiet-open is not installed or cannot quiet that app, say so and ask first
+  — one ask per batch, stating the process count. Then do it in ONE batched run
+  rather than iterating.
 - Never re-run a windowed command "just to check". Print the state instead.
 EOF
 fi

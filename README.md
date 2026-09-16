@@ -108,6 +108,13 @@ hooks/focus-policy.sh --verdict  # "allow" | "deny"
 hooks/focus-policy.sh --check    # exit 0 = allowed, 1 = denied
 ```
 
+The session-start line reads `Focus policy: ALLOW · quiet-open: /path` (or
+`quiet-open: not installed`). The verdict is a tolerance for the interruption,
+not a licence: a window that activates hides a hotkey terminal on either kind of
+machine, so windowed apps go through `quiet-open` (the `tools` repo) under either
+verdict, and only an app it cannot quiet becomes an ask. `--verdict` and
+`--check` are consumed by scripts and never change shape.
+
 **Fails closed.** An unknown machine is `deny`: forgetting to allow one costs a
 little convenience, forgetting to deny one costs the user their attention.
 
@@ -122,8 +129,9 @@ Wire it up in that same directory's `settings.json`:
 { "type": "command", "command": "<abs-path>/hooks/focus-policy.sh", "timeout": 5 }
 ```
 
-The matching standing rule lives in the user-level `CLAUDE.md` — the hook
-reports the verdict, the rule says what to do about it.
+The matching standing rule is `claude/rules/window-focus.md` — the hook
+reports the verdict and whether `quiet-open` is present, the rule says what to
+do about both.
 
 ## Updating
 
