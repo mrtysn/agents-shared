@@ -152,6 +152,7 @@ def skill_record(skill_dir: Path, group: str | None) -> dict | None:
         "external": bool(external),
         "repo": external.get("repo") if external else None,
         "has_override": (skill_dir / "override.patch").is_file(),
+        "enabled": skill_dir.parent.name != "off",
     }
 
 
@@ -163,8 +164,10 @@ def collect() -> tuple[list[dict], list[dict]]:
         manifest = entry / ".claude-plugin" / "plugin.json"
         if manifest.is_file():
             meta = json.loads(manifest.read_text())
-            skills = [r for d in sorted((entry / "skills").iterdir()) if d.is_dir()
+            skills = [r for sub in ("skills", "off") if (entry / sub).is_dir()
+                      for d in sorted((entry / sub).iterdir()) if d.is_dir()
                       for r in [skill_record(d, entry.name)] if r]
+            skills.sort(key=lambda r: r["name"].casefold())
             groups.append({
                 "name": entry.name, "id": f"{entry.name}@skills-dir",
                 "description": meta.get("description", ""),
@@ -219,7 +222,7 @@ def state(project: Path | None) -> dict:
             if g["scopes"][s] is not None:
                 eff, src = bool(g["scopes"][s]), s
         g["enabled"], g["enabled_by"] = eff, src
-        g["tokens"] = sum(k["tokens"] for k in g["skills"] if not k["slash_only"])
+        g["tokens"] = sum(k["tokens"] for k in g["skills"] if k["enabled"] and not k["slash_only"])
     for k in flat:
         k["scopes"] = {s: per_scope[s].get("skillOverrides", {}).get(k["name"]) for s in SCOPES}
         eff, src = "on", "default"
@@ -319,6 +322,25 @@ def set_override(name: str, scope: str, value: str | None, project: Path | None)
         data.pop("skillOverrides", None)
     write_json(path, data)
     return {"ok": True}
+
+
+def set_enabled(skill_dir: Path, enabled: bool) -> dict:
+    """A skill in a group is on when its folder sits in <group>/skills/ and off when it sits in
+    <group>/off/, which no session scans. Nothing inside the folder changes, so auto/slash-only,
+    provenance and any local override travel with it. In git the move is a rename."""
+    if skill_dir.parent.name not in ("skills", "off"):
+        return {"ok": False, "error": "only a skill inside a group can be switched off; a flat skill uses its visibility states"}
+    group = skill_dir.parent.parent
+    dest = group / ("skills" if enabled else "off") / skill_dir.name
+    if dest == skill_dir:
+        return {"ok": True}
+    if dest.exists():
+        return {"ok": False, "error": f"{dest.parent.name}/{dest.name} already exists"}
+    dest.parent.mkdir(exist_ok=True)
+    skill_dir.rename(dest)
+    if not enabled and not any(skill_dir.parent.iterdir()):
+        pass  # keep skills/ even when empty; the plugin needs it
+    return {"ok": True, "dir": str(dest)}
 
 
 def regen_override_patch(skill_dir: Path) -> None:
@@ -490,7 +512,7 @@ function draw(){const t0=performance.now();const edges=$('#edges'),nodes=$('#nod
  FOLDERS.forEach(f=>{const p=pos['f:'+f.path];const n=GN.filter(g=>f.on[g]).length;
   node('f:'+f.path,'folder',p,f.isRoot?'~/dev':f.name,f.isRoot?'user scope':`${(f.has_local||f.has_project)?'⚙ ':''}${n}/${GN.length}`,g=>{if(f.has_children&&!f.isRoot){const t=sv('text',{class:'tw',x:8,y:ROW/2+1,role:'button','aria-label':(f.isOpen?'Collapse ':'Expand ')+f.name},f.isOpen?'▾':'▸');t.addEventListener('click',e=>{e.stopPropagation();toggleFolder(f)});g.append(t)}else if(f.isRoot){g.append(sv('text',{class:'tw',x:8,y:ROW/2+1},'●'))}})});
  S.groups.forEach(g=>node('g:'+g.name,'group'+(g.enabled?'':' off'),pos['g:'+g.name],g.name,(g.enabled?'on':'off')+(gopen[g.name]?` · ${g.skills.length}`:''),n=>{const open=!gopen[g.name];const t=sv('text',{class:'tw',x:8,y:ROW/2+1,role:'button','aria-label':(open?'Collapse ':'Expand ')+g.name},open?'▾':'▸');t.addEventListener('click',e=>{e.stopPropagation();if(open)gopen[g.name]=true;else delete gopen[g.name];save();draw()});n.append(t)}));
- skills.forEach(({g,k})=>node('s:'+g.name+':'+k.name,'skill'+(g.enabled?(k.slash_only?' slash':''):' off'),pos['s:'+g.name+':'+k.name],k.name,g.enabled?(k.slash_only?'slash':''):'off'));
+ skills.forEach(({g,k})=>{const on=g.enabled&&k.enabled;node('s:'+g.name+':'+k.name,'skill'+(on?(k.slash_only?' slash':''):' off'),pos['s:'+g.name+':'+k.name],k.name,on?(k.slash_only?'slash':''):'off')});
  nodes.append(nfrag);applyView();highlight();window.__lastDraw=performance.now()-t0}
 async function toggleFolder(f){if(f.isOpen)delete fopen[f.path];else fopen[f.path]=true;save();await fetchTree(false);draw()}
 function selId(){return SELKIND==='folder'?'f:'+(SEL||ROOT.path):SELKIND==='group'?'g:'+SEL:SELKIND==='skill'?'s:'+SEL:''}
@@ -502,7 +524,7 @@ async function select(id){const[kind,...rest]=id.split(':');const key=rest.join(
  if(relayout)draw();else highlight();
  if(CTX!==prevCtx){await fetchState();draw()}side()}
 function litSet(id){const lit=new Set([id]);const kind=id[0];
- if(kind==='f'){const f=FOLDERS.find(x=>'f:'+x.path===id);if(f){GN.forEach(g=>{if(f.on[g])lit.add('g:'+g)});for(const g of S.groups)if(f.on[g.name])g.skills.forEach(k=>{if(!k.slash_only)lit.add('s:'+g.name+':'+k.name)})}}
+ if(kind==='f'){const f=FOLDERS.find(x=>'f:'+x.path===id);if(f){GN.forEach(g=>{if(f.on[g])lit.add('g:'+g)});for(const g of S.groups)if(f.on[g.name])g.skills.forEach(k=>{if(k.enabled&&!k.slash_only)lit.add('s:'+g.name+':'+k.name)})}}
  else if(kind==='g'){const gname=id.slice(2);FOLDERS.forEach(f=>{if(f.on[gname])lit.add('f:'+f.path)});const g=S.groups.find(x=>x.name===gname);g&&g.skills.forEach(k=>lit.add('s:'+gname+':'+k.name))}
  else{const [gname]=id.slice(2).split(':');lit.add('g:'+gname);FOLDERS.forEach(f=>{if(f.on[gname])lit.add('f:'+f.path)})}
  return lit}
@@ -550,15 +572,15 @@ function side(){const a=$('#side');a.replaceChildren();const noProj=!S.project;f
   a.append(el('p',{class:'title'},el('span',{class:'mono'},g.name),el('span',{class:'k'},g.description)));
   a.append(el('p',{class:'lead'},`${g.skills.length} skills, ~${fmt(g.tokens)} tokens of descriptions when on.`));
   const inl=el('ul',{class:'list'});inl.append(el('li',{},el('span',{class:'name'},'In ',el('span',{class:'mono'},ctxName)),sw(g.enabled,`${g.name} in ${ctxName}`,v=>act('/api/group',{id:g.id,scope:scope(),value:v,project:S.project},`${g.name}: ${v?'on':'off'} at ${scope()} scope`))));a.append(inl);
-  a.append(el('h2',{},'Skills'));const ul=el('ul',{class:'list'});for(const k of g.skills)ul.append(el('li',{},el('span',{class:'name'},link('s:'+g.name+':'+k.name,k.name,'mono'),k.has_override?el('span',{class:'k'},' edited'):''),sw(!k.slash_only,`${k.name} invocable by Claude`,v=>act('/api/skill',{dir:k.dir,slash_only:!v},`${k.name}: ${v?'auto':'slash-only'}`),['auto','slash'])));a.append(ul);
+  a.append(el('h2',{},'Skills'));const ul=el('ul',{class:'list'});for(const k of g.skills){const li=el('li',{},el('span',{class:'name'},link('s:'+g.name+':'+k.name,k.name,'mono'),k.has_override?el('span',{class:'k'},' edited'):''),el('span',{style:'display:inline-flex;gap:2px'},sw(k.enabled,`${k.name} on`,v=>act('/api/skill-enable',{dir:k.dir,enabled:v},`${k.name}: ${v?'on':'off'} in every folder`)),sw(!k.slash_only,`${k.name} invocable by Claude`,v=>act('/api/skill',{dir:k.dir,slash_only:!v},`${k.name}: ${v?'auto':'slash-only'}`),['auto','slash'])));li.style.gridTemplateColumns='minmax(0,1fr) auto';ul.append(li)}a.append(ul);
   a.append(el('h2',{},'Folders with their own setting'));const fl=el('ul',{class:'list'});const own=FOLDERS.filter(f=>!f.isRoot&&!!f.on[g.name]!==!!ROOT.on[g.name]);
   if(!own.length)fl.append(el('li',{},el('span',{class:'k'},'none; every folder follows user scope')));for(const f of own)fl.append(el('li',{},el('span',{class:'name'},link('f:'+f.path,f.name,'mono')),el('span',{class:'k'},f.on[g.name]?'on':'off')));a.append(fl)}
  else{const [gname,kname]=SEL.split(':');const g=S.groups.find(x=>x.name===gname);const k=g&&g.skills.find(x=>x.name===kname);if(!k)return;
   a.append(el('p',{class:'title'},el('span',{class:'mono'},'/'+gname+':'+kname),el('span',{class:'k'},k.description)));
-  const gOn=g.enabled;a.append(el('p',{class:'lead'},`In ${ctxName}: `,el('b',{},gOn?(k.slash_only?'slash-only':'auto'):'off'),gOn?(k.slash_only?', loaded but hidden from Claude; works when you type its name.':`, loaded with its description, ~${fmt(k.tokens)} tokens.`):`, because the `,link('g:'+gname,gname,'mono'),' group is off here, so the skill is not loaded at all.'));
-  const ul=el('ul',{class:'list'});ul.append(el('li',{},el('span',{class:'name'},'Claude may invoke it'),sw(!k.slash_only,`${k.name} invocable by Claude`,v=>act('/api/skill',{dir:k.dir,slash_only:!v},`${k.name}: ${v?'auto':'slash-only'}`),['auto','slash'])));a.append(ul);
+  const gOn=g.enabled,on=gOn&&k.enabled;a.append(el('p',{class:'lead'},`In ${ctxName}: `,el('b',{},on?(k.slash_only?'slash-only':'auto'):'off'),on?(k.slash_only?', loaded but hidden from Claude; works when you type its name.':`, loaded with its description, ~${fmt(k.tokens)} tokens.`):(!k.enabled?', switched off in every folder.':'')));if(!on&&k.enabled)a.lastChild.append(', because the ',link('g:'+gname,gname,'mono'),' group is off here.');
+  const ul=el('ul',{class:'list'});ul.append(el('li',{},el('span',{class:'name'},'On',el('span',{class:'k'},' in every folder')),sw(k.enabled,`${k.name} on`,v=>act('/api/skill-enable',{dir:k.dir,enabled:v},`${k.name}: ${v?'on':'off'} in every folder`))));ul.append(el('li',{},el('span',{class:'name'},'Claude may invoke it',el('span',{class:'k'},' when on')),sw(!k.slash_only,`${k.name} invocable by Claude`,v=>act('/api/skill',{dir:k.dir,slash_only:!v},`${k.name}: ${v?'auto':'slash-only'}`),['auto','slash'])));a.append(ul);
   if(k.has_override)a.append(el('p',{class:'hint'},'Carries a local override in agents-shared.'))}
- a.append(el('p',{class:'hint'},'Click a node to focus it; drag to pan, wheel to zoom. Switches write at the scope chosen at the top. “This repo, this machine” is the repository’s gitignored ',el('code',{},'.claude/settings.local.json'),' and is the usual choice; “this folder, committed” is that folder’s ',el('code',{},'.claude/settings.json'),' for anything the repository’s other readers should share. Local beats project beats user. A skill switch is global: on lets Claude invoke it, off keeps it slash-only.'))}
+ a.append(el('p',{class:'hint'},'Click a node to focus it; drag to pan, wheel to zoom. Switches write at the scope chosen at the top. “This repo, this machine” is the repository’s gitignored ',el('code',{},'.claude/settings.local.json'),' and is the usual choice; “this folder, committed” is that folder’s ',el('code',{},'.claude/settings.json'),' for anything the repository’s other readers should share. Local beats project beats user. A skill in a group has two global switches: on/off decides whether any session loads it, auto/slash decides whether Claude sees its description when it is on.'))}
 $('#scope').addEventListener('change',()=>{scopeTouched=true;side()});
 (()=>{let on=true;try{on=localStorage.getItem('pane')!=='off'}catch(e){}const b=$('#pane');const apply=()=>{document.body.classList.toggle('nopane',!on);b.setAttribute('aria-expanded',String(on));b.setAttribute('aria-label',on?'Hide the detail pane':'Show the detail pane')};apply();b.addEventListener('click',()=>{on=!on;try{localStorage.setItem('pane',on?'on':'off')}catch(e){}apply()})})();
 $('#clear').addEventListener('click',async()=>{SEL='';SELKIND='';CTX='';save();await fetchState();draw();side()});
@@ -628,12 +650,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(set_group(body["id"], body["scope"], body.get("value"), project))
             if u.path == "/api/override":
                 return self._json(set_override(body["name"], body["scope"], body.get("value"), project))
-            if u.path == "/api/skill":
+            if u.path in ("/api/skill", "/api/skill-enable"):
                 # Only a directory the listing itself produced may be edited.
                 groups, flat = collect()
                 known = {k["dir"] for g in groups for k in g["skills"]} | {k["dir"] for k in flat}
                 if body.get("dir") not in known:
                     return self._json({"ok": False, "error": "not a listed skill"}, 400)
+                if u.path == "/api/skill-enable":
+                    return self._json(set_enabled(Path(body["dir"]), bool(body.get("enabled"))))
                 return self._json(set_slash_only(Path(body["dir"]), bool(body.get("slash_only"))))
         except (KeyError, ValueError, json.JSONDecodeError) as e:
             return self._json({"ok": False, "error": str(e)}, 400)

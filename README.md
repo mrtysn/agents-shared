@@ -160,7 +160,10 @@ for Spotlight.
 
 Grouped skills follow the external-skill convention below, one `source.json` per
 skill under `<group>/skills/<name>/`; the sync script finds both layouts, and a
-group name as its argument syncs the whole group.
+group name as its argument syncs the whole group. A skill switched off sits in
+`<group>/off/<name>/` instead, which no session scans; nothing inside it changes,
+so its slash-only setting and provenance survive the move, and the sync script
+still updates it there.
 
 For a skill needed in one session only, skip installation entirely: fetch its
 SKILL.md into scratch, read it, follow it.

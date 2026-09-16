@@ -81,14 +81,14 @@ regen_patch() {
 }
 
 # Skills live either flat (claude/skills/<name>/) or inside a group plugin
-# (claude/skills/<group>/skills/<name>/). A filter matches a skill's own name or
+# (claude/skills/<group>/skills/<name>/, or <group>/off/<name>/ when switched off). A filter matches a skill's own name or
 # its group's name, so one argument can sync a whole group.
-for source_file in "$SKILLS_DIR"/*/source.json "$SKILLS_DIR"/*/skills/*/source.json; do
+for source_file in "$SKILLS_DIR"/*/source.json "$SKILLS_DIR"/*/skills/*/source.json "$SKILLS_DIR"/*/off/*/source.json; do
     [[ -f "$source_file" ]] || continue
     skill_dir="$(dirname "$source_file")"
     skill_name="$(basename "$skill_dir")"
     group_name=""
-    if [[ "$(basename "$(dirname "$skill_dir")")" == "skills" ]]; then
+    if [[ "$(basename "$(dirname "$skill_dir")")" == "skills" || "$(basename "$(dirname "$skill_dir")")" == "off" ]]; then
         group_name="$(basename "$(dirname "$(dirname "$skill_dir")")")"
         skill_name="$group_name:$skill_name"
     fi
