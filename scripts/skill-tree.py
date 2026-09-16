@@ -390,6 +390,7 @@ input[type=search]{min-width:160px}button.plain{cursor:pointer}button.plain[aria
 .canvas svg{position:absolute;inset:0;width:100%;height:100%}
 .lane{font-size:11px;font-weight:600;fill:var(--ink2);letter-spacing:.02em}
 .edge{fill:none;stroke:var(--edge);stroke-width:1.2}.edge.on{stroke:var(--edge-on);stroke-width:1.6}.edge.hov{stroke:var(--focus);stroke-width:2;opacity:1!important}
+.edge.derived{stroke:var(--edge-on);stroke-dasharray:4 3;stroke-width:1.4;opacity:1!important}
 .node rect{fill:var(--node);stroke:var(--node-line);stroke-width:1;rx:6}
 .node text{fill:var(--ink);font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;pointer-events:none}
 .node text.sub{fill:var(--ink2);font-size:10.5px;font-family:system-ui,-apple-system,sans-serif}
@@ -431,7 +432,7 @@ aside h2{font-size:12px;color:var(--ink2);font-weight:600;margin:12px 0 4px}asid
 </div>
 <div class="wrap">
  <div class="canvas" id="canvas">
-  <svg id="svg" aria-label="Folders, groups and skills"><g id="view"><g id="edges"></g><g id="nodes"></g></g></svg>
+  <svg id="svg" aria-label="Folders, groups and skills"><g id="view"><g id="edges"></g><g id="focus-edges"></g><g id="nodes"></g></g></svg>
   <div class="fab"><button class="plain" id="fit">Fit</button><button class="plain" id="clear">Clear selection</button></div>
  </div>
  <aside id="side"></aside>
@@ -501,8 +502,11 @@ function litSet(id){const lit=new Set([id]);const kind=id[0];
  else if(kind==='g'){const gname=id.slice(2);FOLDERS.forEach(f=>{if(f.on[gname])lit.add('f:'+f.path)});const g=S.groups.find(x=>x.name===gname);g&&g.skills.forEach(k=>lit.add('s:'+gname+':'+k.name))}
  else{const [gname]=id.slice(2).split(':');lit.add('g:'+gname);FOLDERS.forEach(f=>{if(f.on[gname])lit.add('f:'+f.path)})}
  return lit}
-function highlight(){const svg=$('#svg');const id=selId();if(!id){svg.classList.remove('dim');NODES.forEach(n=>n.classList.remove('lit'));EDGES.forEach(e=>e.el.classList.remove('lit'));return}
- const lit=litSet(id);svg.classList.add('dim');NODES.forEach((n,nid)=>n.classList.toggle('lit',lit.has(nid)));EDGES.forEach(e=>e.el.classList.toggle('lit',lit.has(e.a)&&lit.has(e.b)))}
+function edgePath(a,b){const x1=a.x+a.w,y1=a.y+ROW/2-3,x2=b.x,y2=b.y+ROW/2-3,mx=(x1+x2)/2;return `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`}
+function highlight(){const svg=$('#svg');const id=selId();const fe=$('#focus-edges');fe.replaceChildren();if(!id){svg.classList.remove('dim');NODES.forEach(n=>n.classList.remove('lit'));EDGES.forEach(e=>e.el.classList.remove('lit'));return}
+ const lit=litSet(id);svg.classList.add('dim');NODES.forEach((n,nid)=>n.classList.toggle('lit',lit.has(nid)));EDGES.forEach(e=>e.el.classList.toggle('lit',lit.has(e.a)&&lit.has(e.b)));
+ // a folder with no edges of its own gets its effective edges drawn while focused, so every folder answers the click
+ if(id[0]==='f'){const f=FOLDERS.find(x=>'f:'+x.path===id);if(f&&!f.isRoot&&!EDGES.some(e=>e.a===id)){const a=POS[id];GN.forEach(g=>{const b=POS['g:'+g];if(a&&b&&f.on[g])fe.append(sv('path',{class:'edge derived',d:edgePath(a,b)}))})}}}
 function hover(id,on){const adj=ADJ.get(id);if(!adj)return;for(const e of adj)e.el.classList.toggle('hov',on)}
 // Keyboard: up/down walk a lane by position, left/right jump to the nearest node in the next lane.
 function nodeKeys(e){const id=e.currentTarget.dataset.id;if(e.key==='Enter'||e.key===' '){e.preventDefault();select(id);return}
