@@ -101,8 +101,9 @@ def under_dev_root(path: Path) -> bool:
 
 def subdirs(path: Path) -> list[Path]:
     try:
-        return sorted(d for d in path.iterdir()
-                      if d.is_dir() and not d.name.startswith(".") and d.name not in SKIP_DIRS)
+        return sorted((d for d in path.iterdir()
+                       if d.is_dir() and not d.name.startswith(".") and d.name not in SKIP_DIRS),
+                      key=lambda d: d.name.casefold())
     except OSError:
         return []
 
