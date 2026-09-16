@@ -400,7 +400,7 @@ body.nopane #pane{right:10px}@media(hover:hover){#pane:hover{border-color:var(--
 .node text.sub{fill:var(--ink2);font-size:10.5px;font-family:system-ui,-apple-system,sans-serif}
 .node .dot{fill:var(--off)}.node .dot.on{fill:var(--on)}
 .node.folder rect{stroke-width:1}.node.group rect{stroke:var(--on);stroke-width:1.2}.node.group.off rect{stroke:var(--off);stroke-dasharray:3 2}
-.node.skill rect{rx:10}.node.skill.slash rect{stroke-dasharray:3 2}
+.node.skill rect{rx:10}.node.skill.slash rect{stroke-dasharray:3 2}.node.skill.off rect{stroke:var(--off);fill:none}.node.skill.off text{text-decoration:line-through;fill:var(--ink2)}
 .node.sel rect{stroke:var(--focus);stroke-width:2;fill:var(--sel)}
 .node .tw{fill:var(--ink2);font-size:10px;font-family:system-ui,sans-serif}
 .node{cursor:pointer}
@@ -490,7 +490,7 @@ function draw(){const t0=performance.now();const edges=$('#edges'),nodes=$('#nod
  FOLDERS.forEach(f=>{const p=pos['f:'+f.path];const n=GN.filter(g=>f.on[g]).length;
   node('f:'+f.path,'folder',p,f.isRoot?'~/dev':f.name,f.isRoot?'user scope':`${(f.has_local||f.has_project)?'⚙ ':''}${n}/${GN.length}`,g=>{if(f.has_children&&!f.isRoot){const t=sv('text',{class:'tw',x:8,y:ROW/2+1,role:'button','aria-label':(f.isOpen?'Collapse ':'Expand ')+f.name},f.isOpen?'▾':'▸');t.addEventListener('click',e=>{e.stopPropagation();toggleFolder(f)});g.append(t)}else if(f.isRoot){g.append(sv('text',{class:'tw',x:8,y:ROW/2+1},'●'))}})});
  S.groups.forEach(g=>node('g:'+g.name,'group'+(g.enabled?'':' off'),pos['g:'+g.name],g.name,(g.enabled?'on':'off')+(gopen[g.name]?` · ${g.skills.length}`:''),n=>{const open=!gopen[g.name];const t=sv('text',{class:'tw',x:8,y:ROW/2+1,role:'button','aria-label':(open?'Collapse ':'Expand ')+g.name},open?'▾':'▸');t.addEventListener('click',e=>{e.stopPropagation();if(open)gopen[g.name]=true;else delete gopen[g.name];save();draw()});n.append(t)}));
- skills.forEach(({g,k})=>node('s:'+g.name+':'+k.name,'skill'+(k.slash_only?' slash':''),pos['s:'+g.name+':'+k.name],k.name,k.slash_only?'slash':''));
+ skills.forEach(({g,k})=>node('s:'+g.name+':'+k.name,'skill'+(g.enabled?(k.slash_only?' slash':''):' off'),pos['s:'+g.name+':'+k.name],k.name,g.enabled?(k.slash_only?'slash':''):'off'));
  nodes.append(nfrag);applyView();highlight();window.__lastDraw=performance.now()-t0}
 async function toggleFolder(f){if(f.isOpen)delete fopen[f.path];else fopen[f.path]=true;save();await fetchTree(false);draw()}
 function selId(){return SELKIND==='folder'?'f:'+(SEL||ROOT.path):SELKIND==='group'?'g:'+SEL:SELKIND==='skill'?'s:'+SEL:''}
@@ -555,7 +555,7 @@ function side(){const a=$('#side');a.replaceChildren();const noProj=!S.project;f
   if(!own.length)fl.append(el('li',{},el('span',{class:'k'},'none; every folder follows user scope')));for(const f of own)fl.append(el('li',{},el('span',{class:'name'},link('f:'+f.path,f.name,'mono')),el('span',{class:'k'},f.on[g.name]?'on':'off')));a.append(fl)}
  else{const [gname,kname]=SEL.split(':');const g=S.groups.find(x=>x.name===gname);const k=g&&g.skills.find(x=>x.name===kname);if(!k)return;
   a.append(el('p',{class:'title'},el('span',{class:'mono'},'/'+gname+':'+kname),el('span',{class:'k'},k.description)));
-  a.append(el('p',{class:'lead'},`~${fmt(k.tokens)} tokens of description when auto. In group `,link('g:'+gname,gname,'mono'),'.'));
+  const gOn=g.enabled;a.append(el('p',{class:'lead'},`In ${ctxName}: `,el('b',{},gOn?(k.slash_only?'slash-only':'auto'):'off'),gOn?(k.slash_only?', loaded but hidden from Claude; works when you type its name.':`, loaded with its description, ~${fmt(k.tokens)} tokens.`):`, because the `,link('g:'+gname,gname,'mono'),' group is off here, so the skill is not loaded at all.'));
   const ul=el('ul',{class:'list'});ul.append(el('li',{},el('span',{class:'name'},'Claude may invoke it'),sw(!k.slash_only,`${k.name} invocable by Claude`,v=>act('/api/skill',{dir:k.dir,slash_only:!v},`${k.name}: ${v?'auto':'slash-only'}`),['auto','slash'])));a.append(ul);
   if(k.has_override)a.append(el('p',{class:'hint'},'Carries a local override in agents-shared.'))}
  a.append(el('p',{class:'hint'},'Click a node to focus it; drag to pan, wheel to zoom. Switches write at the scope chosen at the top. “This repo, this machine” is the repository’s gitignored ',el('code',{},'.claude/settings.local.json'),' and is the usual choice; “this folder, committed” is that folder’s ',el('code',{},'.claude/settings.json'),' for anything the repository’s other readers should share. Local beats project beats user. A skill switch is global: on lets Claude invoke it, off keeps it slash-only.'))}
