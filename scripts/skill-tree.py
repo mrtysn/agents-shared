@@ -370,8 +370,20 @@ select,input[type=search],button.plain{font:inherit;color:var(--ink);background:
 input[type=search]{min-width:180px}button.plain{cursor:pointer}button.plain[aria-pressed=true]{background:var(--code)}
 @media(hover:hover){button.plain:hover{border-color:var(--ink2)}}
 .msg{margin:0;min-height:1.4em;color:var(--ink2);flex-basis:100%}.msg.err{color:#b32d1c}@media(prefers-color-scheme:dark){.msg.err{color:#ff8b74}}
-.wrap{display:grid;grid-template-columns:minmax(260px,22rem) minmax(0,1fr);gap:0 32px;padding:12px 24px 60px}
-@media(max-width:900px){.wrap{grid-template-columns:1fr}}
+.wrap{display:grid;gap:28px;padding:12px 24px 60px;max-width:80rem}
+h2 .k{color:var(--ink2);font-weight:normal;font-size:12px}
+.grid-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+table.grid{border-collapse:separate;border-spacing:0;min-width:100%}
+.grid th,.grid td{padding:0 6px;border-bottom:1px solid var(--line2);text-align:center;white-space:nowrap;height:36px}
+.grid thead th{position:sticky;top:0;background:var(--card);z-index:1;font-size:12px;font-weight:600;color:var(--ink2);padding:8px 10px}
+.grid th.fcol,.grid td.fcol{text-align:left;position:sticky;left:0;background:var(--card);z-index:2;min-width:16rem}
+.grid td.fcol{padding-left:calc(6px + var(--d,0)*20px);display:flex;align-items:center;gap:2px;height:36px}
+.grid tr.sel td{background:var(--sel)}.grid tr:last-child td{border-bottom:0}
+@media(hover:hover){.grid tbody tr:hover td{background:var(--sel)}}
+.cell{min-width:52px;height:26px;border-radius:13px;border:1px solid var(--line);background:none;color:var(--ink2);font:inherit;font-size:12px;cursor:pointer;padding:0 10px}
+.cell.on{background:var(--on);border-color:var(--on);color:#fff;font-weight:600}
+@media(prefers-color-scheme:dark){.cell.on{color:#101412}}
+.cell.diff{box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--focus)}
 h2{font-size:13px;color:var(--ink2);font-weight:600;margin:14px 0 6px;display:flex;gap:10px;align-items:baseline}h2 .act{margin-left:auto;font-weight:normal;font-size:12px}
 h2 .act button{border:0;background:none;color:var(--ink2);text-decoration:underline;text-underline-offset:3px;cursor:pointer;font:inherit;font-size:12px;padding:2px 4px}
 .tree,.tree ul{list-style:none;margin:0;padding:0}.tree ul{padding-left:22px}
@@ -408,50 +420,51 @@ h2 .act button{border:0;background:none;color:var(--ink2);text-decoration:underl
  <p class="msg" id="msg" role="status"></p>
 </div>
 <div class="wrap">
- <aside>
-  <h2>Folders</h2>
-  <ul class="tree" id="folders" aria-label="Folders"></ul>
+ <section>
+  <h2>Folders and groups <span class="k">click a cell to switch that group for that folder at the scope above; click a folder to see its skills below</span></h2>
+  <div class="grid-wrap"><table class="grid" id="grid"><thead><tr id="grid-head"></tr></thead><tbody id="grid-body"></tbody></table></div>
   <p class="legend" id="legend"></p>
- </aside>
- <main>
-  <h2>Groups <span class="act"><button id="expand-all">Expand all</button> <button id="collapse-all">Collapse all</button></span></h2>
+ </section>
+ <section>
+  <h2 id="tree-h">Groups <span class="act"><button id="expand-all">Expand all</button> <button id="collapse-all">Collapse all</button></span></h2>
   <ul class="tree" id="tree"></ul>
   <h2>Flat skills</h2>
   <ul class="tree" id="flat"></ul>
-  <p class="hint">Pick a folder to see what a session started there gets. A group switch writes <code>enabledPlugins</code> at the scope chosen above: project scope is that folder's own <code>.claude/settings.json</code>, local scope is its repository's <code>settings.local.json</code>; local beats project beats user. A skill switch inside a group is global: on lets Claude invoke it, off keeps it slash-only. Open sessions pick changes up on <code>/reload-plugins</code>.</p>
- </main>
+  <p class="hint">A cell or group switch writes <code>enabledPlugins</code> at the scope chosen above: project scope is that folder's own <code>.claude/settings.json</code>, local scope is its repository's <code>settings.local.json</code>; local beats project beats user. A session started in a subfolder reads the project file from that subfolder, not from the repository root. A skill switch inside a group is global: on lets Claude invoke it, off keeps it slash-only. Open sessions pick changes up on <code>/reload-plugins</code>.</p>
+ </section>
 </div>
 <script>
-const $=(s,r=document)=>r.querySelector(s);let S=null,DET=false,SEL='',GN=[];const fmt=t=>t>=1000?(t/1000).toFixed(1)+'k':String(t);
+const $=(s,r=document)=>r.querySelector(s);let S=null,DET=false,SEL='',GN=[],ROOT=null;const fmt=t=>t>=1000?(t/1000).toFixed(1)+'k':String(t);
 let open={},fopen={};try{open=JSON.parse(localStorage.getItem('open')||'{}');fopen=JSON.parse(localStorage.getItem('fopen')||'{}');SEL=localStorage.getItem('sel')||''}catch(e){}
 const save=()=>{try{localStorage.setItem('open',JSON.stringify(open));localStorage.setItem('fopen',JSON.stringify(fopen));localStorage.setItem('sel',SEL)}catch(e){}};
 async function api(path,body){const r=await fetch(path,body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{});return r.json()}
 function el(tag,attrs={},...kids){const e=document.createElement(tag);for(const[k,v]of Object.entries(attrs)){if(k==='class')e.className=v;else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else if(v!==null&&v!==undefined&&v!==false)e.setAttribute(k,v===true?'':v)}for(const k of kids)e.append(k);return e}
-const tilde=p=>p.replace(/^\/Users\/[^/]+/,'~');
-async function load(picked){S=await api('/api/state'+(SEL?'?project='+encodeURIComponent(SEL):''));if(S.error){SEL='';save();return load()}
- if(picked)$('#scope').value=S.project?'project':'user';render();loadFolders();
- if(picked){say(S.project?`${S.project.split('/').pop()} selected — switches write to ${tilde(S.project)}/.claude/settings.json`:'user scope — switches write to '+tilde(S.config_dir)+'/settings.json');window.scrollTo({top:0})}}
+async function load(){S=await api('/api/state'+(SEL?'?project='+encodeURIComponent(SEL):''));if(S.error){SEL='';save();return load()}render();loadGrid()}
 function sw(on,name,cb,labels=['on','off']){return el('button',{class:'sw',role:'switch','aria-checked':String(on),'aria-label':name,onclick:()=>cb(!on)},el('i'),el('span',{class:'lab'},on?labels[0]:labels[1]))}
 function tri(cur,scope,cb){const t=el('span',{class:'tri',role:'group','aria-label':scope+' scope'});for(const[lab,val,name]of[['on',true,'on'],['–',null,'not set'],['off',false,'off']])t.append(el('button',{'aria-label':name,'aria-pressed':String(cur===val),onclick:()=>cb(val)},lab));return t}
-async function act(p,body,done){say('working…');let r;try{r=await api(p,body)}catch(e){say('request failed: '+e.message+' (the server log has the traceback)','err');return}if(!r.ok){say(r.error,'err');return}say(done);load()}
+async function act(p,body,done){say('');const r=await api(p,body);if(!r.ok){say(r.error,'err');return}say(done);load()}
 function scope(){return $('#scope').value}
-function dots(on,names){const n=names.filter(g=>on[g]).length;const d=el('span',{class:'dots',role:'img','aria-label':`${n} of ${names.length} groups on`});for(const g of names)d.append(el('i',{class:on[g]?'on':'',title:g+(on[g]?': on':': off')}));return d}
-// ── folders ──
-let ROOT=null;
-async function loadFolders(){const root=await api('/api/dirs');GN=root.group_names;ROOT=root.self;const ul=$('#folders');ul.replaceChildren();ul.append(await folderNode(root.self,root.children,true));
- $('#legend').replaceChildren(el('span',{},'Dots, in order: '),...GN.map(g=>el('span',{class:'mono'},g)),el('span',{},'— shown where a folder differs from user scope.'))}
-async function folderNode(f,children,isRoot){const li=el('li',{'data-path':f.path});const isOpen=isRoot||!!fopen[f.path];const sel=SEL===f.path||(isRoot&&!SEL);
- const tw=el('button',{class:'tw'+(f.has_children?'':' leaf'),'aria-expanded':String(isOpen),'aria-label':(isOpen?'Collapse ':'Expand ')+f.name,onclick:()=>{fopen[f.path]=!isOpen;save();loadFolders()}});
- const pick=el('button',{class:'pick','aria-pressed':String(sel),onclick:()=>{SEL=isRoot?'':f.path;save();load(true)}},el('span',{class:'name mono'},isRoot?f.path.replace(/^\/Users\/[^/]+/,'~'):f.name),f.has_project?el('span',{class:'k',title:'Has its own .claude/settings.json'},'⚙'):'');
- const same=!isRoot&&GN.every(g=>f.on[g]===ROOT.on[g]);
- li.append(el('div',{class:'row'+(sel?' sel':'')},tw,pick,same?el('span',{class:'k','aria-label':'same as user scope'}):dots(f.on,GN)));
- if(isOpen&&f.has_children){const kids=children||(await api('/api/dirs?path='+encodeURIComponent(f.path))).children;const sub=el('ul');for(const c of kids)sub.append(await folderNode(c,null,false));li.append(sub)}
- return li}
+// ── matrix ──
+async function loadGrid(){const root=await api('/api/dirs');GN=root.group_names;ROOT=root.self;
+ const head=$('#grid-head');head.replaceChildren(el('th',{scope:'col',class:'fcol'},'Folder'),...GN.map(g=>el('th',{scope:'col',class:'mono'},g)));
+ const body=$('#grid-body');body.replaceChildren();await gridRows(body,root.self,root.children,0,true);
+ $('#legend').replaceChildren(el('span',{},'A filled cell is on for a session started in that folder. A ring marks a value that differs from user scope; ⚙ marks a folder with its own committed settings.'))}
+async function gridRows(body,f,children,depth,isRoot){const isOpen=isRoot||!!fopen[f.path];const sel=SEL===f.path||(isRoot&&!SEL);const forScope=isRoot?'':f.path;
+ const tw=el('button',{class:'tw'+(f.has_children?'':' leaf'),'aria-expanded':String(isOpen),'aria-label':(isOpen?'Collapse ':'Expand ')+f.name,onclick:()=>{fopen[f.path]=!isOpen;save();loadGrid()}});
+ const pick=el('button',{class:'pick','aria-pressed':String(sel),onclick:()=>{SEL=forScope;save();load()}},el('span',{class:'name mono'},isRoot?'~/dev (user scope)':f.name),f.has_project?el('span',{class:'k',title:'Has its own committed .claude/settings.json'},'⚙'):'');
+ const tr=el('tr',{class:sel?'sel':'','data-path':f.path});tr.append(el('td',{class:'fcol',style:`--d:${depth}`},tw,pick));
+ for(const g of GN){const on=!!f.on[g],diff=!isRoot&&on!==!!ROOT.on[g];
+  tr.append(el('td',{},el('button',{class:'cell'+(on?' on':'')+(diff?' diff':''),role:'switch','aria-checked':String(on),'aria-label':`${g} in ${isRoot?'user scope':f.name}`,
+   onclick:()=>{const sc=isRoot?'user':scope();if(!isRoot&&sc==='user'){say('Choose project or local scope above to change one folder; user scope changes every folder.','err');return}
+    act('/api/group',{id:g+'@skills-dir',scope:sc,value:!on,project:forScope},`${g}: ${!on?'on':'off'} for ${isRoot?'every folder':f.name} at ${sc} scope`)}},on?'on':'off')))}
+ body.append(tr);
+ if(isOpen&&f.has_children){const kids=children||(await api('/api/dirs?path='+encodeURIComponent(f.path))).children;for(const c of kids)await gridRows(body,c,null,depth+1,false)}}
 // ── groups ──
 function render(){
  const noProj=!S.project;for(const o of $('#scope').options)o.disabled=o.value!=='user'&&noProj;if(noProj)$('#scope').value='user';
  const onG=S.groups.filter(g=>g.enabled).length,where=S.project?S.project.split('/').pop():'user scope';
  $('#sum').textContent=`${where}: ${onG} of ${S.groups.length} groups on, about ${fmt(S.always_on)} tokens of skill descriptions per session.`;
+ $('#tree-h').firstChild.textContent=`Groups and skills for ${where} `;
  const tree=$('#tree');tree.replaceChildren();
  for(const g of S.groups){
   const li=el('li',{'data-name':g.name,'data-desc':g.description});const isOpen=!!open[g.name];
