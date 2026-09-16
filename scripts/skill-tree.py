@@ -431,8 +431,8 @@ aside h2{font-size:12px;color:var(--ink2);font-weight:600;margin:12px 0 4px}asid
 <script>
 const $=(s,r=document)=>r.querySelector(s);const NS='http://www.w3.org/2000/svg';
 let S=null,DET=false,SEL='',SELKIND='',CTX='',GN=[],ROOT=null,FOLDERS=[],fopen={},gopen={},view={x:0,y:0,k:1};const fmt=t=>t>=1000?(t/1000).toFixed(1)+'k':String(t);
-try{fopen=JSON.parse(localStorage.getItem('fopen')||'{}');gopen=JSON.parse(localStorage.getItem('gopen')||'{}');SEL=localStorage.getItem('sel')||'';SELKIND=localStorage.getItem('selkind')||'';CTX=localStorage.getItem('ctx')||''}catch(e){}
-const save=()=>{try{localStorage.setItem('gopen',JSON.stringify(gopen));localStorage.setItem('fopen',JSON.stringify(fopen));localStorage.setItem('sel',SEL);localStorage.setItem('selkind',SELKIND);localStorage.setItem('ctx',CTX)}catch(e){}};
+try{fopen=JSON.parse(localStorage.getItem('fopen')||'{}');gopen=JSON.parse(localStorage.getItem('gclosed')||'{}');SEL=localStorage.getItem('sel')||'';SELKIND=localStorage.getItem('selkind')||'';CTX=localStorage.getItem('ctx')||''}catch(e){}
+const save=()=>{try{localStorage.setItem('gclosed',JSON.stringify(gopen));localStorage.setItem('fopen',JSON.stringify(fopen));localStorage.setItem('sel',SEL);localStorage.setItem('selkind',SELKIND);localStorage.setItem('ctx',CTX)}catch(e){}};
 async function api(path,body){const r=await fetch(path,body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{});return r.json()}
 function el(tag,attrs={},...kids){const e=document.createElement(tag);for(const[k,v]of Object.entries(attrs)){if(k==='class')e.className=v;else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else if(v!==null&&v!==undefined&&v!==false)e.setAttribute(k,v===true?'':v)}for(const k of kids)e.append(k);return e}
 function sv(tag,attrs={},...kids){const e=document.createElementNS(NS,tag);for(const[k,v]of Object.entries(attrs)){if(k==='class')e.setAttribute('class',v);else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else if(v!==null&&v!==undefined)e.setAttribute(k,v)}for(const k of kids)e.append(k);return e}
@@ -450,7 +450,7 @@ function draw(){const edges=$('#edges'),nodes=$('#nodes');edges.replaceChildren(
  const lanes=$('#view');lanes.querySelectorAll('.lane').forEach(l=>l.remove());
  for(const[x,t]of[[X0,'folders'],[XG,'groups'],[XS,'skills']])lanes.insertBefore(sv('text',{class:'lane',x,y:14},t),edges);
  const pos={};FOLDERS.forEach((f,i)=>{pos['f:'+f.path]={x:X0+f.depth*16,y:30+i*ROW,w:W0-f.depth*16}});
- const skills=[];let gy=30;S.groups.forEach(g=>{const open=!!gopen[g.name];const n=open?g.skills.length:0;const h=Math.max(1,n)*ROW;pos['g:'+g.name]={x:XG,y:gy+h/2-ROW/2,w:WG};if(open)g.skills.forEach((k,j)=>{pos['s:'+g.name+':'+k.name]={x:XS,y:gy+j*ROW,w:WS};skills.push({g,k})});gy+=h+(open?14:6)});
+ const skills=[];let gy=30;S.groups.forEach(g=>{const open=!gopen[g.name];const n=open?g.skills.length:0;const h=Math.max(1,n)*ROW;pos['g:'+g.name]={x:XG,y:gy+h/2-ROW/2,w:WG};if(open)g.skills.forEach((k,j)=>{pos['s:'+g.name+':'+k.name]={x:XS,y:gy+j*ROW,w:WS};skills.push({g,k})});gy+=h+(open?14:6)});
  const path=(a,b)=>{const x1=a.x+a.w,y1=a.y+ROW/2-3,x2=b.x,y2=b.y+ROW/2-3,mx=(x1+x2)/2;return `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`};
  const E=[];
  // folder → group edges: the root (user scope) always; other folders only where they differ from the root
@@ -466,11 +466,11 @@ function draw(){const edges=$('#edges'),nodes=$('#nodes');edges.replaceChildren(
   g.addEventListener('click',e=>{if(e.target.classList.contains('tw'))return;select(id)});g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(id)}});return g};
  FOLDERS.forEach(f=>{const p=pos['f:'+f.path];const n=GN.filter(g=>f.on[g]).length;
   node('f:'+f.path,'folder',p,f.isRoot?'~/dev':f.name,f.isRoot?'user scope':((f.has_local||f.has_project)?'⚙ own':`${n}/${GN.length}`),g=>{if(f.has_children&&!f.isRoot){const t=sv('text',{class:'tw',x:8,y:ROW/2+1,role:'button','aria-label':(f.isOpen?'Collapse ':'Expand ')+f.name},f.isOpen?'▾':'▸');t.addEventListener('click',e=>{e.stopPropagation();fopen[f.path]=!f.isOpen;save();load()});g.append(t)}else if(f.isRoot){g.append(sv('text',{class:'tw',x:8,y:ROW/2+1},'●'))}})});
- S.groups.forEach(g=>node('g:'+g.name,'group'+(g.enabled?'':' off'),pos['g:'+g.name],g.name,(g.enabled?'on':'off')+(gopen[g.name]?'':` · ${g.skills.length}`),n=>{const open=!!gopen[g.name];const t=sv('text',{class:'tw',x:8,y:ROW/2+1,role:'button','aria-label':(open?'Collapse ':'Expand ')+g.name},open?'▾':'▸');t.addEventListener('click',e=>{e.stopPropagation();gopen[g.name]=!open;save();draw()});n.append(t)}));
+ S.groups.forEach(g=>node('g:'+g.name,'group'+(g.enabled?'':' off'),pos['g:'+g.name],g.name,(g.enabled?'on':'off')+(gopen[g.name]?` · ${g.skills.length}`:''),n=>{const open=!gopen[g.name];const t=sv('text',{class:'tw',x:8,y:ROW/2+1,role:'button','aria-label':(open?'Collapse ':'Expand ')+g.name},open?'▾':'▸');t.addEventListener('click',e=>{e.stopPropagation();gopen[g.name]=open;save();draw()});n.append(t)}));
  skills.forEach(({g,k})=>node('s:'+g.name+':'+k.name,'skill'+(k.slash_only?' slash':''),pos['s:'+g.name+':'+k.name],k.name,k.slash_only?'slash':''));
  applyView();highlight()}
 function selId(){return SELKIND==='folder'?'f:'+(SEL||ROOT.path):SELKIND==='group'?'g:'+SEL:SELKIND==='skill'?'s:'+SEL:''}
-function select(id){const[kind,...rest]=id.split(':');const key=rest.join(':');if(kind==='f'){SELKIND='folder';SEL=key===ROOT.path?'':key;CTX=SEL}else if(kind==='g'){SELKIND='group';SEL=key;gopen[key]=true}else{SELKIND='skill';SEL=key;gopen[key.split(':')[0]]=true}save();load()}
+function select(id){const[kind,...rest]=id.split(':');const key=rest.join(':');if(kind==='f'){SELKIND='folder';SEL=key===ROOT.path?'':key;CTX=SEL}else if(kind==='g'){SELKIND='group';SEL=key;delete gopen[key]}else{SELKIND='skill';SEL=key;delete gopen[key.split(':')[0]]}save();load()}
 function highlight(){const svg=$('#svg');const id=selId();const lit=new Set();if(!id){svg.classList.remove('dim');return}
  const E=[...$('#edges').children].map(e=>({a:e.dataset.a,b:e.dataset.b,el:e}));lit.add(id);
  const kind=id[0];const groupsOn=new Set(S.groups.filter(g=>g.enabled).map(g=>'g:'+g.name));
