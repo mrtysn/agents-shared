@@ -412,7 +412,7 @@ aside h2{font-size:12px;color:var(--ink2);font-weight:600;margin:12px 0 4px}asid
 .lead{margin:6px 0 0;color:var(--ink2);text-wrap:pretty}
 .list{list-style:none;margin:0;padding:0}.list li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;min-height:28px;padding:0 4px;border-radius:5px}
 .list .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.list .k{color:var(--ink2);font-size:12px}
-.list button.link{border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left;min-width:0;text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line)}
+button.link{border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left;min-width:0;text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line)}
 .sw{display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:2px 3px;font:inherit;font-size:12px;color:var(--ink2);cursor:pointer;border-radius:5px;min-height:24px}
 .sw i{width:26px;height:16px;border-radius:8px;background:var(--off);position:relative;display:inline-block;flex:none}
 .sw i::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--knob)}
@@ -428,7 +428,6 @@ aside h2{font-size:12px;color:var(--ink2);font-weight:600;margin:12px 0 4px}asid
  <h1>Skill Tree</h1>
  <label>Write to <select id="scope" aria-label="Scope that switches write to"><option value="user">user scope, every folder</option><option value="local">this repo, this machine</option><option value="project">this folder, committed</option></select></label>
  <label class="sr" for="q">Find a folder, group or skill</label><input type="search" id="q" placeholder="Find">
- <button class="plain" id="details" aria-pressed="false">Show details</button>
  <button class="plain" id="pane" aria-pressed="true" aria-controls="side">Hide pane</button>
  <p class="msg" id="msg" role="status"></p>
 </div>
@@ -535,7 +534,8 @@ function side(){const a=$('#side');a.replaceChildren();const noProj=!S.project;f
  if(SELKIND===''||SELKIND==='folder'){const f=FOLDERS.find(x=>x.path===(CTX||ROOT.path))||ROOT;const onG=S.groups.filter(g=>g.enabled).length;
   a.append(el('p',{class:'title'},el('span',{class:'mono'},f.isRoot?'~/dev':f.path.slice(S.dev_root.length+1)),el('span',{class:'k'},f.isRoot?'user scope, what every folder inherits':(f.has_local?'has its own settings on this machine':f.has_project?'has its own committed settings':'inherits user scope'))));
   a.append(el('p',{class:'lead'},`A session started here gets ${onG} of ${S.groups.length} groups, about ${fmt(S.always_on)} tokens of skill descriptions.`));
-  a.append(el('h2',{},'Groups'));const ul=el('ul',{class:'list'});
+  const det=el('button',{class:'link',style:'margin-left:auto;font-size:12px','aria-pressed':String(DET),onclick:()=>{DET=!DET;side()}},DET?'Hide scopes and descriptions':'Show scopes and descriptions');
+  a.append(el('h2',{style:'display:flex;align-items:baseline;gap:8px'},'Groups',det));const ul=el('ul',{class:'list'});
   for(const g of S.groups){const li=el('li',{},el('span',{class:'name'},link('g:'+g.name,g.name,'mono'),' ',el('span',{class:'k'},`${g.skills.length} skills`+(g.enabled_by!=='default'&&g.enabled_by!=='user'?`, set at ${g.enabled_by}`:''))),
    sw(g.enabled,`${g.name} group here`,v=>act('/api/group',{id:g.id,scope:scope(),value:v,project:S.project},`${g.name}: ${v?'on':'off'} at ${scope()} scope`)));
    if(DET){const d=el('div',{class:'details'},el('div',{},g.description),el('div',{class:'sc'},el('span',{},`~${fmt(g.tokens)} tokens`)));const sc=el('div',{class:'sc'});for(const s of ['user','project','local'])if(s==='user'||!noProj)sc.append(el('span',{},s),tri(g.scopes[s],s,v=>act('/api/group',{id:g.id,scope:s,value:v,project:S.project},`${g.name}: ${s} scope ${v===null?'cleared':v?'on':'off'}`)));d.append(sc);li.append(d);li.style.gridTemplateColumns='minmax(0,1fr) auto';d.style.gridColumn='1/3'}
@@ -557,7 +557,6 @@ function side(){const a=$('#side');a.replaceChildren();const noProj=!S.project;f
   if(k.has_override)a.append(el('p',{class:'hint'},'Carries a local override in agents-shared.'))}
  a.append(el('p',{class:'hint'},'Click a node to focus it; drag to pan, wheel to zoom. Switches write at the scope chosen at the top. “This repo, this machine” is the repository’s gitignored ',el('code',{},'.claude/settings.local.json'),' and is the usual choice; “this folder, committed” is that folder’s ',el('code',{},'.claude/settings.json'),' for anything the repository’s other readers should share. Local beats project beats user. A skill switch is global: on lets Claude invoke it, off keeps it slash-only.'))}
 $('#scope').addEventListener('change',()=>{scopeTouched=true;side()});
-$('#details').addEventListener('click',e=>{DET=!DET;e.currentTarget.setAttribute('aria-pressed',DET);e.currentTarget.textContent=DET?'Hide details':'Show details';side()});
 (()=>{let on=true;try{on=localStorage.getItem('pane')!=='off'}catch(e){}const b=$('#pane');const apply=()=>{document.body.classList.toggle('nopane',!on);b.setAttribute('aria-pressed',String(on));b.textContent=on?'Hide pane':'Show pane'};apply();b.addEventListener('click',()=>{on=!on;try{localStorage.setItem('pane',on?'on':'off')}catch(e){}apply()})})();
 $('#clear').addEventListener('click',async()=>{SEL='';SELKIND='';CTX='';save();await fetchState();draw();side()});
 $('#q').addEventListener('input',e=>{const q=e.target.value.trim().toLowerCase();const svg=$('#svg');if(!q){highlight();return}svg.classList.add('dim');NODES.forEach((n,id)=>n.classList.toggle('lit',id.toLowerCase().includes(q)));EDGES.forEach(x=>x.el.classList.remove('lit'))});
