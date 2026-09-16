@@ -4,10 +4,12 @@
 
 Groups are the skills-directory plugins under ~/.claude/skills (each a symlink into agents-shared
 with a .claude-plugin/plugin.json). A group is on or off per scope through `enabledPlugins`:
-user (~/.claude/settings.json), project (<repo>/.claude/settings.json, committed) and local
-(<repo>/.claude/settings.local.json). The page shows all three for the project you pick and the
-effective result, and a switch runs `claude plugin enable|disable <group>@skills-dir --scope <s>`
-in that project, which is exactly what the CLI would do.
+user (~/.claude/settings.json, the default for every folder), local (<repo>/.claude/settings.local.json,
+gitignored: this machine's override for one repository) and project (<folder>/.claude/settings.json,
+committed, for the rare setting a repository's other readers should share). The page shows all three
+for the folder you pick and the effective result, and a switch runs
+`claude plugin enable|disable <group>@skills-dir --scope <s>` in that folder, which is exactly what
+the CLI would do. Local is the default target when a folder is selected.
 
 A skill inside a group cannot be scoped per project — Claude Code applies `skillOverrides` to
 plain skills only — so its one control is global: auto (description loaded, Claude may invoke it)
@@ -248,6 +250,8 @@ def folder_states(groups: list[dict], user: dict) -> callable:
             states[g["name"]] = True if v is None else bool(v)
         return {"name": d.name, "path": str(d), "on": states,
                 "has_project": (d / ".claude" / "settings.json").is_file(),
+                "has_local": root is not None and (root / ".claude" / "settings.local.json").is_file()
+                and bool(loc),
                 "is_repo": (d / ".git").exists(),
                 "has_children": bool(subdirs(d))}
     return for_dir
@@ -357,146 +361,171 @@ def set_slash_only(skill_dir: Path, slash_only: bool) -> dict:
 PAGE = r"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <title>Skill Tree</title>
 <style>
-:root{color-scheme:light dark;--bg:#f6f7f9;--card:#fff;--ink:#16181c;--ink2:#555b66;--line:#d8dbe0;--line2:#e9ebee;--focus:#2a78d6;--on:#0f7a52;--off:#8a8f98;--knob:#fff;--code:#eceef1;--sel:#e6eefb;--selink:#0b3c86}
-@media(prefers-color-scheme:dark){:root{--bg:#15171a;--card:#1f2226;--ink:#e6e8eb;--ink2:#a3aab4;--line:#2c3037;--line2:#262a30;--focus:#3987e5;--on:#3fbf88;--off:#6b717b;--knob:#e6e8eb;--code:#272b31;--sel:#1f2a3a;--selink:#bcd4ff}}
+:root{color-scheme:light dark;--bg:#f6f7f9;--card:#fff;--ink:#16181c;--ink2:#555b66;--line:#d8dbe0;--line2:#e9ebee;--focus:#2a78d6;--on:#0f7a52;--off:#8a8f98;--knob:#fff;--code:#eceef1;--sel:#e6eefb;--edge:#b9bec7;--edge-on:#0f7a52;--node:#fff;--node-line:#c9cdd4}
+@media(prefers-color-scheme:dark){:root{--bg:#15171a;--card:#1f2226;--ink:#e6e8eb;--ink2:#a3aab4;--line:#2c3037;--line2:#262a30;--focus:#3987e5;--on:#3fbf88;--off:#6b717b;--knob:#e6e8eb;--code:#272b31;--sel:#1f2a3a;--edge:#3a3f47;--edge-on:#3fbf88;--node:#22262b;--node-line:#3a3f47}}
 *{box-sizing:border-box}[hidden]{display:none!important}
-html{scroll-padding-top:60px}
-body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;height:100vh;display:grid;grid-template-rows:auto minmax(0,1fr)}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
 .sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-.top{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:8px 20px;display:flex;gap:6px 14px;align-items:center;flex-wrap:wrap}
+.top{background:var(--bg);border-bottom:1px solid var(--line);padding:8px 16px;display:flex;gap:6px 14px;align-items:center;flex-wrap:wrap}
 h1{font-size:14px;margin:0;font-weight:600}.top label{display:inline-flex;gap:6px;align-items:center;color:var(--ink2)}
 select,input[type=search],button.plain{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:3px 9px;min-height:28px}
-input[type=search]{min-width:170px}button.plain{cursor:pointer}button.plain[aria-pressed=true]{background:var(--code)}
+input[type=search]{min-width:160px}button.plain{cursor:pointer}button.plain[aria-pressed=true]{background:var(--code)}
 @media(hover:hover){button.plain:hover{border-color:var(--ink2)}}
 .msg{margin:0 0 0 auto;color:var(--ink2)}.msg.err{color:#b32d1c}@media(prefers-color-scheme:dark){.msg.err{color:#ff8b74}}
-.wrap{display:grid;grid-template-columns:minmax(240px,20rem) minmax(0,1fr);gap:0 28px;padding:12px 20px 60px}
-@media(max-width:860px){.wrap{grid-template-columns:1fr}}
-aside{position:sticky;top:var(--top-h,0px);align-self:start;max-height:calc(100vh - var(--top-h,0px));overflow:auto;padding:6px 0 20px}
-h2{font-size:12px;color:var(--ink2);font-weight:600;margin:10px 0 4px;letter-spacing:.01em}
-/* folder tree: the primary navigation */
-.ft,.ft ul{list-style:none;margin:0;padding:0}.ft ul{padding-left:16px}
-.frow{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:4px;align-items:center;min-height:26px;padding:0 6px 0 2px;border-radius:5px}
-@media(hover:hover){.frow:hover{background:var(--card)}}
-.frow.sel{background:var(--sel);color:var(--selink)}.frow.sel .name{font-weight:600}
-.tw{width:18px;height:22px;border:0;background:none;padding:0;color:var(--ink2);cursor:pointer;font-size:11px;border-radius:4px}
-.tw::before{content:"▸"}.tw[aria-expanded=true]::before{content:"▾"}.tw.leaf{visibility:hidden}
-.pick{border:0;background:none;padding:0 2px;font:inherit;color:inherit;cursor:pointer;text-align:left;min-width:0;display:flex;gap:6px;align-items:baseline;min-height:24px}
-.pick .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px}.pick .k{color:var(--ink2);font-size:12px}
-.strip{display:inline-flex;gap:2px}.strip i{width:6px;height:10px;border-radius:2px;background:var(--off);display:inline-block}.strip i.on{background:var(--on)}
-/* detail pane */
-.crumb{display:flex;flex-wrap:wrap;gap:4px;align-items:baseline;margin:6px 0 2px;font-size:13px}
-.crumb button{border:0;background:none;padding:0 2px;font:inherit;color:var(--ink2);cursor:pointer;text-decoration:underline;text-underline-offset:3px}.crumb b{font-weight:600}.crumb .sep{color:var(--ink2)}
-.lead{margin:0 0 14px;color:var(--ink2);max-width:70ch}
-.tree,.tree ul{list-style:none;margin:0;padding:0}.tree ul{padding-left:20px}
-.row{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:8px;align-items:center;min-height:28px;padding:0 6px 0 2px;border-radius:5px}
-@media(hover:hover){.row:hover{background:var(--card)}}
-.row .n{display:flex;gap:8px;align-items:baseline;min-width:0}.row .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.row.g .name{font-weight:600}
-.row .k{color:var(--ink2);font-size:12px;white-space:nowrap}
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) 22rem;min-height:0}
+@media(max-width:860px){.wrap{grid-template-columns:1fr;grid-template-rows:60vh auto}}
+/* canvas */
+.canvas{position:relative;overflow:hidden;background:var(--bg);cursor:grab;touch-action:none;user-select:none}
+.canvas.drag{cursor:grabbing}
+.canvas svg{position:absolute;inset:0;width:100%;height:100%}
+.lane{font-size:11px;font-weight:600;fill:var(--ink2);letter-spacing:.02em}
+.edge{fill:none;stroke:var(--edge);stroke-width:1.2}.edge.on{stroke:var(--edge-on);stroke-width:1.6}
+.node rect{fill:var(--node);stroke:var(--node-line);stroke-width:1;rx:6}
+.node text{fill:var(--ink);font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;pointer-events:none}
+.node text.sub{fill:var(--ink2);font-size:10.5px;font-family:system-ui,-apple-system,sans-serif}
+.node .dot{fill:var(--off)}.node .dot.on{fill:var(--on)}
+.node.folder rect{stroke-width:1}.node.group rect{stroke:var(--on);stroke-width:1.2}.node.group.off rect{stroke:var(--off);stroke-dasharray:3 2}
+.node.skill rect{rx:10}.node.skill.slash rect{stroke-dasharray:3 2}
+.node.sel rect{stroke:var(--focus);stroke-width:2;fill:var(--sel)}
+.node .tw{fill:var(--ink2);font-size:10px;font-family:system-ui,sans-serif}
+.node{cursor:pointer}
+svg.dim .node:not(.lit){opacity:.18}svg.dim .edge:not(.lit){opacity:.12}svg.dim .lane{opacity:.6}
+@media(prefers-reduced-motion:no-preference){.node,.edge{transition:opacity .15s}}
+.fab{position:absolute;right:12px;bottom:12px;display:flex;gap:6px}
+/* detail */
+aside{border-left:1px solid var(--line);padding:12px 16px;overflow:auto;min-height:0}
+@media(max-width:860px){aside{border-left:0;border-top:1px solid var(--line)}}
+aside h2{font-size:12px;color:var(--ink2);font-weight:600;margin:12px 0 4px}aside h2:first-child{margin-top:0}
+.title{margin:0;font-weight:600;font-size:13px;overflow-wrap:anywhere}.title .k{color:var(--ink2);font-weight:normal;display:block;font-size:12px}
+.lead{margin:6px 0 0;color:var(--ink2);text-wrap:pretty}
+.list{list-style:none;margin:0;padding:0}.list li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;min-height:28px;padding:0 4px;border-radius:5px}
+.list .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.list .k{color:var(--ink2);font-size:12px}
+.list button.link{border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left;min-width:0;text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line)}
 .sw{display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:2px 3px;font:inherit;font-size:12px;color:var(--ink2);cursor:pointer;border-radius:5px;min-height:24px}
 .sw i{width:26px;height:16px;border-radius:8px;background:var(--off);position:relative;display:inline-block;flex:none}
 .sw i::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--knob)}
 .sw[aria-checked=true] i{background:var(--on)}.sw[aria-checked=true] i::after{left:12px}.sw[aria-checked=true]{color:var(--on)}
 .sw .lab{min-width:3.2em;text-align:left}
-.details{color:var(--ink2);font-size:12px;line-height:1.45;padding:0 6px 8px 28px;display:grid;gap:3px;text-wrap:pretty}
-.details .sc{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .tri{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:var(--card)}
 .tri button{border:0;border-radius:0;min-height:22px;padding:1px 7px;background:none;color:var(--ink2);font:inherit;font-size:12px;cursor:pointer}
 .tri button+button{border-left:1px solid var(--line2)}.tri button[aria-pressed=true]{background:var(--code);color:var(--ink);font-weight:600}
-.act button{border:0;background:none;color:var(--ink2);text-decoration:underline;text-underline-offset:3px;cursor:pointer;font:inherit;font-size:12px;padding:2px 4px}
-.hint{color:var(--ink2);font-size:12px;margin:18px 0 0;max-width:70ch}.hint code{font-family:ui-monospace,Menlo,monospace;background:var(--code);padding:1px 5px;border-radius:3px;color:var(--ink)}
-@media(max-width:640px){.top,.wrap{padding-left:12px;padding-right:12px}.sw .lab{display:none}aside{position:static;max-height:none}}
+.details{color:var(--ink2);font-size:12px;display:grid;gap:4px;margin-top:4px}.details .sc{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.hint{color:var(--ink2);font-size:12px;margin:16px 0 0}.hint code{font-family:ui-monospace,Menlo,monospace;background:var(--code);padding:1px 5px;border-radius:3px;color:var(--ink)}
 </style></head><body>
 <div class="top">
  <h1>Skill Tree</h1>
- <label>Write to <select id="scope" aria-label="Scope that switches write to"><option value="user">user scope</option><option value="project">project scope</option><option value="local">local scope</option></select></label>
- <label class="sr" for="q">Filter skills</label><input type="search" id="q" placeholder="Filter skills">
+ <label>Write to <select id="scope" aria-label="Scope that switches write to"><option value="user">user scope, every folder</option><option value="local">this repo, this machine</option><option value="project">this folder, committed</option></select></label>
+ <label class="sr" for="q">Find a folder, group or skill</label><input type="search" id="q" placeholder="Find">
  <button class="plain" id="details" aria-pressed="false">Show details</button>
  <p class="msg" id="msg" role="status"></p>
 </div>
 <div class="wrap">
- <aside>
-  <h2>Folders</h2>
-  <ul class="ft" id="folders" aria-label="Folders"></ul>
- </aside>
- <main>
-  <nav class="crumb" id="crumb" aria-label="Selected folder"></nav>
-  <p class="lead" id="lead"></p>
-  <h2>Groups <span class="act"><button id="expand-all">expand all</button> <button id="collapse-all">collapse all</button></span></h2>
-  <ul class="tree" id="tree"></ul>
-  <h2>Flat skills</h2>
-  <ul class="tree" id="flat"></ul>
-  <p class="hint">A group switch writes <code>enabledPlugins</code> at the scope chosen at the top. Picking a folder selects local scope: its repository's <code>settings.local.json</code>, ignored by git, so skill config stays on this machine. Project scope is the folder's own committed <code>.claude/settings.json</code>, for the rare setting a repo should carry everywhere. Local beats project beats user. A session started in a subfolder reads the project file from that subfolder, not the repository root. A skill switch inside a group is global: on lets Claude invoke it, off keeps it slash-only. Open sessions pick changes up on <code>/reload-plugins</code>.</p>
- </main>
+ <div class="canvas" id="canvas">
+  <svg id="svg" aria-label="Folders, groups and skills"><g id="view"><g id="edges"></g><g id="nodes"></g></g></svg>
+  <div class="fab"><button class="plain" id="fit">Fit</button><button class="plain" id="clear">Clear selection</button></div>
+ </div>
+ <aside id="side"></aside>
 </div>
 <script>
-const $=(s,r=document)=>r.querySelector(s);let S=null,DET=false,SEL='',GN=[],ROOT=null;const fmt=t=>t>=1000?(t/1000).toFixed(1)+'k':String(t);
-let open={},fopen={};try{open=JSON.parse(localStorage.getItem('open')||'{}');fopen=JSON.parse(localStorage.getItem('fopen')||'{}');SEL=localStorage.getItem('sel')||''}catch(e){}
-const save=()=>{try{localStorage.setItem('open',JSON.stringify(open));localStorage.setItem('fopen',JSON.stringify(fopen));localStorage.setItem('sel',SEL)}catch(e){}};
+const $=(s,r=document)=>r.querySelector(s);const NS='http://www.w3.org/2000/svg';
+let S=null,DET=false,SEL='',SELKIND='',CTX='',GN=[],ROOT=null,FOLDERS=[],fopen={},gopen={},view={x:0,y:0,k:1};const fmt=t=>t>=1000?(t/1000).toFixed(1)+'k':String(t);
+try{fopen=JSON.parse(localStorage.getItem('fopen')||'{}');gopen=JSON.parse(localStorage.getItem('gopen')||'{}');SEL=localStorage.getItem('sel')||'';SELKIND=localStorage.getItem('selkind')||'';CTX=localStorage.getItem('ctx')||''}catch(e){}
+const save=()=>{try{localStorage.setItem('gopen',JSON.stringify(gopen));localStorage.setItem('fopen',JSON.stringify(fopen));localStorage.setItem('sel',SEL);localStorage.setItem('selkind',SELKIND);localStorage.setItem('ctx',CTX)}catch(e){}};
 async function api(path,body){const r=await fetch(path,body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{});return r.json()}
 function el(tag,attrs={},...kids){const e=document.createElement(tag);for(const[k,v]of Object.entries(attrs)){if(k==='class')e.className=v;else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else if(v!==null&&v!==undefined&&v!==false)e.setAttribute(k,v===true?'':v)}for(const k of kids)e.append(k);return e}
-async function load(picked){S=await api('/api/state'+(SEL?'?project='+encodeURIComponent(SEL):''));if(S.error){SEL='';save();return load()}
- if(picked)$('#scope').value=S.project?'local':'user';render();loadFolders();
- if(picked)say(S.project?`${S.project.split('/').pop()}: switches write to its repository's .claude/settings.local.json, which stays on this machine`:'user scope: switches write to ~/.claude/settings.json')}
+function sv(tag,attrs={},...kids){const e=document.createElementNS(NS,tag);for(const[k,v]of Object.entries(attrs)){if(k==='class')e.setAttribute('class',v);else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else if(v!==null&&v!==undefined)e.setAttribute(k,v)}for(const k of kids)e.append(k);return e}
+function scope(){return $('#scope').value}
+async function act(p,body,done){say('');const r=await api(p,body);if(!r.ok){say(r.error,'err');return}say(done);load()}
+function say(t,cls){const m=$('#msg');m.textContent=t||'';m.className='msg'+(cls?' '+cls:'')}
+const folderProject=()=>CTX;
+async function load(){S=await api('/api/state'+(folderProject()?'?project='+encodeURIComponent(folderProject()):''));if(S.error){SEL='';SELKIND='';CTX='';save();return load()}
+ const root=await api('/api/dirs');GN=root.group_names;ROOT=root.self;FOLDERS=[];await walk(root.self,root.children,0);draw();side()}
+async function walk(f,children,depth){const isRoot=depth===0;const isOpen=isRoot||!!fopen[f.path];FOLDERS.push({...f,depth,isOpen,isRoot});
+ if(isOpen&&f.has_children){const kids=children||(await api('/api/dirs?path='+encodeURIComponent(f.path))).children;for(const c of kids)await walk(c,null,depth+1)}}
+// ── graph ──
+const ROW=26,X0=24,XG=560,XS=800,W0=280,WG=150,WS=190;
+function draw(){const edges=$('#edges'),nodes=$('#nodes');edges.replaceChildren();nodes.replaceChildren();
+ const lanes=$('#view');lanes.querySelectorAll('.lane').forEach(l=>l.remove());
+ for(const[x,t]of[[X0,'folders'],[XG,'groups'],[XS,'skills']])lanes.insertBefore(sv('text',{class:'lane',x,y:14},t),edges);
+ const pos={};FOLDERS.forEach((f,i)=>{pos['f:'+f.path]={x:X0+f.depth*16,y:30+i*ROW,w:W0-f.depth*16}});
+ const skills=[];let gy=30;S.groups.forEach(g=>{const open=!!gopen[g.name];const n=open?g.skills.length:0;const h=Math.max(1,n)*ROW;pos['g:'+g.name]={x:XG,y:gy+h/2-ROW/2,w:WG};if(open)g.skills.forEach((k,j)=>{pos['s:'+g.name+':'+k.name]={x:XS,y:gy+j*ROW,w:WS};skills.push({g,k})});gy+=h+(open?14:6)});
+ const path=(a,b)=>{const x1=a.x+a.w,y1=a.y+ROW/2-3,x2=b.x,y2=b.y+ROW/2-3,mx=(x1+x2)/2;return `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`};
+ const E=[];
+ // folder → group edges: the root (user scope) always; other folders only where they differ from the root
+ FOLDERS.forEach(f=>{GN.forEach(g=>{const on=!!f.on[g];if(f.isRoot){if(on)E.push({a:'f:'+f.path,b:'g:'+g,on:true})}else if(on!==!!ROOT.on[g])E.push({a:'f:'+f.path,b:'g:'+g,on,own:true})});
+ });
+ skills.forEach(({g,k})=>E.push({a:'g:'+g.name,b:'s:'+g.name+':'+k.name,on:g.enabled&&!k.slash_only}));
+ for(const e of E){const a=pos[e.a],b=pos[e.b];if(!a||!b)continue;
+  let d;if(e.inherit){const x1=a.x,y1=a.y+ROW/2-3,x2=b.x+8,y2=b.y+ROW-2;d=`M${x1},${y1} C${x1-14},${y1} ${x2},${y2+10} ${x2},${y2}`}else d=path(a,b);
+  edges.append(sv('path',{class:'edge'+(e.on?' on':''),d,'data-a':e.a,'data-b':e.b}))}
+ const node=(id,cls,p,label,sub,extra)=>{const g=sv('g',{class:'node '+cls+(id===selId()?' sel':''),transform:`translate(${p.x},${p.y})`,'data-id':id,tabindex:0,role:'button','aria-label':label+(sub?', '+sub:'')});
+  g.append(sv('rect',{width:p.w,height:ROW-6}));if(extra)extra(g);const t=sv('text',{x:extra?22:10,y:ROW/2+1},label);g.append(t);let subEl=null;if(sub){subEl=sv('text',{class:'sub',x:p.w-8,y:ROW/2+1,'text-anchor':'end'},sub);g.append(subEl)}
+  nodes.append(g);const room=p.w-(extra?22:10)-8-(subEl?subEl.getComputedTextLength()+8:0);if(t.getComputedTextLength()>room){let txt=label;while(txt.length>1&&t.getComputedTextLength()>room){txt=txt.slice(0,-1);t.textContent=txt+'…'}g.append(sv('title',{},label))}
+  g.addEventListener('click',e=>{if(e.target.classList.contains('tw'))return;select(id)});g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(id)}});return g};
+ FOLDERS.forEach(f=>{const p=pos['f:'+f.path];const n=GN.filter(g=>f.on[g]).length;
+  node('f:'+f.path,'folder',p,f.isRoot?'~/dev':f.name,f.isRoot?'user scope':((f.has_local||f.has_project)?'⚙ own':`${n}/${GN.length}`),g=>{if(f.has_children&&!f.isRoot){const t=sv('text',{class:'tw',x:8,y:ROW/2+1,role:'button','aria-label':(f.isOpen?'Collapse ':'Expand ')+f.name},f.isOpen?'▾':'▸');t.addEventListener('click',e=>{e.stopPropagation();fopen[f.path]=!f.isOpen;save();load()});g.append(t)}else if(f.isRoot){g.append(sv('text',{class:'tw',x:8,y:ROW/2+1},'●'))}})});
+ S.groups.forEach(g=>node('g:'+g.name,'group'+(g.enabled?'':' off'),pos['g:'+g.name],g.name,(g.enabled?'on':'off')+(gopen[g.name]?'':` · ${g.skills.length}`),n=>{const open=!!gopen[g.name];const t=sv('text',{class:'tw',x:8,y:ROW/2+1,role:'button','aria-label':(open?'Collapse ':'Expand ')+g.name},open?'▾':'▸');t.addEventListener('click',e=>{e.stopPropagation();gopen[g.name]=!open;save();draw()});n.append(t)}));
+ skills.forEach(({g,k})=>node('s:'+g.name+':'+k.name,'skill'+(k.slash_only?' slash':''),pos['s:'+g.name+':'+k.name],k.name,k.slash_only?'slash':''));
+ applyView();highlight()}
+function selId(){return SELKIND==='folder'?'f:'+(SEL||ROOT.path):SELKIND==='group'?'g:'+SEL:SELKIND==='skill'?'s:'+SEL:''}
+function select(id){const[kind,...rest]=id.split(':');const key=rest.join(':');if(kind==='f'){SELKIND='folder';SEL=key===ROOT.path?'':key;CTX=SEL}else if(kind==='g'){SELKIND='group';SEL=key;gopen[key]=true}else{SELKIND='skill';SEL=key;gopen[key.split(':')[0]]=true}save();load()}
+function highlight(){const svg=$('#svg');const id=selId();const lit=new Set();if(!id){svg.classList.remove('dim');return}
+ const E=[...$('#edges').children].map(e=>({a:e.dataset.a,b:e.dataset.b,el:e}));lit.add(id);
+ const kind=id[0];const groupsOn=new Set(S.groups.filter(g=>g.enabled).map(g=>'g:'+g.name));
+ if(kind==='f'){const f=FOLDERS.find(x=>'f:'+x.path===id);GN.forEach(g=>{if(f&&f.on[g])lit.add('g:'+g)});
+  for(const g of S.groups)if(f&&f.on[g.name])g.skills.forEach(k=>{if(!k.slash_only)lit.add('s:'+g.name+':'+k.name)});
+  if(f&&!f.isRoot&&!(f.has_local||f.has_project))lit.add('f:'+ROOT.path)}
+ else if(kind==='g'){const gname=id.slice(2);FOLDERS.forEach(f=>{if(f.on[gname])lit.add('f:'+f.path)});const g=S.groups.find(x=>x.name===gname);g&&g.skills.forEach(k=>lit.add('s:'+gname+':'+k.name))}
+ else{const [gname]=id.slice(2).split(':');lit.add('g:'+gname);FOLDERS.forEach(f=>{if(f.on[gname])lit.add('f:'+f.path)})}
+ svg.classList.add('dim');$('#nodes').querySelectorAll('.node').forEach(n=>n.classList.toggle('lit',lit.has(n.dataset.id)));
+ E.forEach(e=>e.el.classList.toggle('lit',lit.has(e.a)&&lit.has(e.b)))}
+// ── pan / zoom ──
+const applyView=()=>$('#view').setAttribute('transform',`translate(${view.x},${view.y}) scale(${view.k})`);
+(()=>{const c=$('#canvas');let drag=null;c.addEventListener('pointerdown',e=>{if(e.target.closest('.node,.fab'))return;drag={x:e.clientX-view.x,y:e.clientY-view.y};c.classList.add('drag');c.setPointerCapture(e.pointerId)});
+ c.addEventListener('pointermove',e=>{if(!drag)return;view.x=e.clientX-drag.x;view.y=e.clientY-drag.y;applyView()});
+ const end=()=>{drag=null;c.classList.remove('drag')};c.addEventListener('pointerup',end);c.addEventListener('pointercancel',end);
+ c.addEventListener('wheel',e=>{e.preventDefault();const r=c.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;const k=Math.min(3,Math.max(.3,view.k*(e.deltaY<0?1.1:1/1.1)));view.x=mx-(mx-view.x)*k/view.k;view.y=my-(my-view.y)*k/view.k;view.k=k;applyView()},{passive:false});
+ $('#fit').addEventListener('click',fit)})();
+function fit(){const b=$('#view').getBBox(),c=$('#canvas').getBoundingClientRect();const k=Math.min(1.25,(c.width-32)/b.width,(c.height-32)/b.height);view={k,x:16-b.x*k,y:16-b.y*k};applyView()}
+// ── detail pane ──
 function sw(on,name,cb,labels=['on','off']){return el('button',{class:'sw',role:'switch','aria-checked':String(on),'aria-label':name,onclick:()=>cb(!on)},el('i'),el('span',{class:'lab'},on?labels[0]:labels[1]))}
 function tri(cur,scope,cb){const t=el('span',{class:'tri',role:'group','aria-label':scope+' scope'});for(const[lab,val,name]of[['on',true,'on'],['–',null,'not set'],['off',false,'off']])t.append(el('button',{'aria-label':name,'aria-pressed':String(cur===val),onclick:()=>cb(val)},lab));return t}
-async function act(p,body,done){say('working…');let r;try{r=await api(p,body)}catch(e){say('request failed: '+e.message+' (the server log has the traceback)','err');return}if(!r.ok){say(r.error,'err');return}say(done);load()}
-function scope(){return $('#scope').value}
-function strip(on){const n=GN.filter(g=>on[g]).length;const d=el('span',{class:'strip',role:'img','aria-label':`${n} of ${GN.length} groups on`});for(const g of GN)d.append(el('i',{class:on[g]?'on':'',title:g+(on[g]?': on':': off')}));return d}
-// ── folder tree ──
-async function loadFolders(){const root=await api('/api/dirs');GN=root.group_names;ROOT=root.self;const ul=$('#folders');ul.replaceChildren(await folderNode(root.self,root.children,true));ul.querySelector('.frow.sel')?.scrollIntoView({block:'nearest'})}
-async function folderNode(f,children,isRoot){const li=el('li',{'data-path':f.path});const isOpen=isRoot||!!fopen[f.path];const sel=SEL===f.path||(isRoot&&!SEL);
- const tw=el('button',{class:'tw'+(f.has_children?'':' leaf'),'aria-expanded':String(isOpen),'aria-label':(isOpen?'Collapse ':'Expand ')+f.name,onclick:()=>{fopen[f.path]=!isOpen;save();loadFolders()}});
- const pick=el('button',{class:'pick','aria-current':sel?'true':null,onclick:()=>{SEL=isRoot?'':f.path;save();load(true)}},el('span',{class:'name mono'},isRoot?'~/dev':f.name),f.has_project?el('span',{class:'k',title:'Has its own committed .claude/settings.json'},'⚙'):'');
- li.append(el('div',{class:'frow'+(sel?' sel':'')},tw,pick,strip(f.on)));
- if(isOpen&&f.has_children){const kids=children||(await api('/api/dirs?path='+encodeURIComponent(f.path))).children;const sub=el('ul');for(const c of kids)sub.append(await folderNode(c,null,false));li.append(sub)}
- return li}
-// ── detail pane ──
-function render(){
- const noProj=!S.project;for(const o of $('#scope').options)o.disabled=o.value!=='user'&&noProj;if(noProj)$('#scope').value='user';
- const crumb=$('#crumb');crumb.replaceChildren();
- if(noProj){crumb.append(el('b',{class:'mono'},'~/dev'),el('span',{class:'k'},' user scope, what every folder inherits'))}
- else{const rel=S.project.slice(S.dev_root.length+1).split('/');crumb.append(el('button',{class:'mono',onclick:()=>{SEL='';save();load()}},'~/dev'));let acc=S.dev_root;
-  rel.forEach((part,i)=>{acc+='/'+part;crumb.append(el('span',{class:'sep'},'/'));crumb.append(i===rel.length-1?el('b',{class:'mono'},part):el('button',{class:'mono',onclick:((p)=>()=>{SEL=p;save();load()})(acc)},part))})}
- const onG=S.groups.filter(g=>g.enabled).length;
- $('#lead').textContent=`A session started here gets ${onG} of ${S.groups.length} groups, about ${fmt(S.always_on)} tokens of skill descriptions.`;
- const tree=$('#tree');tree.replaceChildren();
- for(const g of S.groups){
-  const li=el('li',{'data-name':g.name,'data-desc':g.description});const isOpen=!!open[g.name];
-  const tw=el('button',{class:'tw','aria-expanded':String(isOpen),'aria-label':(isOpen?'Collapse ':'Expand ')+g.name,onclick:()=>{open[g.name]=!isOpen;save();render()}});
-  const hidden=g.skills.filter(k=>k.slash_only).length;
-  li.append(el('div',{class:'row g'},tw,el('span',{class:'n'},el('span',{class:'name mono'},g.name),el('span',{class:'k'},`${g.skills.length} skills`+(hidden?`, ${hidden} slash-only`:'')+(g.enabled_by!=='default'&&g.enabled_by!=='user'?`, set at ${g.enabled_by} scope`:''))),
-   sw(g.enabled,`${g.name} group`,v=>act('/api/group',{id:g.id,scope:scope(),value:v,project:S.project},`${g.name}: ${v?'on':'off'} at ${scope()} scope`))));
-  if(DET){const d=el('div',{class:'details'},el('div',{},g.description),el('div',{class:'sc'},el('span',{},`~${fmt(g.tokens)} tokens`)));
-   const sc=el('div',{class:'sc'});for(const s of ['user','project','local'])if(s==='user'||!noProj)sc.append(el('span',{},s),tri(g.scopes[s],s,v=>act('/api/group',{id:g.id,scope:s,value:v,project:S.project},`${g.name}: ${s} scope ${v===null?'cleared':v?'on':'off'}`)));
-   d.append(sc);li.append(d)}
-  if(isOpen){const ul=el('ul');for(const k of g.skills){const kli=el('li',{'data-name':k.name,'data-desc':k.description});
-   kli.append(el('div',{class:'row'},el('span'),el('span',{class:'n'},el('span',{class:'name mono',title:k.description},k.name),k.has_override?el('span',{class:'k',title:'Has a local override'},'edited'):''),
-    sw(!k.slash_only,`${k.name} invocable by Claude`,v=>act('/api/skill',{dir:k.dir,slash_only:!v},`${k.name}: ${v?'auto':'slash-only'}`),['auto','slash'])));
-   if(DET)kli.append(el('div',{class:'details'},el('div',{},k.description),el('div',{class:'sc'},el('span',{},`~${fmt(k.tokens)} tokens`))));
-   ul.append(kli)}li.append(ul)}
-  tree.append(li)}
- const fl=$('#flat');fl.replaceChildren();
- for(const k of S.flat){const li=el('li',{'data-name':k.name,'data-desc':k.description});const on=k.state==='on';
-  li.append(el('div',{class:'row'},el('span'),el('span',{class:'n'},el('span',{class:'name mono',title:k.description},k.name),el('span',{class:'k'},on?'':k.state==='off'?'off':k.state==='name-only'?'name only':'slash-only')),
-   sw(on,k.name,v=>act('/api/override',{name:k.name,scope:scope(),value:v?'on':'off',project:S.project},`${k.name}: ${v?'on':'off'} at ${scope()} scope`))));
-  if(DET){const d=el('div',{class:'details'},el('div',{},k.description),el('div',{class:'sc'},el('span',{},`~${fmt(k.tokens)} tokens`),el('span',{},k.state_by==='default'?'':'decided at '+k.state_by+' scope')));
-   const sc=el('div',{class:'sc'},el('span',{},'state at '+scope()+' scope'));const seg=el('span',{class:'tri',role:'group','aria-label':'visibility for '+k.name});
-   for(const[lab,val]of[['on','on'],['name only','name-only'],['slash only','user-invocable-only'],['off','off']])seg.append(el('button',{'aria-pressed':String((k.scopes[scope()]||'on')===val),onclick:()=>act('/api/override',{name:k.name,scope:scope(),value:val,project:S.project},`${k.name}: ${lab} at ${scope()} scope`)},lab));
-   sc.append(seg);d.append(sc);li.append(d)}
-  fl.append(li)}
- filter()}
-function say(t,cls){const m=$('#msg');m.textContent=t||'';m.className='msg'+(cls?' '+cls:'')}
-function filter(){const q=$('#q').value.trim().toLowerCase();const hit=e=>!q||(e.dataset.name+' '+(e.dataset.desc||'')).toLowerCase().includes(q);
- for(const g of $('#tree').children){const gh=hit(g);let any=gh;for(const k of g.querySelectorAll('ul>li')){const h=gh||hit(k);k.hidden=!h;any=any||h}g.hidden=!any;if(q&&any&&!gh&&!g.querySelector('ul')){open[g.dataset.name]=true;render();return}}
- for(const k of $('#flat').children)k.hidden=!hit(k)}
-$('#scope').addEventListener('change',()=>render());$('#q').addEventListener('input',filter);
-$('#details').addEventListener('click',e=>{DET=!DET;e.currentTarget.setAttribute('aria-pressed',DET);e.currentTarget.textContent=DET?'Hide details':'Show details';render()});
-$('#expand-all').addEventListener('click',()=>{for(const g of S.groups)open[g.name]=true;save();render()});
-$('#collapse-all').addEventListener('click',()=>{open={};save();render()});
-document.addEventListener('keydown',e=>{if(e.key==='/'&&document.activeElement!==$('#q')){e.preventDefault();$('#q').focus()}});
-const topH=()=>document.documentElement.style.setProperty('--top-h',$('.top').getBoundingClientRect().height+'px');new ResizeObserver(topH).observe($('.top'));topH();
+let scopeTouched=false;
+function side(){const a=$('#side');a.replaceChildren();const noProj=!S.project;for(const o of $('#scope').options)o.disabled=o.value!=='user'&&noProj;if(noProj)$('#scope').value='user';else if(!scopeTouched&&$('#scope').value==='user')$('#scope').value='local';
+ const link=(id,text,cls='')=>el('button',{class:'link '+cls,onclick:()=>select(id)},text);
+ const ctxName=CTX?CTX.split('/').pop():'user scope';
+ if(SELKIND===''||SELKIND==='folder'){const f=FOLDERS.find(x=>x.path===(CTX||ROOT.path))||ROOT;const onG=S.groups.filter(g=>g.enabled).length;
+  a.append(el('p',{class:'title'},el('span',{class:'mono'},f.isRoot?'~/dev':f.path.slice(S.dev_root.length+1)),el('span',{class:'k'},f.isRoot?'user scope, what every folder inherits':(f.has_local?'has its own settings on this machine':f.has_project?'has its own committed settings':'inherits user scope'))));
+  a.append(el('p',{class:'lead'},`A session started here gets ${onG} of ${S.groups.length} groups, about ${fmt(S.always_on)} tokens of skill descriptions.`));
+  a.append(el('h2',{},'Groups'));const ul=el('ul',{class:'list'});
+  for(const g of S.groups){const li=el('li',{},el('span',{class:'name'},link('g:'+g.name,g.name,'mono'),' ',el('span',{class:'k'},`${g.skills.length} skills`+(g.enabled_by!=='default'&&g.enabled_by!=='user'?`, set at ${g.enabled_by}`:''))),
+   sw(g.enabled,`${g.name} group here`,v=>act('/api/group',{id:g.id,scope:scope(),value:v,project:S.project},`${g.name}: ${v?'on':'off'} at ${scope()} scope`)));
+   if(DET){const d=el('div',{class:'details'},el('div',{},g.description),el('div',{class:'sc'},el('span',{},`~${fmt(g.tokens)} tokens`)));const sc=el('div',{class:'sc'});for(const s of ['user','project','local'])if(s==='user'||!noProj)sc.append(el('span',{},s),tri(g.scopes[s],s,v=>act('/api/group',{id:g.id,scope:s,value:v,project:S.project},`${g.name}: ${s} scope ${v===null?'cleared':v?'on':'off'}`)));d.append(sc);li.append(d);li.style.gridTemplateColumns='minmax(0,1fr) auto';d.style.gridColumn='1/3'}
+   ul.append(li)}a.append(ul);
+  a.append(el('h2',{},'Flat skills'));const fl=el('ul',{class:'list'});
+  for(const k of S.flat){const on=k.state==='on';fl.append(el('li',{},el('span',{class:'name'},el('span',{class:'mono',title:k.description},k.name),' ',el('span',{class:'k'},on?'':k.state==='off'?'off':k.state==='name-only'?'name only':'slash-only')),
+   sw(on,k.name,v=>act('/api/override',{name:k.name,scope:scope(),value:v?'on':'off',project:S.project},`${k.name}: ${v?'on':'off'} at ${scope()} scope`))))}a.append(fl)}
+ else if(SELKIND==='group'){const g=S.groups.find(x=>x.name===SEL);if(!g)return;const where=FOLDERS.filter(f=>f.on[g.name]&&!f.isRoot);
+  a.append(el('p',{class:'title'},el('span',{class:'mono'},g.name),el('span',{class:'k'},g.description)));
+  a.append(el('p',{class:'lead'},`${g.skills.length} skills, ~${fmt(g.tokens)} tokens of descriptions when on.`));
+  const inl=el('ul',{class:'list'});inl.append(el('li',{},el('span',{class:'name'},'In ',el('span',{class:'mono'},ctxName)),sw(g.enabled,`${g.name} in ${ctxName}`,v=>act('/api/group',{id:g.id,scope:scope(),value:v,project:S.project},`${g.name}: ${v?'on':'off'} at ${scope()} scope`))));a.append(inl);
+  a.append(el('h2',{},'Skills'));const ul=el('ul',{class:'list'});for(const k of g.skills)ul.append(el('li',{},el('span',{class:'name'},link('s:'+g.name+':'+k.name,k.name,'mono'),k.has_override?el('span',{class:'k'},' edited'):''),sw(!k.slash_only,`${k.name} invocable by Claude`,v=>act('/api/skill',{dir:k.dir,slash_only:!v},`${k.name}: ${v?'auto':'slash-only'}`),['auto','slash'])));a.append(ul);
+  a.append(el('h2',{},'Folders with their own setting'));const fl=el('ul',{class:'list'});const own=FOLDERS.filter(f=>!f.isRoot&&!!f.on[g.name]!==!!ROOT.on[g.name]);
+  if(!own.length)fl.append(el('li',{},el('span',{class:'k'},'none; every folder follows user scope')));for(const f of own)fl.append(el('li',{},el('span',{class:'name'},link('f:'+f.path,f.name,'mono')),el('span',{class:'k'},f.on[g.name]?'on':'off')));a.append(fl)}
+ else{const [gname,kname]=SEL.split(':');const g=S.groups.find(x=>x.name===gname);const k=g&&g.skills.find(x=>x.name===kname);if(!k)return;
+  a.append(el('p',{class:'title'},el('span',{class:'mono'},'/'+gname+':'+kname),el('span',{class:'k'},k.description)));
+  a.append(el('p',{class:'lead'},`~${fmt(k.tokens)} tokens of description when auto. In group `,link('g:'+gname,gname,'mono'),'.'));
+  const ul=el('ul',{class:'list'});ul.append(el('li',{},el('span',{class:'name'},'Claude may invoke it'),sw(!k.slash_only,`${k.name} invocable by Claude`,v=>act('/api/skill',{dir:k.dir,slash_only:!v},`${k.name}: ${v?'auto':'slash-only'}`),['auto','slash'])));a.append(ul);
+  if(k.has_override)a.append(el('p',{class:'hint'},'Carries a local override in agents-shared.'))}
+ a.append(el('p',{class:'hint'},'Click a node to focus it; drag to pan, wheel to zoom. Switches write at the scope chosen at the top. “This repo, this machine” is the repository’s gitignored ',el('code',{},'.claude/settings.local.json'),' and is the usual choice; “this folder, committed” is that folder’s ',el('code',{},'.claude/settings.json'),' for anything the repository’s other readers should share. Local beats project beats user. A skill switch is global: on lets Claude invoke it, off keeps it slash-only.'))}
+$('#scope').addEventListener('change',()=>{scopeTouched=true;side()});
+$('#details').addEventListener('click',e=>{DET=!DET;e.currentTarget.setAttribute('aria-pressed',DET);e.currentTarget.textContent=DET?'Hide details':'Show details';side()});
+$('#clear').addEventListener('click',()=>{SEL='';SELKIND='';CTX='';save();load()});
+$('#q').addEventListener('input',e=>{const q=e.target.value.trim().toLowerCase();const svg=$('#svg');if(!q){highlight();return}svg.classList.add('dim');$('#nodes').querySelectorAll('.node').forEach(n=>n.classList.toggle('lit',n.dataset.id.toLowerCase().includes(q)));$('#edges').querySelectorAll('.edge').forEach(x=>x.classList.remove('lit'))});
+document.addEventListener('keydown',e=>{if(e.key==='/'&&document.activeElement!==$('#q')){e.preventDefault();$('#q').focus()}if(e.key==='Escape'&&document.activeElement!==$('#q')){SEL='';SELKIND='';save();load()}});
+let first=true;const _draw=draw;draw=function(){_draw();if(first){first=false;fit()}};
 load();
 </script></body></html>
 """
