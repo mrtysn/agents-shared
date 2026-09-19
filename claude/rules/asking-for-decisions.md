@@ -10,6 +10,13 @@ has to re-type by hand.
 The user should be able to decide from the question and its options alone, without
 scrolling back through the transcript.
 
+**Assume the prompt is the only thing that gets read.** In a long session the user
+skims or skips the prose around a question and decides from the prompt alone. So the
+question text itself carries the facts the decision turns on — what was found, what
+is at stake, what was already assumed and why — not a pointer to "the table above".
+If a finding matters to the choice and appears only in the surrounding message, it
+has not been communicated.
+
 - **Explain each option inside the option**, briefly — what it means and what
   follows from picking it. Not "A or B?" but one line of substance per choice.
 - **Put the recommended option first** and mark it `(Recommended)`.
