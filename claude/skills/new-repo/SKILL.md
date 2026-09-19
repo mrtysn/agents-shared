@@ -79,6 +79,31 @@ Stage specific files rather than `git add -A` to avoid accidentally committing s
 
 Respect repo-local conventions if they already exist (e.g., no Co-Authored-By trailer on personal repos).
 
+### 4b. Offer to register the repo in atlas's include file
+
+**Only when `$ATLAS_INCLUDE` is set.** That variable names the machine-local
+file atlas's document manager reads to decide what counts as a document per
+repo. Unset means this machine does not file documents in atlas: skip this step
+and never mention it.
+
+When it is set, ask once whether to add the repo, showing the patterns:
+
+> Add `<repo-name>` to the atlas include file? `docs/**/*.md`, `reports/**/*.html`
+
+On a yes, append the section to `$ATLAS_INCLUDE` (creating the file with a short
+header comment if it is missing) and print the path:
+
+```
+# or: *.md — markdown anywhere in the repo
+[<repo-name>]
+docs/**/*.md
+reports/**/*.html
+```
+
+Those patterns are a default, not a reading of the repo's real layout. On a no,
+write nothing. Nothing is ever added inside the repo itself; the file lives only
+on this machine.
+
 ### 5. Confirm visibility, then create remote and push
 
 Re-confirm visibility with the user. Echo back: account, repo name, description, visibility — then wait for a clear go-ahead.
