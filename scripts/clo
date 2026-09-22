@@ -25,24 +25,27 @@ state_file="${XDG_STATE_HOME:-$HOME/.local/state}/clo/last"
 claude_json="${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json"
 settings_json="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
 
-# value <TAB> label <TAB> description
+# value <TAB> label
 menu() {
     local saved=""
     [[ -r "$settings_json" ]] && command -v jq >/dev/null \
         && saved="$(jq -r '.model // empty' "$settings_json" 2>/dev/null || true)"
-    print -r -- "default"$'\t'"default"$'\t'"Saved default: ${saved:-Claude Code's own} (no --model)"
-    print -r -- $'opus\tOpus\tLatest Opus'
-    print -r -- $'sonnet\tSonnet\tLatest Sonnet'
-    print -r -- $'haiku\tHaiku\tLatest Haiku'
+    print -r -- "default"$'\t'"default  ${saved:-(unset)}"
+    print -r -- $'opus\tOpus'
+    print -r -- $'sonnet\tSonnet'
+    print -r -- $'haiku\tHaiku'
+    # Extras carry their version only in the description ("Fable 5.1 · …").
     if [[ -r "$claude_json" ]] && command -v jq >/dev/null; then
-        jq -r '.additionalModelOptionsCache[]? | [.value, .label, .description] | @tsv' \
-            "$claude_json" 2>/dev/null | grep -vE $'^(default|opus|sonnet|haiku)\t' || true
+        jq -r '.additionalModelOptionsCache[]?
+               | [.value, ((.description // "") | split(" · ")[0] | select(. != "")) // .label]
+               | @tsv' "$claude_json" 2>/dev/null \
+            | grep -vE $'^(default|opus|sonnet|haiku)\t' || true
     fi
 }
 
 case "${1:-}" in
     -h|--help) usage; exit 0 ;;
-    --list)    menu | column -t -s $'\t'; exit 0 ;;
+    --list)    menu | cut -f2; exit 0 ;;
 esac
 
 command -v fzf >/dev/null || { print -u2 "clo: fzf is not on PATH"; exit 1; }
@@ -56,8 +59,8 @@ for i in {1..${#entries}}; do
 done
 
 pick="$(print -rl -- "${entries[@]}" \
-    | fzf --delimiter=$'\t' --with-nth=2,3 --tabstop=12 --height=~50% --reverse \
-          --no-sort --prompt='model> ' --header='Enter: launch · Esc: cancel' \
+    | fzf --delimiter=$'\t' --with-nth=2 --height=~50% --reverse --info=hidden \
+          --no-sort --prompt='model> ' \
           --bind="load:pos($pos)")" || exit 130
 model="${pick%%$'\t'*}"
 
