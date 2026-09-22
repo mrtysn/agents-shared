@@ -59,7 +59,7 @@ esac
 command -v fzf >/dev/null || { print -u2 "clo: fzf is not on PATH"; exit 1; }
 command -v claude >/dev/null || { print -u2 "clo: claude is not on PATH"; exit 1; }
 
-# pick <prompt> <state file> <first-run value> <value<TAB>label>... — print the
+# pick <prompt> <state file> <first-run value> <value<TAB>[…<TAB>]label>... — print the
 # chosen value. The menu opens on the value saved in <state file>, else on
 # <first-run value>, else on the first entry. An empty <state file> remembers nothing.
 pick() {
@@ -75,7 +75,7 @@ pick() {
     done
     set -- "${rows[@]}"
     choice="$(print -rl -- "$@" \
-        | fzf --ansi --delimiter=$'\t' --with-nth=2 --height=~50% --reverse --info=hidden \
+        | fzf --ansi --delimiter=$'\t' --with-nth=2.. --nth=-1 --height=~50% --reverse --info=hidden \
               --no-sort --prompt="$prompt> " --bind="load:pos($pos)")" || return 130
     choice="${choice%%$'\t'*}"
     if [[ -n "$state" ]]; then
@@ -85,13 +85,13 @@ pick() {
     print -r -- "$choice"
 }
 
-# path <TAB> name + dimmed tags, for every folder local-repos-list reports,
+# path <TAB> dimmed tags <TAB> name, for every folder local-repos-list reports,
 # after rows for the dev root itself and the current folder ("here"). Falls back to the dev root's
 # immediate subfolders, untagged, when local-repos-list is not installed.
 folder_menu() {
     local dim=$'\e[2m' off=$'\e[0m' here="${PWD/#$HOME/~}"
     local -a names paths tags
-    local name dir tag w=4 i
+    local name dir tag i
     if command -v local-repos-list >/dev/null && command -v jq >/dev/null; then
         while IFS=$'\t' read -r name dir tag; do
             names+=("$name") paths+=("$dir") tags+=("$tag")
@@ -102,13 +102,14 @@ folder_menu() {
             names+=("${dir:t}") paths+=("$dir") tags+=("")
         done
     fi
-    # Align tags to the longest name up to 32 columns; longer names push theirs.
-    for name in "${names[@]}"; do (( ${#name} > w && ${#name} <= 32 )) && w=${#name}; done
-    printf '%s\t%-*s  %s\n' "$DEV_ROOT" "$w" "${DEV_ROOT:t}" "$dim${DEV_ROOT/#$HOME/~}$off"
-    printf '%s\t%-*s  %s\n' "$PWD" "$w" here "$dim$here$off"
-    for i in {1..$#names}; do
-        printf '%s\t%-*s  %s\n' "${paths[$i]}" "$w" "${names[$i]}" "$dim${tags[$i]}$off"
-    done
+    # Tags go first, padded to one width, so every name starts in the same
+    # column however long it is; pick() searches only the last field, the name.
+    local tw=${#here}
+    for tag in "${tags[@]}"; do (( ${#tag} > tw )) && tw=${#tag}; done
+    row() { printf '%s\t%s%-*s%s  \t%s\n' "$1" "$dim" "$tw" "$3" "$off" "$2"; }
+    row "$DEV_ROOT" "${DEV_ROOT:t}" "${DEV_ROOT/#$HOME/~}"
+    row "$PWD" here "$here"
+    for i in {1..$#names}; do row "${paths[$i]}" "${names[$i]}" "${tags[$i]}"; done
 }
 
 # Outside the dev root, pick where to launch first. Inside it, launch here.
