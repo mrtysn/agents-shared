@@ -76,7 +76,7 @@ pick() {
     set -- "${rows[@]}"
     choice="$(print -rl -- "$@" \
         | fzf --ansi --delimiter=$'\t' --with-nth=2.. --nth=-1 --height=~50% --reverse --info=hidden \
-              --no-sort --prompt="$prompt> " --bind="load:pos($pos)")" || return 130
+              --prompt="$prompt> " --bind="load:pos($pos)")" || return 130
     choice="${choice%%$'\t'*}"
     if [[ -n "$state" ]]; then
         mkdir -p "${state:h}"
