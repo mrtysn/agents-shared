@@ -162,7 +162,7 @@ any other skill. Skills the machine's owner wrote stay flat under
 with its skills, the description cost, and the switches: a group per scope for
 the project you pick, a skill inside a group as auto or slash-only (a fenced
 frontmatter edit in this repo, override.patch regenerated), a flat skill through
-the four `skillOverrides` states. Symlink it into `~/bin` as `skill-tree`;
+the four `skillOverrides` states. It reaches `~/bin` as `skill-tree` through the tools repo's `links.txt`;
 `scripts/make-skill-tree-app.zsh` wraps it as *Skill Tree* in `~/Applications`
 for Spotlight.
 

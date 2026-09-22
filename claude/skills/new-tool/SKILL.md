@@ -1,5 +1,5 @@
 ---
-description: Register a script as a toolbelt entry — add a DESC comment, ensure executable, symlink into ~/bin so it shows in `toolbelt`. Use when the user asks to add a script to their toolbelt or wants a one-line invocation for an existing script.
+description: Register a script as a toolbelt entry — add a DESC comment, ensure executable, link it into ~/bin through the tools repo's installer so it shows in `toolbelt`. Use when the user asks to add a script to their toolbelt or wants a one-line invocation for an existing script.
 argument-hint: [script-path] [one-line description]
 allowed-tools: Bash, Read, Edit, Write
 ---
@@ -38,25 +38,33 @@ If DESC is missing, insert it as **line 2** (immediately after the shebang). Thi
 chmod +x <script-path>
 ```
 
-### 4. Symlink into ~/bin
+### 4. Link it through the manifest
 
-Pre-check that the target name is free:
+`~/bin` holds only what `$DEV_ROOT/tools/install.sh` puts there, so the
+installer creates the link, not you — never a bare `ln -s`.
+
+- **Script in `tools/bin/`** — nothing to register; `install.sh` links every
+  executable there.
+- **Script anywhere else** (its own repo, `agents-shared/scripts/`) — add a line
+  to `$DEV_ROOT/tools/links.txt`: `<tool-name>  <path relative to $DEV_ROOT>`,
+  kept in alphabetical order.
+
+Pre-check that the name is free, both in `~/bin` and in `links.txt`:
 
 ```bash
 [[ -e "$HOME/bin/<tool-name>" || -L "$HOME/bin/<tool-name>" ]] && echo "already exists"
+grep -E '^<tool-name>[[:space:]]' "$DEV_ROOT/tools/links.txt"
 ```
 
 (`-e` alone misses broken symlinks; the `-L` clause catches dangling links too.)
-
-If a file or symlink already lives there, stop and ask the user before doing anything destructive. Renaming or overwriting an existing tool silently is the wrong default.
-
-Otherwise:
+If either finds something, stop and ask the user. Then run:
 
 ```bash
-ln -s "<absolute-source-path>" "$HOME/bin/<tool-name>"
+"$DEV_ROOT/tools/install.sh"
 ```
 
-Always use an **absolute** path for the symlink target. Relative paths break depending on the cwd at invocation time.
+It never replaces a `~/bin` entry that points elsewhere — it prints a `!` line
+instead. The `tools` repo now has a change to commit.
 
 ### 5. Verify
 
@@ -72,7 +80,7 @@ If the entry doesn't appear, the most likely causes are: missing `# DESC:` line,
 
 - **Name collision in `~/bin`** — stop and ask. Don't overwrite or rename existing tools without explicit confirmation.
 - **DESC line position** — `toolbelt` only scans the first 20 lines for `^#\s*DESC:`. Placement matters.
-- **Relative symlink target** — always use the absolute path. Relative targets break the symlink when invoked from a different cwd.
+- **Hand-made symlink** — a link `install.sh` did not create is invisible to the next machine. Register it in `links.txt` instead.
 - **`~/bin` not in PATH** — verify with `echo $PATH | tr ':' '\n' | grep -F "$HOME/bin"`. If absent, the symlink works but invocation-by-name doesn't; tell the user to add it to their shell rc.
 - **Extension convention** — symlinks omit `.sh` / `.py` / `.rb` (e.g., `adb-keep-awake`, not `adb-keep-awake.sh`). Source files keep their extensions. The `toolbelt` listing uses the symlink name.
 - **Don't write source into `~/bin`** — that directory is for symlinks. The source script lives in its project so it's editable in context and easy to find via `readlink`.
