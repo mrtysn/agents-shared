@@ -34,11 +34,9 @@ menu() {
     print -r -- $'opus\tOpus'
     print -r -- $'sonnet\tSonnet'
     print -r -- $'haiku\tHaiku'
-    # Extras carry their version only in the description ("Fable 5.1 · …").
     if [[ -r "$claude_json" ]] && command -v jq >/dev/null; then
-        jq -r '.additionalModelOptionsCache[]?
-               | [.value, ((.description // "") | split(" · ")[0] | select(. != "")) // .label]
-               | @tsv' "$claude_json" 2>/dev/null \
+        jq -r '.additionalModelOptionsCache[]? | [.value, .label] | @tsv' \
+            "$claude_json" 2>/dev/null \
             | grep -vE $'^(default|opus|sonnet|haiku)\t' || true
     fi
 }
