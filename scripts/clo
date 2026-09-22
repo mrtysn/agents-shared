@@ -12,8 +12,7 @@ Usage:
   clo -h | --help         Show this help
 
 The pick applies to that session only (claude --model); your saved default in
-settings.json is untouched. "default" launches without --model, so the saved
-default applies. The last pick is remembered and the menu opens on it.
+settings.json is untouched. The last pick is remembered and the menu opens on it.
 
 The menu is the stable aliases (always the latest of each family) plus any
 extra models your account is offered, read from Claude Code's own cache in
@@ -23,21 +22,16 @@ EOF
 
 state_file="${XDG_STATE_HOME:-$HOME/.local/state}/clo/last"
 claude_json="${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json"
-settings_json="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
 
 # value <TAB> label
 menu() {
-    local saved=""
-    [[ -r "$settings_json" ]] && command -v jq >/dev/null \
-        && saved="$(jq -r '.model // empty' "$settings_json" 2>/dev/null || true)"
-    print -r -- "default"$'\t'"default  ${saved:-(unset)}"
     print -r -- $'opus\tOpus'
     print -r -- $'sonnet\tSonnet'
     print -r -- $'haiku\tHaiku'
     if [[ -r "$claude_json" ]] && command -v jq >/dev/null; then
         jq -r '.additionalModelOptionsCache[]? | [.value, .label] | @tsv' \
             "$claude_json" 2>/dev/null \
-            | grep -vE $'^(default|opus|sonnet|haiku)\t' || true
+            | grep -vE $'^(opus|sonnet|haiku)\t' || true
     fi
 }
 
@@ -65,7 +59,4 @@ model="${pick%%$'\t'*}"
 mkdir -p "${state_file:h}"
 print -r -- "$model" > "$state_file"
 
-if [[ "$model" == default ]]; then
-    exec claude "$@"
-fi
 exec claude --model "$model" "$@"
