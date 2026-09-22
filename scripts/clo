@@ -16,9 +16,9 @@ defaults in settings.json are untouched. The model menu opens on your last
 model, and the effort menu on the effort you last used with that model.
 "unset" passes no --effort, so Claude Code's own default applies.
 
-Launched outside $DEV_ROOT, clo first asks where to launch: the current folder
-("here", where the cursor starts) or any folder local-repos-list reports, with
-its tags. Inside $DEV_ROOT it launches in the current folder.
+Launched outside $DEV_ROOT, clo first asks where to launch: $DEV_ROOT itself,
+the current folder ("here", where the cursor starts), or any folder
+local-repos-list reports, with its tags. Inside $DEV_ROOT it launches in the current folder.
 
 The model menu is the stable aliases (always the latest of each family) plus any
 extra models your account is offered, read from Claude Code's own cache in
@@ -86,7 +86,7 @@ pick() {
 }
 
 # path <TAB> name + dimmed tags, for every folder local-repos-list reports,
-# after a "here" row for the current folder. Falls back to the dev root's
+# after rows for the dev root itself and the current folder ("here"). Falls back to the dev root's
 # immediate subfolders, untagged, when local-repos-list is not installed.
 folder_menu() {
     local dim=$'\e[2m' off=$'\e[0m' here="${PWD/#$HOME/~}"
@@ -104,6 +104,7 @@ folder_menu() {
     fi
     # Align tags to the longest name up to 32 columns; longer names push theirs.
     for name in "${names[@]}"; do (( ${#name} > w && ${#name} <= 32 )) && w=${#name}; done
+    printf '%s\t%-*s  %s\n' "$DEV_ROOT" "$w" "${DEV_ROOT:t}" "$dim${DEV_ROOT/#$HOME/~}$off"
     printf '%s\t%-*s  %s\n' "$PWD" "$w" here "$dim$here$off"
     for i in {1..$#names}; do
         printf '%s\t%-*s  %s\n' "${paths[$i]}" "$w" "${names[$i]}" "$dim${tags[$i]}$off"
@@ -114,7 +115,7 @@ folder_menu() {
 if [[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT" ]]; then
     dev="${DEV_ROOT:A}"
     if [[ "${PWD:A}" != "$dev" && "${PWD:A}" != "$dev"/* ]]; then
-        dir="$(pick folder "" "" "${(@f)$(folder_menu)}")" || exit 130
+        dir="$(pick folder "" "$PWD" "${(@f)$(folder_menu)}")" || exit 130
         cd "$dir"
     fi
 fi
