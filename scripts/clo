@@ -1,18 +1,20 @@
 #!/bin/zsh
-# DESC: Pick a Claude model from a menu and launch Claude Code with it; the menu opens on your last pick
+# DESC: Pick a Claude model and effort from a menu and launch Claude Code with them; menus open on your last pick
 set -euo pipefail
 
 usage() {
     cat <<'EOF'
-clo — pick a Claude model, then launch Claude Code with it.
+clo — pick a Claude model and effort level, then launch Claude Code with them.
 
 Usage:
   clo [claude args...]    Open the picker; extra args go to `claude` (e.g. clo -c)
   clo --list              Print the menu entries and exit
   clo -h | --help         Show this help
 
-The pick applies to that session only (claude --model); your saved default in
-settings.json is untouched. The last pick is remembered and the menu opens on it.
+The picks apply to that session only (claude --model --effort); your saved
+defaults in settings.json are untouched. The model menu opens on your last
+model, and the effort menu on the effort you last used with that model.
+"unset" passes no --effort, so Claude Code's own default applies.
 
 The menu is the stable aliases (always the latest of each family) plus any
 extra models your account is offered, read from Claude Code's own cache in
@@ -20,7 +22,7 @@ extra models your account is offered, read from Claude Code's own cache in
 EOF
 }
 
-state_file="${XDG_STATE_HOME:-$HOME/.local/state}/clo/last"
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/clo"
 claude_json="${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json"
 
 # Model families, most capable first. An extra from the cache whose family is
@@ -53,20 +55,32 @@ esac
 command -v fzf >/dev/null || { print -u2 "clo: fzf is not on PATH"; exit 1; }
 command -v claude >/dev/null || { print -u2 "clo: claude is not on PATH"; exit 1; }
 
-entries=("${(@f)$(menu)}")
-last="$(cat "$state_file" 2>/dev/null || true)"
-pos=1
-for i in {1..${#entries}}; do
-    [[ "${entries[$i]%%$'\t'*}" == "$last" ]] && { pos=$i; break; }
-done
+# pick <prompt> <state file> <first-run value> <value<TAB>label>... — print the
+# chosen value. The menu opens on the value saved in <state file>, else on
+# <first-run value>, else on the first entry.
+pick() {
+    local prompt="$1" state="$2" last="$3"; shift 3
+    local pos=1 i choice
+    [[ -r "$state" ]] && last="$(<"$state")"
+    for i in {1..$#}; do
+        [[ "${@[$i]%%$'\t'*}" == "$last" ]] && { pos=$i; break; }
+    done
+    choice="$(print -rl -- "$@" \
+        | fzf --delimiter=$'\t' --with-nth=2 --height=~50% --reverse --info=hidden \
+              --no-sort --prompt="$prompt> " --bind="load:pos($pos)")" || return 130
+    choice="${choice%%$'\t'*}"
+    mkdir -p "${state:h}"
+    print -r -- "$choice" > "$state"
+    print -r -- "$choice"
+}
 
-pick="$(print -rl -- "${entries[@]}" \
-    | fzf --delimiter=$'\t' --with-nth=2 --height=~50% --reverse --info=hidden \
-          --no-sort --prompt='model> ' \
-          --bind="load:pos($pos)")" || exit 130
-model="${pick%%$'\t'*}"
+model="$(pick model "$state_dir/last" "" "${(@f)$(menu)}")" || exit 130
+# Effort is remembered per model: medium on Opus and xhigh on Fable each stick.
+effort="$(pick effort "$state_dir/effort/${model//[^A-Za-z0-9._-]/_}" unset \
+    $'unset\tunset' $'low\tlow' $'medium\tmedium' $'high\thigh' $'xhigh\txhigh' $'max\tmax')" \
+    || exit 130
 
-mkdir -p "${state_file:h}"
-print -r -- "$model" > "$state_file"
-
-exec claude --model "$model" "$@"
+if [[ "$effort" == unset ]]; then
+    exec claude --model "$model" "$@"
+fi
+exec claude --model "$model" --effort "$effort" "$@"
