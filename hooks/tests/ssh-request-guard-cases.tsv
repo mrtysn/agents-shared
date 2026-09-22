@@ -22,3 +22,53 @@ pass	git push origin main
 pass	curl -s https://example.com
 pass	python3 scripts/radar.py
 pass	git commit -F - <<'EOF'\nuse ssh node01 curl to check\nEOF
+# ssh by path, autossh, mosh
+ask	/usr/bin/ssh node01 curl -s https://example.com
+ask	autossh -M 0 node01 'wget -q https://example.com'
+ask	mosh node01 -- curl https://example.com
+# ssh options that take a value: the host is found after them, including bundles and after-host options
+ask	ssh -J bastion node01 curl https://example.com
+ask	ssh -vp 22 node01 wget https://example.com
+ask	ssh -o StrictHostKeyChecking=no node01 'python3 x.py'
+# wrappers stay covered by the whole-text check
+ask	ssh node01 'timeout 10 curl https://example.com'
+ask	ssh node01 'sudo -u app curl https://example.com'
+ask	ssh node01 'ls urls | xargs curl -s'
+ask	ssh node01 'sh -c "wget -q https://example.com"'
+ask	ssh node01 'for u in a b; do curl $u; done'
+# programs added to the list
+ask	ssh node01 'cd /opt/app && git pull'
+ask	ssh node01 'apt-get update'
+ask	ssh node01 'openssl s_client -connect example.com:443'
+ask	ssh node01 'exec 3<>/dev/tcp/example.com/80'
+ask	ssh node01 'docker-compose exec app sh'
+ask	ssh node01 'docker --context prod exec app python x.py'
+ask	ssh node01 'docker container run --rm alpine wget x'
+ask	ssh node01 'kubectl -n prod exec pod -- ls'
+ask	ssh node01 'podman exec app ls'
+ask	ssh node01 'uvx some-tool'
+# a remote shell reading its script from stdin
+ask	ssh node01 bash <<EOF\ncurl -s https://example.com\nEOF
+ask	ssh node01 'bash -s' <<'EOF'\npython3 fetch.py\nEOF
+pass	ssh node01 bash <<EOF\nls /opt\ndf -h\nEOF
+ask	ssh node01 < fetch.sh
+ask	cat fetch.sh | ssh node01 bash
+ask	echo 'curl x' | ssh node01 sh
+ask	ssh node01 < fetch.sh
+pass	cat local.txt | ssh node01 'cat > /tmp/x'
+pass	ssh node01 'cat > /tmp/notes.txt' <<EOF\nremember to curl the thing\nEOF
+# tunnels that carry traffic out from the remote host
+ask	ssh -fN -D 1080 node01
+ask	ssh -o DynamicForward=1080 node01 -N
+ask	ssh -L 8443:google.com:443 node01 -N
+ask	ssh -o 'LocalForward 8443 google.com:443' node01 -N
+pass	ssh -L 5432:localhost:5432 node01 -N
+pass	ssh -N -L 8080:127.0.0.1:80 node01
+# only ssh's own arguments count: local commands around it do not
+pass	ssh node01 'cat /opt/funds/state.json' | python3 -m json.tool
+pass	ssh node01 cat /opt/x > local.txt
+pass	ssh node01 'docker compose ps' && curl -s https://example.com
+pass	ssh node01 'git log --oneline -5'
+pass	ssh node01 'docker logs -n 20 app 2>&1 | tail -5'
+# known false positive, kept by choice: a network word inside an argument
+ask	ssh node01 'grep -o "href=\\"https\\?://[^/]*" /opt/funds/data/telegram-log.jsonl'
