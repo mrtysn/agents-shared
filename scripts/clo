@@ -18,7 +18,11 @@ model, and the effort menu on the effort you last used with that model.
 
 Launched outside $DEV_ROOT, clo first asks where to launch: $DEV_ROOT itself,
 the current folder ("here", where the cursor starts), or any folder
-local-repos-list reports, with its tags. Inside $DEV_ROOT it launches in the current folder.
+local-repos-list reports, with its tags. Folders you last used Claude in come
+first, with how long ago. Inside $DEV_ROOT it launches in the current folder.
+
+When the folder has a past session, clo asks whether to start a new one,
+continue the most recent (claude --continue) or pick one (claude --resume).
 
 The model menu is the stable aliases (always the latest of each family) plus any
 extra models your account is offered, read from Claude Code's own cache in
@@ -85,7 +89,31 @@ pick() {
     print -r -- "$choice"
 }
 
-# path <TAB> dimmed tags <TAB> name, for every folder local-repos-list reports,
+zmodload -F zsh/stat b:zstat
+zmodload zsh/datetime
+projects_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects"
+now=$EPOCHSECONDS
+
+# last_session <dir> — print when Claude Code last wrote a session for <dir>
+# (epoch seconds), or nothing. Its per-folder directory name is the real path
+# with every character other than a letter or digit turned into "-".
+last_session() {
+    local -a f=("$projects_dir/${${1:A}//[^A-Za-z0-9]/-}"/*.jsonl(N.om[1]))
+    (( $#f )) && zstat +mtime -- "$f[1]"
+}
+
+# ago <epoch> — "now", "5m", "3h", "12d", "4mo"
+ago() {
+    local s=$(( now - $1 ))
+    if   (( s < 60 ));      then print -r -- now
+    elif (( s < 3600 ));    then print -r -- "$(( s / 60 ))m"
+    elif (( s < 86400 ));   then print -r -- "$(( s / 3600 ))h"
+    elif (( s < 2592000 )); then print -r -- "$(( s / 86400 ))d"
+    else                         print -r -- "$(( s / 2592000 ))mo"
+    fi
+}
+
+# path <TAB> dimmed age + tags <TAB> name, for every folder local-repos-list reports,
 # after rows for the dev root itself and the current folder ("here"). Falls back to the dev root's
 # immediate subfolders, untagged, when local-repos-list is not installed.
 folder_menu() {
@@ -102,14 +130,23 @@ folder_menu() {
             names+=("${dir:t}") paths+=("$dir") tags+=("")
         done
     fi
-    # Tags go first, padded to one width, so every name starts in the same
-    # column however long it is; pick() searches only the last field, the name.
-    local tw=${#here}
+    # Folders with a Claude session come first, most recent on top; the rest
+    # keep alphabetical order. The dev root and "here" always lead.
+    local -a when order
+    for i in {1..$#names}; do when[$i]="$(last_session "${paths[$i]}")"; done
+    order=(${(f)"$(for i in {1..$#names}; do print -r -- "${when[$i]:-0}"$'\t'"$i"; done \
+        | sort -t$'\t' -k1,1nr -k2,2n | cut -f2)"})
+    # Age and tags go first, padded to one width, so every name starts in the
+    # same column however long it is; pick() searches only the last field.
+    local tw=${#here} t
     for tag in "${tags[@]}"; do (( ${#tag} > tw )) && tw=${#tag}; done
-    row() { printf '%s\t%s%-*s%s  \t%s\n' "$1" "$dim" "$tw" "$3" "$off" "$2"; }
+    row() {
+        t="$(last_session "$1")"; [[ -n "$t" ]] && t="$(ago "$t")"
+        printf '%s\t%s%-4s %-*s%s  \t%s\n' "$1" "$dim" "$t" "$tw" "$3" "$off" "$2"
+    }
     row "$DEV_ROOT" "${DEV_ROOT:t}" "${DEV_ROOT/#$HOME/~}"
     row "$PWD" here "$here"
-    for i in {1..$#names}; do row "${paths[$i]}" "${names[$i]}" "${tags[$i]}"; done
+    for i in "${order[@]}"; do row "${paths[$i]}" "${names[$i]}" "${tags[$i]}"; done
 }
 
 # Outside the dev root, pick where to launch first. Inside it, launch here.
@@ -121,13 +158,26 @@ if [[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT" ]]; then
     fi
 fi
 
+# With a past session in this folder, choose to start fresh, continue the most
+# recent one, or open Claude Code's own session picker.
+launch=()
+if t="$(last_session "$PWD")" && [[ -n "$t" ]]; then
+    t="$(ago "$t")"; [[ "$t" == now ]] || t+=" ago"
+    session="$(pick session "" new $'new\tnew' \
+        "continue"$'\t'"continue  "$'\e[2m'"$t"$'\e[0m' \
+        $'resume\tresume…')" || exit 130
+    case "$session" in
+        continue) launch+=(--continue) ;;
+        resume)   launch+=(--resume) ;;
+    esac
+fi
+
 model="$(pick model "$state_dir/last" "" "${(@f)$(menu)}")" || exit 130
 # Effort is remembered per model: medium on Opus and xhigh on Fable each stick.
 effort="$(pick effort "$state_dir/effort/${model//[^A-Za-z0-9._-]/_}" unset \
     $'unset\tunset' $'low\tlow' $'medium\tmedium' $'high\thigh' $'xhigh\txhigh' $'max\tmax')" \
     || exit 130
 
-if [[ "$effort" == unset ]]; then
-    exec claude --model "$model" "$@"
-fi
-exec claude --model "$model" --effort "$effort" "$@"
+launch+=(--model "$model")
+[[ "$effort" != unset ]] && launch+=(--effort "$effort")
+exec claude "${launch[@]}" "$@"
