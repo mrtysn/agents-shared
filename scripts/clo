@@ -60,11 +60,16 @@ command -v claude >/dev/null || { print -u2 "clo: claude is not on PATH"; exit 1
 # <first-run value>, else on the first entry.
 pick() {
     local prompt="$1" state="$2" last="$3"; shift 3
-    local pos=1 i choice
-    [[ -r "$state" ]] && last="$(<"$state")"
-    for i in {1..$#}; do
-        [[ "${@[$i]%%$'\t'*}" == "$last" ]] && { pos=$i; break; }
+    local pos=1 i choice saved=""
+    [[ -r "$state" ]] && saved="$(<"$state")" && last="$saved"
+    local -a rows=("$@")
+    for i in {1..$#rows}; do
+        [[ "${rows[$i]%%$'\t'*}" == "$last" ]] || continue
+        pos=$i
+        [[ -n "$saved" ]] && rows[$i]+="  (latest)"
+        break
     done
+    set -- "${rows[@]}"
     choice="$(print -rl -- "$@" \
         | fzf --delimiter=$'\t' --with-nth=2 --height=~50% --reverse --info=hidden \
               --no-sort --prompt="$prompt> " --bind="load:pos($pos)")" || return 130
