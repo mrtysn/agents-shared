@@ -178,9 +178,9 @@ while (( step <= 4 )); do
         launch=()
         t="$(last_session "$PWD" || true)"
         [[ -n "$t" ]] || { step=3; continue; }
-        t="$(ago "$t")"; [[ "$t" == now ]] || t+=" ago"
+        t="$(ago "$t")"; [[ "$t" == now ]] && t="just now" || t+=" ago"
         session="$(pick session "" new $'new\tnew session' \
-            "continue"$'\t'"continue latest  "$'\e[2m'"$t"$'\e[0m' \
+            "continue"$'\t'"continue latest  "$'\e[2m'"last seen $t"$'\e[0m' \
             $'resume\tresume any')" || rc=$?
         case "$session" in
             continue) launch+=(--continue) ;;
