@@ -25,14 +25,15 @@ The probe is a workaround for a file that cannot vary per machine, not a
 convention worth keeping. It currently appears twice (`focus-policy.sh`,
 `block-tree-discard.sh`) and grows by one with every hook added.
 
-The peon-ping entries in the same file hardcode nothing — they use
-`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/peon-ping/peon.sh`, because the
-script lives under the Claude config dir rather than in a repo.
+The cc-statusline event hook in the same file hardcodes nothing — it is
+registered as `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/cc-statusline-event.zsh`,
+a symlink that cc-statusline's `scripts/install-event-hook.zsh` creates into the
+repo, so the synced entry is valid wherever the repo is checked out.
 
 ### What to do
 
 Move the hook scripts into the Claude config dir as symlinks, and reference them
-the way peon-ping is referenced.
+the way the cc-statusline event hook is referenced.
 
 1. Add a third source pair to `scripts/init-global.sh`: `hooks/` →
    `$CLAUDE_DIR/hooks/`, alongside the existing commands and skills pairs. The
@@ -56,8 +57,9 @@ part is the symlink, created by a script that knows its own path.
   what makes this work: hook scripts stay machine-local while their
   registration stays shared.
 - The `statusLine` entry has the same problem in the same file, but points at
-  the `cc-statusline` repo, so this change cannot fix it. It stays a probe list
-  unless cc-statusline grows its own installer.
+  the `cc-statusline` repo, so this change cannot fix it. cc-statusline now has
+  an installer (`scripts/install-event-hook.zsh`) that links its event hook this
+  way; extending it to link `cc-statusline.js` too would retire this probe.
 
 ### Not doing
 
