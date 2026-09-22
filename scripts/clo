@@ -11,6 +11,8 @@ Usage:
   clo --list              Print the menu entries and exit
   clo -h | --help         Show this help
 
+Esc goes back to the previous menu (and quits from the first); Ctrl-C quits.
+
 The picks apply to that session only (claude --model --effort); your saved
 defaults in settings.json are untouched. The model menu opens on your last
 model, and the effort menu on the effort you last used with that model.
@@ -66,6 +68,7 @@ command -v claude >/dev/null || { print -u2 "clo: claude is not on PATH"; exit 1
 # pick <prompt> <state file> <first-run value> <value<TAB>[…<TAB>]label>... — print the
 # chosen value. The menu opens on the value saved in <state file>, else on
 # <first-run value>, else on the first entry. An empty <state file> remembers nothing.
+# Returns 2 when Esc asks for the previous menu, 130 on Ctrl-C.
 pick() {
     local prompt="$1" state="$2" last="$3"; shift 3
     local pos=1 i choice saved=""
@@ -80,7 +83,10 @@ pick() {
     set -- "${rows[@]}"
     choice="$(print -rl -- "$@" \
         | fzf --ansi --delimiter=$'\t' --with-nth=2.. --nth=-1 --height=~50% --reverse --info=hidden \
-              --prompt="$prompt> " --bind="load:pos($pos)" --bind=change:first)" || return 130
+              --prompt="$prompt> " --bind="load:pos($pos)" --bind=change:first \
+              --bind='esc:print(<back>)+accept')" \
+        || [[ "$choice" == "<back>"* ]] || return 130
+    [[ "${choice%%$'\n'*}" == "<back>" ]] && return 2
     choice="${choice%%$'\t'*}"
     if [[ -n "$state" ]]; then
         mkdir -p "${state:h}"
@@ -149,34 +155,50 @@ folder_menu() {
     for i in "${order[@]}"; do row "${paths[$i]}" "${names[$i]}" "${tags[$i]}"; done
 }
 
-# Outside the dev root, pick where to launch first. Inside it, launch here.
+# The menus run as a wizard: folder (outside the dev root only), session (only
+# when the folder has one), model, effort. Esc steps back to the previous menu
+# that was shown, and quits from the first; Ctrl-C quits from any.
+start="$PWD" ask_folder=0
 if [[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT" ]]; then
     dev="${DEV_ROOT:A}"
-    if [[ "${PWD:A}" != "$dev" && "${PWD:A}" != "$dev"/* ]]; then
-        dir="$(pick folder "" "$PWD" "${(@f)$(folder_menu)}")" || exit 130
-        cd "$dir"
-    fi
+    [[ "${PWD:A}" != "$dev" && "${PWD:A}" != "$dev"/* ]] && ask_folder=1
 fi
 
-# With a past session in this folder, choose to start fresh, continue the most
-# recent one, or open Claude Code's own session picker.
-launch=()
-if t="$(last_session "$PWD")" && [[ -n "$t" ]]; then
-    t="$(ago "$t")"; [[ "$t" == now ]] || t+=" ago"
-    session="$(pick session "" new $'new\tnew' \
-        "continue"$'\t'"continue  "$'\e[2m'"$t"$'\e[0m' \
-        $'resume\tresume…')" || exit 130
-    case "$session" in
-        continue) launch+=(--continue) ;;
-        resume)   launch+=(--resume) ;;
+step=1 shown=() launch=()
+while (( step <= 4 )); do
+    rc=0
+    case $step in
+    1)  # Where to launch.
+        (( ask_folder )) || { step=2; continue; }
+        cd "$start"
+        dir="$(pick folder "" "$start" "${(@f)$(folder_menu)}")" || rc=$?
+        (( rc )) || cd "$dir" ;;
+    2)  # With a past session here: start fresh, continue the most recent one,
+        # or open Claude Code's own session picker.
+        launch=()
+        t="$(last_session "$PWD" || true)"
+        [[ -n "$t" ]] || { step=3; continue; }
+        t="$(ago "$t")"; [[ "$t" == now ]] || t+=" ago"
+        session="$(pick session "" new $'new\tnew' \
+            "continue"$'\t'"continue  "$'\e[2m'"$t"$'\e[0m' \
+            $'resume\tresume…')" || rc=$?
+        case "$session" in
+            continue) launch+=(--continue) ;;
+            resume)   launch+=(--resume) ;;
+        esac ;;
+    3)  model="$(pick model "$state_dir/last" "" "${(@f)$(menu)}")" || rc=$? ;;
+    4)  # Effort is remembered per model: medium on Opus and xhigh on Fable each stick.
+        effort="$(pick effort "$state_dir/effort/${model//[^A-Za-z0-9._-]/_}" unset \
+            $'unset\tunset' $'low\tlow' $'medium\tmedium' $'high\thigh' \
+            $'xhigh\txhigh' $'max\tmax')" || rc=$? ;;
     esac
-fi
-
-model="$(pick model "$state_dir/last" "" "${(@f)$(menu)}")" || exit 130
-# Effort is remembered per model: medium on Opus and xhigh on Fable each stick.
-effort="$(pick effort "$state_dir/effort/${model//[^A-Za-z0-9._-]/_}" unset \
-    $'unset\tunset' $'low\tlow' $'medium\tmedium' $'high\thigh' $'xhigh\txhigh' $'max\tmax')" \
-    || exit 130
+    case $rc in
+        0) shown+=($step); step=$(( step + 1 )) ;;
+        2) (( $#shown )) || exit 130
+           step=${shown[-1]}; shown[-1]=() ;;
+        *) exit 130 ;;
+    esac
+done
 
 launch+=(--model "$model")
 [[ "$effort" != unset ]] && launch+=(--effort "$effort")
