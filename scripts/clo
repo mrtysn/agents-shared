@@ -1,0 +1,66 @@
+#!/bin/zsh
+# DESC: Pick a Claude model from a menu and launch Claude Code with it; the menu opens on your last pick
+set -euo pipefail
+
+usage() {
+    cat <<'EOF'
+clo — pick a Claude model, then launch Claude Code with it.
+
+Usage:
+  clo [claude args...]    Open the picker; extra args go to `claude` (e.g. clo -c)
+  clo --list              Print the menu entries and exit
+  clo -h | --help         Show this help
+
+The pick applies to that session only (claude --model); your saved default in
+settings.json is untouched. "default" launches without --model, so the saved
+default applies. The last pick is remembered and the menu opens on it.
+
+The menu is the stable aliases (always the latest of each family) plus any
+extra models your account is offered, read from Claude Code's own cache in
+.claude.json. Claude Code has no command that prints the picker's list.
+EOF
+}
+
+state_file="${XDG_STATE_HOME:-$HOME/.local/state}/clo/last"
+claude_json="${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json"
+
+# value <TAB> label <TAB> description
+menu() {
+    print -r -- $'default\tdefault\tYour saved default (settings.json), no --model'
+    print -r -- $'opus\tOpus\tLatest Opus'
+    print -r -- $'sonnet\tSonnet\tLatest Sonnet'
+    print -r -- $'haiku\tHaiku\tLatest Haiku'
+    if [[ -r "$claude_json" ]] && command -v jq >/dev/null; then
+        jq -r '.additionalModelOptionsCache[]? | [.value, .label, .description] | @tsv' \
+            "$claude_json" 2>/dev/null | grep -vE $'^(default|opus|sonnet|haiku)\t' || true
+    fi
+}
+
+case "${1:-}" in
+    -h|--help) usage; exit 0 ;;
+    --list)    menu | column -t -s $'\t'; exit 0 ;;
+esac
+
+command -v fzf >/dev/null || { print -u2 "clo: fzf is not on PATH"; exit 1; }
+command -v claude >/dev/null || { print -u2 "clo: claude is not on PATH"; exit 1; }
+
+entries=("${(@f)$(menu)}")
+last="$(cat "$state_file" 2>/dev/null || true)"
+pos=1
+for i in {1..${#entries}}; do
+    [[ "${entries[$i]%%$'\t'*}" == "$last" ]] && { pos=$i; break; }
+done
+
+pick="$(print -rl -- "${entries[@]}" \
+    | fzf --delimiter=$'\t' --with-nth=2,3 --tabstop=12 --height=~50% --reverse \
+          --no-sort --prompt='model> ' --header='Enter: launch · Esc: cancel' \
+          --bind="load:pos($pos)")" || exit 130
+model="${pick%%$'\t'*}"
+
+mkdir -p "${state_file:h}"
+print -r -- "$model" > "$state_file"
+
+if [[ "$model" == default ]]; then
+    exec claude "$@"
+fi
+exec claude --model "$model" "$@"
