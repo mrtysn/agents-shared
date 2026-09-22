@@ -23,16 +23,26 @@ EOF
 state_file="${XDG_STATE_HOME:-$HOME/.local/state}/clo/last"
 claude_json="${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json"
 
-# value <TAB> label
+# Model families, most capable first. An extra from the cache whose family is
+# not listed here goes last.
+families=(fable opus sonnet haiku)
+
+# value <TAB> label, most capable first
 menu() {
-    print -r -- $'opus\tOpus'
-    print -r -- $'sonnet\tSonnet'
-    print -r -- $'haiku\tHaiku'
+    local -a rows=($'opus\tOpus' $'sonnet\tSonnet' $'haiku\tHaiku')
     if [[ -r "$claude_json" ]] && command -v jq >/dev/null; then
-        jq -r '.additionalModelOptionsCache[]? | [.value, .label] | @tsv' \
-            "$claude_json" 2>/dev/null \
-            | grep -vE $'^(opus|sonnet|haiku)\t' || true
+        rows+=("${(@f)$(jq -r '.additionalModelOptionsCache[]? | [.value, .label] | @tsv' \
+            "$claude_json" 2>/dev/null | grep -vE $'^(opus|sonnet|haiku)\t' || true)}")
     fi
+    local row fam rank
+    for row in "${rows[@]}"; do
+        [[ -n "$row" ]] || continue
+        rank=$(( ${#families} + 1 ))
+        for fam in "${families[@]}"; do
+            [[ "${row%%$'\t'*}" == *"$fam"* ]] && { rank=${families[(i)$fam]}; break; }
+        done
+        print -r -- "$rank"$'\t'"$row"
+    done | sort -t$'\t' -k1,1n -s | cut -f2-
 }
 
 case "${1:-}" in
