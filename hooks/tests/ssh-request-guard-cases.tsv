@@ -1,0 +1,24 @@
+# Cases for ssh-request-guard.sh — one per line: <verdict><TAB><command>
+#
+# verdict is `pass` (no output) or `ask` (permissionDecision "ask"). Use \n for a newline inside a
+# command; the runner decodes it with printf %b.
+ask	ssh node01 'docker exec funds-poller python -c "import radar"'
+ask	ssh node01 "cd /opt/funds && docker compose exec funds-poller python x.py"
+ask	ssh node01 'curl -s https://news.google.com/rss'
+ask	ssh -o BatchMode=yes node01 wget -q https://example.com
+ask	cd /tmp && ssh node01 'python3 /root/scrape.py'
+ask	x=$(ssh node01 'node fetch.js')
+ask	ssh node01 'docker run --rm curlimages/curl https://example.com'
+ask	ssh -p 2222 -i ~/.ssh/k host 'uv run scraper.py'
+pass	ssh node01 'docker ps --format "{{.Names}}"'
+pass	ssh node01 'docker logs -n 50 funds-poller'
+pass	ssh node01 'systemctl status node01-health.timer; journalctl -n 20'
+pass	ssh node01 'tail -1 /opt/funds/data/telegram-log.jsonl'
+pass	ssh node01 'ls /opt/node01-media'
+pass	scp file.txt node01:/tmp/
+pass	rsync -az scripts/ node01:/opt/funds/app/scripts/
+pass	ssh-keygen -t ed25519 -f ~/.ssh/new
+pass	git push origin main
+pass	curl -s https://example.com
+pass	python3 scripts/radar.py
+pass	git commit -F - <<'EOF'\nuse ssh node01 curl to check\nEOF
