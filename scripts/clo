@@ -23,10 +23,14 @@ EOF
 
 state_file="${XDG_STATE_HOME:-$HOME/.local/state}/clo/last"
 claude_json="${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json"
+settings_json="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
 
 # value <TAB> label <TAB> description
 menu() {
-    print -r -- $'default\tdefault\tYour saved default (settings.json), no --model'
+    local saved=""
+    [[ -r "$settings_json" ]] && command -v jq >/dev/null \
+        && saved="$(jq -r '.model // empty' "$settings_json" 2>/dev/null || true)"
+    print -r -- "default"$'\t'"default"$'\t'"Saved default: ${saved:-Claude Code's own} (no --model)"
     print -r -- $'opus\tOpus\tLatest Opus'
     print -r -- $'sonnet\tSonnet\tLatest Sonnet'
     print -r -- $'haiku\tHaiku\tLatest Haiku'
