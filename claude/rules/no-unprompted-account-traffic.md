@@ -52,7 +52,8 @@ Fetching a single public page the user pointed at is ordinary work.
 
 ## agent-request-limiter
 
-Where it is installed, every agent request goes through a per-site budget proxy. A refusal is an
+Where it is installed, agents' requests go through a per-site budget proxy (via the proxy settings
+every session gets; a tool that ignores them is not counted, so never reach for one to get around it). A refusal is an
 HTTP 429 carrying an `X-Agent-Request-Limiter` header. On one: stop requesting that site and tell the
 user what you were doing and how many requests it needed. **Never** retry it, route around the proxy,
 edit its tier or state files, stop or restart it, or run its `approve`/`deny`/`ask` commands. Raising
