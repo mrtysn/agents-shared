@@ -67,7 +67,7 @@ init_zsh() {
     cat <<'EOF'
 clo() {
     local f rc d
-    f="$(mktemp -t clo)" || return
+    f="$(mktemp "${TMPDIR:-/tmp}/clo.XXXXXX")" || return
     CLO_CD_FILE="$f" command clo "$@"
     rc=$?
     d="$(cat -- "$f" 2>/dev/null)"
