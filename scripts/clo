@@ -137,8 +137,25 @@ now=$EPOCHSECONDS
 # (epoch seconds), or nothing. Its per-folder directory name is the real path
 # with every character other than a letter or digit turned into "-".
 last_session() {
+    local f
+    f="$(last_session_file "$1")" && zstat +mtime -- "$f"
+}
+
+# last_session_file <dir> — the newest session file for <dir>, or fail
+last_session_file() {
     local -a f=("$projects_dir/${${1:A}//[^A-Za-z0-9]/-}"/*.jsonl(N.om[1]))
-    (( $#f )) && zstat +mtime -- "$f[1]"
+    (( $#f )) && print -r -- "$f[1]"
+}
+
+# session_title <file> — the session's name: one you gave it with /rename,
+# else the title Claude Code generated, else nothing.
+session_title() {
+    local type t
+    for type in custom-title ai-title; do
+        t="$(grep -F "\"type\":\"$type\"" -- "$1" 2>/dev/null | tail -1 \
+            | jq -r '.customTitle // .aiTitle // .title // empty' 2>/dev/null || true)"
+        [[ -n "$t" ]] && { print -r -- "$t"; return; }
+    done
 }
 
 # ago <epoch> — "now", "5m", "3h", "12d", "4mo"
@@ -197,12 +214,13 @@ effort_state() { print -r -- "$state_dir/effort/${1//[^A-Za-z0-9._-]/_}"; }
 # start_rows <dir> — the session menu for <dir>: every model (each starts a new
 # session), then, when <dir> has a past session, continue and resume.
 start_rows() {
-    local t
+    local f t title
     menu
-    t="$(last_session "$1" || true)"
-    [[ -n "$t" ]] || return 0
-    t="$(ago "$t")"; [[ "$t" == now ]] && t="just now" || t+=" ago"
-    print -r -- "continue"$'\t'"continue latest  "$'\e[2m'"last seen $t"$'\e[0m'
+    f="$(last_session_file "$1")" || return 0
+    t="$(ago "$(zstat +mtime -- "$f")")"; [[ "$t" == now ]] && t="just now" || t+=" ago"
+    title="$(session_title "$f")"
+    if [[ -n "$title" ]]; then t="$title · $t"; else t="last seen $t"; fi
+    print -r -- "continue"$'\t'"continue latest  "$'\e[2m'"$t"$'\e[0m'
     print -r -- $'resume\tresume any'
 }
 
