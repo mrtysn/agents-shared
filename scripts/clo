@@ -27,7 +27,7 @@ first, with how long ago. Inside $DEV_ROOT it launches in the current folder.
 
 The session menu lists the models, each starting a new session, and, when
 the folder has a past session, "continue latest" (claude --continue) and
-"resume any" (claude --resume). Those two launch at once: the session already
+"resume a session" (claude --resume). Those two launch at once: the session already
 has its model and effort.
 
 The model menu is the stable aliases (always the latest of each family) plus any
@@ -221,7 +221,7 @@ start_rows() {
     title="$(session_title "$f")"
     if [[ -n "$title" ]]; then t="$title · $t"; else t="last seen $t"; fi
     print -r -- "continue"$'\t'"continue latest  "$'\e[2m'"$t"$'\e[0m'
-    print -r -- $'resume\tresume any'
+    print -r -- $'resume\tresume a session'
 }
 
 # label <value> <value<TAB>label>... — the label shown for <value>
