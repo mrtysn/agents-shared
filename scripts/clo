@@ -147,15 +147,21 @@ last_session_file() {
     (( $#f )) && print -r -- "$f[1]"
 }
 
-# session_title <file> — the session's name: one you gave it with /rename,
-# else the title Claude Code generated, else nothing.
-session_title() {
-    local type t
-    for type in custom-title ai-title; do
-        t="$(grep -F "\"type\":\"$type\"" -- "$1" 2>/dev/null | tail -1 \
-            | jq -r '.customTitle // .aiTitle // .title // empty' 2>/dev/null || true)"
-        [[ -n "$t" ]] && { print -r -- "$t"; return; }
-    done
+# session_setup <file> — the model and effort of the session's last reply,
+# e.g. "Opus 5.5 · medium". Model ids read as names: claude-opus-5-5 is
+# "Opus 5.5", claude-haiku-4-5-20251001 is "Haiku 4.5".
+session_setup() {
+    local line model effort
+    line="$(grep -F '"type":"assistant"' -- "$1" 2>/dev/null | tail -1)"
+    [[ -n "$line" ]] || return 0
+    model="$(jq -r '.message.model // empty' <<<"$line" 2>/dev/null || true)"
+    effort="$(jq -r '.effort // empty' <<<"$line" 2>/dev/null || true)"
+    if [[ -n "$model" ]]; then
+        local -a parts=(${(s:-:)${${model#claude-}%%\[*}})
+        [[ "${parts[-1]}" == <10000000-> ]] && parts[-1]=()   # a date suffix
+        model="${(C)parts[1]}${parts[2]:+ ${(j:.:)parts[2,-1]}}"
+    fi
+    print -r -- "${model}${model:+${effort:+ · }}${effort}"
 }
 
 # ago <epoch> — "now", "5m", "3h", "12d", "4mo"
@@ -214,12 +220,12 @@ effort_state() { print -r -- "$state_dir/effort/${1//[^A-Za-z0-9._-]/_}"; }
 # start_rows <dir> — the session menu for <dir>: every model (each starts a new
 # session), then, when <dir> has a past session, continue and resume.
 start_rows() {
-    local f t title
+    local f t setup
     menu
     f="$(last_session_file "$1")" || return 0
     t="$(ago "$(zstat +mtime -- "$f")")"; [[ "$t" == now ]] && t="just now" || t+=" ago"
-    title="$(session_title "$f")"
-    if [[ -n "$title" ]]; then t="$title · $t"; else t="last seen $t"; fi
+    setup="$(session_setup "$f")"
+    if [[ -n "$setup" ]]; then t="$setup · $t"; else t="last seen $t"; fi
     print -r -- "continue"$'\t'"continue latest  "$'\e[2m'"$t"$'\e[0m'
     print -r -- $'resume\tresume a session'
 }
