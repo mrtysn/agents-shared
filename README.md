@@ -62,6 +62,8 @@ config dir (`$CLAUDE_CONFIG_DIR`, else `~/.claude`).
 | `hooks/focus-policy.sh` | SessionStart | Tells the session whether this machine tolerates a window stealing keyboard focus |
 | `hooks/memory-lint.sh` | PreToolUse (`Edit\|Write`) | Keeps auto-memory index lines topic-only and refuses a memory that duplicates a rule |
 | `hooks/dump-hook-stdin.sh` | any | Probe: writes the JSON a hook event receives to a file, then allows the call |
+| `hooks/system-one-start.sh` | SessionStart | Brings up the system-one decision-model server in the background; reports one line, never blocks |
+| `hooks/system-one-bash.sh` | PreToolUse (`Bash`) | Scores each command for destructiveness with the decision model; shadow mode logs, act mode asks (never denies) |
 
 ### memory-lint.sh
 
@@ -132,6 +134,62 @@ Wire it up in that same directory's `settings.json`:
 The matching standing rule is `claude/rules/window-focus.md` — the hook
 reports the verdict and whether `quiet-open` is present, the rule says what to
 do about both.
+
+### system-one
+
+A local decision model (Laya, one warm server on loopback) that answers typed
+questions (`choice`, `score`, yes/no `noul`) about a text state with calibrated
+probabilities, for the bounded checks the exact guards cannot enumerate. Design,
+measurements and the evaluation plan: `notebook/2026-09-24-system-one-decision-model-integration.md`.
+
+`scripts/system-one` is the wrapper (`start`, `stop`, `status`, `ask`,
+`shadow-report`, `install`; `roster` is a stub until the prompt hook lands). It
+reaches `~/bin` through the tools repo's `links.txt`. Copy
+`scripts/system-one.local.sh.example` to `${CLAUDE_CONFIG_DIR:-~/.claude}/system-one.local.sh`
+and set `SYSTEM_ONE_VENV`; the port (7811), idle exit (30 min) and mode have
+defaults there, and the Bash hook's thresholds live in the questions file with
+`SYSTEM_ONE_BASH_ASK_<QUESTION>` as the override.
+
+- `system-one-start.sh` runs `system-one start` at SessionStart (it returns at
+  once; the server takes about 4 s to load and is warm by the first Bash call).
+  Nothing else starts it; a start lock keeps two sessions from launching it twice;
+  a watchdog stops it by pid after the idle period. `stop` and the watchdog signal
+  only the pid they wrote, and only while that pid is still `laya-serve`, never a
+  port or a name.
+- `system-one-bash.sh` builds `cwd: ...\ncommand:\n...` (each heredoc body cut to
+  its first two lines plus a marker by `hooks/system-one-bash-state.awk`), asks the
+  four yes/no questions in `hooks/system-one-bash-questions.json` (foreign process,
+  irreversible, leaves the machine, network install) and pipes them to
+  `system-one ask --fail-open --gate` with that file's thresholds. **Shadow** and
+  **show** modes append the verdict to the shadow log and emit nothing (identical
+  behaviour; `show` only tells `status`, the status line and Agent Bar Hopping the
+  user has opted in to seeing verdicts there); **act** mode emits
+  `permissionDecision: "ask"` naming the question that fired. Fails open
+  everywhere: no config, no server, timeout. Flip to act only on the user's word,
+  after the evaluation plan in the design doc.
+- Agents needing a bounded judgment: `echo '{"state": "...", "questions": {...}}' | system-one ask`.
+  Do not start Python or the server yourself.
+
+Shadow log: one file per session, `${XDG_STATE_HOME:-~/.local/state}/system-one/shadow/<session_id>.jsonl`
+(no session id: `shadow/_nosession.jsonl`), one JSON object per call (hook, latency,
+sha256 and length of the state, every answer, `would_act`, `acted`, and for the
+Bash hook the command itself, which labelling needs). `system-one shadow-report`
+summarises every file under `shadow/`, or one with `--session <id>`; `status`
+counts lines across all of them. A flat `shadow.jsonl` from before this layout is
+split by `session_id` into `shadow/` the first time `status` or `shadow-report`
+runs, and renamed to `shadow.jsonl.migrated`. Cases in
+`hooks/tests/system-one-bash-cases.tsv`, run with `hooks/tests/run-system-one-bash.sh`,
+which reports agreement with the expected column and fails only on a hook error,
+output in shadow mode, or a call over 2 s.
+
+**Show mode**: the status line and the Agent Bar Hopping app (`cc-statusline`
+repo) read the session's shadow log and draw the four gate scores as a fourth
+row whenever the user has turned that display on and the log file exists,
+whatever `SYSTEM_ONE_MODE` is (see
+`notebook/2026-09-24-system-one-decision-model-integration.md` section 9). The
+mode name `show` exists only so `status`, the status line and the app can say
+the user has chosen to see verdicts; nothing in system-one itself renders the
+row, and the log is the only interface between the two repos.
 
 ## Updating
 
