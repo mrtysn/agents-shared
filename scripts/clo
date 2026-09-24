@@ -92,7 +92,8 @@ esac
 # Returns 2 when Esc asks for the previous menu, 130 on Ctrl-C. Reads $crumb.
 pick() {
     local prompt="$1" state="$2" last="$3"; shift 3
-    local pos=1 i choice saved=""
+    local pos=1 i choice saved="" noun="a $prompt"
+    [[ "$prompt" == effort ]] && noun="an effort"
     [[ -n "$state" && -r "$state" ]] && saved="$(<"$state")" && last="$saved"
     local -a rows=("$@")
     for i in {1..$#rows}; do
@@ -106,7 +107,8 @@ pick() {
     # for the row under the cursor (clo --preview, re-run on every move).
     choice="$(print -rl -- "$@" \
         | fzf --ansi --delimiter=$'\t' --with-nth=2.. --nth=-1 --reverse --info=hidden \
-              --prompt="$prompt> " --bind="load:pos($pos)" --bind=change:first \
+              --prompt="choose $noun > " \
+              --bind="load:pos($pos)" --bind=change:first \
               --bind='esc:print(<back>)+accept' \
               ${crumb:+--header="$crumb"} \
               --preview="${(q)self} --preview $prompt {1}" \
