@@ -92,8 +92,12 @@ esac
 # Returns 2 when Esc asks for the previous menu, 130 on Ctrl-C. Reads $crumb.
 pick() {
     local prompt="$1" state="$2" last="$3"; shift 3
-    local pos=1 i choice saved="" noun="a $prompt"
-    [[ "$prompt" == effort ]] && noun="an effort"
+    local pos=1 i choice saved="" noun
+    case "$prompt" in
+        folder)  noun="a folder" ;;
+        session) noun="a model" ;;
+        effort)  noun="an effort level" ;;
+    esac
     [[ -n "$state" && -r "$state" ]] && saved="$(<"$state")" && last="$saved"
     local -a rows=("$@")
     for i in {1..$#rows}; do
@@ -249,7 +253,7 @@ if [[ "${1:-}" == --preview ]]; then
     [[ -n "$model" ]] || model="${${(f)"$(menu)"}[1]%%$'\t'*}"
     case "$stage" in
         folder)  dir="$v"
-                 section session "$state_dir/last" "" "${(@f)$(start_rows "$dir")}" ;;
+                 section model "$state_dir/last" "" "${(@f)$(start_rows "$dir")}" ;;
         session) if [[ "$v" == (continue|resume) ]]; then
                      print -r -- $'\e[2m'"model, effort"$'\e[0m'; print -r -- "  kept from the session"; print
                      launch_line "$dir" "$v" "" ""
@@ -258,7 +262,7 @@ if [[ "${1:-}" == --preview ]]; then
                  model="$v" ;;
         effort)  launch_line "$dir" new "$model" "$v"; exit 0 ;;
     esac
-    section "effort · $(label "$model" "${(@f)$(menu)}")" "$(effort_state "$model")" unset "${effort_rows[@]}"
+    section "effort level · $(label "$model" "${(@f)$(menu)}")" "$(effort_state "$model")" unset "${effort_rows[@]}"
     exit 0
 fi
 
