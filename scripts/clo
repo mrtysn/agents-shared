@@ -419,7 +419,7 @@ else
     run_set step model; run_set dir "$PWD"
 fi
 
-current_rows | fzf --ansi --delimiter=$'\t' --with-nth=2.. --nth=-1 --reverse --info=hidden \
+current_rows | fzf --ansi --delimiter=$'\t' --with-nth=2.. --nth=-1 --reverse --cycle --info=hidden \
     --prompt="$(prompt_text)" --header="$(header_text)" \
     --bind="load:transform(${(q)self} --pos)" --bind=change:first \
     --bind="enter:transform(${(q)self} --next {1})" \
