@@ -9,6 +9,8 @@ clo — pick a folder, Claude model and effort level, then launch Claude Code.
 Usage:
   clo [claude args...]    Open the picker; extra args go to `claude` (e.g. clo -c)
   clo --list              Print the menu entries and exit
+  clo --init zsh          Print the shell function that leaves your terminal in
+                          the launched folder; add to .zshrc: eval "$(clo --init zsh)"
   clo -h | --help         Show this help
 
 Esc goes back to the previous menu (and quits from the first); Ctrl-C quits.
@@ -25,6 +27,8 @@ first, with how long ago. Inside $DEV_ROOT it launches in the current folder.
 
 When the folder has a past session, clo asks whether to start a new one,
 continue the most recent (claude --continue) or pick one (claude --resume).
+Continuing or resuming skips the model and effort menus: the session already
+has them.
 
 The model menu is the stable aliases (always the latest of each family) plus any
 extra models your account is offered, read from Claude Code's own cache in
@@ -57,9 +61,28 @@ menu() {
     done | sort -t$'\t' -k1,1n -s | cut -f2-
 }
 
+# A program cannot change its parent shell's folder, so the shell function
+# printed here runs clo, then cds to the folder the session was launched in.
+init_zsh() {
+    cat <<'EOF'
+clo() {
+    local f rc d
+    f="$(mktemp -t clo)" || return
+    CLO_CD_FILE="$f" command clo "$@"
+    rc=$?
+    d="$(cat -- "$f" 2>/dev/null)"
+    command rm -f -- "$f"
+    [[ -n "$d" && -d "$d" && "$d" != "$PWD" ]] && cd -- "$d"
+    return $rc
+}
+EOF
+}
+
 case "${1:-}" in
     -h|--help) usage; exit 0 ;;
     --list)    menu | cut -f2; exit 0 ;;
+    --init)    [[ "${2:-}" == zsh ]] || { print -u2 "clo: --init supports zsh only"; exit 1; }
+               init_zsh; exit 0 ;;
 esac
 
 command -v fzf >/dev/null || { print -u2 "clo: fzf is not on PATH"; exit 1; }
@@ -175,7 +198,7 @@ while (( step <= 4 )); do
         (( rc )) || cd "$dir" ;;
     2)  # With a past session here: start fresh, continue the most recent one,
         # or open Claude Code's own session picker.
-        launch=()
+        launch=() session=new
         t="$(last_session "$PWD" || true)"
         [[ -n "$t" ]] || { step=3; continue; }
         t="$(ago "$t")"; [[ "$t" == now ]] && t="just now" || t+=" ago"
@@ -193,13 +216,18 @@ while (( step <= 4 )); do
             $'xhigh\txhigh' $'max\tmax')" || rc=$? ;;
     esac
     case $rc in
-        0) shown+=($step); step=$(( step + 1 )) ;;
+        0) shown+=($step); step=$(( step + 1 ))
+           [[ "$step" == 3 && "$session" != new ]] && break ;;
         2) (( $#shown )) || exit 130
            step=${shown[-1]}; shown[-1]=() ;;
         *) exit 130 ;;
     esac
 done
 
-launch+=(--model "$model")
-[[ "$effort" != unset ]] && launch+=(--effort "$effort")
+if [[ "$session" == new ]]; then
+    launch+=(--model "$model")
+    [[ "$effort" != unset ]] && launch+=(--effort "$effort")
+fi
+# Tell the shell function (clo --init zsh) where to leave the terminal.
+[[ -n "${CLO_CD_FILE:-}" ]] && print -r -- "$PWD" > "$CLO_CD_FILE"
 exec claude "${launch[@]}" "$@"
