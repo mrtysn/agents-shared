@@ -36,6 +36,7 @@ extra models your account is offered, read from Claude Code's own cache in
 EOF
 }
 
+self="${0:A}"
 state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/clo"
 claude_json="${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json"
 
@@ -85,13 +86,10 @@ case "${1:-}" in
                init_zsh; exit 0 ;;
 esac
 
-command -v fzf >/dev/null || { print -u2 "clo: fzf is not on PATH"; exit 1; }
-command -v claude >/dev/null || { print -u2 "clo: claude is not on PATH"; exit 1; }
-
 # pick <prompt> <state file> <first-run value> <value<TAB>[…<TAB>]label>... — print the
 # chosen value. The menu opens on the value saved in <state file>, else on
 # <first-run value>, else on the first entry. An empty <state file> remembers nothing.
-# Returns 2 when Esc asks for the previous menu, 130 on Ctrl-C.
+# Returns 2 when Esc asks for the previous menu, 130 on Ctrl-C. Reads $crumb.
 pick() {
     local prompt="$1" state="$2" last="$3"; shift 3
     local pos=1 i choice saved=""
@@ -104,10 +102,15 @@ pick() {
         break
     done
     set -- "${rows[@]}"
+    # The header shows the picks so far; the side pane, the menus still to come
+    # for the row under the cursor (clo --preview, re-run on every move).
     choice="$(print -rl -- "$@" \
-        | fzf --ansi --delimiter=$'\t' --with-nth=2.. --nth=-1 --height=~50% --reverse --info=hidden \
+        | fzf --ansi --delimiter=$'\t' --with-nth=2.. --nth=-1 --height=18 --reverse --info=hidden \
               --prompt="$prompt> " --bind="load:pos($pos)" --bind=change:first \
-              --bind='esc:print(<back>)+accept')" \
+              --bind='esc:print(<back>)+accept' \
+              ${crumb:+--header="$crumb"} \
+              --preview="${(q)self} --preview $prompt {1}" \
+              --preview-window='right,40%,border-left,<30(hidden)')" \
         || [[ "$choice" == "<back>"* ]] || return 130
     [[ "${choice%%$'\n'*}" == "<back>" ]] && return 2
     choice="${choice%%$'\t'*}"
@@ -181,15 +184,114 @@ folder_menu() {
 # The menus run as a wizard: folder (outside the dev root only), session (only
 # when the folder has one), model, effort. Esc steps back to the previous menu
 # that was shown, and quits from the first; Ctrl-C quits from any.
+effort_rows=($'unset\tunset' $'low\tlow' $'medium\tmedium' $'high\thigh' $'xhigh\txhigh' $'max\tmax')
+effort_state() { print -r -- "$state_dir/effort/${1//[^A-Za-z0-9._-]/_}"; }
+
+# session_rows <dir> — the session menu for <dir>, or nothing when it has no
+# past session.
+session_rows() {
+    local t
+    t="$(last_session "$1" || true)"
+    [[ -n "$t" ]] || return 0
+    t="$(ago "$t")"; [[ "$t" == now ]] && t="just now" || t+=" ago"
+    print -r -- $'new\tnew session'
+    print -r -- "continue"$'\t'"continue latest  "$'\e[2m'"last seen $t"$'\e[0m'
+    print -r -- $'resume\tresume any'
+}
+
+# label <value> <value<TAB>label>... — the label shown for <value>
+label() {
+    local v="$1" r; shift
+    for r in "$@"; do [[ "${r%%$'\t'*}" == "$v" ]] && { print -r -- "${r#*$'\t'}"; return; }; done
+    print -r -- "$v"
+}
+
+# section <title> <state file> <first-run value> <rows>... — a menu as text,
+# for the side pane: the row it would open on marked, "latest" as in pick().
+section() {
+    local title="$1" state="$2" last="$3" saved="" r v mark=$'  \e[2mlatest\e[0m'; shift 3
+    [[ -n "$state" && -r "$state" ]] && saved="$(<"$state")" && last="$saved"
+    [[ -n "$last" ]] || last="${1%%$'\t'*}"
+    print -r -- $'\e[2m'"$title"$'\e[0m'
+    for r in "$@"; do
+        v="${r%%$'\t'*}"
+        if [[ "$v" == "$last" ]]; then
+            print -r -- "› ${r#*$'\t'}${saved:+$mark}"
+        else
+            print -r -- "  ${r#*$'\t'}"
+        fi
+    done
+    [[ "$title" == effort* ]] || print
+}
+
+# The command a launch would run, as text.
+launch_line() {
+    local dir="$1" session="$2" model="$3" effort="$4" cmd=claude
+    case "$session" in
+        continue) cmd+=" --continue" ;;
+        resume)   cmd+=" --resume" ;;
+        *)        cmd+=" --model $model"; [[ "$effort" == unset ]] || cmd+=" --effort $effort" ;;
+    esac
+    print -r -- $'\e[2m'"launches"$'\e[0m'
+    print -r -- "$cmd"
+    print -r -- $'\e[2m'"in ${dir/#$HOME/~}"$'\e[0m'
+}
+
+# clo --preview <menu> <value> — the side pane: the menus after <menu> if
+# <value> were picked. Picks already made arrive as CLO_DIR, CLO_SESSION and
+# CLO_MODEL.
+if [[ "${1:-}" == --preview ]]; then
+    stage="$2" v="${3%$'\t'}"
+    dir="${CLO_DIR:-$PWD}" session="${CLO_SESSION:-new}"
+    model="${CLO_MODEL:-$(cat "$state_dir/last" 2>/dev/null || true)}"
+    [[ -n "$model" ]] || model="${${(f)"$(menu)"}[1]%%$'\t'*}"
+    case "$stage" in
+        folder)  dir="$v"
+                 rows=("${(@f)$(session_rows "$dir")}")
+                 if [[ -n "${rows[1]}" ]]; then section session "" new "${rows[@]}"
+                 else print -r -- $'\e[2m'"session"$'\e[0m'; print -r -- "  new — none here yet"; print; fi ;;
+        session) session="$v" ;;
+        model)   model="$v" ;;
+    esac
+    if [[ "$session" != new ]]; then
+        print -r -- $'\e[2m'"model, effort"$'\e[0m'; print -r -- "  kept from the session"; print
+        launch_line "$dir" "$session" "" ""
+        exit 0
+    fi
+    [[ "$stage" == folder || "$stage" == session ]] && section model "$state_dir/last" "" "${(@f)$(menu)}"
+    if [[ "$stage" == effort ]]; then
+        launch_line "$dir" new "$model" "$v"
+    else
+        section "effort · $(label "$model" "${(@f)$(menu)}")" "$(effort_state "$model")" unset "${effort_rows[@]}"
+    fi
+    exit 0
+fi
+
+command -v fzf >/dev/null || { print -u2 "clo: fzf is not on PATH"; exit 1; }
+command -v claude >/dev/null || { print -u2 "clo: claude is not on PATH"; exit 1; }
+
+# The menus run as a wizard: folder (outside the dev root only), session (only
+# when the folder has one), model, effort. Esc steps back to the previous menu
+# that was shown, and quits from the first; Ctrl-C quits from any.
 start="$PWD" ask_folder=0
 if [[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT" ]]; then
     dev="${DEV_ROOT:A}"
     [[ "${PWD:A}" != "$dev" && "${PWD:A}" != "$dev"/* ]] && ask_folder=1
 fi
 
-step=1 shown=() launch=()
+# crumb <step> — the picks made before <step>, e.g. "oj › new session › Opus"
+make_crumb() {
+    local -a c=()
+    (( $1 > 1 && ask_folder )) && c+=("${${PWD:A}/#$HOME/~}")
+    (( $1 > 2 )) && [[ -n "${srows[1]:-}" ]] && c+=("$(label "$session" "${srows[@]}" | sed 's/\x1b\[[0-9]*m//g; s/  .*//')")
+    (( $1 > 3 )) && c+=("$(label "$model" "${(@f)$(menu)}")")
+    crumb="${(j: › :)c}"
+}
+
+step=1 shown=() launch=() crumb="" srows=()
 while (( step <= 4 )); do
     rc=0
+    make_crumb $step
     case $step in
     1)  # Where to launch.
         (( ask_folder )) || { step=2; continue; }
@@ -199,21 +301,19 @@ while (( step <= 4 )); do
     2)  # With a past session here: start fresh, continue the most recent one,
         # or open Claude Code's own session picker.
         launch=() session=new
-        t="$(last_session "$PWD" || true)"
-        [[ -n "$t" ]] || { step=3; continue; }
-        t="$(ago "$t")"; [[ "$t" == now ]] && t="just now" || t+=" ago"
-        session="$(pick session "" new $'new\tnew session' \
-            "continue"$'\t'"continue latest  "$'\e[2m'"last seen $t"$'\e[0m' \
-            $'resume\tresume any')" || rc=$?
+        export CLO_DIR="$PWD"
+        srows=("${(@f)$(session_rows "$PWD")}")
+        [[ -n "${srows[1]}" ]] || { srows=(); step=3; continue; }
+        session="$(pick session "" new "${srows[@]}")" || rc=$?
         case "$session" in
             continue) launch+=(--continue) ;;
             resume)   launch+=(--resume) ;;
         esac ;;
-    3)  model="$(pick model "$state_dir/last" "" "${(@f)$(menu)}")" || rc=$? ;;
+    3)  export CLO_SESSION="$session"
+        model="$(pick model "$state_dir/last" "" "${(@f)$(menu)}")" || rc=$? ;;
     4)  # Effort is remembered per model: medium on Opus and xhigh on Fable each stick.
-        effort="$(pick effort "$state_dir/effort/${model//[^A-Za-z0-9._-]/_}" unset \
-            $'unset\tunset' $'low\tlow' $'medium\tmedium' $'high\thigh' \
-            $'xhigh\txhigh' $'max\tmax')" || rc=$? ;;
+        export CLO_MODEL="$model"
+        effort="$(pick effort "$(effort_state "$model")" unset "${effort_rows[@]}")" || rc=$? ;;
     esac
     case $rc in
         0) shown+=($step); step=$(( step + 1 ))
