@@ -138,8 +138,8 @@ folder_menu() {
     # Folders with a Claude session come first, most recent on top; the rest
     # keep alphabetical order. The dev root and the current folder always lead.
     local -a when order
-    for i in {1..$#names}; do when[$i]="$(last_session "${paths[$i]}")"; done
-    order=(${(f)"$(for i in {1..$#names}; do print -r -- "${when[$i]:-0}"$'\t'"$i"; done \
+    for (( i = 1; i <= $#names; i++ )); do when[$i]="$(last_session "${paths[$i]}")"; done
+    order=(${(f)"$(for (( i = 1; i <= $#names; i++ )); do print -r -- "${when[$i]:-0}"$'\t'"$i"; done \
         | sort -t$'\t' -k1,1nr -k2,2n | cut -f2)"})
     # Age and tags go first, padded to one width, so every name starts in the
     # same column however long it is; fzf searches only the last field, the name.
@@ -181,7 +181,7 @@ session_rows() {
            ([.summary.model_full, .summary.effort] | map(select(. != null and . != "")) | join(" · ")),
            (if .is_live then "live" else "" end)]
         | join("\u001f")' "$CLO_SNAPSHOT" 2>/dev/null)
-    for i in {1..$#ids}; do
+    for (( i = 1; i <= $#ids; i++ )); do
         printf 'resume:%s\t%s%-4s%s %-*s  %s%s%s\n' "${ids[$i]}" "$dim" "$(ago "${ats[$i]}")" "$off" \
             "$w" "${topics[$i]}" "$dim" "${setups[$i]}${lives[$i]:+  ${lives[$i]}}" "$off"
     done
@@ -191,10 +191,15 @@ session_rows() {
 # session), then <dir>'s sessions, then Claude Code's own session picker for
 # anything older.
 start_rows() {
-    menu
-    session_rows "$1"
+    local sessions pad="" r
+    sessions="$(session_rows "$1")"
+    # Session rows lead with an age column; the others leave it empty, so every
+    # name starts in the same column.
+    [[ -n "$sessions" ]] && pad="     "
+    for r in "${(@f)$(menu)}"; do print -r -- "${r%%$'\t'*}"$'\t'"$pad${r#*$'\t'}"; done
+    [[ -n "$sessions" ]] && print -r -- "$sessions"
     last_session_file "$1" >/dev/null || return 0
-    print -r -- $'resume\tresume a session'
+    print -r -- "resume"$'\t'"${pad}resume a session"
 }
 
 # label <value> <value<TAB>label>... — the label shown for <value>
@@ -274,7 +279,7 @@ mark_rows() {
     local state="$1" last="$2" saved="" i pos=1; shift 2
     [[ -n "$state" && -r "$state" ]] && saved="$(<"$state")" && last="$saved"
     local -a rows=("$@")
-    for i in {1..$#rows}; do
+    for (( i = 1; i <= $#rows; i++ )); do
         [[ "${rows[$i]%%$'\t'*}" == "$last" ]] || continue
         pos=$i
         [[ -n "$saved" ]] && rows[$i]+=$'  \e[2mlatest\e[0m'
