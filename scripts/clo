@@ -105,7 +105,7 @@ pick() {
     # The header shows the picks so far; the side pane, the menus still to come
     # for the row under the cursor (clo --preview, re-run on every move).
     choice="$(print -rl -- "$@" \
-        | fzf --ansi --delimiter=$'\t' --with-nth=2.. --nth=-1 --height=18 --reverse --info=hidden \
+        | fzf --ansi --delimiter=$'\t' --with-nth=2.. --nth=-1 --reverse --info=hidden \
               --prompt="$prompt> " --bind="load:pos($pos)" --bind=change:first \
               --bind='esc:print(<back>)+accept' \
               ${crumb:+--header="$crumb"} \
