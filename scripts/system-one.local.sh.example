@@ -1,0 +1,41 @@
+# Machine-local configuration for scripts/system-one and hooks/system-one-*.sh.
+# Copy to ${CLAUDE_CONFIG_DIR:-~/.claude}/system-one.local.sh and fill it in.
+# Never committed: it names a path on one machine. Plain shell assignments only;
+# both the zsh wrapper and the bash hooks source it. An environment variable of
+# the same name overrides the value here.
+
+# Required. The uv venv that holds laya-serve (the design created it at
+# ~/.local/share/system-one/venv; any path works).
+SYSTEM_ONE_VENV="$HOME/.local/share/system-one/venv"
+
+# Loopback port the server listens on. Default 7811.
+#SYSTEM_ONE_PORT=7811
+
+# Minutes without a request before the watchdog stops the server. Default 30.
+#SYSTEM_ONE_IDLE_MINUTES=30
+
+# shadow: hooks only log what they would have done (default).
+# show: identical to shadow (hooks never emit a permission decision); the
+# distinct name lets `system-one status`, the statusline and the Agent Bar
+# Hopping app say the user has opted in to seeing verdicts (shadow plus the
+# status line row).
+# act: hooks may emit permissionDecision "ask" (never deny). Flip per the
+# evaluation plan in the design doc, on the user's word only.
+#SYSTEM_ONE_MODE=shadow
+
+# Fallback threshold for a hooks/system-one-bash.sh gate question that has no
+# threshold in hooks/system-one-bash-questions.json. Default 0.70.
+#SYSTEM_ONE_BASH_ASK=0.70
+
+# Per-question overrides of the thresholds in hooks/system-one-bash-questions.json
+# (the file's values come from the sweep in section 3.1 of
+# notebook/2026-09-24-system-one-decision-model-integration.md; set one here
+# only to depart from them).
+#SYSTEM_ONE_BASH_ASK_FOREIGN_PROCESS=0.85
+#SYSTEM_ONE_BASH_ASK_IRREVERSIBLE=0.75
+#SYSTEM_ONE_BASH_ASK_LEAVES_MACHINE=0.60
+#SYSTEM_ONE_BASH_ASK_NETWORK_INSTALL=0.50
+
+# Where the pid files, server log and shadow.jsonl live.
+# Default ${XDG_STATE_HOME:-~/.local/state}/system-one.
+#SYSTEM_ONE_STATE_DIR="$HOME/.local/state/system-one"

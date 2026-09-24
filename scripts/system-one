@@ -1,0 +1,496 @@
+#!/bin/zsh
+# DESC: Start, stop, query and audit the local Laya decision-model server that hooks consult for bounded judgments
+#
+# system-one is one warm Laya server on loopback (see
+# notebook/2026-09-24-system-one-decision-model-integration.md). It answers typed
+# questions (choice / score / noul) about a text "state" with calibrated
+# probabilities and generates no text. Hooks pipe their state and questions to
+# `system-one ask`; this wrapper owns the single code path: the curl, the
+# timeout, the fail-open exit, the shadow log, and the server lifecycle.
+#
+# Agents: if you need a bounded judgment (is this destructive, which of these
+# options, yes or no with a probability), call `system-one ask` with a JSON
+# object on stdin. Do not start Python or the server by hand; `start` is the
+# SessionStart hook's job and `ask` fails open when the server is not up.
+#
+# Config: ${CLAUDE_CONFIG_DIR:-~/.claude}/system-one.local.sh (gitignored, never
+# in this repo); the committed shape is scripts/system-one.local.sh.example.
+# Environment variables of the same names take precedence over the file.
+#
+# Idle exit: laya-serve has no idle option (its --help is not even parsed; it
+# just starts the server), so `start` also launches a watchdog loop that reads
+# the state dir's `last-request` mtime once a minute and stops the server by its
+# own pid after SYSTEM_ONE_IDLE_MINUTES without a request. Both processes run in
+# their own session (setsid via the venv's python) so a hook's exit cannot take
+# them down.
+
+set -euo pipefail
+zmodload zsh/stat zsh/datetime
+
+usage() {
+    cat <<'EOF'
+system-one: the local decision-model server and its client.
+
+Usage:
+  system-one start                Start the server if it is not running; returns
+                                  at once, the model loads in the background (~4 s).
+  system-one stop                 Stop the server and its idle watchdog, by pid file only.
+  system-one status               Running or not, pid, port, device, mode, idle
+                                  timeout, shadow log line count.
+  system-one ask [options]        POST a {"state","questions"} JSON object and print
+                                  the answers JSON. Reads stdin unless --file is given.
+      --file <path>               Read the request from a file instead of stdin.
+      --hook <name>               Append a shadow-log line tagged with this hook name.
+      --session <id>              Session id for the shadow-log line; also names the
+                                  per-session log file (shadow/<id>.jsonl). Omitted or
+                                  empty uses shadow/_nosession.jsonl.
+      --threshold <0..1>          Compute would_act: any noul >= t, or any score
+                                  normalised to [0,1] >= t. Adds "would_act" and
+                                  "fired" to the printed JSON.
+      --gate <json>               Per-question gate, e.g. {"foreign_process": 0.9,
+                                  "target": {"threshold": 0.6, "ask_on": ["remote"]}}.
+                                  A bare number is the threshold on P(yes) or the
+                                  normalised score; the object form also gates a
+                                  choice question on the summed probability of the
+                                  named options. A question not in the gate is
+                                  ignored when the gate is given; without --gate
+                                  every noul/score question is checked at --threshold.
+      --would-act true|false      Set would_act by hand (overrides --threshold).
+      --acted true|false          Record whether the caller acted on it (default false).
+      --keep-state                Log the full state text (bash hook: the command is
+                                  needed for labelling). Default: sha256 plus 80 chars.
+      --fail-open                 On any failure print nothing and exit 0 (hooks use
+                                  this). Without it a failure exits non-zero.
+  system-one roster               Rebuild the skill criteria cache (not in this slice).
+  system-one shadow-report [-n N] [--session <id>]
+                                  Summarise the shadow log (every file under shadow/,
+                                  or one session with --session): calls per hook,
+                                  would_act rate, p50/p95 latency, last N
+                                  would_act=true lines.
+  system-one install              Print the links.txt line and the settings.json
+                                  entries to add (edits nothing).
+  system-one -h | --help          This text.
+
+Request shape for `ask` (Laya /v1/systemone):
+  {"state": "<text>",
+   "questions": {
+     "q1": {"type": "noul",   "instructions": "..."},
+     "q2": {"type": "score",  "instructions": "...", "criteria": ["low","mid","high"]},
+     "q3": {"type": "choice", "instructions": "...", "criteria": {"a": "...", "b": "..."}}}}
+Answer keys: answers.q1.noul (P(yes)), answers.q2.score (expected level index,
+0..k-1) plus .probabilities, answers.q3.choice plus .probabilities.
+
+Config file: ${CLAUDE_CONFIG_DIR:-~/.claude}/system-one.local.sh
+  SYSTEM_ONE_VENV          required; the uv venv holding laya-serve
+  SYSTEM_ONE_PORT          default 7811
+  SYSTEM_ONE_IDLE_MINUTES  default 30; the watchdog stops an idle server after this
+  SYSTEM_ONE_MODE          shadow (default: log only), show (log only, same as
+                           shadow; status and the statusline/app say the user opted
+                           in to seeing verdicts), or act (hooks may ask)
+  SYSTEM_ONE_BASH_ASK      fallback threshold for a hooks/system-one-bash.sh gate
+                           question that names none in system-one-bash-questions.json
+  SYSTEM_ONE_BASH_ASK_<Q>  per-question override (FOREIGN_PROCESS, IRREVERSIBLE,
+                           LEAVES_MACHINE, NETWORK_INSTALL) of the file's threshold
+  SYSTEM_ONE_STATE_DIR     default ${XDG_STATE_HOME:-~/.local/state}/system-one
+State dir: server.pid, watchdog.pid, server.log, last-request, shadow/<session_id>.jsonl
+(one file per session; a call with no --session writes shadow/_nosession.jsonl). A
+pre-existing flat shadow.jsonl from before this layout is split into shadow/ the
+first time `status` or `shadow-report` runs, and renamed to shadow.jsonl.migrated.
+EOF
+}
+
+self="${0:A}"
+config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+config_file="$config_dir/system-one.local.sh"
+
+# ---- configuration ---------------------------------------------------------
+# Environment wins over the file: remember what was set, source, then restore.
+typeset -a cfg_vars=(SYSTEM_ONE_VENV SYSTEM_ONE_PORT SYSTEM_ONE_IDLE_MINUTES
+    SYSTEM_ONE_MODE SYSTEM_ONE_BASH_ASK SYSTEM_ONE_STATE_DIR
+    SYSTEM_ONE_BASH_ASK_FOREIGN_PROCESS SYSTEM_ONE_BASH_ASK_IRREVERSIBLE
+    SYSTEM_ONE_BASH_ASK_LEAVES_MACHINE SYSTEM_ONE_BASH_ASK_NETWORK_INSTALL)
+typeset -A env_pre
+local v
+for v in "${cfg_vars[@]}"; do
+    [[ -n "${(P)v:-}" ]] && env_pre[$v]="${(P)v}"
+done
+config_present=0
+if [[ -r "$config_file" ]]; then
+    source "$config_file"
+    config_present=1
+fi
+for v in "${(k)env_pre[@]}"; do
+    typeset -g "$v=${env_pre[$v]}"
+done
+
+SYSTEM_ONE_PORT="${SYSTEM_ONE_PORT:-7811}"
+SYSTEM_ONE_IDLE_MINUTES="${SYSTEM_ONE_IDLE_MINUTES:-30}"
+SYSTEM_ONE_MODE="${SYSTEM_ONE_MODE:-shadow}"
+SYSTEM_ONE_BASH_ASK="${SYSTEM_ONE_BASH_ASK:-0.70}"
+SYSTEM_ONE_STATE_DIR="${SYSTEM_ONE_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/system-one}"
+
+state_dir="$SYSTEM_ONE_STATE_DIR"
+pid_file="$state_dir/server.pid"
+watchdog_pid_file="$state_dir/watchdog.pid"
+log_file="$state_dir/server.log"
+last_request="$state_dir/last-request"
+shadow_dir="$state_dir/shadow"
+old_shadow_log="$state_dir/shadow.jsonl"
+base_url="http://127.0.0.1:$SYSTEM_ONE_PORT"
+
+# A session id, safe for a filename: keep only word chars and dashes, same
+# rule cc-statusline uses for its per-session spool names. Empty (or no
+# --session) becomes _nosession, so an ask with no session id still lands
+# somewhere shadow-report and status can find it.
+session_file_id() {
+    local sid="${1//[^A-Za-z0-9_-]/}"
+    [[ -n "$sid" ]] || sid="_nosession"
+    print -r -- "$sid"
+}
+
+# One-time migration: an old flat shadow.jsonl (from before the per-session
+# layout) is split by session_id into shadow/<id>.jsonl and renamed aside, so
+# the old file is never read twice. The first step is an atomic rename to a
+# claim name: rename(2) succeeds for exactly one caller, so two sessions that
+# run status in the same second cannot both split the file and double every
+# line. A no-op once the old file is gone. A claim left by a crash
+# (shadow.jsonl.migrating) is not resumed: it would duplicate the lines it had
+# already copied, so it is left for a hand.
+migrate_shadow() {
+    [[ -f "$old_shadow_log" ]] || return 0
+    local claim="$old_shadow_log.migrating"
+    mv -n -- "$old_shadow_log" "$claim" 2>/dev/null || return 0
+    [[ -f "$claim" && ! -f "$old_shadow_log" ]] || return 0
+    mkdir -p "$shadow_dir"
+    # One jq pass over the file: each line becomes "<session_id>\x1f<line>".
+    # The unit separator is not IFS whitespace, so an empty session id still
+    # yields an empty first field, and tojson re-escapes any control character
+    # inside the line, so the split is safe.
+    local sid line n=0
+    typeset -A seen
+    while IFS=$'\x1f' read -r sid line; do
+        [[ -n "$line" ]] || continue
+        sid=$(session_file_id "$sid")
+        print -r -- "$line" >>"$shadow_dir/$sid.jsonl"
+        seen[$sid]=1
+        n=$(( n + 1 ))
+    done < <(jq -r '"\(.session_id // "")\u001f\(tojson)"' "$claim" 2>/dev/null)
+    mv -- "$claim" "$old_shadow_log.migrated"
+    print "system-one: migrated $n line(s) from $old_shadow_log into ${#seen} file(s) under $shadow_dir (old file kept as $old_shadow_log.migrated)"
+}
+
+die() { print -u2 "system-one: $*"; exit 1; }
+
+require_venv() {
+    [[ "$config_present" = 1 ]] || die "not configured: copy scripts/system-one.local.sh.example to $config_file and fill it in"
+    [[ -n "${SYSTEM_ONE_VENV:-}" ]] || die "SYSTEM_ONE_VENV is not set in $config_file"
+    [[ -x "$SYSTEM_ONE_VENV/bin/laya-serve" ]] || die "no laya-serve in $SYSTEM_ONE_VENV/bin"
+    [[ -x "$SYSTEM_ONE_VENV/bin/python" ]] || die "no python in $SYSTEM_ONE_VENV/bin"
+}
+
+# A pid file names one of ours only while that pid is alive AND its command
+# line still matches what we launched (laya-serve, or this script's _watchdog).
+# A pid can be reused by a foreign process after ours dies; a stale pid file
+# must never make `stop` or the watchdog signal that process.
+pid_alive() {
+    local f="$1" want="$2" pid cmd
+    [[ -r "$f" ]] || return 1
+    pid=$(<"$f")
+    [[ "$pid" == <-> ]] || return 1
+    kill -0 "$pid" 2>/dev/null || return 1
+    cmd=$(ps -o command= -p "$pid" 2>/dev/null) || return 1
+    [[ "$cmd" == *"$want"* ]]
+}
+server_alive()   { pid_alive "$pid_file" laya-serve; }
+watchdog_alive() { pid_alive "$watchdog_pid_file" _watchdog; }
+
+health() {
+    curl -s --max-time 1 "$base_url/health" 2>/dev/null
+}
+
+# Run a command in its own session, detached, and print its pid.
+# python's os.setsid is the portable setsid: macOS ships no setsid(1).
+detach() {
+    local pid
+    nohup "$SYSTEM_ONE_VENV/bin/python" -c '
+import os, sys
+try:
+    os.setsid()
+except OSError:
+    pass
+os.execvp(sys.argv[1], sys.argv[1:])
+' "$@" >>"$log_file" 2>&1 </dev/null &!
+    pid=$!
+    print "$pid"
+}
+
+# ---- subcommands -----------------------------------------------------------
+cmd_start() {
+    require_venv
+    mkdir -p "$state_dir"
+    # Two SessionStart hooks in the same second must not both launch a server:
+    # the loser would fail to bind, overwrite the pid file with a dead pid and
+    # leave the winner orphaned without a watchdog. mkdir is the atomic lock;
+    # a lock older than 60 s is a crashed start and is reclaimed.
+    local lock="$state_dir/start.lock" age
+    if ! mkdir "$lock" 2>/dev/null; then
+        age=$(( EPOCHSECONDS - $(zstat +mtime "$lock" 2>/dev/null || print "$EPOCHSECONDS") ))
+        if (( age < 60 )); then
+            print "system-one: another start is in progress (:$SYSTEM_ONE_PORT)"
+            return 0
+        fi
+        rmdir "$lock" 2>/dev/null || true
+        mkdir "$lock" 2>/dev/null || { print "system-one: another start is in progress"; return 0; }
+    fi
+    trap "rmdir ${(q)lock} 2>/dev/null" EXIT   # expanded now: the local is gone when the trap runs
+    if server_alive; then
+        # alive: either serving or still loading; either way nothing to do
+        print "system-one: running (pid $(<"$pid_file"), :$SYSTEM_ONE_PORT)"
+        return 0
+    fi
+    rm -f -- "$pid_file"
+    # Someone else on the port would make our server fail to bind; say so
+    # rather than fight for it (it is not ours to free).
+    if [[ -n "$(health)" ]]; then
+        die "something already answers on :$SYSTEM_ONE_PORT but it is not in $pid_file; pick another SYSTEM_ONE_PORT"
+    fi
+    local pid
+    pid=$(LAYA_HOST=127.0.0.1 LAYA_PORT="$SYSTEM_ONE_PORT" LAYA_MODELS=english HF_HUB_OFFLINE=1 \
+        detach "$SYSTEM_ONE_VENV/bin/laya-serve")
+    print "$pid" >"$pid_file"
+    touch "$last_request"
+    # watchdog: stops this exact pid after the idle period
+    if watchdog_alive; then
+        kill "$(<"$watchdog_pid_file")" 2>/dev/null || true
+    fi
+    local wpid
+    wpid=$(detach "$self" _watchdog "$pid")
+    print "$wpid" >"$watchdog_pid_file"
+    print "system-one: starting on :$SYSTEM_ONE_PORT (pid $pid, $SYSTEM_ONE_MODE, idle exit ${SYSTEM_ONE_IDLE_MINUTES}m)"
+}
+
+# Hidden: the idle watchdog loop. Argument: the server pid it is allowed to stop.
+cmd_watchdog() {
+    local pid="$1" idle_s=$(( SYSTEM_ONE_IDLE_MINUTES * 60 )) last now
+    while sleep 60; do
+        # the pid must still be ours (alive, laya-serve) and the pid file must
+        # still name it, else a newer start owns the server or the pid was reused
+        [[ -r "$pid_file" && "$(<"$pid_file")" == "$pid" ]] || exit 0
+        server_alive || break
+        last=$(zstat +mtime "$last_request" 2>/dev/null || print 0)
+        now=$EPOCHSECONDS
+        if (( now - last >= idle_s )); then
+            kill "$pid" 2>/dev/null || true
+            rm -f -- "$pid_file"
+            print "$(strftime '%Y-%m-%dT%H:%M:%S' "$now") system-one: idle for ${SYSTEM_ONE_IDLE_MINUTES}m, stopped pid $pid"
+            break
+        fi
+    done
+    rm -f -- "$watchdog_pid_file"
+}
+
+cmd_stop() {
+    local stopped=0 pid
+    if server_alive; then
+        pid=$(<"$pid_file")
+        kill "$pid" 2>/dev/null && stopped=1
+        print "system-one: stopped server pid $pid"
+    fi
+    if watchdog_alive; then
+        pid=$(<"$watchdog_pid_file")
+        kill "$pid" 2>/dev/null || true
+        print "system-one: stopped watchdog pid $pid"
+    fi
+    rm -f -- "$pid_file" "$watchdog_pid_file"
+    (( stopped )) || print "system-one: server was not running"
+}
+
+cmd_status() {
+    migrate_shadow
+    local h lines=0
+    if server_alive; then
+        h=$(health)
+        if [[ -n "$h" ]]; then
+            print "server:   running, pid $(<"$pid_file"), :$SYSTEM_ONE_PORT, device $(print -r -- "$h" | jq -r '.device // "?"'), loaded $(print -r -- "$h" | jq -c '.loaded // []')"
+        else
+            print "server:   pid $(<"$pid_file") alive on :$SYSTEM_ONE_PORT but /health not answering (still loading?)"
+        fi
+    else
+        print "server:   not running (:$SYSTEM_ONE_PORT)"
+    fi
+    if watchdog_alive; then
+        print "watchdog: pid $(<"$watchdog_pid_file"), idle exit after ${SYSTEM_ONE_IDLE_MINUTES}m without a request"
+    else
+        print "watchdog: not running (idle exit ${SYSTEM_ONE_IDLE_MINUTES}m)"
+    fi
+    print "mode:     $SYSTEM_ONE_MODE"
+    print "config:   $config_file$( (( config_present )) || print ' (missing)')"
+    local -a shadow_files=("$shadow_dir"/*.jsonl(N))
+    (( ${#shadow_files} )) && lines=$(cat -- "${shadow_files[@]}" | wc -l | tr -d ' ')
+    print "shadow:   $shadow_dir (${#shadow_files} session file(s), $lines lines)"
+}
+
+cmd_ask() {
+    local file="" hook="" session="" threshold="" gate="" would_act="" acted="false" keep_state=0 fail_open=0
+    while (( $# )); do
+        case "$1" in
+            --file) file="$2"; shift 2 ;;
+            --hook) hook="$2"; shift 2 ;;
+            --session) session="$2"; shift 2 ;;
+            --threshold) threshold="$2"; shift 2 ;;
+            --gate) gate="$2"; shift 2 ;;
+            --would-act) would_act="$2"; shift 2 ;;
+            --acted) acted="$2"; shift 2 ;;
+            --keep-state) keep_state=1; shift ;;
+            --fail-open) fail_open=1; shift ;;
+            -h|--help) usage; return 0 ;;
+            *) die "ask: unknown option $1" ;;
+        esac
+    done
+    fail() {
+        (( fail_open )) && exit 0
+        die "ask: $*"
+    }
+    local req body
+    if [[ -n "$file" ]]; then
+        req=$(<"$file") || fail "cannot read $file"
+    else
+        req=$(cat)
+    fi
+    body=$(print -r -- "$req" | jq -c '. + {model: (.model // "english")}' 2>/dev/null) || fail "request is not valid JSON"
+    [[ -n "$body" ]] || fail "empty request"
+
+    mkdir -p "$state_dir" 2>/dev/null || true
+    local t0 t1 resp latency_ms
+    t0=$EPOCHREALTIME
+    resp=$(print -r -- "$body" | curl -s --max-time 1.5 -H 'content-type: application/json' \
+        -d @- "$base_url/v1/systemone" 2>/dev/null) || fail "server not answering on :$SYSTEM_ONE_PORT"
+    t1=$EPOCHREALTIME
+    touch "$last_request" 2>/dev/null || true
+    latency_ms=$(( (t1 - t0) * 1000 ))
+    latency_ms=${latency_ms%.*}
+    print -r -- "$resp" | jq -e '.answers' >/dev/null 2>&1 || fail "response has no answers: $resp"
+
+    # would_act: explicit flag, else the gate (only the questions it names, each
+    # at its own threshold; a choice question on the summed probability of its
+    # ask_on options), else every noul/score question at --threshold, else false.
+    local fired='[]'
+    if [[ -z "$would_act" && ( -n "$threshold" || -n "$gate" ) ]]; then
+        fired=$(print -r -- "$resp" | jq -c --argjson t "${threshold:-0}" --argjson gate "${gate:-null}" '
+            [.answers | to_entries[]
+             | . as $e
+             | ($gate[$e.key] // (if $gate == null then $t else null end)) as $g
+             | select($g != null)
+             | (if ($g | type) == "object" then ($g.threshold // $t) else $g end) as $thr
+             | if .value.noul != null then {q: .key, kind: "noul", value: .value.noul}
+               elif .value.score != null then {q: .key, kind: "score",
+                    value: (if (.value.probabilities | length) > 1
+                            then .value.score / ((.value.probabilities | length) - 1)
+                            else .value.score end)}
+               elif .value.choice != null and ($g | type) == "object" then {q: .key, kind: "choice",
+                    value: ([.value.probabilities[($g.ask_on // [])[]] // 0] | add // 0)}
+               else empty end
+             | select(.value >= $thr)]') || fail "malformed --gate"
+        would_act=$(print -r -- "$fired" | jq -r 'length > 0')
+    fi
+    [[ -n "$would_act" ]] || would_act=false
+
+    local out
+    out=$(print -r -- "$resp" | jq -c --argjson w "$would_act" --argjson f "$fired" '. + {would_act: $w, fired: $f}')
+    print -r -- "$out"
+
+    if [[ -n "$hook" ]]; then
+        local state sha len state_field sess_file shadow_file
+        mkdir -p "$shadow_dir" 2>/dev/null || true
+        sess_file=$(session_file_id "$session")
+        shadow_file="$shadow_dir/$sess_file.jsonl"
+        state=$(print -r -- "$body" | jq -r '.state // ""')
+        sha=$(print -rn -- "$state" | shasum -a 256 | cut -d' ' -f1)
+        len=${#state}
+        if (( keep_state )); then
+            state_field=$(jq -cn --arg s "$state" '{state: $s}')
+        else
+            state_field=$(jq -cn --arg s "${state[1,80]}" '{state_excerpt: $s}')
+        fi
+        jq -cn \
+            --arg ts "$(strftime '%Y-%m-%dT%H:%M:%S%z' "$EPOCHSECONDS")" \
+            --arg hook "$hook" --arg session "$session" --arg mode "$SYSTEM_ONE_MODE" \
+            --argjson latency "$latency_ms" --arg sha "$sha" --argjson len "$len" \
+            --argjson answers "$(print -r -- "$resp" | jq -c '.answers')" \
+            --argjson would_act "$would_act" --argjson acted "$acted" --argjson fired "$fired" \
+            --argjson extra "$state_field" \
+            '{ts: $ts, hook: $hook, session_id: $session, mode: $mode, latency_ms: $latency,
+              state_sha256: $sha, state_len: $len, answers: $answers, would_act: $would_act,
+              acted: $acted, fired: $fired} + $extra' >>"$shadow_file" 2>/dev/null || true
+    fi
+}
+
+cmd_roster() {
+    print -u2 "system-one roster: not implemented in this slice"
+    return 1
+}
+
+cmd_shadow_report() {
+    local n=10 session_filter=""
+    while (( $# )); do
+        case "$1" in
+            -n) n="$2"; shift 2 ;;
+            --session) session_filter="$2"; shift 2 ;;
+            -h|--help) usage; return 0 ;;
+            *) die "shadow-report: unknown option $1" ;;
+        esac
+    done
+    migrate_shadow
+    local -a files
+    if [[ -n "$session_filter" ]]; then
+        files=("$shadow_dir/$(session_file_id "$session_filter").jsonl"(N))
+    else
+        files=("$shadow_dir"/*.jsonl(N))
+    fi
+    (( ${#files} )) || { print "shadow log is empty: $shadow_dir${session_filter:+ (session $session_filter)}"; return 0; }
+    print "shadow log: $shadow_dir${session_filter:+ (session $session_filter)} (${#files} file(s))"
+    jq -rs --argjson n "$n" '
+        def pct(p): sort | .[ ((length - 1) * p | round) ];
+        "calls: \(length)   mode: \(map(.mode) | unique | join(","))",
+        (group_by(.hook)[] |
+            "  \(.[0].hook): \(length) calls, would_act \(map(select(.would_act)) | length) (\(100 * (map(select(.would_act)) | length) / length | round)%), acted \(map(select(.acted)) | length), latency p50 \(map(.latency_ms) | pct(0.5)) ms p95 \(map(.latency_ms) | pct(0.95)) ms"),
+        "last \($n) would_act=true:",
+        (map(select(.would_act)) | .[-$n:][] |
+            "  \(.ts) \(.hook) fired=\([.fired[]? | "\(.q)=\(.value * 100 | round / 100)"] | join(",")) :: \((.state // .state_excerpt // "") | split("\n") | map(select(startswith("cwd:") or . == "command:" | not)) | join(" ") | .[0:100])")
+    ' "${files[@]}"
+}
+
+cmd_install() {
+    cat <<EOF
+Register the wrapper (tools repo, then re-run its installer):
+  links.txt:  system-one        agents-shared/scripts/system-one
+  \$ <tools>/install.sh
+
+Config (gitignored, machine-local):
+  cp <agents-shared>/scripts/system-one.local.sh.example $config_file
+  then set SYSTEM_ONE_VENV.
+
+settings.json hook entries (Claude config dir; edit by hand, this prints only).
+SessionStart, first group, after focus-policy (timeout 5):
+  f="\${CLAUDE_CONFIG_DIR:-\$HOME/.claude}/paths.local.sh"; [ -r "\$f" ] && . "\$f"; [ -n "\${AGENTS_SHARED_DIR:-}" ] && [ -x "\$AGENTS_SHARED_DIR/hooks/system-one-start.sh" ] && exec "\$AGENTS_SHARED_DIR/hooks/system-one-start.sh"; echo "system-one-start.sh unavailable: set AGENTS_SHARED_DIR in \${CLAUDE_CONFIG_DIR:-\$HOME/.claude}/paths.local.sh" >&2; exit 0
+PreToolUse, matcher Bash, after ssh-request-guard (timeout 3):
+  f="\${CLAUDE_CONFIG_DIR:-\$HOME/.claude}/paths.local.sh"; [ -r "\$f" ] && . "\$f"; [ -n "\${AGENTS_SHARED_DIR:-}" ] && [ -x "\$AGENTS_SHARED_DIR/hooks/system-one-bash.sh" ] && exec "\$AGENTS_SHARED_DIR/hooks/system-one-bash.sh"; echo "system-one-bash.sh unavailable: set AGENTS_SHARED_DIR in \${CLAUDE_CONFIG_DIR:-\$HOME/.claude}/paths.local.sh" >&2; exit 0
+Both fall back to exit 0: a missing checkout must never block a session.
+EOF
+}
+
+# ---- dispatch --------------------------------------------------------------
+(( $# )) || { usage; exit 1; }
+cmd="$1"; shift
+case "$cmd" in
+    start) cmd_start "$@" ;;
+    _watchdog) cmd_watchdog "$@" ;;
+    stop) cmd_stop "$@" ;;
+    status) cmd_status "$@" ;;
+    ask) cmd_ask "$@" ;;
+    roster) cmd_roster "$@" ;;
+    shadow-report) cmd_shadow_report "$@" ;;
+    install) cmd_install "$@" ;;
+    -h|--help|help) usage ;;
+    *) die "unknown subcommand: $cmd (try --help)" ;;
+esac
