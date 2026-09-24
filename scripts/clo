@@ -87,48 +87,6 @@ case "${1:-}" in
                init_zsh; exit 0 ;;
 esac
 
-# pick <prompt> <state file> <first-run value> <value<TAB>[…<TAB>]label>... — print the
-# chosen value. The menu opens on the value saved in <state file>, else on
-# <first-run value>, else on the first entry. An empty <state file> remembers nothing.
-# Returns 2 when Esc asks for the previous menu, 130 on Ctrl-C. Reads $crumb.
-pick() {
-    local prompt="$1" state="$2" last="$3"; shift 3
-    local pos=1 i choice saved="" noun
-    case "$prompt" in
-        folder)  noun="a folder" ;;
-        session) noun="a model" ;;
-        effort)  noun="an effort level" ;;
-    esac
-    [[ -n "$state" && -r "$state" ]] && saved="$(<"$state")" && last="$saved"
-    local -a rows=("$@")
-    for i in {1..$#rows}; do
-        [[ "${rows[$i]%%$'\t'*}" == "$last" ]] || continue
-        pos=$i
-        [[ -n "$saved" ]] && rows[$i]+=$'  \e[2mlatest\e[0m'
-        break
-    done
-    set -- "${rows[@]}"
-    # The header shows the picks so far; the side pane, the menus still to come
-    # for the row under the cursor (clo --preview, re-run on every move).
-    choice="$(print -rl -- "$@" \
-        | fzf --ansi --delimiter=$'\t' --with-nth=2.. --nth=-1 --reverse --info=hidden \
-              --prompt="choose $noun > " \
-              --bind="load:pos($pos)" --bind=change:first \
-              --bind='esc:print(<back>)+accept' \
-              ${crumb:+--header="$crumb"} \
-              --preview="${(q)self} --preview $prompt {1}" \
-              --preview-window='right,40%,border-left,<30(hidden)')" \
-        || [[ "$choice" == "<back>"* ]] || return 130
-    [[ "${choice%%$'\n'*}" == "<back>" ]] && return 2
-    choice="${choice%%$'\t'*}"
-    # resume reopens a session; it is not a model to remember.
-    if [[ -n "$state" && "$choice" != resume* ]]; then
-        mkdir -p "${state:h}"
-        print -r -- "$choice" > "$state"
-    fi
-    print -r -- "$choice"
-}
-
 zmodload -F zsh/stat b:zstat
 zmodload zsh/datetime
 projects_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects"
@@ -183,7 +141,7 @@ folder_menu() {
     order=(${(f)"$(for i in {1..$#names}; do print -r -- "${when[$i]:-0}"$'\t'"$i"; done \
         | sort -t$'\t' -k1,1nr -k2,2n | cut -f2)"})
     # Age and tags go first, padded to one width, so every name starts in the
-    # same column however long it is; pick() searches only the last field.
+    # same column however long it is; fzf searches only the last field, the name.
     local tw=${#${DEV_ROOT/#$HOME/~}} t
     for tag in "${tags[@]}"; do (( ${#tag} > tw )) && tw=${#tag}; done
     row() {
@@ -246,7 +204,7 @@ label() {
 }
 
 # section <title> <state file> <first-run value> <rows>... — a menu as text,
-# for the side pane: the row it would open on marked, "latest" as in pick().
+# for the side pane: the row it would open on marked, "latest" as in mark_rows().
 section() {
     local title="$1" state="$2" last="$3" saved="" r v mark=$'  \e[2mlatest\e[0m'; shift 3
     [[ -n "$state" && -r "$state" ]] && saved="$(<"$state")" && last="$saved"
@@ -294,91 +252,178 @@ launch_line() {
     print -r -- $'\e[2m'"in ${dir/#$HOME/~}"$'\e[0m'
 }
 
-# clo --preview <menu> <value> — the side pane: the menus after <menu> if
-# <value> were picked. Picks already made arrive as CLO_DIR and CLO_MODEL.
-if [[ "${1:-}" == --preview ]]; then
-    stage="$2" v="${3%$'\t'}"
-    dir="${CLO_DIR:-$PWD}"
-    model="${CLO_MODEL:-$(cat "$state_dir/last" 2>/dev/null || true)}"
+# ── One fzf for the whole run ─────────────────────────────────────────────────
+# Every menu shows in the same fzf, so moving between them never leaves the
+# screen: Enter and Esc run clo again (the handlers below), which record the
+# pick in $CLO_RUN and tell fzf which prompt, header and rows come next.
+# Separate fzf runs would each swap the terminal's screen in and out: a flicker.
+#
+# $CLO_RUN holds: step (folder, model or effort), history (the steps shown, in
+# order), start (the folder clo was run from), dir, choice (a model, resume or
+# resume:<id>), effort, pos (the row the current menu opens on), done, and
+# snapshot and folder.rows (built once).
+
+run_get() { cat -- "$CLO_RUN/$1" 2>/dev/null || true; }
+run_set() { print -r -- "$2" > "$CLO_RUN/$1"; }
+
+# mark_rows <state file> <first-run value> <value<TAB>label>... — print the rows
+# with the remembered one marked "latest", and record the row the menu opens on:
+# the value saved in <state file>, else <first-run value>, else the first row.
+mark_rows() {
+    local state="$1" last="$2" saved="" i pos=1; shift 2
+    [[ -n "$state" && -r "$state" ]] && saved="$(<"$state")" && last="$saved"
+    local -a rows=("$@")
+    for i in {1..$#rows}; do
+        [[ "${rows[$i]%%$'\t'*}" == "$last" ]] || continue
+        pos=$i
+        [[ -n "$saved" ]] && rows[$i]+=$'  \e[2mlatest\e[0m'
+        break
+    done
+    run_set pos "$pos"
+    print -rl -- "${rows[@]}"
+}
+
+# The rows of the current menu.
+current_rows() {
+    local dir
+    case "$(run_get step)" in
+        folder) [[ -s "$CLO_RUN/folder.rows" ]] || folder_menu > "$CLO_RUN/folder.rows"
+                mark_rows "" "$(run_get start)" "${(@f)$(<"$CLO_RUN/folder.rows")}" ;;
+        model)  dir="$(run_get dir)"
+                mark_rows "$state_dir/last" "" "${(@f)$(start_rows "$dir")}" ;;
+        effort) mark_rows "$(effort_state "$(run_get choice)")" unset "${effort_rows[@]}" ;;
+    esac
+}
+
+# The current menu's prompt, e.g. "choose a model > "
+prompt_text() {
+    case "$(run_get step)" in
+        folder) print -r -- "choose a folder > " ;;
+        model)  print -r -- "choose a model > " ;;
+        effort) print -r -- "choose an effort level > " ;;
+    esac
+}
+
+# The current menu's header: the picks so far, e.g. "~/dev/oj › Opus"
+header_text() {
+    local step="$(run_get step)"
+    local -a c=()
+    [[ "$step" != folder && "$(run_get ask_folder)" == 1 ]] && c+=("${$(run_get dir)/#$HOME/~}")
+    [[ "$step" == effort ]] && c+=("$(label "$(run_get choice)" "${(@f)$(menu)}")")
+    print -r -- "${(j: › :)c}"
+}
+
+# The fzf actions that show the current menu. change-header: takes the rest of
+# the line, so it goes last.
+show_actions() {
+    print -r -- "change-prompt($(prompt_text))+clear-query+reload(${(q)self} --rows)+change-header:$(header_text)"
+}
+
+# Enter: record the pick, then show the next menu, or finish.
+handle_next() {
+    local v="${1%$'\t'}" step="$(run_get step)"
+    [[ -n "$v" ]] || return 0
+    print -r -- "$step" >> "$CLO_RUN/history"
+    case "$step" in
+        folder) run_set dir "$v"; run_set step model ;;
+        model)  run_set choice "$v"
+                # resume reopens a session; it is not a model to remember, and
+                # the session already has its effort.
+                if [[ "$v" == resume* ]]; then run_set done 1; print -r -- accept; return; fi
+                mkdir -p "$state_dir"; print -r -- "$v" > "$state_dir/last"
+                run_set step effort ;;
+        effort) run_set effort "$v"
+                # Effort is remembered per model: medium on Opus and xhigh on Fable each stick.
+                mkdir -p "$state_dir/effort"; print -r -- "$v" > "$(effort_state "$(run_get choice)")"
+                run_set done 1; print -r -- accept; return ;;
+    esac
+    show_actions
+}
+
+# Esc: show the previous menu, or quit from the first.
+handle_back() {
+    local -a h=("${(@f)$(run_get history)}")
+    h=(${h:#})
+    (( $#h )) || { print -r -- abort; return; }
+    run_set step "${h[-1]}"
+    print -rl -- "${h[1,-2][@]}" > "$CLO_RUN/history"
+    show_actions
+}
+
+# The side pane: the menus still to come if the row under the cursor were picked.
+handle_preview() {
+    local v="${1%$'\t'}" step="$(run_get step)" dir="$(run_get dir)" model
+    model="$(run_get choice)"
+    [[ -n "$model" && "$model" != resume* ]] || model="$(cat "$state_dir/last" 2>/dev/null || true)"
     [[ -n "$model" ]] || model="${${(f)"$(menu)"}[1]%%$'\t'*}"
-    case "$stage" in
-        folder)  dir="$v"
-                 section model "$state_dir/last" "" "${(@f)$(start_rows "$dir")}" ;;
-        session) if [[ "$v" == resume ]]; then
-                     print -r -- $'\e[2m'"model, effort"$'\e[0m'; print -r -- "  kept from the session"; print
-                     launch_line "$dir" "$v" "" ""
-                     exit 0
-                 fi
-                 if [[ "$v" == resume:* ]]; then
-                     session_detail "${v#resume:}"
-                     launch_line "$dir" "$v" "" ""
-                     exit 0
-                 fi
-                 model="$v" ;;
-        effort)  launch_line "$dir" new "$model" "$v"; exit 0 ;;
+    case "$step" in
+        folder) dir="$v"
+                section model "$state_dir/last" "" "${(@f)$(start_rows "$dir")}" ;;
+        model)  if [[ "$v" == resume ]]; then
+                    print -r -- $'\e[2m'"model, effort"$'\e[0m'; print -r -- "  kept from the session"; print
+                    launch_line "$dir" "$v" "" ""; return
+                fi
+                if [[ "$v" == resume:* ]]; then
+                    session_detail "${v#resume:}"
+                    launch_line "$dir" "$v" "" ""; return
+                fi
+                model="$v" ;;
+        effort) launch_line "$dir" new "$model" "$v"; return ;;
     esac
     section "effort level · $(label "$model" "${(@f)$(menu)}")" "$(effort_state "$model")" unset "${effort_rows[@]}"
-    exit 0
-fi
+}
+
+# The handlers fzf runs; they find the run through $CLO_RUN.
+case "${1:-}" in
+    --rows)    current_rows; exit 0 ;;
+    --pos)     print -r -- "pos($(run_get pos))"; exit 0 ;;
+    --next)    handle_next "${2:-}"; exit 0 ;;
+    --back)    handle_back; exit 0 ;;
+    --preview) handle_preview "${2:-}"; exit 0 ;;
+esac
 
 command -v fzf >/dev/null || { print -u2 "clo: fzf is not on PATH"; exit 1; }
 command -v claude >/dev/null || { print -u2 "clo: claude is not on PATH"; exit 1; }
+
+CLO_RUN="$(mktemp -d "${TMPDIR:-/tmp}/clo.XXXXXX")"
+export CLO_RUN CLO_SNAPSHOT="$CLO_RUN/snapshot"
+trap 'rm -rf -- "$CLO_RUN"' EXIT
 
 # One snapshot of every session cc-statusline knows, taken now and read by the
 # menus and the side pane. It is the command Agent Bar Hopping itself runs.
 # Without node or a cc-statusline checkout, the menus just list no sessions.
 statusline="${DEV_ROOT:-${self:h:h:h}}/cc-statusline/cc-statusline.js"
-CLO_SNAPSHOT="$(mktemp "${TMPDIR:-/tmp}/clo-snapshot.XXXXXX")"
-export CLO_SNAPSHOT
-trap 'rm -f -- "$CLO_SNAPSHOT"' EXIT
+: > "$CLO_SNAPSHOT"
 if [[ -r "$statusline" ]] && command -v node >/dev/null; then
     node "$statusline" live > "$CLO_SNAPSHOT" 2>/dev/null || : > "$CLO_SNAPSHOT"
 fi
 
-# The menus run as a wizard: folder (outside the dev root only), session
-# (a model, or resume), effort (new sessions only). Esc steps back to the previous menu
-# that was shown, and quits from the first; Ctrl-C quits from any.
-start="$PWD" ask_folder=0
+# The menus: folder (outside the dev root only), model (a model, or a session to
+# resume), effort (new sessions only). Esc steps back to the previous menu, and
+# quits from the first; Ctrl-C quits from any.
+run_set start "$PWD"
+run_set ask_folder 0
 if [[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT" ]]; then
     dev="${DEV_ROOT:A}"
-    [[ "${PWD:A}" != "$dev" && "${PWD:A}" != "$dev"/* ]] && ask_folder=1
+    [[ "${PWD:A}" != "$dev" && "${PWD:A}" != "$dev"/* ]] && run_set ask_folder 1
+fi
+if [[ "$(run_get ask_folder)" == 1 ]]; then
+    run_set step folder
+else
+    run_set step model; run_set dir "$PWD"
 fi
 
-# crumb <step> — the picks made before <step>, e.g. "~/dev/oj › Opus"
-make_crumb() {
-    local -a c=()
-    (( $1 > 1 && ask_folder )) && c+=("${${PWD:A}/#$HOME/~}")
-    (( $1 > 2 )) && c+=("$(label "$choice" "${(@f)$(menu)}")")
-    crumb="${(j: › :)c}"
-}
+current_rows | fzf --ansi --delimiter=$'\t' --with-nth=2.. --nth=-1 --reverse --info=hidden \
+    --prompt="$(prompt_text)" --header="$(header_text)" \
+    --bind="load:transform(${(q)self} --pos)" --bind=change:first \
+    --bind="enter:transform(${(q)self} --next {1})" \
+    --bind="esc:transform(${(q)self} --back)" \
+    --preview="${(q)self} --preview {1}" \
+    --preview-window='right,40%,border-left,<30(hidden)' >/dev/null || true
+[[ "$(run_get done)" == 1 ]] || exit 130
 
-step=1 shown=() crumb="" choice=""
-while (( step <= 3 )); do
-    rc=0
-    make_crumb $step
-    case $step in
-    1)  # Where to launch.
-        (( ask_folder )) || { step=2; continue; }
-        cd "$start"
-        dir="$(pick folder "" "$start" "${(@f)$(folder_menu)}")" || rc=$?
-        (( rc )) || cd "$dir" ;;
-    2)  # A model for a new session, or, with a past session here, Claude
-        # Code's own session picker.
-        export CLO_DIR="$PWD"
-        choice="$(pick session "$state_dir/last" "" "${(@f)$(start_rows "$PWD")}")" || rc=$? ;;
-    3)  # Effort is remembered per model: medium on Opus and xhigh on Fable each stick.
-        export CLO_MODEL="$choice"
-        effort="$(pick effort "$(effort_state "$choice")" unset "${effort_rows[@]}")" || rc=$? ;;
-    esac
-    case $rc in
-        0) shown+=($step); step=$(( step + 1 ))
-           [[ "$step" == 3 && "$choice" == resume* ]] && break ;;
-        2) (( $#shown )) || exit 130
-           step=${shown[-1]}; shown[-1]=() ;;
-        *) exit 130 ;;
-    esac
-done
-
+dir="$(run_get dir)" choice="$(run_get choice)" effort="$(run_get effort)"
+cd "$dir"
 case "$choice" in
     resume)   launch=(--resume) ;;
     resume:*) launch=(--resume "${choice#resume:}") ;;
@@ -387,5 +432,5 @@ case "$choice" in
 esac
 # Tell the shell function (clo --init zsh) where to leave the terminal.
 [[ -n "${CLO_CD_FILE:-}" ]] && print -r -- "$PWD" > "$CLO_CD_FILE"
-rm -f -- "$CLO_SNAPSHOT"   # exec skips the EXIT trap
+rm -rf -- "$CLO_RUN"   # exec skips the EXIT trap
 exec claude "${launch[@]}" "$@"
