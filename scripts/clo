@@ -25,9 +25,11 @@ the current folder (shown as its path, where the cursor starts), or any folder
 local-repos-list reports, with its tags. Folders you last used Claude in come
 first, with how long ago. Inside $DEV_ROOT it launches in the current folder.
 
-The session menu lists the models, each starting a new session, and, when
-the folder has a past session, "resume a session" (claude --resume), which
-launches at once: the session already has its model and effort.
+The model menu lists the models, each starting a new session, then the
+folder's sessions from cc-statusline (the list Agent Bar Hopping shows), each
+reopened with claude --resume <id>, then "resume a session" for Claude Code's
+own picker. Reopening a session launches at once: it already has its model
+and effort.
 
 The model menu is the stable aliases (always the latest of each family) plus any
 extra models your account is offered, read from Claude Code's own cache in
@@ -120,7 +122,7 @@ pick() {
     [[ "${choice%%$'\n'*}" == "<back>" ]] && return 2
     choice="${choice%%$'\t'*}"
     # resume reopens a session; it is not a model to remember.
-    if [[ -n "$state" && "$choice" != resume ]]; then
+    if [[ -n "$state" && "$choice" != resume* ]]; then
         mkdir -p "${state:h}"
         print -r -- "$choice" > "$state"
     fi
@@ -196,10 +198,42 @@ folder_menu() {
 effort_rows=($'unset\tunset' $'low\tlow' $'medium\tmedium' $'high\thigh' $'xhigh\txhigh' $'max\tmax')
 effort_state() { print -r -- "$state_dir/effort/${1//[^A-Za-z0-9._-]/_}"; }
 
-# start_rows <dir> — the session menu for <dir>: every model (each starts a new
-# session), then, when <dir> has a past session, resume.
+# session_rows <dir> — <dir>'s sessions, newest first, as rows whose value is
+# resume:<session id>. They come from the cc-statusline snapshot clo takes at
+# start ($CLO_SNAPSHOT), the same list Agent Bar Hopping shows: its topic, the
+# model and effort, and "live" for one still running in another terminal.
+session_rows() {
+    [[ -r "${CLO_SNAPSHOT:-}" ]] || return 0
+    local want="${${1:A}/#$HOME/~}" id at topic setup live i w=0
+    local dim=$'\e[2m' off=$'\e[0m'
+    local -a ids ats topics setups lives
+    # Fields are split on \x1f, not a tab: a tab is whitespace to read, and
+    # empty fields would collapse.
+    while IFS=$'\x1f' read -r id at topic setup live; do
+        ids+=("$id") ats+=("$at") topics+=("$topic") setups+=("$setup") lives+=("$live")
+        (( ${#topic} > w && ${#topic} <= 48 )) && w=${#topic}
+    done < <(jq -r --arg d "$want" '
+        [(.live[]? | . + {is_live: true}), (.history[]? | . + {is_live: false})]
+        | map(select(.summary.cwd == $d and .summary.session_id != null))
+        | sort_by(-(.active_at // .updated_at // 0))[]
+        | [.summary.session_id,
+           ((.active_at // .updated_at // 0) / 1000 | floor | tostring),
+           (.summary.topic // .summary.session_name // "untitled"),
+           ([.summary.model_full, .summary.effort] | map(select(. != null and . != "")) | join(" · ")),
+           (if .is_live then "live" else "" end)]
+        | join("\u001f")' "$CLO_SNAPSHOT" 2>/dev/null)
+    for i in {1..$#ids}; do
+        printf 'resume:%s\t%s%-4s%s %-*s  %s%s%s\n' "${ids[$i]}" "$dim" "$(ago "${ats[$i]}")" "$off" \
+            "$w" "${topics[$i]}" "$dim" "${setups[$i]}${lives[$i]:+  ${lives[$i]}}" "$off"
+    done
+}
+
+# start_rows <dir> — the model menu for <dir>: every model (each starts a new
+# session), then <dir>'s sessions, then Claude Code's own session picker for
+# anything older.
 start_rows() {
     menu
+    session_rows "$1"
     last_session_file "$1" >/dev/null || return 0
     print -r -- $'resume\tresume a session'
 }
@@ -229,11 +263,30 @@ section() {
     [[ "$title" == effort* ]] || print
 }
 
+# session_detail <session id> — the side pane for one session: its topic and
+# Claude Code's own name for it, model and effort, and whether it still runs.
+session_detail() {
+    jq -r --arg id "$1" '
+        [(.live[]? | . + {is_live: true}), (.history[]? | . + {is_live: false})]
+        | map(select(.summary.session_id == $id))[0] // empty
+        | "\u001b[2msession\u001b[0m",
+          "  " + (.summary.topic // "untitled"),
+          (if .summary.session_name then "  \u001b[2m" + .summary.session_name + "\u001b[0m" else empty end),
+          "",
+          "\u001b[2mmodel, effort\u001b[0m",
+          "  " + ([.summary.model_full, .summary.effort] | map(select(. != null)) | join(" · ")),
+          "",
+          "\u001b[2mstate\u001b[0m",
+          "  " + (if .is_live then "live in another terminal" else "ended" end),
+          ""' "$CLO_SNAPSHOT" 2>/dev/null || true
+}
+
 # The command a launch would run, as text.
 launch_line() {
     local dir="$1" session="$2" model="$3" effort="$4" cmd=claude
     case "$session" in
         resume)   cmd+=" --resume" ;;
+        resume:*) cmd+=" --resume ${session#resume:}" ;;
         *)        cmd+=" --model $model"; [[ "$effort" == unset ]] || cmd+=" --effort $effort" ;;
     esac
     print -r -- $'\e[2m'"launches"$'\e[0m'
@@ -256,6 +309,11 @@ if [[ "${1:-}" == --preview ]]; then
                      launch_line "$dir" "$v" "" ""
                      exit 0
                  fi
+                 if [[ "$v" == resume:* ]]; then
+                     session_detail "${v#resume:}"
+                     launch_line "$dir" "$v" "" ""
+                     exit 0
+                 fi
                  model="$v" ;;
         effort)  launch_line "$dir" new "$model" "$v"; exit 0 ;;
     esac
@@ -265,6 +323,17 @@ fi
 
 command -v fzf >/dev/null || { print -u2 "clo: fzf is not on PATH"; exit 1; }
 command -v claude >/dev/null || { print -u2 "clo: claude is not on PATH"; exit 1; }
+
+# One snapshot of every session cc-statusline knows, taken now and read by the
+# menus and the side pane. It is the command Agent Bar Hopping itself runs.
+# Without node or a cc-statusline checkout, the menus just list no sessions.
+statusline="${DEV_ROOT:-${self:h:h:h}}/cc-statusline/cc-statusline.js"
+CLO_SNAPSHOT="$(mktemp "${TMPDIR:-/tmp}/clo-snapshot.XXXXXX")"
+export CLO_SNAPSHOT
+trap 'rm -f -- "$CLO_SNAPSHOT"' EXIT
+if [[ -r "$statusline" ]] && command -v node >/dev/null; then
+    node "$statusline" live > "$CLO_SNAPSHOT" 2>/dev/null || : > "$CLO_SNAPSHOT"
+fi
 
 # The menus run as a wizard: folder (outside the dev root only), session
 # (a model, or resume), effort (new sessions only). Esc steps back to the previous menu
@@ -303,7 +372,7 @@ while (( step <= 3 )); do
     esac
     case $rc in
         0) shown+=($step); step=$(( step + 1 ))
-           [[ "$step" == 3 && "$choice" == resume ]] && break ;;
+           [[ "$step" == 3 && "$choice" == resume* ]] && break ;;
         2) (( $#shown )) || exit 130
            step=${shown[-1]}; shown[-1]=() ;;
         *) exit 130 ;;
@@ -311,10 +380,12 @@ while (( step <= 3 )); do
 done
 
 case "$choice" in
-    resume) launch=(--resume) ;;
-    *)      launch=(--model "$choice")
-            [[ "$effort" != unset ]] && launch+=(--effort "$effort") ;;
+    resume)   launch=(--resume) ;;
+    resume:*) launch=(--resume "${choice#resume:}") ;;
+    *)        launch=(--model "$choice")
+              [[ "$effort" != unset ]] && launch+=(--effort "$effort") ;;
 esac
 # Tell the shell function (clo --init zsh) where to leave the terminal.
 [[ -n "${CLO_CD_FILE:-}" ]] && print -r -- "$PWD" > "$CLO_CD_FILE"
+rm -f -- "$CLO_SNAPSHOT"   # exec skips the EXIT trap
 exec claude "${launch[@]}" "$@"
