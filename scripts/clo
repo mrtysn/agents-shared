@@ -21,7 +21,7 @@ model, and the effort menu on the effort you last used with that model.
 "unset" passes no --effort, so Claude Code's own default applies.
 
 Launched outside $DEV_ROOT, clo first asks where to launch: $DEV_ROOT itself,
-the current folder ("here", where the cursor starts), or any folder
+the current folder (shown as its path, where the cursor starts), or any folder
 local-repos-list reports, with its tags. Folders you last used Claude in come
 first, with how long ago. Inside $DEV_ROOT it launches in the current folder.
 
@@ -147,7 +147,7 @@ ago() {
 }
 
 # path <TAB> dimmed age + tags <TAB> name, for every folder local-repos-list reports,
-# after rows for the dev root itself and the current folder ("here"). Falls back to the dev root's
+# after rows for the dev root itself and the current folder. Falls back to the dev root's
 # immediate subfolders, untagged, when local-repos-list is not installed.
 folder_menu() {
     local dim=$'\e[2m' off=$'\e[0m' here="${PWD/#$HOME/~}"
@@ -164,21 +164,21 @@ folder_menu() {
         done
     fi
     # Folders with a Claude session come first, most recent on top; the rest
-    # keep alphabetical order. The dev root and "here" always lead.
+    # keep alphabetical order. The dev root and the current folder always lead.
     local -a when order
     for i in {1..$#names}; do when[$i]="$(last_session "${paths[$i]}")"; done
     order=(${(f)"$(for i in {1..$#names}; do print -r -- "${when[$i]:-0}"$'\t'"$i"; done \
         | sort -t$'\t' -k1,1nr -k2,2n | cut -f2)"})
     # Age and tags go first, padded to one width, so every name starts in the
     # same column however long it is; pick() searches only the last field.
-    local tw=${#here} t
+    local tw=${#${DEV_ROOT/#$HOME/~}} t
     for tag in "${tags[@]}"; do (( ${#tag} > tw )) && tw=${#tag}; done
     row() {
         t="$(last_session "$1")"; [[ -n "$t" ]] && t="$(ago "$t")"
         printf '%s\t%s%-4s %-*s%s  \t%s\n' "$1" "$dim" "$t" "$tw" "$3" "$off" "$2"
     }
     row "$DEV_ROOT" "${DEV_ROOT:t}" "${DEV_ROOT/#$HOME/~}"
-    row "$PWD" here "$here"
+    row "$PWD" "$here" ""
     for i in "${order[@]}"; do row "${paths[$i]}" "${names[$i]}" "${tags[$i]}"; done
 }
 
