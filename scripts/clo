@@ -25,10 +25,10 @@ the current folder ("here", where the cursor starts), or any folder
 local-repos-list reports, with its tags. Folders you last used Claude in come
 first, with how long ago. Inside $DEV_ROOT it launches in the current folder.
 
-When the folder has a past session, clo asks whether to start a new one,
-continue the most recent (claude --continue) or pick one (claude --resume).
-Continuing or resuming skips the model and effort menus: the session already
-has them.
+The session menu lists the models, each starting a new session, and, when
+the folder has a past session, "continue latest" (claude --continue) and
+"resume any" (claude --resume). Those two launch at once: the session already
+has its model and effort.
 
 The model menu is the stable aliases (always the latest of each family) plus any
 extra models your account is offered, read from Claude Code's own cache in
@@ -114,7 +114,8 @@ pick() {
         || [[ "$choice" == "<back>"* ]] || return 130
     [[ "${choice%%$'\n'*}" == "<back>" ]] && return 2
     choice="${choice%%$'\t'*}"
-    if [[ -n "$state" ]]; then
+    # continue and resume reopen a session; they are not a model to remember.
+    if [[ -n "$state" && "$choice" != (continue|resume) ]]; then
         mkdir -p "${state:h}"
         print -r -- "$choice" > "$state"
     fi
@@ -181,20 +182,20 @@ folder_menu() {
     for i in "${order[@]}"; do row "${paths[$i]}" "${names[$i]}" "${tags[$i]}"; done
 }
 
-# The menus run as a wizard: folder (outside the dev root only), session (only
-# when the folder has one), model, effort. Esc steps back to the previous menu
+# The menus run as a wizard: folder (outside the dev root only), session
+# (a model, or continue/resume), effort (new sessions only). Esc steps back to the previous menu
 # that was shown, and quits from the first; Ctrl-C quits from any.
 effort_rows=($'unset\tunset' $'low\tlow' $'medium\tmedium' $'high\thigh' $'xhigh\txhigh' $'max\tmax')
 effort_state() { print -r -- "$state_dir/effort/${1//[^A-Za-z0-9._-]/_}"; }
 
-# session_rows <dir> — the session menu for <dir>, or nothing when it has no
-# past session.
-session_rows() {
+# start_rows <dir> — the session menu for <dir>: every model (each starts a new
+# session), then, when <dir> has a past session, continue and resume.
+start_rows() {
     local t
+    menu
     t="$(last_session "$1" || true)"
     [[ -n "$t" ]] || return 0
     t="$(ago "$t")"; [[ "$t" == now ]] && t="just now" || t+=" ago"
-    print -r -- $'new\tnew session'
     print -r -- "continue"$'\t'"continue latest  "$'\e[2m'"last seen $t"$'\e[0m'
     print -r -- $'resume\tresume any'
 }
@@ -238,40 +239,32 @@ launch_line() {
 }
 
 # clo --preview <menu> <value> — the side pane: the menus after <menu> if
-# <value> were picked. Picks already made arrive as CLO_DIR, CLO_SESSION and
-# CLO_MODEL.
+# <value> were picked. Picks already made arrive as CLO_DIR and CLO_MODEL.
 if [[ "${1:-}" == --preview ]]; then
     stage="$2" v="${3%$'\t'}"
-    dir="${CLO_DIR:-$PWD}" session="${CLO_SESSION:-new}"
+    dir="${CLO_DIR:-$PWD}"
     model="${CLO_MODEL:-$(cat "$state_dir/last" 2>/dev/null || true)}"
     [[ -n "$model" ]] || model="${${(f)"$(menu)"}[1]%%$'\t'*}"
     case "$stage" in
         folder)  dir="$v"
-                 rows=("${(@f)$(session_rows "$dir")}")
-                 if [[ -n "${rows[1]}" ]]; then section session "" new "${rows[@]}"
-                 else print -r -- $'\e[2m'"session"$'\e[0m'; print -r -- "  new — none here yet"; print; fi ;;
-        session) session="$v" ;;
-        model)   model="$v" ;;
+                 section session "$state_dir/last" "" "${(@f)$(start_rows "$dir")}" ;;
+        session) if [[ "$v" == (continue|resume) ]]; then
+                     print -r -- $'\e[2m'"model, effort"$'\e[0m'; print -r -- "  kept from the session"; print
+                     launch_line "$dir" "$v" "" ""
+                     exit 0
+                 fi
+                 model="$v" ;;
+        effort)  launch_line "$dir" new "$model" "$v"; exit 0 ;;
     esac
-    if [[ "$session" != new ]]; then
-        print -r -- $'\e[2m'"model, effort"$'\e[0m'; print -r -- "  kept from the session"; print
-        launch_line "$dir" "$session" "" ""
-        exit 0
-    fi
-    [[ "$stage" == folder || "$stage" == session ]] && section model "$state_dir/last" "" "${(@f)$(menu)}"
-    if [[ "$stage" == effort ]]; then
-        launch_line "$dir" new "$model" "$v"
-    else
-        section "effort · $(label "$model" "${(@f)$(menu)}")" "$(effort_state "$model")" unset "${effort_rows[@]}"
-    fi
+    section "effort · $(label "$model" "${(@f)$(menu)}")" "$(effort_state "$model")" unset "${effort_rows[@]}"
     exit 0
 fi
 
 command -v fzf >/dev/null || { print -u2 "clo: fzf is not on PATH"; exit 1; }
 command -v claude >/dev/null || { print -u2 "clo: claude is not on PATH"; exit 1; }
 
-# The menus run as a wizard: folder (outside the dev root only), session (only
-# when the folder has one), model, effort. Esc steps back to the previous menu
+# The menus run as a wizard: folder (outside the dev root only), session
+# (a model, or continue/resume), effort (new sessions only). Esc steps back to the previous menu
 # that was shown, and quits from the first; Ctrl-C quits from any.
 start="$PWD" ask_folder=0
 if [[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT" ]]; then
@@ -279,17 +272,16 @@ if [[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT" ]]; then
     [[ "${PWD:A}" != "$dev" && "${PWD:A}" != "$dev"/* ]] && ask_folder=1
 fi
 
-# crumb <step> — the picks made before <step>, e.g. "oj › new session › Opus"
+# crumb <step> — the picks made before <step>, e.g. "~/dev/oj › Opus"
 make_crumb() {
     local -a c=()
     (( $1 > 1 && ask_folder )) && c+=("${${PWD:A}/#$HOME/~}")
-    (( $1 > 2 )) && [[ -n "${srows[1]:-}" ]] && c+=("$(label "$session" "${srows[@]}" | sed 's/\x1b\[[0-9]*m//g; s/  .*//')")
-    (( $1 > 3 )) && c+=("$(label "$model" "${(@f)$(menu)}")")
+    (( $1 > 2 )) && c+=("$(label "$choice" "${(@f)$(menu)}")")
     crumb="${(j: › :)c}"
 }
 
-step=1 shown=() launch=() crumb="" srows=()
-while (( step <= 4 )); do
+step=1 shown=() crumb="" choice=""
+while (( step <= 3 )); do
     rc=0
     make_crumb $step
     case $step in
@@ -298,36 +290,29 @@ while (( step <= 4 )); do
         cd "$start"
         dir="$(pick folder "" "$start" "${(@f)$(folder_menu)}")" || rc=$?
         (( rc )) || cd "$dir" ;;
-    2)  # With a past session here: start fresh, continue the most recent one,
-        # or open Claude Code's own session picker.
-        launch=() session=new
+    2)  # A model for a new session, or, with a past session here, continue the
+        # most recent one or open Claude Code's own session picker.
         export CLO_DIR="$PWD"
-        srows=("${(@f)$(session_rows "$PWD")}")
-        [[ -n "${srows[1]}" ]] || { srows=(); step=3; continue; }
-        session="$(pick session "" new "${srows[@]}")" || rc=$?
-        case "$session" in
-            continue) launch+=(--continue) ;;
-            resume)   launch+=(--resume) ;;
-        esac ;;
-    3)  export CLO_SESSION="$session"
-        model="$(pick model "$state_dir/last" "" "${(@f)$(menu)}")" || rc=$? ;;
-    4)  # Effort is remembered per model: medium on Opus and xhigh on Fable each stick.
-        export CLO_MODEL="$model"
-        effort="$(pick effort "$(effort_state "$model")" unset "${effort_rows[@]}")" || rc=$? ;;
+        choice="$(pick session "$state_dir/last" "" "${(@f)$(start_rows "$PWD")}")" || rc=$? ;;
+    3)  # Effort is remembered per model: medium on Opus and xhigh on Fable each stick.
+        export CLO_MODEL="$choice"
+        effort="$(pick effort "$(effort_state "$choice")" unset "${effort_rows[@]}")" || rc=$? ;;
     esac
     case $rc in
         0) shown+=($step); step=$(( step + 1 ))
-           [[ "$step" == 3 && "$session" != new ]] && break ;;
+           [[ "$step" == 3 && "$choice" == (continue|resume) ]] && break ;;
         2) (( $#shown )) || exit 130
            step=${shown[-1]}; shown[-1]=() ;;
         *) exit 130 ;;
     esac
 done
 
-if [[ "$session" == new ]]; then
-    launch+=(--model "$model")
-    [[ "$effort" != unset ]] && launch+=(--effort "$effort")
-fi
+case "$choice" in
+    continue) launch=(--continue) ;;
+    resume)   launch=(--resume) ;;
+    *)        launch=(--model "$choice")
+              [[ "$effort" != unset ]] && launch+=(--effort "$effort") ;;
+esac
 # Tell the shell function (clo --init zsh) where to leave the terminal.
 [[ -n "${CLO_CD_FILE:-}" ]] && print -r -- "$PWD" > "$CLO_CD_FILE"
 exec claude "${launch[@]}" "$@"
