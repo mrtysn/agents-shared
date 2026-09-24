@@ -13,7 +13,8 @@ Usage:
                           the launched folder; add to .zshrc: eval "$(clo --init zsh)"
   clo -h | --help         Show this help
 
-Esc goes back to the previous menu (and quits from the first); Ctrl-C quits.
+Enter or → picks; Esc or ← goes back to the previous menu (and quits from the
+first); Ctrl-C quits. Ctrl-B and Ctrl-F move within what you typed.
 
 The picks apply to that session only (claude --model --effort); your saved
 defaults in settings.json are untouched. The model menu opens on your last
@@ -417,7 +418,9 @@ current_rows | fzf --ansi --delimiter=$'\t' --with-nth=2.. --nth=-1 --reverse --
     --prompt="$(prompt_text)" --header="$(header_text)" \
     --bind="load:transform(${(q)self} --pos)" --bind=change:first \
     --bind="enter:transform(${(q)self} --next {1})" \
+    --bind="right:transform(${(q)self} --next {1})" \
     --bind="esc:transform(${(q)self} --back)" \
+    --bind="left:transform(${(q)self} --back)" \
     --preview="${(q)self} --preview {1}" \
     --preview-window='right,40%,border-left,<30(hidden)' >/dev/null || true
 [[ "$(run_get done)" == 1 ]] || exit 130
