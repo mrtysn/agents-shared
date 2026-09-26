@@ -1,0 +1,77 @@
+{
+  "_comment": "Single source for hooks/system-one-prompt.sh and scripts/system-one-measure.py --hook prompt. state.prompt_chars: the prompt is cut to this many characters (the encoder's state budget is about 300 tokens). state.previous_chars: last characters of the previous assistant message appended as `previous:` context; 0 disables it, the measured default (the excerpt raised correction recall but cut overall accuracy from 0.55 to 0.48 on the hand-labelled set, 2026-09-24). threshold: kept for scripts/system-one-measure.py's historical reporting; act mode itself no longer reads it (see act_min below). wording: superseded by `context` below (section 13 of the design doc); kept only as the pre-13 record, unread by the hook.",
+  "_skip_comment": "skip_prefixes/skip_markers: substrings that mark a UserPromptSubmit payload as relayed text rather than something the user typed -- a subagent hand-back, a cross-session message, a task notification, a system reminder. The hook checks these with a plain substring match (a marker anywhere in the prompt, not only at the start -- both names are kept because some markers are true prefixes and some are wrapper tags that can be preceded by other text) before doing anything else: no model call, no classification, no shadow-log row, no act-mode line. One list, read by both fields; split only for readability, add new markers to either.",
+  "skip_prefixes": [
+    "Another Claude session sent a message",
+    "[Subagent hand-back]",
+    "[SYSTEM NOTIFICATION"
+  ],
+  "skip_markers": [
+    "<agent-message",
+    "<cross-session-message",
+    "[Cross-session",
+    "<system-reminder>",
+    "<task-notification"
+  ],
+  "state": {
+    "prompt_chars": 600,
+    "previous_chars": 0
+  },
+  "threshold": 0.8,
+  "act_min": 0.60,
+  "_act_min_comment": "act_min is the file-level default for SYSTEM_ONE_PROMPT_ACT_MIN (config/env override; see hooks/system-one-prompt.sh and system-one.local.sh.example): the top kind's probability must reach this before act mode emits additionalContext. Set to 0.60 per section 13's design decision, not a val sweep: prompt/kind is a 'choice' question, and $HOME/.local/share/system-one/models/full-v1/eval.json's top-level `thresholds` map carries `\"prompt/kind\": null` -- only noul/score questions (e.g. prompt/wants_action: 0.115, the gate below) get a swept probability threshold there; a choice question is read by per-class recall at argmax instead. full-v1/eval.json per_class_recall at argmax, by criteria order (question, order, wish, correction, other): val [0.60, 0.86, 1.00, 0.86, 0.75] (n=52, bal_acc 0.81), test [0.69, 1.00, 0.83, 0.78, 1.00] (n=66, bal_acc 0.86) -- read 2026-09-25. The kept wording (section 10a's 'terse criteria') already showed 44/324 rows firing at 0.89 accuracy at a 0.80 gate; 0.60 trades some of that precision for recall on a checkpoint whose question and correction classes are the weakest (recall 0.60 and 0.86 on val), so act mode should still be read as a nudge, not a verdict.",
+  "gate": {
+    "wants_action": 0.908,
+    "delegate": 0.5
+  },
+  "_gate_comment": "wants_action 0.908 is training.finetune.val_thresholds['prompt/wants_action'] from $HOME/.local/share/system-one/models/full-v3/rl_agent_config.json (val-swept for that checkpoint, 2026-09-26; full-v1's was 0.115 -- see notebook/2026-09-24-system-one-decision-model-integration.md sections 12 and 14). Meaningless against any other model. delegate 0.5 is the act-mode threshold for the delegate line (see `delegate` below), listed here too so the shadow row's `fired`/`would_act` records the same verdict act mode used. kind stays argmax against act_min above, unaffected by this gate; wants_action is not itself an act-mode decision, only a logged/would_act signal. Bare key (matching hooks/system-one-bash-questions.json's convention), because hooks/system-one-prompt.sh forwards .gate to `ask --gate` unmodified, unlike the stop hook's _min-suffixed keys which it translates itself.",
+  "questions": {
+    "kind": {
+      "type": "choice",
+      "instructions": "What is the user doing with this one typed message?",
+      "criteria": {
+        "question": "asks for information",
+        "order": "tells the agent to do something now",
+        "wish": "states a desired outcome without ordering it built",
+        "correction": "says the previous action or answer was wrong",
+        "other": "acknowledgement, approval, or a paste"
+      }
+    },
+    "wants_action": {
+      "type": "noul",
+      "instructions": "Is the user asking the agent to take an action now (edit a file, run a command, build something) rather than only to explain, answer, or discuss?"
+    },
+    "delegate": {
+      "type": "noul",
+      "instructions": "Should this prompt be handed to a subagent rather than done inline?"
+    }
+  },
+  "_delegate_comment": "delegate: the exact question scripts/system-one-mine-tasks.py trained full-v3 on (state = the same prompt: state as kind; label = the assistant spawned an Agent in that turn; anchors typed, non-slash, >=8-word prompts). All three questions go out in ONE ask call. Act mode emits context.delegate when p >= delegate.min AND the prompt has at least delegate.min_words words (the mining filter -- shorter prompts were never in the training set), never for a slash command, a relayed message, or in show/shadow mode; SYSTEM_ONE_PROMPT_DELEGATE_MIN (config/env) overrides delegate.min. Why 0.5 and not the checkpoint's swept value: full-v3/rl_agent_config.json val_thresholds['delegate/q'] is 0.159 (best F1: val P/R 0.41/0.60, test 0.37/0.63), which would fire on one prompt in three with a third of them wrong; at 0.5 the test split reads P 1.00 / R 0.30 (9 fired, 0 wrong, n=120, 30 positives), and precision stays 1.00 up to 0.7 with recall 0.27, so the line is rare and, when it appears, right. The rule is max(swept, 0.5). Read 2026-09-26.",
+  "delegate": {
+    "min": 0.5,
+    "min_words": 8
+  },
+  "wording": {
+    "question": "system-one: this prompt reads as a question (%.2f). Answer it; do not edit or run anything unless asked.",
+    "order": "system-one: this prompt reads as an imperative (%.2f). Carry it out directly, without re-litigating a decision already made.",
+    "wish": "system-one: this prompt reads as a stated wish, not a build order (%.2f). Name the real forks, recommend one, then wait for the build order.",
+    "correction": "system-one: this prompt reads as a correction (%.2f). Stop, acknowledge what was wrong, and do not repeat the rejected action.",
+    "other": ""
+  },
+  "_context_comment": "context: the line hooks/system-one-prompt.sh emits as additionalContext in act mode, keyed by kind (section 13 of the design doc, superseding `wording` above); the `delegate` key is not a kind but the delegate question's line (section 14), emitted on its own gate and composable with a kind line (order: skill, delegate, kind). %.2f is spliced with the top kind's probability. order and other carry no line (empty string): an order needs no framing, and other (acknowledgement/paste) is not actionable text to react to. A slash command (prompt starting with '/') or a prompt under 3 words is never annotated regardless of kind or probability -- the hook checks this before consulting this map. Wording drawn from question-handling.md (question), stated-desires.md (wish) and communication-style.md's 'honest in error' plus answer-shape.md (correction).",
+  "context": {
+    "question": "system-one: this prompt reads as a QUESTION (p=%.2f). Answer it; do not edit, run, or change anything unless the message also contains an imperative.",
+    "order": "",
+    "wish": "system-one: this prompt reads as a stated WISH (p=%.2f). Name the forks, recommend one, and wait for a build order; do not start building.",
+    "correction": "system-one: this prompt reads as a CORRECTION (p=%.2f). Explain what happened and verify; do not capitulate or re-plan without evidence.",
+    "other": "",
+    "delegate": "system-one: this prompt looks like bulk or mechanical work (p=%.2f). Hand it to a Sonnet or Haiku subagent with a capped report instead of doing it on this model."
+  },
+  "_skill_name_rule_comment": "Deterministic skill-routing rule (no model call), hooks/system-one-prompt.sh, act mode only, independent of the kind line above (both may appear in one additionalContext, skill line first). Fires when a typed prompt (not a slash command itself, >=3 words) explicitly names a roster skill or command: '/<name>' anywhere, or the bare name when it is hyphenated/multi-token (stg-msg-cmt, search-history, new-repo, be-literal, ...), or when it is listed in allow_bare below. Roster is a literal ls of ${CLAUDE_CONFIG_DIR:-~/.claude}/skills/*/SKILL.md and .../commands/*.md at runtime (top-level only -- a plugin group directory such as interface/ or motion/ has no SKILL.md of its own, so 'better-ui', 'animate' etc. are out of scope), cached under STATE_DIR for roster_ttl_seconds. allow_bare exists because a handful of single-word skill names would otherwise need '/' to avoid colliding with ordinary English (archify, humanizer are names, not verbs; homelab-connect is hyphenated already and listed here mainly as the seed example). Measured 2026-09-25/26 against ~/.local/state/system-one/train/skill_route.jsonl (448 mined rows, state=prompt text, label=actually-invoked skill or none): with allow_bare exactly as below, restricting the roster to top-level dirs, and a terminal-paste guard (skip a match immediately followed by a '--flag' token, e.g. a pasted 'search-history --resume' shell line) -- fired_lines=56, tp=45, fp=11, precision=0.804, recall=0.421 (recall denominator: the 112 rows whose label names one of the 15 skills the mined set tracks). Tried and rejected: adding any other single-word roster name (aristocrat, board, caveman, cmt, grilling, gs, handoff, improve, outstanding, refactor, refocus, scrapling, standup) to allow_bare -- none added a true positive on this set and several (cmt, handoff, improve, outstanding) added false positives, so the allowlist stays exactly these three. Precision falls short of the 0.90 target asked for: the remaining false positives are cases where the exact same surface text ('/<name> your changes', '/name> your repo/account') labels 'none' in one row and the matching skill in another -- e.g. row 39 'proceed, stg-msg-cmt, and then deploy' labels homelab-connect (a later step named nothing this rule can see), row 357 'holy shit that worked. /stg-msg-cmt your changes' labels none. No further deterministic, non-overfit textual signal separated these in this sample; forcing 0.90 here would mean hand-fitting specific phrases from the 448 rows rather than a generalizable rule. Read the line as the rest of act mode's lines are meant to be read (see act_min comment above): a nudge, not a verdict.",
+  "skill_name_rule": {
+    "allow_bare": ["archify", "humanizer", "homelab-connect"],
+    "roster_ttl_seconds": 600,
+    "wording_one": "system-one: this prompt names the skill %s; invoke it with the Skill tool instead of doing the work by hand.",
+    "wording_many": "system-one: this prompt names the skills %s; invoke them with the Skill tool instead of doing the work by hand."
+  }
+}

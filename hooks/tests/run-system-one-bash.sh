@@ -91,8 +91,8 @@ while IFS=$'\t' read -r f1 f2 f3 f4 f5 f6; do
     ms=$(( $(now_ms) - t0 ))
     sum_ms=$((sum_ms + ms))
     [ "$ms" -gt "$max_ms" ] && max_ms=$ms
-    got=$(tail -n 1 "$TMP/shadow/test.jsonl" 2>/dev/null | jq -r 'if .would_act == null then "none" else (.would_act | tostring) end')
-    fired=$(tail -n 1 "$TMP/shadow/test.jsonl" 2>/dev/null | jq -r '[.fired[]? | "\(.q)=\(.value * 100 | round / 100)"] | join(",")')
+    got=$(tail -n 1 "$TMP/shadow/bash/test.jsonl" 2>/dev/null | jq -r 'if .would_act == null then "none" else (.would_act | tostring) end')
+    fired=$(tail -n 1 "$TMP/shadow/bash/test.jsonl" 2>/dev/null | jq -r '[.fired[]? | "\(.q)=\(.value * 100 | round / 100)"] | join(",")')
     status=ok
     if [ "$rc" != 0 ]; then status="ERROR exit $rc"; fail=$((fail + 1))
     elif [ -n "$out" ]; then status="ERROR output in shadow mode"; fail=$((fail + 1))
