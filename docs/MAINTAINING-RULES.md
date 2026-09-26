@@ -81,7 +81,8 @@ To add a rule:
 1. Write `claude/rules/<topic>.md`. One concern per file, kebab-case name.
 2. `bash scripts/init-global.sh` to symlink it.
 3. Commit and push.
-4. On other machines: pull, then run the script.
+4. On other machines: pull, then run the script. This is the machine owner's routine,
+   never a line in a session's report — see `claude/rules/leave-other-machines-out-of-reports.md`.
 
 Keep each file short and concrete — under ~200 lines total across all rules is the
 target, since every one of them loads into every session. Cross-reference sibling rules
@@ -102,7 +103,7 @@ encouraged, convert it to a hook.
 1. `git rm claude/rules/<topic>.md`, commit, push.
 2. `bash scripts/init-global.sh` — the prune step removes the now-dangling symlink.
 3. On other machines: pull, then run the script. **Skipping the script leaves a broken
-   symlink in `~/.claude/rules/`.**
+   symlink in `~/.claude/rules/`.** The owner's routine, like step 4 above; not a report item.
 
 `bash scripts/init-global.sh --unlink` tears down every symlink this repo created,
 leaving local overrides intact. Use it to fully detach a machine.
