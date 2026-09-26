@@ -1,0 +1,32 @@
+{
+  "_comment": "Single source for hooks/system-one-ask.sh and scripts/system-one-measure.py --hook ask. One model call per question of the AskUserQuestion call (state: `question:` then header: text, multiSelect, options with descriptions cut to state.description_chars), then, when state.recent_prompts is non-zero, a `recent:` block with the session's last state.recent_prompts typed user prompts and the last assistant text excerpt, state.recent_chars characters each, from a bounded transcript-tail read (off by default: measured, it moved no question's precision off its base rate and cost 60 ms). options_complete was dropped from the request: it predicts the user's answer, not a property of the ask, and scored exactly the on-option base rate at every threshold (section 11a); its gold column stays in the cases file. gate: act mode denies only when every question of the call reaches its gate and none reaches naming_or_irreversible_min (a naming or irreversible ask is always legitimate per asking-for-decisions.md and is never denied). wording: the deny reason per fired question, and `all` for a multi-question call (%d = question count, %.2f = the weakest fired probability). Numbers from the 2026-09-24 review pass over hooks/tests/system-one-ask-cases.tsv (200 hand-labelled question rows), notebook design doc section 11a.",
+  "state": {
+    "recent_prompts": 0,
+    "recent_chars": 150,
+    "description_chars": 50
+  },
+  "gate": {
+    "answered_in_context": 0.75,
+    "routine_default": 0.75
+  },
+  "naming_or_irreversible_min": 0.5,
+  "questions": {
+    "answered_in_context": {
+      "type": "noul",
+      "instructions": "Look at the recent user messages shown. Did the user already state, in those messages, the information or decision this question is now asking for? Yes: the question restates or narrows something the user already said plainly. No: the question asks for something genuinely new, or the recent messages are silent on it."
+    },
+    "routine_default": {
+      "type": "noul",
+      "instructions": "Yes: a conventional default or a routine implementation choice a senior engineer would ordinarily make and state rather than ask about -- a naming convention with an obvious answer, a technical detail with one normal choice, picking the option already marked recommended with nothing left to weigh. No: the options carry real, differently-costed trade-offs (money, risk, time, who is affected, a preference only the user holds)."
+    },
+    "naming_or_irreversible": {
+      "type": "noul",
+      "instructions": "Is this question about naming something the user will type or read daily (an alias, file, command, directory, repo, branch), or about a hard-to-reverse or outward-facing action (publishing, committing and pushing, deleting, sending or sharing something with a third party)? These are legitimate to ask about even when routine."
+    }
+  },
+  "wording": {
+    "answered_in_context": "system-one: the answer is already in context (%.2f): decide and state it.",
+    "routine_default": "system-one: this reads as a routine default (%.2f): decide and state it.",
+    "all": "system-one: every one of the %d questions reads as answered in context or a routine default (weakest %.2f): decide and state them."
+  }
+}

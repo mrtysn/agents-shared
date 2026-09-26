@@ -1,0 +1,23 @@
+{
+  "_comment": "Single source for hooks/system-one-stop.sh and scripts/system-one-measure.py --hook stop. state.message_chars: characters of the assistant's last text message kept in the state (the rest is summarised only by the length_chars/tables/headers/bullets line). pregate.max_chars: a message shorter than this with no table is never padded, so the hook exits before calling the model (no log line); on the hand-audited set it skips 40% of calls and loses no padded message. gate: which noul questions, at which threshold, make act mode block (a question absent here never fires). wording: the block reason template, with the gate probabilities spliced in where %.2f appears (needless_table, then overlong). Drawn from answer-shape.md and communication-style.md. leads_with_answer and verbosity were dropped 2026-09-24: on the audited set the first scored padded messages higher than fitting ones and the second did not separate them at all; the deterministic rule `tables > 0 or words > 500` still beats every model gate (F1 0.56 vs 0.47), which is why this hook stays in shadow.",
+  "state": {
+    "message_chars": 1500
+  },
+  "gate": {
+    "needless_table_min": 0.6
+  },
+  "questions": {
+    "overlong": {
+      "type": "noul",
+      "instructions": "Would a senior engineer call this reply padded for the question it answers? Yes: it opens with an \"Overview\" or restates the question before answering, it hedges with caveats nobody asked for, it lists options when only one was wanted, or it repeats the same point more than once. No: a short technical answer with exactly the reasoning or steps the question needed is not overlong even if it runs several sentences or includes necessary code -- length alone does not make something padded."
+    },
+    "needless_table": {
+      "type": "noul",
+      "instructions": "Does the reply use a table, or a multi-item ranked list, to present something that was not genuinely several comparable options -- table-as-decoration rather than a real comparison?"
+    }
+  },
+  "wording": "system-one: this answer reads as table-as-decoration (%.2f) and padded (%.2f). Rewrite: lead with the answer, plain sentences, no table unless comparing options.",
+  "pregate": {
+    "max_chars": 1000
+  }
+}
