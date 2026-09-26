@@ -36,8 +36,30 @@ party, deleting or overwriting. Confirming these is not hedging and does not
 conflict with [chasing the ideal](chase-the-ideal.md) — but ask for that
 confirmation with the tool, not with a sentence.
 
-## Naming is always the user's call
+## Naming: ask only for what the user types or sees
 
-Aliases, command names, file and directory names — anything the user will type or
-read daily. Present options; never pick one unilaterally. This holds even when the
-choice looks trivial, and even mid-implementation.
+**Ask** for names the user will type or look at: slash commands and CLI tools they
+invoke by hand, repo names, an app's visible name (Spotlight, menu, window title),
+and folders in their home directory. This holds even mid-implementation.
+
+**Pick without asking** everything only agents use — scripts agents run,
+subcommands and flags agents call, modules, config keys, rule and doc filenames,
+internal folders — and state the chosen name in the report. Optimize for an agent
+reading it cold.
+
+**Every name, picked or offered, says what the thing does** — verb-object where it
+fits, two to four words, length no objection: `count-manual-commit-requests`,
+`render-terminal-screen`. Never a short metaphor noun (`beat`, `desk`, `scout`,
+`beacon`); descriptive beats ambiguous. Offered options meet the same bar, so the
+user is not sent round again for "more descriptive".
+
+**Name only what has been agreed.** A naming question is never the first the user
+hears of a folder, command, or tool; settle that it exists and what it does first,
+per [stated desires](stated-desires.md).
+
+### Provenance
+
+Sep 2026: 143 naming questions in 30 days; in 73 the user took none of the options.
+The answers repeated: "optimize for agent use", "agents will use it, pick whatever
+is best", "none of these are descriptive enough", "descriptive beats ambigious",
+and "what data folder??? no way" for a name asked before the thing was agreed.
