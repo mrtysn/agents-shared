@@ -105,17 +105,36 @@ def text_of(content):
     return ""
 
 
-def classify_invisible_user_entry(content):
+def tool_result_chars(content):
+    """Total text length of the tool_result blocks in a 'user' entry, or 0."""
+    if not isinstance(content, list):
+        return 0
+    total = 0
+    for b in content:
+        if not isinstance(b, dict) or b.get("type") != "tool_result":
+            continue
+        inner = b.get("content")
+        if isinstance(inner, str):
+            total += len(inner)
+        elif isinstance(inner, list):
+            total += sum(len(x.get("text", "")) for x in inner if isinstance(x, dict))
+    return total
+
+
+def classify_invisible_user_entry(content, tool_output_chars=0):
     """Return a kind string if this 'user' entry is an injected message the
     user did not type and whose full content they cannot read inline, else
     None.
 
-    Deliberately narrow: an ordinary synchronous Bash/Monitor tool_result
-    renders inline in the transcript UI, so it is not "invisible" by itself.
-    What is genuinely invisible is the class of injected notices that only
-    summarize a result and point at a file or a separate agent transcript --
-    a backgrounded task's task-notification, or another session's
-    agent-message / SubagentHandback report."""
+    By default this is narrow: the injected notices that only summarize a
+    result and point at a file or a separate agent transcript -- a
+    backgrounded task's task-notification, or another session's
+    agent-message / SubagentHandback report.
+
+    With tool_output_chars > 0, a tool_result whose text is longer than that
+    also counts: the terminal shows a collapsed line and at most a few lines
+    of a command's or a file read's output, so anything past that reaches
+    only the model."""
     if isinstance(content, str):
         if TASK_NOTIFICATION_RE.search(content):
             if MONITOR_TAG_RE.search(content):
@@ -125,6 +144,8 @@ def classify_invisible_user_entry(content):
             return "task-notification (background command)"
         if AGENT_MESSAGE_RE.search(content):
             return "agent-message / SubagentHandback"
+    elif tool_output_chars > 0 and tool_result_chars(content) > tool_output_chars:
+        return "tool output (long)"
     return None
 
 
@@ -135,7 +156,7 @@ def clean_excerpt(text, limit):
     return t
 
 
-def scan_transcript(path, slug, ref_re, conf_re, within_turns, since_dt):
+def scan_transcript(path, slug, ref_re, conf_re, within_turns, since_dt, tool_output_chars=0):
     project = slug_name(slug)
     ref_hits = []       # dicts: project, ts, phrase, assistant_excerpt, invisible_kind
     conf_pairs = []      # dicts: project, ts, assistant_excerpt, user_excerpt
@@ -168,7 +189,7 @@ def scan_transcript(path, slug, ref_re, conf_re, within_turns, since_dt):
             content = msg.get("content")
 
             if t == "user":
-                kind = classify_invisible_user_entry(content)
+                kind = classify_invisible_user_entry(content, tool_output_chars)
                 if kind:
                     pending_kind = kind
                     turns_after = 0
@@ -285,6 +306,10 @@ def main():
         epilog=__doc__,
     )
     ap.add_argument("--since", help="only consider entries at/after this ISO date (YYYY-MM-DD)")
+    ap.add_argument("--tool-output-chars", type=int, default=0,
+                    help="also count a tool_result longer than this many characters as "
+                         "hidden content (the terminal shows only a few lines of it); "
+                         "0 = off (default)")
     ap.add_argument("--within-turns", type=int, default=3,
                      help="how many assistant turns after an invisible tool result still count as 'recent' (default 3)")
     ap.add_argument("--examples", type=int, default=25, help="number of paired examples to print (default 25)")
@@ -324,7 +349,8 @@ def main():
         for path in glob.glob(os.path.join(cfg, "projects", "*", "*.jsonl")):
             slug = os.path.basename(os.path.dirname(path))
             ref_hits, conf_pairs, confusion_count = scan_transcript(
-                path, slug, ref_re, conf_re, args.within_turns, since_dt)
+                path, slug, ref_re, conf_re, args.within_turns, since_dt,
+                args.tool_output_chars)
             all_ref_hits.extend(ref_hits)
             all_conf_pairs.extend(conf_pairs)
             all_confusion_count += confusion_count
