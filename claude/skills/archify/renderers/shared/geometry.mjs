@@ -1215,10 +1215,10 @@ export function automaticPortSpread(relations, boxes, { gutter = 16, maxSpacing 
   const groups = new Map();
   const spread = new Map();
 
-  const add = (relation, endpoint, rect, side, counterpart) => {
+  const add = (relation, endpoint, rect, side, counterpart, counterpartSide) => {
     const key = `${rect.id}\u0000${side}`;
     const items = groups.get(key) || [];
-    items.push({ relation, endpoint, rect, side, counterpart });
+    items.push({ relation, endpoint, rect, side, counterpart, counterpartSide });
     groups.set(key, items);
   };
 
@@ -1236,8 +1236,8 @@ export function automaticPortSpread(relations, boxes, { gutter = 16, maxSpacing 
       relation.toSide,
       sideFor?.(relation, 'target') || defaultToSide(from, to),
     );
-    add(relation, 'from', from, fromSide, to);
-    add(relation, 'to', to, toSide, from);
+    add(relation, 'from', from, fromSide, to, toSide);
+    add(relation, 'to', to, toSide, from, fromSide);
   }
 
   for (const items of groups.values()) {
@@ -1254,13 +1254,18 @@ export function automaticPortSpread(relations, boxes, { gutter = 16, maxSpacing 
 
     const extent = verticalSide ? items[0].rect.height : items[0].rect.width;
     const usable = Math.max(0, extent - gutter * 2);
-    const spacing = Math.min(maxSpacing, usable / (items.length - 1));
+    let spacing = Math.min(maxSpacing, usable / (items.length - 1));
     if (!(spacing > 0)) continue;
+    const bundle = facingBundle(items, groups, verticalSide, gutter, maxSpacing);
+    if (bundle) spacing = bundle.spacing;
 
     for (const [index, item] of items.entries()) {
       const offset = (index - (items.length - 1) / 2) * spacing;
       const point = anchor(item.rect, item.side);
-      if (verticalSide) point[1] += offset;
+      if (bundle) {
+        if (verticalSide) point[1] = bundle.center + offset;
+        else point[0] = bundle.center + offset;
+      } else if (verticalSide) point[1] += offset;
       else point[0] += offset;
       const endpoints = spread.get(item.relation) || {};
       endpoints[item.endpoint] = point;
@@ -1269,6 +1274,35 @@ export function automaticPortSpread(relations, boxes, { gutter = 16, maxSpacing 
   }
 
   return spread;
+}
+
+// Parallel relationships that run only between the same two boxes, on facing
+// sides, spread around the middle of the boxes' shared span instead of each
+// box's own centre. Both ends then compute the same slots, so boxes whose
+// centres differ by a few pixels still get straight, evenly spaced links
+// instead of outside bridges. Returns null when the bundle is not exclusive
+// on both sides or the slots would not fit inside both corner gutters.
+const OPPOSITE_SIDE = { left: 'right', right: 'left', top: 'bottom', bottom: 'top' };
+function facingBundle(items, groups, verticalSide, gutter, maxSpacing) {
+  const { rect, side, counterpart } = items[0];
+  if (!items.every((item) => item.counterpart === counterpart && item.counterpartSide === OPPOSITE_SIDE[side])) return null;
+  const mirror = groups.get(`${counterpart.id}\u0000${OPPOSITE_SIDE[side]}`) || [];
+  if (mirror.length !== items.length || !mirror.every((item) => item.counterpart === rect)) return null;
+  const span = (box) => (verticalSide ? [box.y, box.y + box.height] : [box.x, box.x + box.width]);
+  const [aLo, aHi] = span(rect);
+  const [bLo, bHi] = span(counterpart);
+  const spacing = Math.min(
+    maxSpacing,
+    Math.max(0, aHi - aLo - gutter * 2) / (items.length - 1),
+    Math.max(0, bHi - bLo - gutter * 2) / (items.length - 1),
+  );
+  if (!(spacing > 0)) return null;
+  const half = ((items.length - 1) / 2) * spacing;
+  const lo = Math.max(aLo, bLo) + gutter + half;
+  const hi = Math.min(aHi, bHi) - gutter - half;
+  if (lo > hi) return null;
+  const middle = (Math.max(aLo, bLo) + Math.min(aHi, bHi)) / 2;
+  return { center: Math.min(hi, Math.max(lo, middle)), spacing };
 }
 
 export function defaultFromSide(from, to) {
