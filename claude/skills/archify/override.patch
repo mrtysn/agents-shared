@@ -103,15 +103,18 @@
 +              <span class="semantic-passport-notes-eyebrow" id="focus-notes-eyebrow" hidden></span>
 +              <p class="semantic-passport-summary" id="focus-notes-summary" hidden></p>
 +              <ul class="semantic-passport-points" id="focus-notes-points"></ul>
-+              <div class="semantic-passport-links" id="focus-notes-links"></div>
 +            </div>
++            <div class="semantic-passport-links" id="focus-notes-links"></div>
              <div class="semantic-passport-meta" id="focus-passport-meta" aria-label="{{i18n:viewer.passport.metadata}}">
                <span id="focus-kind" data-passport="kind"></span>
                <span id="focus-context" data-passport="context" hidden></span>
-@@ -7456,6 +7518,38 @@
-       };
-     })();
- 
+@@ -7453,6 +7515,38 @@
+         suspend: suspend,
+         isPaused: effectivePaused,
+         owner: function () { return owner; }
++      };
++    })();
++
 +    /* Authored details on demand. Like source evidence they live outside the
 +       SVG, so every canonical visual export and share card stays unchanged.
 +       Links are restricted to relative paths, fragments, http(s) and mailto. */
@@ -141,12 +144,9 @@
 +        node: function (id) { return own(payload.nodes, id); },
 +        relationship: function (key) { return own(payload.relationships, key); },
 +        safeHref: safeHref
-+      };
-+    })();
-+
-     /* Verified repository evidence is emitted only after the renderer checks
-        the authored GitHub revision, source blobs, and optional line ranges
-        against the explicit --repo-root. It remains outside the SVG so every
+       };
+     })();
+ 
 @@ -7539,6 +7633,12 @@
        var chip = document.getElementById('focus-chip');
        var label = document.getElementById('focus-label');
@@ -160,7 +160,7 @@
        var kind = document.getElementById('focus-kind');
        var context = document.getElementById('focus-context');
        var tag = document.getElementById('focus-tag');
-@@ -7902,7 +8002,47 @@
+@@ -7902,7 +8002,48 @@
          });
          evidence.hidden = false;
        }
@@ -187,9 +187,10 @@
 +          }
 +          notesLinks.appendChild(anchor);
 +        });
-+        var has = !notesSummary.hidden || notesPoints.childNodes.length > 0 || notesLinks.childNodes.length > 0;
-+        setPassportValue(notesEyebrow, has ? eyebrowText || '' : '');
-+        notes.hidden = !has;
++        var hasText = !notesSummary.hidden || notesPoints.childNodes.length > 0;
++        var has = hasText || notesLinks.childNodes.length > 0;
++        setPassportValue(notesEyebrow, hasText ? eyebrowText || '' : '');
++        notes.hidden = !hasText;
 +        if (has) chip.setAttribute('data-has-notes', 'true');
 +        else chip.removeAttribute('data-has-notes');
 +        notes.scrollTop = 0;
@@ -208,7 +209,7 @@
          setPassportValue(detail, node.getAttribute('data-node-sublabel'));
          setPassportValue(kind, viewerKindLabel(node.getAttribute('data-node-kind') || 'node'));
          setPassportValue(context, node.getAttribute('data-node-context'));
-@@ -8221,9 +8361,11 @@
+@@ -8221,9 +8362,11 @@
          svg.removeAttribute('data-relationship-preview-active');
          svg.removeAttribute('data-relationship-direct-active');
          if (options.clearPin === true) {
@@ -220,7 +221,7 @@
          }
          chip.removeAttribute('data-relationship-previewing');
          edges().forEach(function (edge) { edge.removeAttribute('data-relationship-preview'); });
-@@ -8337,6 +8479,7 @@
+@@ -8337,6 +8480,7 @@
          var target = relationshipHitTarget(key);
          if (target) target.setAttribute('aria-pressed', 'true');
          renderRelationshipCopyAction();

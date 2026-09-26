@@ -5418,8 +5418,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
               <span class="semantic-passport-notes-eyebrow" id="focus-notes-eyebrow" hidden></span>
               <p class="semantic-passport-summary" id="focus-notes-summary" hidden></p>
               <ul class="semantic-passport-points" id="focus-notes-points"></ul>
-              <div class="semantic-passport-links" id="focus-notes-links"></div>
             </div>
+            <div class="semantic-passport-links" id="focus-notes-links"></div>
             <div class="semantic-passport-meta" id="focus-passport-meta" aria-label="{{i18n:viewer.passport.metadata}}">
               <span id="focus-kind" data-passport="kind"></span>
               <span id="focus-context" data-passport="context" hidden></span>
@@ -8025,9 +8025,10 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           }
           notesLinks.appendChild(anchor);
         });
-        var has = !notesSummary.hidden || notesPoints.childNodes.length > 0 || notesLinks.childNodes.length > 0;
-        setPassportValue(notesEyebrow, has ? eyebrowText || '' : '');
-        notes.hidden = !has;
+        var hasText = !notesSummary.hidden || notesPoints.childNodes.length > 0;
+        var has = hasText || notesLinks.childNodes.length > 0;
+        setPassportValue(notesEyebrow, hasText ? eyebrowText || '' : '');
+        notes.hidden = !hasText;
         if (has) chip.setAttribute('data-has-notes', 'true');
         else chip.removeAttribute('data-has-notes');
         notes.scrollTop = 0;
