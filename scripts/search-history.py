@@ -1,4 +1,9 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# DESC: Search Claude Code session transcripts by keyword across all projects
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["textual"]
+# ///
 """
 search-history: Search Claude Code conversation history by keyword.
 
