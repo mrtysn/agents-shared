@@ -22,6 +22,7 @@ import re
 import sqlite3
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -427,8 +428,10 @@ def required_literal(regex: str) -> str | None:
 
 def session_filter(project_filter: str | None, current_only: bool, days: int):
     """A predicate over session rows for the --project, --current and --days
-    flags; the session this runs inside never passes."""
+    flags. The session this runs inside never passes, nor does one run in a
+    temp folder: those are throwaway runs, test harnesses and scratchpads."""
     this_session = os.environ.get("CLAUDE_CODE_SESSION_ID")
+    temp_roots = tuple({os.path.realpath(d) + "/" for d in (tempfile.gettempdir(), "/tmp")})
     project_dir = None
     if current_only:
         repo_root = get_repo_root()
@@ -443,6 +446,7 @@ def session_filter(project_filter: str | None, current_only: bool, days: int):
     def keep(s: dict) -> bool:
         return (s["session_id"] != this_session
                 and s["cwd"] is not None
+                and not (s["cwd"] + "/").startswith(temp_roots)
                 and (not project_filter or project_filter.lower() in s["project_dir"].lower())
                 and (project_dir is None or s["project_dir"] == project_dir)
                 and (cutoff is None or (s["last"] or "") >= cutoff))
@@ -579,19 +583,22 @@ def run_search(
     any_args = [a for _, args in clauses for a in args]
     results = []
     for _, s, title_match in hits:
-        match_count, snippets = 0, []
+        match_count, together_count, snippets = 0, 0, []
         for text, role in db.execute(
                 f"SELECT text, role FROM messages WHERE session_id = ? AND ({any_sql}) "
                 f"ORDER BY ({phrase_sql}) DESC, rowid",
                 [s["session_id"], *any_args, *phrase_args]):
             # A message holding the words together shows them together.
             shown = phrase if phrase and phrase.search(text) else highlight
-            for m in highlight.finditer(text):
-                match_count += 1
+            match_count += sum(1 for _ in highlight.finditer(text))
+            if phrase:
+                together_count += sum(1 for _ in phrase.finditer(text))
             for m in shown.finditer(text):
                 if len(snippets) < max_snippets:
                     snippets.append((role, extract_snippet_parts(text, m, shown)))
-        results.append(result_for(s, match_count, snippets, title_match))
+        # Where the words appear together, the count is of that: the stronger
+        # match, and the one the snippets show.
+        results.append(result_for(s, together_count or match_count, snippets, title_match))
     db.close()
 
     if results:
