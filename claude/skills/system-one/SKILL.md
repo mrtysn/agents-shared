@@ -5,10 +5,17 @@ description: Use when a session needs a bounded judgment over some text - classi
 
 # system-one
 
-A local decision model (Laya, one warm server on loopback, port 7811). It
-answers typed questions about a text state and returns calibrated
-probabilities, not prose, in roughly 65 ms once warm. Nothing leaves the
-machine; the model does not generate text, it only scores the options given.
+A local decision model, one warm server on loopback (port 7811): Laya by
+default, or Kev (`SYSTEM_ONE_BACKEND=kev` in the config) -- both speak the
+same `/v1/systemone` wire shape, so the call below is identical either way. A
+laya backend can also serve a fine-tuned checkpoint directory alongside the
+published bundle, both preloaded (`SYSTEM_ONE_MODEL_DIR`); `system-one ask
+--model <name>` (default `english`) picks which one answers -- the
+checkpoint's friendly name is `SYSTEM_ONE_MODEL_NAME` (default:
+`SYSTEM_ONE_MODEL_DIR`'s basename). It answers typed questions about a
+text state and returns calibrated probabilities, not prose, in roughly 65 ms
+once warm. Nothing leaves the machine; the model does not generate text, it
+only scores the options given.
 
 ## When to use it
 
@@ -66,6 +73,28 @@ sized to the cost of a false positive and state it where you call this
 `hooks/system-one-bash-questions.json` for real numbers). Below threshold,
 fall back to full LLM reasoning or ask the user; at or above, act. For
 `score`, normalise by dividing by `k - 1` (levels minus one) first.
+
+Four hooks already use this model this way: `hooks/system-one-bash.sh`
+(PreToolUse, command destructiveness), `hooks/system-one-prompt.sh`
+(UserPromptSubmit, prompt-kind gate), `hooks/system-one-stop.sh` (Stop,
+answer-shape check), and `hooks/system-one-ask.sh` (PreToolUse on
+`AskUserQuestion`, whether the ask is already answered, routine, or
+legitimately about naming or an irreversible action) - each with its own
+questions file, shadow log under `shadow/<hook>/`, and cases file in
+`hooks/tests/`.
+
+The prompt hook's act mode (top kind probability at or above
+`SYSTEM_ONE_PROMPT_ACT_MIN`, default 0.60) adds one line of
+`additionalContext` worded per kind from `hooks/system-one-prompt-questions.json`'s
+`context` map; order and other, slash commands, and prompts under 3 words
+never get a line. The logs also label themselves: a later hook call appends
+`{"kind":"outcome","ref":<verdict row id>, ...}` once the real answer is
+known (the prompt hook does this for its own previous row and for the Stop
+hook's rows; `hooks/system-one-bash-post.sh`, PostToolUse and
+PostToolUseFailure on `Bash`, does it for the Bash hook, joined by
+`tool_use_id`, with the exit code). `scripts/system-one-receipts.py`
+joins verdict and outcome rows and reports per-hook agreement, or
+`--export-cases <hook> <tsv>` for the next fine-tune.
 
 ## Fail-open
 

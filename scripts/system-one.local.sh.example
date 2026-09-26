@@ -4,8 +4,9 @@
 # both the zsh wrapper and the bash hooks source it. An environment variable of
 # the same name overrides the value here.
 
-# Required. The uv venv that holds laya-serve (the design created it at
-# ~/.local/share/system-one/venv; any path works).
+# Required for SYSTEM_ONE_BACKEND=laya (the default). The uv venv that holds
+# laya-serve (the design created it at ~/.local/share/system-one/venv; any
+# path works). The kev backend does not need it.
 SYSTEM_ONE_VENV="$HOME/.local/share/system-one/venv"
 
 # Loopback port the server listens on. Default 7811.
@@ -19,9 +20,44 @@ SYSTEM_ONE_VENV="$HOME/.local/share/system-one/venv"
 # distinct name lets `system-one status`, the statusline and the Agent Bar
 # Hopping app say the user has opted in to seeing verdicts (shadow plus the
 # status line row).
-# act: hooks may emit permissionDecision "ask" (never deny). Flip per the
-# evaluation plan in the design doc, on the user's word only.
+# act: hooks may emit a permission decision. The Bash hook only ever emits
+# "ask" (never deny, since the deterministic guards already own hard blocks);
+# the AskUserQuestion pre-check (system-one-ask.sh) is the one hook that
+# denies, and only when the fired question is not naming_or_irreversible (a
+# naming or hard-to-reverse ask is always legitimate and is never denied).
+# Flip per the evaluation plan in the design doc, on the user's word only.
 #SYSTEM_ONE_MODE=shadow
+
+# Per-hook overrides of SYSTEM_ONE_MODE above (same three values). Unset means
+# "use SYSTEM_ONE_MODE". Set these to try one hook in act mode without moving
+# the others.
+#SYSTEM_ONE_BASH_MODE=shadow
+#SYSTEM_ONE_PROMPT_MODE=shadow
+#SYSTEM_ONE_STOP_MODE=shadow
+#SYSTEM_ONE_ASK_MODE=shadow
+
+# Prompt hook only: the top kind probability act mode requires before it adds
+# additionalContext (question/wish/correction only; order and other never get
+# a line, nor does a slash command or a prompt under 3 words). Default 0.60,
+# falling back to hooks/system-one-prompt-questions.json's "act_min" when
+# unset here (see that file's "_act_min_comment" for why: prompt/kind is a
+# choice question, so full-v1/eval.json's thresholds map carries no swept
+# value for it, only per-class recall at argmax -- section 13 of the design
+# doc).
+# Measured on full-v1's test split (n=66) at 0.60, precision of the emitted
+# line per class: question 0.90 (10 fired, 1 wrong), wish 1.00 (10 fired),
+# correction 1.00 (14 fired); order/other never emit. No class is below 0.5,
+# so there is no per-class floor.
+#SYSTEM_ONE_PROMPT_ACT_MIN=0.60
+
+# Prompt hook only: the delegate question's probability act mode requires
+# before it adds the "hand this to a Sonnet or Haiku subagent" line (only for
+# typed prompts of at least 8 words; never a slash command or a relayed
+# message). Default 0.5, falling back to hooks/system-one-prompt-questions.json's
+# "delegate.min". On full-v3's test split precision is 1.00 at 0.5 through 0.7
+# (recall 0.30 to 0.27); the checkpoint's own swept threshold (0.159) would
+# fire three times as often with a third of the lines wrong.
+#SYSTEM_ONE_PROMPT_DELEGATE_MIN=0.5
 
 # Fallback threshold for a hooks/system-one-bash.sh gate question that has no
 # threshold in hooks/system-one-bash-questions.json. Default 0.70.
@@ -39,3 +75,48 @@ SYSTEM_ONE_VENV="$HOME/.local/share/system-one/venv"
 # Where the pid files, server log and shadow.jsonl live.
 # Default ${XDG_STATE_HOME:-~/.local/state}/system-one.
 #SYSTEM_ONE_STATE_DIR="$HOME/.local/state/system-one"
+
+# Which server `start` launches: laya (default) or kev. Both speak the same
+# /v1/systemone wire shape, so `ask` and every hook work unchanged either way.
+# Changing this while a server runs takes effect after `system-one stop`;
+# `start` leaves a running server of the other shape alone and says so.
+# Every shape starts with HF_HUB_OFFLINE=1: a start never downloads a model,
+# so the checkpoint must already be on disk or in the Hugging Face cache.
+#SYSTEM_ONE_BACKEND=laya
+
+# laya backend only, optional. A fine-tuned Laya checkpoint directory (one
+# that holds rl_agent_config.json and model.safetensors, loadable with
+# laya.Agent(dir)), served side by side with the published "english" bundle
+# via scripts/system-one-serve.py instead of laya-serve -- both preloaded
+# (Router max_loaded=2). Unset serves only the published convaiinnovations/laya
+# bundle, as "english" (SYSTEM_ONE_VENV/bin/laya-serve).
+#SYSTEM_ONE_MODEL_DIR="$HOME/.local/share/system-one/models/full-v1"
+
+# The name the checkpoint above is served and asked for under: a request's
+# "model" field, `system-one ask --model`, the shadow-log model field and
+# /health's loaded list all use it as is. Default: SYSTEM_ONE_MODEL_DIR's
+# basename (e.g. "full-v1"). Lowercase [a-z0-9._-], and never one of laya's
+# own names (english, multilingual, typed-decisions or an alias); `start`
+# refuses anything else.
+#SYSTEM_ONE_MODEL_NAME=full-v1
+
+# Which model each hook asks (default english for all four). Set one to
+# SYSTEM_ONE_MODEL_NAME's value to point that hook at the checkpoint instead
+# of the published bundle. The stop hook asks both its questions
+# (needless_table, overlong) in one call, so SYSTEM_ONE_STOP_MODEL covers
+# both -- see hooks/system-one-stop.sh.
+#SYSTEM_ONE_BASH_MODEL=english
+#SYSTEM_ONE_PROMPT_MODEL=english
+#SYSTEM_ONE_STOP_MODEL=english
+#SYSTEM_ONE_ASK_MODEL=english
+
+# Required when SYSTEM_ONE_BACKEND=kev. The kev checkout, with its own .venv
+# already synced (started as `cd <dir> && uv run --offline --extra serve
+# python -m kev.serve`; uv must be on PATH).
+#SYSTEM_ONE_KEV_DIR="$HOME/.local/share/system-one/kev"
+
+# kev backend only. Passed as kev.serve's --run: a Hugging Face id
+# (owner/name, optionally @revision; must already be in the HF cache) or a
+# run directory holding head.pt, relative to the checkout or absolute.
+# Default jaredpalmer/kev-0.8b.
+#SYSTEM_ONE_KEV_MODEL=jaredpalmer/kev-0.8b

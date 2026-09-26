@@ -1,12 +1,14 @@
 #!/bin/zsh
 # DESC: Start, stop, query and audit the local Laya decision-model server that hooks consult for bounded judgments
 #
-# system-one is one warm Laya server on loopback (see
-# notebook/2026-09-24-system-one-decision-model-integration.md). It answers typed
-# questions (choice / score / noul) about a text "state" with calibrated
-# probabilities and generates no text. Hooks pipe their state and questions to
-# `system-one ask`; this wrapper owns the single code path: the curl, the
-# timeout, the fail-open exit, the shadow log, and the server lifecycle.
+# system-one is one warm decision-model server on loopback (see
+# notebook/2026-09-24-system-one-decision-model-integration.md): Laya by
+# default, or Kev (SYSTEM_ONE_BACKEND=kev) -- both speak the same
+# /v1/systemone wire shape. It answers typed questions (choice / score / noul)
+# about a text "state" with calibrated probabilities and generates no text.
+# Hooks pipe their state and questions to `system-one ask`; this wrapper owns
+# the single code path: the curl, the timeout, the fail-open exit, the shadow
+# log, and the server lifecycle.
 #
 # Agents: if you need a bounded judgment (is this destructive, which of these
 # options, yes or no with a probability), call `system-one ask` with a JSON
@@ -42,8 +44,8 @@ Usage:
       --file <path>               Read the request from a file instead of stdin.
       --hook <name>               Append a shadow-log line tagged with this hook name.
       --session <id>              Session id for the shadow-log line; also names the
-                                  per-session log file (shadow/<id>.jsonl). Omitted or
-                                  empty uses shadow/_nosession.jsonl.
+                                  per-session log file (shadow/<hook>/<id>.jsonl).
+                                  Omitted or empty uses shadow/<hook>/_nosession.jsonl.
       --threshold <0..1>          Compute would_act: any noul >= t, or any score
                                   normalised to [0,1] >= t. Adds "would_act" and
                                   "fired" to the printed JSON.
@@ -55,17 +57,26 @@ Usage:
                                   named options. A question not in the gate is
                                   ignored when the gate is given; without --gate
                                   every noul/score question is checked at --threshold.
+      --model <name>              Model to ask: "english" (default, the published
+                                  bundle) or SYSTEM_ONE_MODEL_NAME's value for the
+                                  configured checkpoint. Sent as the request's
+                                  "model" field as is; the printed JSON and the
+                                  shadow-log row carry the same name.
       --would-act true|false      Set would_act by hand (overrides --threshold).
       --acted true|false          Record whether the caller acted on it (default false).
+      --extra <json>              Extra fields merged into the shadow-log line, an
+                                  object (e.g. {"q_index": 2, "q_count": 3}).
       --keep-state                Log the full state text (bash hook: the command is
                                   needed for labelling). Default: sha256 plus 80 chars.
       --fail-open                 On any failure print nothing and exit 0 (hooks use
                                   this). Without it a failure exits non-zero.
   system-one roster               Rebuild the skill criteria cache (not in this slice).
-  system-one shadow-report [-n N] [--session <id>]
-                                  Summarise the shadow log (every file under shadow/,
-                                  or one session with --session): calls per hook,
-                                  would_act rate, p50/p95 latency, last N
+  system-one shadow-report [-n N] [--hook <name>] [--session <id>]
+                                  Summarise the shadow log: one report per hook
+                                  directory by default; --hook restricts to one
+                                  hook, --session to one session (across every
+                                  hook if --hook is not also given). Each report:
+                                  calls, would_act rate, p50/p95 latency, last N
                                   would_act=true lines.
   system-one install              Print the links.txt line and the settings.json
                                   entries to add (edits nothing).
@@ -81,7 +92,7 @@ Answer keys: answers.q1.noul (P(yes)), answers.q2.score (expected level index,
 0..k-1) plus .probabilities, answers.q3.choice plus .probabilities.
 
 Config file: ${CLAUDE_CONFIG_DIR:-~/.claude}/system-one.local.sh
-  SYSTEM_ONE_VENV          required; the uv venv holding laya-serve
+  SYSTEM_ONE_VENV          required for backend=laya; the uv venv holding laya-serve
   SYSTEM_ONE_PORT          default 7811
   SYSTEM_ONE_IDLE_MINUTES  default 30; the watchdog stops an idle server after this
   SYSTEM_ONE_MODE          shadow (default: log only), show (log only, same as
@@ -92,10 +103,52 @@ Config file: ${CLAUDE_CONFIG_DIR:-~/.claude}/system-one.local.sh
   SYSTEM_ONE_BASH_ASK_<Q>  per-question override (FOREIGN_PROCESS, IRREVERSIBLE,
                            LEAVES_MACHINE, NETWORK_INSTALL) of the file's threshold
   SYSTEM_ONE_STATE_DIR     default ${XDG_STATE_HOME:-~/.local/state}/system-one
-State dir: server.pid, watchdog.pid, server.log, last-request, shadow/<session_id>.jsonl
-(one file per session; a call with no --session writes shadow/_nosession.jsonl). A
-pre-existing flat shadow.jsonl from before this layout is split into shadow/ the
-first time `status` or `shadow-report` runs, and renamed to shadow.jsonl.migrated.
+  SYSTEM_ONE_BACKEND       laya (default) or kev; selects which server `start` launches.
+                           Both speak the same /v1/systemone wire shape, so `ask` and
+                           every hook need no change either way.
+  SYSTEM_ONE_MODEL_DIR     laya backend only, optional; a fine-tuned checkpoint
+                           directory (loadable with laya.Agent(dir)), served
+                           alongside the published "english" bundle -- both
+                           preloaded -- via this repo's scripts/system-one-serve.py
+                           instead of laya-serve. Unset means only the published
+                           convaiinnovations/laya bundle is served, as "english".
+  SYSTEM_ONE_MODEL_NAME    the name the checkpoint is served and asked for under
+                           (`ask --model <name>`, a hook's SYSTEM_ONE_<HOOK>_MODEL,
+                           /health's loaded list, the shadow-log model field).
+                           Default: SYSTEM_ONE_MODEL_DIR's basename (e.g. "full-v1").
+                           Lowercase [a-z0-9._-], and not one of laya's own names
+                           (english, multilingual, typed-decisions or an alias);
+                           `start` refuses anything else. Ignored when
+                           SYSTEM_ONE_MODEL_DIR is unset.
+  SYSTEM_ONE_{BASH,PROMPT,STOP,ASK}_MODEL
+                           model name each hook asks (default english). Set to
+                           SYSTEM_ONE_MODEL_NAME's value to point a hook at the
+                           checkpoint.
+  SYSTEM_ONE_KEV_DIR       required for backend=kev; the kev checkout (its own
+                           .venv; started with `uv run --offline --extra serve`).
+  SYSTEM_ONE_KEV_MODEL     kev backend only; default jaredpalmer/kev-0.8b. A Hub id
+                           (owner/name[@rev], must already be in the HF cache: a
+                           start never downloads) or a run directory holding
+                           head.pt (relative to the checkout, or absolute),
+                           passed as kev.serve's --run.
+`stop` and the idle watchdog signal the process group of the pid they wrote,
+and only while that pid is still one of the three server shapes above.
+State dir: server.pid, watchdog.pid, server.log, last-request,
+shadow/<hook>/<session_id>.jsonl (one file per hook per session; a call with no
+--session writes shadow/<hook>/_nosession.jsonl). A pre-existing flat
+shadow.jsonl from before the per-session layout is split into shadow/ the first
+time `status` or `shadow-report` runs (renamed to shadow.jsonl.migrated); a
+pre-existing flat shadow/<session_id>.jsonl from before the per-hook layout
+(the Bash hook was the only caller) is then moved into shadow/bash/.
+Every verdict row written by `ask --hook` since 2026-09-25 carries an "id"
+(ts, the state sha's first 8 hex characters and the wrapper's pid) and a
+"ts_epoch" (Unix seconds, so readers never parse ts); rows from before that
+carry none. An "outcome" row ({"kind":"outcome","ref":<id>, ...}, no "hook"/
+"answers"/"fired" fields) is appended to the same log by the prompt hook
+(prompt-outcome and stop-outcome, see hooks/system-one-prompt.sh) and by
+hooks/system-one-bash-post.sh (bash-outcome); scripts/system-one-receipts.py
+joins them by "ref". A reader that wants only verdict rows filters out
+kind == "outcome" (cc-statusline.js's readVerdict/readOutstandingRow do this).
 EOF
 }
 
@@ -108,7 +161,10 @@ config_file="$config_dir/system-one.local.sh"
 typeset -a cfg_vars=(SYSTEM_ONE_VENV SYSTEM_ONE_PORT SYSTEM_ONE_IDLE_MINUTES
     SYSTEM_ONE_MODE SYSTEM_ONE_BASH_ASK SYSTEM_ONE_STATE_DIR
     SYSTEM_ONE_BASH_ASK_FOREIGN_PROCESS SYSTEM_ONE_BASH_ASK_IRREVERSIBLE
-    SYSTEM_ONE_BASH_ASK_LEAVES_MACHINE SYSTEM_ONE_BASH_ASK_NETWORK_INSTALL)
+    SYSTEM_ONE_BASH_ASK_LEAVES_MACHINE SYSTEM_ONE_BASH_ASK_NETWORK_INSTALL
+    SYSTEM_ONE_BACKEND SYSTEM_ONE_MODEL_DIR SYSTEM_ONE_MODEL_NAME
+    SYSTEM_ONE_KEV_DIR SYSTEM_ONE_KEV_MODEL
+    SYSTEM_ONE_BASH_MODEL SYSTEM_ONE_PROMPT_MODEL SYSTEM_ONE_STOP_MODEL SYSTEM_ONE_ASK_MODEL)
 typeset -A env_pre
 local v
 for v in "${cfg_vars[@]}"; do
@@ -128,6 +184,15 @@ SYSTEM_ONE_IDLE_MINUTES="${SYSTEM_ONE_IDLE_MINUTES:-30}"
 SYSTEM_ONE_MODE="${SYSTEM_ONE_MODE:-shadow}"
 SYSTEM_ONE_BASH_ASK="${SYSTEM_ONE_BASH_ASK:-0.70}"
 SYSTEM_ONE_STATE_DIR="${SYSTEM_ONE_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/system-one}"
+SYSTEM_ONE_BACKEND="${SYSTEM_ONE_BACKEND:-laya}"
+SYSTEM_ONE_KEV_MODEL="${SYSTEM_ONE_KEV_MODEL:-jaredpalmer/kev-0.8b}"
+# The friendly name a checkpoint is served and asked for under (SYSTEM_ONE_MODEL_DIR's
+# basename by default, e.g. "full-v1"). Empty when no checkpoint is configured.
+SYSTEM_ONE_MODEL_NAME="${SYSTEM_ONE_MODEL_NAME:-${SYSTEM_ONE_MODEL_DIR:+${SYSTEM_ONE_MODEL_DIR:t}}}"
+SYSTEM_ONE_BASH_MODEL="${SYSTEM_ONE_BASH_MODEL:-english}"
+SYSTEM_ONE_PROMPT_MODEL="${SYSTEM_ONE_PROMPT_MODEL:-english}"
+SYSTEM_ONE_STOP_MODEL="${SYSTEM_ONE_STOP_MODEL:-english}"
+SYSTEM_ONE_ASK_MODEL="${SYSTEM_ONE_ASK_MODEL:-english}"
 
 state_dir="$SYSTEM_ONE_STATE_DIR"
 pid_file="$state_dir/server.pid"
@@ -179,19 +244,116 @@ migrate_shadow() {
     print "system-one: migrated $n line(s) from $old_shadow_log into ${#seen} file(s) under $shadow_dir (old file kept as $old_shadow_log.migrated)"
 }
 
+# A hook name, safe for a directory name: same rule as session_file_id.
+hook_file_id() {
+    local h="${1//[^A-Za-z0-9_-]/}"
+    print -r -- "$h"
+}
+
+# Second migration: layout moved from shadow/<session_id>.jsonl (the Bash hook
+# was the only caller) to shadow/<hook>/<session_id>.jsonl. Every plain
+# *.jsonl file directly under shadow/ is the Bash hook's, by construction --
+# no other hook ever wrote there. Each file is first claimed by an atomic
+# rename to <name>.migrating, which exactly one of two racing callers wins
+# (the loser's mv fails and it moves on); the claim is then appended to
+# shadow/bash/<name>.jsonl and removed. Append, not mv -n: a session that was
+# live across the layout change already has a bash/<id>.jsonl the hook keeps
+# writing to, and mv -n would leave its older lines stranded in the flat file
+# forever (454 lines in three files on the first machine this ran on). Always
+# run after migrate_shadow so a legacy flat shadow.jsonl is fully split into
+# per-session files first.
+migrate_shadow_layout() {
+    migrate_shadow
+    local -a legacy=("$shadow_dir"/*.jsonl(N))
+    (( ${#legacy} )) || return 0
+    mkdir -p "$shadow_dir/bash"
+    local f claim
+    for f in "${legacy[@]}"; do
+        claim="$f.migrating"
+        mv -- "$f" "$claim" 2>/dev/null || continue
+        cat -- "$claim" >> "$shadow_dir/bash/${f:t}" && rm -f -- "$claim"
+    done
+}
+
 die() { print -u2 "system-one: $*"; exit 1; }
 
 require_venv() {
     [[ "$config_present" = 1 ]] || die "not configured: copy scripts/system-one.local.sh.example to $config_file and fill it in"
     [[ -n "${SYSTEM_ONE_VENV:-}" ]] || die "SYSTEM_ONE_VENV is not set in $config_file"
-    [[ -x "$SYSTEM_ONE_VENV/bin/laya-serve" ]] || die "no laya-serve in $SYSTEM_ONE_VENV/bin"
     [[ -x "$SYSTEM_ONE_VENV/bin/python" ]] || die "no python in $SYSTEM_ONE_VENV/bin"
+    if [[ -n "${SYSTEM_ONE_MODEL_DIR:-}" ]]; then
+        # A Laya checkpoint directory is what laya.Agent(dir) loads: the
+        # config and the weights are the two files every one carries.
+        [[ -d "$SYSTEM_ONE_MODEL_DIR" ]] || die "SYSTEM_ONE_MODEL_DIR does not exist: $SYSTEM_ONE_MODEL_DIR"
+        [[ -f "$SYSTEM_ONE_MODEL_DIR/rl_agent_config.json" && -f "$SYSTEM_ONE_MODEL_DIR/model.safetensors" ]] \
+            || die "SYSTEM_ONE_MODEL_DIR is not a Laya checkpoint directory (no rl_agent_config.json + model.safetensors): $SYSTEM_ONE_MODEL_DIR"
+        [[ -r "${self:h}/system-one-serve.py" ]] || die "missing ${self:h}/system-one-serve.py"
+        # The name goes into laya's own model registry (system-one-serve.py):
+        # lowercase, since laya lowercases a request's model field before the
+        # lookup, and never one of laya's slot names or aliases, which would
+        # shadow the published bundle or make the checkpoint answer as one.
+        case "$SYSTEM_ONE_MODEL_NAME" in
+            english|multilingual|typed-decisions|en|laya|default|multi|ml|laya-multilingual|typed|typed_decisions|laya-typed-decisions|decisions)
+                die "SYSTEM_ONE_MODEL_NAME is one of laya's own model names or aliases: $SYSTEM_ONE_MODEL_NAME (pick another)" ;;
+        esac
+        [[ "$SYSTEM_ONE_MODEL_NAME" =~ '^[a-z0-9][a-z0-9._-]*$' ]] \
+            || die "SYSTEM_ONE_MODEL_NAME must be lowercase [a-z0-9._-]: $SYSTEM_ONE_MODEL_NAME"
+    else
+        [[ -x "$SYSTEM_ONE_VENV/bin/laya-serve" ]] || die "no laya-serve in $SYSTEM_ONE_VENV/bin"
+    fi
+}
+
+require_kev() {
+    [[ "$config_present" = 1 ]] || die "not configured: copy scripts/system-one.local.sh.example to $config_file and fill it in"
+    [[ -n "${SYSTEM_ONE_KEV_DIR:-}" ]] || die "SYSTEM_ONE_KEV_DIR is not set in $config_file"
+    [[ -d "$SYSTEM_ONE_KEV_DIR" ]] || die "SYSTEM_ONE_KEV_DIR does not exist: $SYSTEM_ONE_KEV_DIR"
+    [[ -f "$SYSTEM_ONE_KEV_DIR/kev/serve.py" ]] || die "SYSTEM_ONE_KEV_DIR is not a kev checkout (no kev/serve.py): $SYSTEM_ONE_KEV_DIR"
+    command -v uv >/dev/null 2>&1 || die "uv not found on PATH (needed to run kev.serve)"
+    # kev.serve --run takes a run directory (holding head.pt) or a Hub id
+    # (owner/name, optionally @revision). Anything else makes it fall back
+    # silently to runs/smoke -- so decide here, before anything is launched.
+    # A relative directory resolves against the checkout, where kev.serve runs.
+    local run="$SYSTEM_ONE_KEV_MODEL" run_dir
+    [[ "$run" == /* ]] && run_dir="$run" || run_dir="$SYSTEM_ONE_KEV_DIR/$run"
+    if [[ -d "$run_dir" ]]; then
+        [[ -f "$run_dir/head.pt" ]] || die "SYSTEM_ONE_KEV_MODEL is a directory without head.pt (not a kev run): $run_dir"
+    else
+        # owner/name[@rev], the character set kev's HUB_ID regex accepts
+        [[ "$run" == ?*/?* && "$run" != */*/* && -z "${run//[A-Za-z0-9_.@\/-]/}" ]] \
+            || die "SYSTEM_ONE_KEV_MODEL is neither a kev run directory nor a Hub id (owner/name[@rev]): $run"
+    fi
+}
+
+# Which of our three launch shapes a `ps -o command=` line is: laya-serve,
+# this repo's shim for a checkpoint directory (system-one-serve.py, still laya
+# under the hood), or kev.serve (as the `uv run` parent or the python child:
+# both carry the module name). Empty for anything else. The pid file is
+# trusted only while its pid is one of these, whatever the config says now,
+# so `stop` still finds a server started under a previous backend setting.
+server_kind_of() {
+    case "$1" in
+        *system-one-serve.py*) print checkpoint ;;
+        *laya-serve*)          print laya ;;
+        *kev.serve*)           print kev ;;
+    esac
+}
+# The shape the current config would launch.
+server_kind_wanted() {
+    if [[ "$SYSTEM_ONE_BACKEND" == kev ]]; then
+        print kev
+    elif [[ -n "${SYSTEM_ONE_MODEL_DIR:-}" ]]; then
+        print checkpoint
+    else
+        print laya
+    fi
 }
 
 # A pid file names one of ours only while that pid is alive AND its command
-# line still matches what we launched (laya-serve, or this script's _watchdog).
-# A pid can be reused by a foreign process after ours dies; a stale pid file
-# must never make `stop` or the watchdog signal that process.
+# line still matches what we launched (one of the server shapes above, or this
+# script's _watchdog). A pid can be reused by a foreign process after ours
+# dies; a stale pid file must never make `stop` or the watchdog signal that
+# process. `want` is a substring of the command line, or `server` for any of
+# the three server shapes.
 pid_alive() {
     local f="$1" want="$2" pid cmd
     [[ -r "$f" ]] || return 1
@@ -199,20 +361,59 @@ pid_alive() {
     [[ "$pid" == <-> ]] || return 1
     kill -0 "$pid" 2>/dev/null || return 1
     cmd=$(ps -o command= -p "$pid" 2>/dev/null) || return 1
-    [[ "$cmd" == *"$want"* ]]
+    if [[ "$want" == server ]]; then
+        [[ -n "$(server_kind_of "$cmd")" ]]
+    else
+        [[ "$cmd" == *"$want"* ]]
+    fi
 }
-server_alive()   { pid_alive "$pid_file" laya-serve; }
+server_alive()   { pid_alive "$pid_file" server; }
 watchdog_alive() { pid_alive "$watchdog_pid_file" _watchdog; }
+# The shape of the live server named by the pid file (call after server_alive).
+server_kind_running() { server_kind_of "$(ps -o command= -p "$(<"$pid_file")" 2>/dev/null)"; }
 
+# Stop the server tree behind a pid we launched. detach() made that pid a
+# session and process-group leader, so its whole tree is the group: for kev
+# that is uv (the pid) plus the python it spawned (`uv run` does not exec on
+# this platform; measured), for laya-serve and the shim a single process.
+# Signalling the group is what reaches the python behind uv; a plain kill of
+# uv alone would leave it holding the port. If setsid had failed the pid is
+# no group leader and the group kill fails, so fall back to the pid itself.
+kill_server_tree() {
+    local pid="$1"
+    kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null
+}
+
+# Laya exposes GET /health; kev has no /health route, only GET /v1/models
+# (see kev/serve.py) -- both are cheap, side-effect-free liveness probes.
 health() {
-    curl -s --max-time 1 "$base_url/health" 2>/dev/null
+    if [[ "$SYSTEM_ONE_BACKEND" == kev ]]; then
+        curl -s --max-time 1 "$base_url/v1/models" 2>/dev/null
+    else
+        curl -s --max-time 1 "$base_url/health" 2>/dev/null
+    fi
 }
 
 # Run a command in its own session, detached, and print its pid.
-# python's os.setsid is the portable setsid: macOS ships no setsid(1).
+# python's os.setsid is the portable setsid: macOS ships no setsid(1). Any
+# python3 does (the snippet touches nothing laya- or kev-specific): the laya
+# venv's when configured, else the kev checkout's own .venv (the kev backend
+# never requires SYSTEM_ONE_VENV), else whatever python3 is on PATH. The
+# last is a real fallback, not the normal case: on a Mac without the
+# developer tools /usr/bin/python3 is a stub that pops the CLT installer
+# instead of running, which is why the two venvs come first.
+# Runs inside $(...): a failure here prints to stderr and yields an empty
+# pid, which cmd_start checks before writing the pid file.
 detach() {
-    local pid
-    nohup "$SYSTEM_ONE_VENV/bin/python" -c '
+    local pid py
+    if [[ -n "${SYSTEM_ONE_VENV:-}" && -x "$SYSTEM_ONE_VENV/bin/python" ]]; then
+        py="$SYSTEM_ONE_VENV/bin/python"
+    elif [[ -n "${SYSTEM_ONE_KEV_DIR:-}" && -x "$SYSTEM_ONE_KEV_DIR/.venv/bin/python" ]]; then
+        py="$SYSTEM_ONE_KEV_DIR/.venv/bin/python"
+    else
+        py=$(command -v python3) || die "no python3 available to detach a process (set SYSTEM_ONE_VENV, or put python3 on PATH)"
+    fi
+    nohup "$py" -c '
 import os, sys
 try:
     os.setsid()
@@ -226,7 +427,11 @@ os.execvp(sys.argv[1], sys.argv[1:])
 
 # ---- subcommands -----------------------------------------------------------
 cmd_start() {
-    require_venv
+    case "$SYSTEM_ONE_BACKEND" in
+        laya) require_venv ;;
+        kev)  require_kev ;;
+        *)    die "unknown SYSTEM_ONE_BACKEND: $SYSTEM_ONE_BACKEND (want laya or kev)" ;;
+    esac
     mkdir -p "$state_dir"
     # Two SessionStart hooks in the same second must not both launch a server:
     # the loser would fail to bind, overwrite the pid file with a dead pid and
@@ -244,8 +449,17 @@ cmd_start() {
     fi
     trap "rmdir ${(q)lock} 2>/dev/null" EXIT   # expanded now: the local is gone when the trap runs
     if server_alive; then
-        # alive: either serving or still loading; either way nothing to do
-        print "system-one: running (pid $(<"$pid_file"), :$SYSTEM_ONE_PORT)"
+        # alive: either serving or still loading; either way nothing to do.
+        # A live server of another shape than the config now asks for is
+        # left alone too: a SessionStart hook must not kill a server other
+        # sessions are using; the user switches backends with stop + start.
+        local running wanted
+        running=$(server_kind_running); wanted=$(server_kind_wanted)
+        if [[ "$running" != "$wanted" ]]; then
+            print "system-one: running (pid $(<"$pid_file"), :$SYSTEM_ONE_PORT) as $running, but the config now wants $wanted: run \`system-one stop\` then \`start\` to switch"
+        else
+            print "system-one: running (pid $(<"$pid_file"), :$SYSTEM_ONE_PORT)"
+        fi
         return 0
     fi
     rm -f -- "$pid_file"
@@ -254,9 +468,27 @@ cmd_start() {
     if [[ -n "$(health)" ]]; then
         die "something already answers on :$SYSTEM_ONE_PORT but it is not in $pid_file; pick another SYSTEM_ONE_PORT"
     fi
+    # HF_HUB_OFFLINE=1 on every shape: a start runs from a SessionStart hook
+    # and must never download a model; one that is not in the local cache
+    # fails at once, into server.log, and the hooks fail open.
     local pid
-    pid=$(LAYA_HOST=127.0.0.1 LAYA_PORT="$SYSTEM_ONE_PORT" LAYA_MODELS=english HF_HUB_OFFLINE=1 \
-        detach "$SYSTEM_ONE_VENV/bin/laya-serve")
+    if [[ "$SYSTEM_ONE_BACKEND" == kev ]]; then
+        # kev.serve takes no --host (fixed to 127.0.0.1 in kev/serve.py); it
+        # must run with cwd set to the checkout, which detach's execvp cannot
+        # do directly, so route through zsh -c. uv --offline for the same
+        # reason as HF_HUB_OFFLINE: the env sync it does first must come
+        # from its cache or fail, never fetch.
+        local kev_cmd="cd ${(q)SYSTEM_ONE_KEV_DIR} && exec uv run --offline --extra serve python -m kev.serve --run ${(q)SYSTEM_ONE_KEV_MODEL} --port ${(q)SYSTEM_ONE_PORT}"
+        pid=$(HF_HUB_OFFLINE=1 detach zsh -c "$kev_cmd")
+    elif [[ -n "${SYSTEM_ONE_MODEL_DIR:-}" ]]; then
+        pid=$(LAYA_HOST=127.0.0.1 LAYA_PORT="$SYSTEM_ONE_PORT" HF_HUB_OFFLINE=1 \
+            detach "$SYSTEM_ONE_VENV/bin/python" "${self:h}/system-one-serve.py" \
+                --model-dir "$SYSTEM_ONE_MODEL_DIR" --name "$SYSTEM_ONE_MODEL_NAME")
+    else
+        pid=$(LAYA_HOST=127.0.0.1 LAYA_PORT="$SYSTEM_ONE_PORT" LAYA_MODELS=english HF_HUB_OFFLINE=1 \
+            detach "$SYSTEM_ONE_VENV/bin/laya-serve")
+    fi
+    [[ "$pid" == <-> ]] || die "could not launch the server (see above)"
     print "$pid" >"$pid_file"
     touch "$last_request"
     # watchdog: stops this exact pid after the idle period
@@ -266,21 +498,30 @@ cmd_start() {
     local wpid
     wpid=$(detach "$self" _watchdog "$pid")
     print "$wpid" >"$watchdog_pid_file"
-    print "system-one: starting on :$SYSTEM_ONE_PORT (pid $pid, $SYSTEM_ONE_MODE, idle exit ${SYSTEM_ONE_IDLE_MINUTES}m)"
+    local model_desc
+    if [[ "$SYSTEM_ONE_BACKEND" == kev ]]; then
+        model_desc="kev:$SYSTEM_ONE_KEV_MODEL"
+    elif [[ -n "${SYSTEM_ONE_MODEL_DIR:-}" ]]; then
+        model_desc="laya:english+$SYSTEM_ONE_MODEL_NAME ($SYSTEM_ONE_MODEL_DIR)"
+    else
+        model_desc="laya:english"
+    fi
+    print "system-one: starting on :$SYSTEM_ONE_PORT (pid $pid, $model_desc, $SYSTEM_ONE_MODE, idle exit ${SYSTEM_ONE_IDLE_MINUTES}m)"
 }
 
 # Hidden: the idle watchdog loop. Argument: the server pid it is allowed to stop.
 cmd_watchdog() {
     local pid="$1" idle_s=$(( SYSTEM_ONE_IDLE_MINUTES * 60 )) last now
     while sleep 60; do
-        # the pid must still be ours (alive, laya-serve) and the pid file must
-        # still name it, else a newer start owns the server or the pid was reused
+        # the pid must still be ours (alive, one of our server shapes) and the
+        # pid file must still name it, else a newer start owns the server or
+        # the pid was reused
         [[ -r "$pid_file" && "$(<"$pid_file")" == "$pid" ]] || exit 0
         server_alive || break
         last=$(zstat +mtime "$last_request" 2>/dev/null || print 0)
         now=$EPOCHSECONDS
         if (( now - last >= idle_s )); then
-            kill "$pid" 2>/dev/null || true
+            kill_server_tree "$pid" || true
             rm -f -- "$pid_file"
             print "$(strftime '%Y-%m-%dT%H:%M:%S' "$now") system-one: idle for ${SYSTEM_ONE_IDLE_MINUTES}m, stopped pid $pid"
             break
@@ -293,8 +534,23 @@ cmd_stop() {
     local stopped=0 pid
     if server_alive; then
         pid=$(<"$pid_file")
-        kill "$pid" 2>/dev/null && stopped=1
-        print "system-one: stopped server pid $pid"
+        local kind
+        kind=$(server_kind_running)
+        kill_server_tree "$pid" && stopped=1
+        # Wait for the pid to go, up to 10 s: `stop` then `start` is the
+        # documented way to switch backends or checkpoints, and a start that
+        # runs while the old process is still unwinding finds the port
+        # answering and refuses. Our own pid, checked by kill -0 only.
+        local i
+        for i in {1..100}; do
+            kill -0 "$pid" 2>/dev/null || break
+            sleep 0.1
+        done
+        if kill -0 "$pid" 2>/dev/null; then
+            print "system-one: stopped server pid $pid ($kind), still exiting after 10 s"
+        else
+            print "system-one: stopped server pid $pid ($kind)"
+        fi
     fi
     if watchdog_alive; then
         pid=$(<"$watchdog_pid_file")
@@ -306,12 +562,31 @@ cmd_stop() {
 }
 
 cmd_status() {
-    migrate_shadow
-    local h lines=0
+    migrate_shadow_layout
+    local h lines=0 model_desc device loaded
+    if [[ "$SYSTEM_ONE_BACKEND" == kev ]]; then
+        model_desc="$SYSTEM_ONE_KEV_MODEL"
+    elif [[ -n "${SYSTEM_ONE_MODEL_DIR:-}" ]]; then
+        model_desc="english (published) + $SYSTEM_ONE_MODEL_NAME ($SYSTEM_ONE_MODEL_DIR)"
+    else
+        model_desc="english (published)"
+    fi
+    print "backend:  $SYSTEM_ONE_BACKEND"
+    print "model:    $model_desc"
     if server_alive; then
         h=$(health)
         if [[ -n "$h" ]]; then
-            print "server:   running, pid $(<"$pid_file"), :$SYSTEM_ONE_PORT, device $(print -r -- "$h" | jq -r '.device // "?"'), loaded $(print -r -- "$h" | jq -c '.loaded // []')"
+            if [[ "$SYSTEM_ONE_BACKEND" == kev ]]; then
+                device=$(print -r -- "$h" | jq -r '.models[0].device // "?"')
+                loaded=$(print -r -- "$h" | jq -c '[.models[]?.name] // []')
+            else
+                device=$(print -r -- "$h" | jq -r '.device // "?"')
+                # /health's loaded list names the models as they are asked
+                # for: "english" and, when the shim serves one, the
+                # checkpoint under SYSTEM_ONE_MODEL_NAME.
+                loaded=$(print -r -- "$h" | jq -c '.loaded // []')
+            fi
+            print "server:   running, pid $(<"$pid_file"), :$SYSTEM_ONE_PORT, device $device, loaded $loaded"
         else
             print "server:   pid $(<"$pid_file") alive on :$SYSTEM_ONE_PORT but /health not answering (still loading?)"
         fi
@@ -325,13 +600,22 @@ cmd_status() {
     fi
     print "mode:     $SYSTEM_ONE_MODE"
     print "config:   $config_file$( (( config_present )) || print ' (missing)')"
-    local -a shadow_files=("$shadow_dir"/*.jsonl(N))
-    (( ${#shadow_files} )) && lines=$(cat -- "${shadow_files[@]}" | wc -l | tr -d ' ')
-    print "shadow:   $shadow_dir (${#shadow_files} session file(s), $lines lines)"
+    local -a hook_dirs=("$shadow_dir"/*(N/))
+    local total_files=0
+    for d in "${hook_dirs[@]}"; do
+        local -a files=("$d"/*.jsonl(N))
+        local n=${#files}
+        (( n )) || continue
+        local hlines=$(cat -- "${files[@]}" | wc -l | tr -d ' ')
+        total_files=$(( total_files + n ))
+        lines=$(( lines + hlines ))
+        print "shadow:   ${d:t}: $n session file(s), $hlines lines"
+    done
+    (( ${#hook_dirs} )) || print "shadow:   $shadow_dir (empty)"
 }
 
 cmd_ask() {
-    local file="" hook="" session="" threshold="" gate="" would_act="" acted="false" keep_state=0 fail_open=0
+    local file="" hook="" session="" threshold="" gate="" would_act="" acted="false" keep_state=0 fail_open=0 extra="{}" model=""
     while (( $# )); do
         case "$1" in
             --file) file="$2"; shift 2 ;;
@@ -341,6 +625,8 @@ cmd_ask() {
             --gate) gate="$2"; shift 2 ;;
             --would-act) would_act="$2"; shift 2 ;;
             --acted) acted="$2"; shift 2 ;;
+            --extra) extra="$2"; shift 2 ;;
+            --model) model="$2"; shift 2 ;;
             --keep-state) keep_state=1; shift ;;
             --fail-open) fail_open=1; shift ;;
             -h|--help) usage; return 0 ;;
@@ -357,7 +643,18 @@ cmd_ask() {
     else
         req=$(cat)
     fi
-    body=$(print -r -- "$req" | jq -c '. + {model: (.model // "english")}' 2>/dev/null) || fail "request is not valid JSON"
+    # --model names the model ("english", or SYSTEM_ONE_MODEL_NAME's value,
+    # e.g. "full-v1"; default english) and goes out as the request's "model"
+    # field unchanged: system-one-serve.py registers the checkpoint under that
+    # very name in laya's model registry, so the server, the response, the
+    # printed JSON and the shadow-log row all agree on one name. A name the
+    # server does not hold (a typo, or the checkpoint name while laya-serve
+    # alone is running) is treated by laya as a foreign model id and
+    # auto-routed; the response's routing.model says which checkpoint
+    # actually answered, and a mismatch is a failure below (no log row), so a
+    # row can never claim a model that did not answer it.
+    local requested_model="${model:-english}"
+    body=$(print -r -- "$req" | jq -c --arg m "$requested_model" '. + {model: $m}' 2>/dev/null) || fail "request is not valid JSON"
     [[ -n "$body" ]] || fail "empty request"
 
     mkdir -p "$state_dir" 2>/dev/null || true
@@ -370,6 +667,12 @@ cmd_ask() {
     latency_ms=$(( (t1 - t0) * 1000 ))
     latency_ms=${latency_ms%.*}
     print -r -- "$resp" | jq -e '.answers' >/dev/null 2>&1 || fail "response has no answers: $resp"
+    # laya records the checkpoint that answered in routing.model (kev sends no
+    # routing key, so the check only applies when it is there).
+    local served_model
+    served_model=$(print -r -- "$resp" | jq -r '.routing.model // empty' 2>/dev/null)
+    [[ -z "$served_model" || "$served_model" == "$requested_model" ]] \
+        || fail "asked for model $requested_model but the server answered with $served_model (is it loaded there? see \`system-one status\`)"
 
     # would_act: explicit flag, else the gate (only the questions it names, each
     # at its own threshold; a choice question on the summed probability of its
@@ -396,32 +699,42 @@ cmd_ask() {
     [[ -n "$would_act" ]] || would_act=false
 
     local out
-    out=$(print -r -- "$resp" | jq -c --argjson w "$would_act" --argjson f "$fired" '. + {would_act: $w, fired: $f}')
+    out=$(print -r -- "$resp" | jq -c --argjson w "$would_act" --argjson f "$fired" --arg m "$requested_model" \
+        '. + {would_act: $w, fired: $f, model: $m}')
     print -r -- "$out"
 
     if [[ -n "$hook" ]]; then
-        local state sha len state_field sess_file shadow_file
-        mkdir -p "$shadow_dir" 2>/dev/null || true
+        local state sha len state_field sess_file hook_dir shadow_file ts id
+        hook_dir="$shadow_dir/$(hook_file_id "$hook")"
+        mkdir -p "$hook_dir" 2>/dev/null || true
         sess_file=$(session_file_id "$session")
-        shadow_file="$shadow_dir/$sess_file.jsonl"
+        shadow_file="$hook_dir/$sess_file.jsonl"
         state=$(print -r -- "$body" | jq -r '.state // ""')
         sha=$(print -rn -- "$state" | shasum -a 256 | cut -d' ' -f1)
         len=${#state}
+        ts="$(strftime '%Y-%m-%dT%H:%M:%S%z' "$EPOCHSECONDS")"
+        # Row id: ts, the state sha's first 8 hex characters and this
+        # wrapper's pid. ts and sha alone collided in practice: the Stop hook
+        # asks two questions of the identical state in the same second from
+        # two wrapper processes (found in review, 3 duplicate ids in the live
+        # stop log), so the pid is what tells those two rows apart.
+        id="${ts}-${sha[1,8]}-$$"
         if (( keep_state )); then
             state_field=$(jq -cn --arg s "$state" '{state: $s}')
         else
             state_field=$(jq -cn --arg s "${state[1,80]}" '{state_excerpt: $s}')
         fi
         jq -cn \
-            --arg ts "$(strftime '%Y-%m-%dT%H:%M:%S%z' "$EPOCHSECONDS")" \
+            --arg ts "$ts" --argjson ts_epoch "$EPOCHSECONDS" --arg id "$id" \
             --arg hook "$hook" --arg session "$session" --arg mode "$SYSTEM_ONE_MODE" \
+            --arg model "$requested_model" \
             --argjson latency "$latency_ms" --arg sha "$sha" --argjson len "$len" \
             --argjson answers "$(print -r -- "$resp" | jq -c '.answers')" \
             --argjson would_act "$would_act" --argjson acted "$acted" --argjson fired "$fired" \
-            --argjson extra "$state_field" \
-            '{ts: $ts, hook: $hook, session_id: $session, mode: $mode, latency_ms: $latency,
+            --argjson extra "$state_field" --argjson more "$extra" \
+            '{ts: $ts, ts_epoch: $ts_epoch, id: $id, hook: $hook, session_id: $session, mode: $mode, model: $model, latency_ms: $latency,
               state_sha256: $sha, state_len: $len, answers: $answers, would_act: $would_act,
-              acted: $acted, fired: $fired} + $extra' >>"$shadow_file" 2>/dev/null || true
+              acted: $acted, fired: $fired} + $extra + $more' >>"$shadow_file" 2>/dev/null || true
     fi
 }
 
@@ -431,33 +744,61 @@ cmd_roster() {
 }
 
 cmd_shadow_report() {
-    local n=10 session_filter=""
+    local n=10 session_filter="" hook_filter=""
     while (( $# )); do
         case "$1" in
             -n) n="$2"; shift 2 ;;
             --session) session_filter="$2"; shift 2 ;;
+            --hook) hook_filter="$2"; shift 2 ;;
             -h|--help) usage; return 0 ;;
             *) die "shadow-report: unknown option $1" ;;
         esac
     done
-    migrate_shadow
-    local -a files
-    if [[ -n "$session_filter" ]]; then
-        files=("$shadow_dir/$(session_file_id "$session_filter").jsonl"(N))
-    else
-        files=("$shadow_dir"/*.jsonl(N))
+    migrate_shadow_layout
+
+    _report_files() {
+        # prints one report for the given file list, or nothing if empty
+        local label="$1"; shift
+        local -a files=("$@")
+        (( ${#files} )) || { print "  (empty)"; return 0; }
+        print "$label (${#files} file(s))"
+        jq -rs --argjson n "$n" '
+            def pct(p): sort | .[ ((length - 1) * p | round) ];
+            "  calls: \(length)   mode: \(map(.mode) | unique | join(","))",
+            (group_by(.hook)[] |
+                "    \(.[0].hook): \(length) calls, would_act \(map(select(.would_act)) | length) (\(100 * (map(select(.would_act)) | length) / length | round)%), acted \(map(select(.acted)) | length), latency p50 \(map(.latency_ms) | pct(0.5)) ms p95 \(map(.latency_ms) | pct(0.95)) ms"),
+            "  last \($n) would_act=true:",
+            (map(select(.would_act)) | .[-$n:][] |
+                "    \(.ts) \(.hook) fired=\([.fired[]? | "\(.q)=\(.value * 100 | round / 100)"] | join(",")) :: \((.state // .state_excerpt // "") | split("\n") | map(select(startswith("cwd:") or . == "command:" | not)) | join(" ") | .[0:100])")
+        ' "${files[@]}"
+    }
+
+    if [[ -n "$hook_filter" ]]; then
+        local hdir="$shadow_dir/$(hook_file_id "$hook_filter")"
+        local -a files
+        if [[ -n "$session_filter" ]]; then
+            files=("$hdir/$(session_file_id "$session_filter").jsonl"(N))
+        else
+            files=("$hdir"/*.jsonl(N))
+        fi
+        _report_files "shadow log: $hdir${session_filter:+ (session $session_filter)}" "${files[@]}"
+        return 0
     fi
-    (( ${#files} )) || { print "shadow log is empty: $shadow_dir${session_filter:+ (session $session_filter)}"; return 0; }
-    print "shadow log: $shadow_dir${session_filter:+ (session $session_filter)} (${#files} file(s))"
-    jq -rs --argjson n "$n" '
-        def pct(p): sort | .[ ((length - 1) * p | round) ];
-        "calls: \(length)   mode: \(map(.mode) | unique | join(","))",
-        (group_by(.hook)[] |
-            "  \(.[0].hook): \(length) calls, would_act \(map(select(.would_act)) | length) (\(100 * (map(select(.would_act)) | length) / length | round)%), acted \(map(select(.acted)) | length), latency p50 \(map(.latency_ms) | pct(0.5)) ms p95 \(map(.latency_ms) | pct(0.95)) ms"),
-        "last \($n) would_act=true:",
-        (map(select(.would_act)) | .[-$n:][] |
-            "  \(.ts) \(.hook) fired=\([.fired[]? | "\(.q)=\(.value * 100 | round / 100)"] | join(",")) :: \((.state // .state_excerpt // "") | split("\n") | map(select(startswith("cwd:") or . == "command:" | not)) | join(" ") | .[0:100])")
-    ' "${files[@]}"
+
+    if [[ -n "$session_filter" ]]; then
+        # no --hook: every hook directory's copy of this session
+        local -a files=("$shadow_dir"/*/"$(session_file_id "$session_filter").jsonl"(N))
+        _report_files "shadow log: $shadow_dir (session $session_filter, every hook)" "${files[@]}"
+        return 0
+    fi
+
+    # default: report per hook
+    local -a hook_dirs=("$shadow_dir"/*(N/))
+    (( ${#hook_dirs} )) || { print "shadow log is empty: $shadow_dir"; return 0; }
+    local d
+    for d in "${hook_dirs[@]}"; do
+        _report_files "shadow log: ${d:t}" "$d"/*.jsonl(N)
+    done
 }
 
 cmd_install() {
