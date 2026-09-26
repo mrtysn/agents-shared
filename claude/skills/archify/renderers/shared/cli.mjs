@@ -12,6 +12,7 @@ import { resolveLocale, translateMessage } from './i18n.mjs';
 installRendererDiagnosticBoundary();
 
 const outputPathGuards = new Map();
+const detailsByOutput = new Map();
 
 // Common CLI head: node render-<type>.mjs [input.json] [output.html]
 // Keep this synchronous because callers also use it to establish the guarded
@@ -35,6 +36,7 @@ export function loadDiagram({ rendererDir, diagramType, defaultExample, argv = p
   };
   const { outputPath: outPath } = resolveOutputPath(outputRequest);
   outputPathGuards.set(outPath, outputRequest);
+  detailsByOutput.set(outPath, collectDetails(diagramType, diagram));
   return { diagram, template, outPath, sourceEvidence };
 }
 
@@ -64,8 +66,10 @@ export function writeDiagram({ outPath, template, diagramType, meta, svg, cards,
     visualPreset: meta.visual_preset || 'classic',
     guidedViews: meta.views || [],
     sourceEvidence,
+    details: detailsByOutput.get(outPath) || null,
   }));
   outputPathGuards.delete(outPath);
+  detailsByOutput.delete(outPath);
   console.log(outPath);
 }
 
@@ -84,6 +88,22 @@ const RELATIONSHIP_COLLECTIONS = {
   dataflow: 'flows',
   lifecycle: 'transitions',
 };
+
+// Details on demand travel beside the SVG, never inside it, so canonical
+// exports and share cards stay byte-identical whether or not an author wrote
+// them. Relationships are keyed by authored index, which every renderer
+// already emits as data-edge-key.
+export function collectDetails(diagramType, diagram) {
+  const nodes = {};
+  const relationships = {};
+  (diagram[SEMANTIC_COLLECTIONS[diagramType]] || []).forEach((item) => {
+    if (item && item.detail) nodes[item.id] = item.detail;
+  });
+  (diagram[RELATIONSHIP_COLLECTIONS[diagramType]] || []).forEach((item, index) => {
+    if (item && item.detail) relationships[String(index)] = item.detail;
+  });
+  return Object.keys(nodes).length || Object.keys(relationships).length ? { nodes, relationships } : null;
+}
 
 // Relationship IDs are optional for backwards compatibility, but once an
 // author supplies one it becomes the durable identity used by viewer links.

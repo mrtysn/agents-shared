@@ -37,6 +37,17 @@ Use this bounded path for ordinary generation. Do not read the optional Viewer R
 
    A non-zero exit can never be described as success. A failed delivery preserves any previous output, so do not run `visual-check` on that path: it would inspect the stale last-good artifact, not the failed candidate. If validation fails, change only the diagnosed `subject`, verify `evidence`, choose from `supportedFixes`, and rerun. Continue focused correction while the objective error count reaches a new minimum. If two consecutive rounds do not improve that best count, stop and report the unresolved diagnostics truthfully.
 
+<!-- LOCAL: depth and grouping; the passport otherwise repeats the node plus metadata -->
+## Depth and grouping
+
+- **No subject, ask.** A bare invocation gets an AskUserQuestion for what to draw; never default to what this session just built.
+- **Name the question and its axis first**: runtime dependency, data custody, deployment, ownership, or directory layout (only when asked). Boundaries, lanes and stages follow that axis, not the folder tree. Edges that cross groups are the finding; keep them. A diagram whose point is coupling (fan-in, shared hubs) may run `quality_profile: "standard"`, since showcase counts shared corridors as errors.
+- **Every node and edge takes `detail`** (`{summary, points[≤6], links[≤4]}`, shown on click, kept out of the SVG, so it costs no layout). Give `summary` (≤320 chars: what it is, why it is here) to every node whose passport would otherwise only repeat its label; add `points` for the non-obvious facts: responsibilities, owned state, inputs/outputs, invariants, failure mode. Give an edge `detail` when its label compresses a mechanism.
+- **Repository subjects** (architecture only): declare `meta.repository`, attach 1–3 `sources` per node, and render with `--repo-root`; see *Repository evidence* in the authoring contract.
+- **Beyond ~12 primary nodes, split; never a flat wall.** Deliver an overview as `YYYY-MM-DD-<slug>/index.html` plus one drill-down per group beside it, linked through `detail.links` (`{"label": "Open inside", "href": "<group>.html#focus=<id>"}`) and back. Each drill-down keeps its outside neighbours as `external` nodes so cross-group coupling stays visible.
+- **Cards hold only facts that belong to no single node**; per-node narrative goes in that node's `detail`. `meta.views[].note` narrates a chapter; sequence and lifecycle `note` annotate one message or transition.
+<!-- LOCAL END -->
+
 ## Update awareness
 
 After the first candidate exists, run the packaged checker `scripts/check-update.mjs` once with Node and continue the requested workflow. If the command cannot run, continue without mentioning the check.

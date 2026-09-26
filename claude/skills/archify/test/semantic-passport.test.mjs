@@ -97,3 +97,55 @@ test('Node Finder searches and presents the same passport facts', () => {
 });
 
 process.on('exit', () => fs.rmSync(tmp, { recursive: true, force: true }));
+
+const DETAIL_COLLECTIONS = {
+  architecture: ['components', 'connections'],
+  workflow: ['nodes', 'edges'],
+  sequence: ['participants', 'messages'],
+  dataflow: ['nodes', 'flows'],
+  lifecycle: ['states', 'transitions'],
+};
+
+function renderAuthored(mode, diagram, name) {
+  const input = path.join(tmp, `${name}.json`);
+  const output = path.join(tmp, `${name}.html`);
+  fs.writeFileSync(input, JSON.stringify(diagram));
+  execFileSync(process.execPath, [path.join(skillRoot, `renderers/${mode}/render-${mode}.mjs`), input, output], { stdio: 'pipe' });
+  return fs.readFileSync(output, 'utf8');
+}
+
+test('authored details travel beside the SVG, keyed by node id and relationship key', () => {
+  for (const [mode, example] of Object.entries(CASES)) {
+    const [nodeCollection, relationCollection] = DETAIL_COLLECTIONS[mode];
+    const diagram = JSON.parse(fs.readFileSync(path.join(skillRoot, 'examples', example), 'utf8'));
+    const plain = renderAuthored(mode, diagram, `${mode}-plain`);
+    const node = diagram[nodeCollection][0];
+    const lastIndex = diagram[relationCollection].length - 1;
+    const relation = diagram[relationCollection][lastIndex];
+    node.detail = { summary: `Why ${node.id} exists`, points: ['Owns one fact'], links: [{ label: 'Open inside', href: `inner.html#focus=${node.id}` }] };
+    relation.detail = { summary: 'What crosses this edge' };
+    const html = renderAuthored(mode, diagram, `${mode}-detail`);
+
+    assert.equal(svg(html), svg(plain), `${mode}: details must not change the canonical SVG`);
+    assert.doesNotMatch(plain, /id="archify-details-data"/, `${mode}: no blob without authored details`);
+    const blob = JSON.parse(html.match(/<script id="archify-details-data" type="application\/json">([^<]*)<\/script>/)[1]);
+    assert.deepEqual(blob.nodes[node.id], node.detail, mode);
+    assert.deepEqual(blob.relationships[String(lastIndex)], relation.detail, mode);
+    const keyed = new RegExp(`data-edge-from="${relation.from}" data-edge-to="${relation.to}"[^>]*data-edge-key="${lastIndex}"`);
+    assert.match(svg(html), keyed, `${mode}: relationship key must match authored index`);
+  }
+});
+
+test('detail links reject script and data URLs at validation time', () => {
+  const diagram = JSON.parse(fs.readFileSync(path.join(skillRoot, 'examples', CASES.architecture), 'utf8'));
+  diagram.components[0].detail = { links: [{ label: 'x', href: 'javascript:alert(1)' }] };
+  assert.throws(() => renderAuthored('architecture', diagram, 'architecture-bad-link'), /must match pattern/);
+});
+
+test('viewer renders authored details as the passport lead and demotes metadata', () => {
+  const html = render('architecture', CASES.architecture);
+  assert.match(html, /<div class="semantic-passport-notes" id="focus-notes" hidden/);
+  assert.match(html, /Archify\.details = \(function/);
+  assert.match(html, /\.focus-chip\[data-has-notes="true"\] \.semantic-passport-meta/);
+  assert.match(html, /function safeHref\(href\)/);
+});
