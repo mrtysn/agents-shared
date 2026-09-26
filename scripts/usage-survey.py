@@ -622,6 +622,347 @@ def print_text(agg, samples):
             print(f"  {b['script']}: {b['msg'][:90]}  <- {(b['action'] or '')[:50]}")
 
 
+SIMPLIFY_RE = re.compile(
+    r"\b(simpler|simplify|shorter|plainer|too long|less verbose|just answer|"
+    r"be brief|tl;?dr|shorten|too much|less detail|more concise|too verbose)\b",
+    re.IGNORECASE,
+)
+
+# --------------------------------------------------------- AskUserQuestion dump
+
+# The tool_result Claude Code synthesises for an answered AskUserQuestion call:
+#   The user answered: "Q1"="A1", "Q2"="A2". Read the answers carefully ...
+# An unanswered item in a multi-question call reads
+#   "Q"=(no option selected) notes: <free text>
+# so the value side is either a quoted string or that bare marker plus
+# whatever notes follow it up to the next `, "` or the trailing sentence.
+ASK_QA_RE = re.compile(
+    r'"((?:[^"\\]|\\.)*)"\s*=\s*(?:"((?:[^"\\]|\\.)*)"'
+    r'|(\(no option selected\)(?:\s*notes:\s*.*?)?)(?=,\s*"|\.\s*Read the answers|\s*$))',
+    re.S,
+)
+ROUTINE_ANSWER_RE = re.compile(
+    r"\b(just do (it|that|whatever)|whatever you (think|want|prefer|say)|"
+    r"you decide|your call|up to you|i don'?t (care|mind)|"
+    r"whichever( you (prefer|think))?|go with (the )?(recommend|first|default)|"
+    r"do what you think( is best)?)\b",
+    re.IGNORECASE,
+)
+NAMING_OR_IRREVERSIBLE_RE = re.compile(
+    r"\b(name|naming|alias|rename|call it|hostname|branch name|file ?name|"
+    r"directory name|repo name|commit message|delete|remove|discard|drop|"
+    r"commit|push|publish|send|share|email|post|overwrite|force[- ]?push|"
+    r"merge|deploy|destroy|wipe)\b",
+    re.IGNORECASE,
+)
+ASK_ROW_KEYS = ("answered_in_context", "routine_default", "naming_or_irreversible", "options_complete",
+                "call", "index", "count", "project", "question_json", "answer", "recent")
+ASK_NOT_A_PROMPT_RE = re.compile(r"\[Request interrupted|Base directory for this skill:|This session is being continued")
+ASK_RECENT_PROMPTS = 5      # prompts kept per row; the harness cuts to state.recent_prompts
+ASK_RECENT_CHARS = 600      # last chars kept per message; the harness cuts to state.recent_chars
+
+
+def _ask_option_labels(options):
+    return [re.sub(r"\s*\(recommended\)\s*", "", (o.get("label") or ""), flags=re.I).strip()
+            for o in options]
+
+
+def _options_complete(answer, options):
+    """Heuristic for the options_complete gold label: 1 unless the answer reads
+    as free text that does not match any offered option (the survey's "answered
+    outside the offered options" cases)."""
+    ans_low = answer.lower()
+    ans_words = set(re.findall(r"[a-z0-9]+", ans_low))
+    for label in _ask_option_labels(options):
+        low = label.lower()
+        if not low:
+            continue
+        if low in ans_low or ans_low in low:
+            return 1
+        label_words = {w for w in re.findall(r"[a-z0-9]+", low) if len(w) > 2}
+        if label_words and len(label_words & ans_words) / len(label_words) >= 0.6:
+            return 1
+    return 0
+
+
+def _answered_in_context(answer, recent_text):
+    """Heuristic: does the answer's content already appear in the last 3 user
+    prompts (the user stated it before being asked)?"""
+    ans_words = {w for w in re.findall(r"[a-z0-9]{4,}", answer.lower())}
+    if not ans_words:
+        return 0
+    recent_low = recent_text.lower()
+    hits = sum(1 for w in ans_words if w in recent_low)
+    return 1 if hits >= max(2, len(ans_words) * 0.5) else 0
+
+
+def _routine_default(answer):
+    a = answer.strip()
+    # A bare pick of the recommended option, copied with its "(Recommended)"
+    # suffix and no added commentary, is the conventional-default case (a
+    # senior engineer would have picked it without asking); a longer answer
+    # ending the same way still carries its own reasoning and is not this.
+    if a.lower().endswith("(recommended)") and len(a) < 60:
+        return 1
+    return 1 if ROUTINE_ANSWER_RE.search(a) else 0
+
+
+def _naming_or_irreversible(question):
+    text = (question.get("question") or "") + " " + (question.get("header") or "")
+    return 1 if NAMING_OR_IRREVERSIBLE_RE.search(text) else 0
+
+
+def _flat(text):
+    """One-line cell text: tabs and newlines escaped, the home directory
+    scrubbed to ~ so a cases file never carries a machine path."""
+    return text.replace("\t", " ").replace("\n", "\\n").replace(os.path.expanduser("~"), "~")
+
+
+def _dump_asks_from(path, slug):
+    """Yields one row dict per question of every answered AskUserQuestion call
+    in one transcript (an ask the user rejected with Escape has no answer and
+    is skipped). Heuristic labels only, same convention as _dump_one for
+    --dump-prompts/--dump-stops: regex over the answer text and the
+    question/header text, not a hand-graded pass over every row. The call id
+    groups a multi-question call's rows so a whole-ask measurement can
+    rebuild the call."""
+    try:
+        fh = open(path, encoding="utf-8", errors="replace")
+    except OSError:
+        return
+    with fh:
+        lines = fh.readlines()
+    parsed = []
+    for line in lines:
+        try:
+            parsed.append(json.loads(line))
+        except json.JSONDecodeError:
+            parsed.append(None)
+
+    recent_prompts = collections.deque(maxlen=ASK_RECENT_PROMPTS)
+    last_assistant_text = ""
+    session = os.path.basename(path)[:-6][:8]
+    for i, e in enumerate(parsed):
+        if e is None:
+            continue
+        t = e.get("type")
+        msg = e.get("message") or {}
+        content = msg.get("content")
+        if t == "user":
+            if isinstance(content, str) or (
+                isinstance(content, list) and content and all(
+                    isinstance(b, dict) and b.get("type") == "text" for b in content)
+            ):
+                text = text_of(content).strip()
+                # Typed prompts only: skip harness markers, skill expansions
+                # and interrupt notices, which the user did not write.
+                if text and not text.startswith("<") and not ASK_NOT_A_PROMPT_RE.match(text):
+                    recent_prompts.append(text)
+            continue
+        if t != "assistant" or not isinstance(content, list):
+            continue
+        for b in content:
+            if not isinstance(b, dict):
+                continue
+            if b.get("type") == "text":
+                txt = b.get("text") or ""
+                if txt.strip():
+                    last_assistant_text = txt
+                continue
+            if b.get("type") != "tool_use" or b.get("name") != "AskUserQuestion":
+                continue
+            questions = (b.get("input") or {}).get("questions") or []
+            if not questions:
+                continue
+            tool_id = b.get("id")
+            # The matching tool_result is usually the next user entry, but a
+            # progress or sidechain entry can sit between; search a bounded
+            # window and stop at the entry that carries this id.
+            answer_text = ""
+            for j in range(i + 1, min(i + 40, len(parsed))):
+                e2 = parsed[j]
+                if not e2 or e2.get("type") != "user":
+                    continue
+                c2 = (e2.get("message") or {}).get("content")
+                if not isinstance(c2, list):
+                    continue
+                for bb in c2:
+                    if isinstance(bb, dict) and bb.get("type") == "tool_result" \
+                            and bb.get("tool_use_id") == tool_id:
+                        rc = bb.get("content")
+                        answer_text = rc if isinstance(rc, str) else text_of(rc) or json.dumps(rc)
+                if answer_text:
+                    break
+            if not answer_text:
+                continue
+            pairs = ASK_QA_RE.findall(answer_text)
+            if len(pairs) != len(questions):
+                continue
+            answers = [(a if a else marker).strip() for _q, a, marker in pairs]
+            recent_text = "\n".join(list(recent_prompts)[-3:])
+            recent_excerpt = "\\n".join("user: " + _flat(p[-ASK_RECENT_CHARS:]) for p in recent_prompts)
+            if last_assistant_text.strip():
+                recent_excerpt += ("\\n" if recent_excerpt else "") + \
+                    "assistant: " + _flat(last_assistant_text.strip()[-ASK_RECENT_CHARS:])
+            call = f"{session}-{(tool_id or '')[-6:]}"
+            for k, (q, a) in enumerate(zip(questions, answers)):
+                qjson = json.dumps({
+                    "question": q.get("question"), "header": q.get("header"),
+                    "multiSelect": bool(q.get("multiSelect")),
+                    "options": [{"label": o.get("label"), "description": o.get("description")}
+                                for o in (q.get("options") or [])],
+                }, ensure_ascii=False)
+                yield {
+                    "answered_in_context": _answered_in_context(a, recent_text),
+                    "routine_default": _routine_default(a),
+                    "naming_or_irreversible": _naming_or_irreversible(q),
+                    "options_complete": _options_complete(a, q.get("options") or []),
+                    "call": call, "index": k + 1, "count": len(questions),
+                    "project": slug_name(slug),
+                    "question_json": _flat(qjson), "answer": _flat(a),
+                    "recent": recent_excerpt,
+                }
+
+
+def dump_asks(project_filter=None):
+    for cfg in config_dirs():
+        projects = os.path.join(cfg, "projects")
+        if not os.path.isdir(projects):
+            continue
+        for slug in sorted(os.listdir(projects)):
+            if project_filter and project_filter.lower() not in slug.lower():
+                continue
+            pdir = os.path.join(projects, slug)
+            if not os.path.isdir(pdir):
+                continue
+            for entry in sorted(os.listdir(pdir)):
+                if entry.endswith(".jsonl"):
+                    yield from _dump_asks_from(os.path.join(pdir, entry), slug)
+
+
+def sample_asks(rows, n, seed):
+    """Stratified across projects, whole calls at a time: round-robin over the
+    projects (each shuffled by the seed) until at least n question rows are
+    taken, so a multi-question call is never split between sampled and not.
+    Deterministic for a given seed and transcript set."""
+    import random
+    by_project = collections.defaultdict(dict)
+    for r in rows:
+        by_project[r["project"]].setdefault(r["call"], []).append(r)
+    rng = random.Random(seed)
+    queues = {p: list(calls.values()) for p, calls in by_project.items()}
+    for q in queues.values():
+        rng.shuffle(q)
+    order = sorted(queues)
+    taken, count = [], 0
+    while count < n and any(queues.values()):
+        for p in order:
+            if not queues[p]:
+                continue
+            call = queues[p].pop()
+            taken.extend(call)
+            count += len(call)
+            if count >= n:
+                break
+    return taken
+
+
+def _dump_one(path, mode):
+    """Yields labelled rows from one transcript for --dump-prompts /
+    --dump-stops. Heuristic labels only (the same regex classifiers the rest
+    of this file already uses for classify_prompt and CORRECTION_RE), not a
+    hand-graded pass over every row -- see the system-one design doc section
+    10 for how these seed the hooks' test cases."""
+    last_assistant_text = ""
+    last_prompt_text = ""
+    try:
+        fh = open(path, encoding="utf-8", errors="replace")
+    except OSError:
+        return
+    with fh:
+        for line in fh:
+            try:
+                e = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            t = e.get("type")
+            msg = e.get("message") or {}
+            content = msg.get("content")
+            if t == "user":
+                if isinstance(content, str) or (
+                    isinstance(content, list) and content and all(
+                        isinstance(b, dict) and b.get("type") == "text" for b in content)
+                ):
+                    text = text_of(content).strip()
+                    if not text or text.startswith("<"):
+                        continue
+                    if mode == "prompts":
+                        head = " ".join(words(text.splitlines()[0])[:10])
+                        cm = CORRECTION_RE.search(head)
+                        cls = classify_prompt(text)
+                        if cm:
+                            kind = "correction"
+                        elif cls == "wish":
+                            kind = "wish"
+                        elif cls == "question":
+                            kind = "question"
+                        elif cls in ("ack", "slash", "url", "error-paste"):
+                            kind = "other"
+                        else:
+                            kind = "order"
+                        wants_action = 1 if kind in ("order", "correction") else 0
+                        clean = text[:200].replace("\t", " ").replace("\n", " ")
+                        prev = last_assistant_text[-600:].replace("\t", " ").replace("\n", "\\n")
+                        yield (kind, wants_action, clean, prev)
+                        # the prompt that led to a correction, labelled the same
+                        # heuristic way, per the design doc's request for the
+                        # "moment before" set
+                        if kind == "correction" and last_prompt_text:
+                            pcls = classify_prompt(last_prompt_text)
+                            if pcls == "wish":
+                                pkind = "wish"
+                            elif pcls == "question":
+                                pkind = "question"
+                            elif pcls in ("ack", "slash", "url", "error-paste"):
+                                pkind = "other"
+                            else:
+                                pkind = "order"
+                            pclean = last_prompt_text[:200].replace("\t", " ").replace("\n", " ")
+                            yield (pkind, 1 if pkind == "order" else 0, pclean, "")
+                    elif mode == "stops" and last_assistant_text:
+                        is_simplify = bool(SIMPLIFY_RE.search(text)) and len(words(text)) < 20
+                        yield ("padded" if is_simplify else "fitting", last_assistant_text, text[:160])
+                    last_prompt_text = text
+                continue
+            if t != "assistant" or not isinstance(content, list):
+                continue
+            for b in content:
+                if isinstance(b, dict) and b.get("type") == "text":
+                    txt = b.get("text") or ""
+                    if txt.strip():
+                        last_assistant_text = txt
+
+
+def dump_dataset(mode, project_filter=None):
+    """Streams labelled rows across every transcript under every config dir.
+    mode: 'prompts' (kind, wants_action, prompt<=200 chars, previous assistant
+    message's last 600 chars with newlines escaped as \\n) or 'stops'
+    ('padded'/'fitting', assistant message, the next prompt)."""
+    for cfg in config_dirs():
+        projects = os.path.join(cfg, "projects")
+        if not os.path.isdir(projects):
+            continue
+        for slug in sorted(os.listdir(projects)):
+            if project_filter and project_filter.lower() not in slug.lower():
+                continue
+            pdir = os.path.join(projects, slug)
+            if not os.path.isdir(pdir):
+                continue
+            for entry in sorted(os.listdir(pdir)):
+                if entry.endswith(".jsonl"):
+                    yield from _dump_one(os.path.join(pdir, entry), mode)
+
+
 def jsonable(obj):
     if isinstance(obj, collections.Counter):
         return dict(obj.most_common())
@@ -644,7 +985,40 @@ def main():
     ap.add_argument("--json", action="store_true", help="emit one JSON object instead of tables")
     ap.add_argument("--samples", type=int, default=0, help="print N sample corrections/judgments/blocks")
     ap.add_argument("--project", help="substring filter on the project slug")
+    ap.add_argument("--dump-prompts", action="store_true",
+                     help="stream kind<TAB>wants_action<TAB>prompt<TAB>previous rows for the system-one prompt-kind cases file, heuristically labelled, and exit")
+    ap.add_argument("--dump-stops", action="store_true",
+                     help="stream label<TAB>message rows (padded/fitting, newlines escaped, a # next: comment before each row naming the prompt that followed) for the system-one stop cases file, heuristically labelled, and exit")
+    ap.add_argument("--dump-asks", action="store_true",
+                     help="stream one row per AskUserQuestion question (columns: " + ", ".join(ASK_ROW_KEYS) +
+                          ") for the system-one ask cases file, heuristically labelled, and exit")
+    ap.add_argument("--sample", type=int, default=0, metavar="N",
+                     help="--dump-asks: keep about N question rows, whole calls, stratified across projects")
+    ap.add_argument("--seed", type=int, default=1, help="--sample: shuffle seed (default 1)")
     args = ap.parse_args()
+
+    if args.dump_prompts:
+        for kind, wants_action, prompt, prev in dump_dataset("prompts", args.project):
+            print(f"{kind}\t{wants_action}\t{prompt}\t{prev}")
+        return
+    if args.dump_asks:
+        rows = list(dump_asks(args.project))
+        if args.sample:
+            rows = sample_asks(rows, args.sample, args.seed)
+        for r in rows:
+            print("\t".join(str(r[k]) for k in ASK_ROW_KEYS))
+        return
+    if args.dump_stops:
+        # Newlines are escaped as a literal backslash-n so the message's
+        # structure (tables, headers, bullets) survives the one-row-per-line
+        # file; readers unescape. Every row is preceded by a comment naming
+        # the prompt that followed the message (the one that labelled it), so
+        # a hand audit can tell a shape complaint from a content one.
+        for label, message, nxt in dump_dataset("stops", args.project):
+            if nxt:
+                print(f"# next: {nxt.replace(chr(9), ' ').replace(chr(10), ' ')}")
+            print(f"{label}\t{message.replace(chr(9), ' ').replace(chr(10), '\\n')}")
+        return
 
     since = None
     if args.since:
