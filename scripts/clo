@@ -328,10 +328,11 @@ recent_run() {
 search_rows() {
     [[ -s "$CLO_RUN/search.json" ]] || return 0
     local dim=$'\e[2m' off=$'\e[0m' id at cwd topic n t i fw=0 folder count
-    local -a ids ats folders topics ns ts
+    local -a ids ats folders topics ns ts counts
+    local cw=0
     while IFS=$'\x1f' read -r id at cwd topic n t; do
         folder="${cwd:t}"; [[ "$cwd" == "$HOME" ]] && folder="~"
-        (( ${#topic} > 60 )) && topic="${topic[1,59]}…"
+        (( ${#topic} > 120 )) && topic="${topic[1,119]}…"
         ids+=("$id") ats+=("$at") folders+=("$folder") topics+=("$topic") ns+=("$n") ts+=("$t")
         (( ${#folder} > fw )) && fw=${#folder}
     done < <(jq -r --slurpfile snap "$CLO_SNAPSHOT" "$known_jq"'
@@ -343,13 +344,21 @@ search_rows() {
            (.match_count | tostring),
            (if .title_match then "1" else "" end)]
         | join("\u001f")' "$CLO_RUN/search.json" 2>/dev/null)
-    (( fw > 24 )) && fw=24
+    # The topic goes last, so it gets the rest of the width and fzf cuts only it.
+    (( fw > 16 )) && fw=16
     for (( i = 1; i <= $#ids; i++ )); do
         count=""
         (( ns[$i] > 0 )) && count="${ns[$i]} $( (( ns[$i] == 1 )) && print hit || print hits)"
-        [[ -n "${ts[$i]}" ]] && count="in title${count:+ · $count}"
-        printf 'hit:%s\t%s%-4s%s %-*s  %s  %s%s%s\n' "${ids[$i]}" "$dim" "$(ago "${ats[$i]}")" "$off" \
-            "$fw" "${folders[$i][1,$fw]}" "${topics[$i]}" "$dim" "$count" "$off"
+        [[ -n "${ts[$i]}" ]] && count="title${count:+ · $count}"
+        counts+=("$count")
+        (( ${#count} > cw )) && cw=${#count}
+    done
+    local gap=""
+    (( cw > 0 )) && gap="  "
+    for (( i = 1; i <= $#ids; i++ )); do
+        (( ${#folders[$i]} > fw )) && folders[$i]="${folders[$i][1,$(( fw - 1 ))]}…"
+        printf 'hit:%s\t%s%-4s%s %-*s  %s%-*s%s%s%s\n' "${ids[$i]}" "$dim" "$(ago "${ats[$i]}")" "$off" \
+            "$fw" "${folders[$i]}" "$dim" "$cw" "${counts[$i]}" "$off" "$gap" "${topics[$i]}"
     done
 }
 
@@ -360,7 +369,7 @@ recent_header() {
     if [[ -z "$n" ]]; then
         print -r -- "recent sessions: $(tail -n 1 "$CLO_RUN/search.err" 2>/dev/null || print "the listing failed")"
     else
-        print -r -- "$n sessions, most recently active first$( (( n > 200 )) && print " · newest 200 shown") · type to filter · Enter reopens one"
+        print -r -- "$n sessions · newest first$( (( n > 200 )) && print ", 200 shown")"
     fi
 }
 
@@ -377,8 +386,8 @@ search_header() {
         n="$(jq -r '.total' "$CLO_RUN/search.json")"
         case "$n" in
             0) print -r -- "no session mentions “$term”" ;;
-            1) print -r -- "1 session mentions “$term” · Enter reopens it" ;;
-            *) print -r -- "$n sessions mention “$term”$( (( n > 50 )) && print " · newest 50 shown") · Enter reopens one" ;;
+            1) print -r -- "1 session mentions “$term”" ;;
+            *) print -r -- "$n sessions mention “$term”$( (( n > 50 )) && print ", best 50 shown")" ;;
         esac
     fi
 }
@@ -481,10 +490,11 @@ header_text() {
 # the line, so it goes last. The search step types a term rather than filtering
 # rows, and wants a wider, wrapping side pane for the matches.
 show_actions() {
-    local mode="enable-search+change-ghost()+change-preview-window(40%,nowrap)"
+    local mode="enable-search+change-ghost()+change-preview-window(right,40%,border-left,nowrap)"
     case "$(run_get step)" in
-        search) mode="disable-search+change-ghost(type to search every session)+change-preview-window(60%,wrap)" ;;
-        recent) mode="enable-search+change-ghost(type to filter)+change-preview-window(60%,wrap)" ;;
+        # Session rows need the full width; the pane goes underneath them.
+        search) mode="disable-search+change-ghost(type to search every session)+change-preview-window(down,45%,border-top,wrap)" ;;
+        recent) mode="enable-search+change-ghost(type to filter)+change-preview-window(down,9,border-top,wrap)" ;;
     esac
     print -r -- "change-prompt($(prompt_text))+clear-query+$mode+reload(${(q)self} --rows)+change-header:$(header_text)"
 }
@@ -642,7 +652,7 @@ current_rows | fzf --ansi --delimiter=$'\t' --with-nth=2.. --nth=-1 --reverse --
     --bind="esc:transform(${(q)self} --back)" \
     --bind="left:transform(${(q)self} --back)" \
     --preview="${(q)self} --preview {1}" \
-    --preview-window='right,40%,border-left,<30(hidden)' >/dev/null || true
+    --preview-window='right,40%,border-left' >/dev/null || true
 [[ "$(run_get done)" == 1 ]] || exit 130
 
 dir="$(run_get dir)" choice="$(run_get choice)" effort="$(run_get effort)"
