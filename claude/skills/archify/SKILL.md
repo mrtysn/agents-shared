@@ -103,6 +103,9 @@ Read Mermaid for topology and meaning, then author fresh Archify JSON; do not me
 - Spacing means clear gap, not center distance. For a relationship label, clear gap must exceed its measured mask width; follow the label-preserving repair order.
 - Automatic routes own their endpoint sides. A side is a direction contract: the first and final segment must leave/enter perpendicular to that side.
 - Automatic Port Spread is a default renderer behavior for architecture, workflow, data-flow, and lifecycle. It skips single relationships and explicit `via`, `channelX`, `channelY`, `labelAt`, or non-`auto` routes. Near parallel ports use an outside bridge so automatic routing cannot create a sub-8px segment or sub-16px interior turn. Architecture separately keeps unobstructed facing automatic ports (`left`/`right` or `top`/`bottom`) on one shared axis when their offset is under 16px and both ports retain corner clearance. If exactly one endpoint was spread, only the unshared endpoint may move onto that axis; if both endpoints were spread, keep the outside bridge so competing ports remain distinct.
+<!-- LOCAL: straight links between near-aligned boxes -->
+- Relationships that run only between the same two boxes on facing sides spread around the middle of the boxes' shared span, so both ends take the same slots and stay straight even when the box centres differ by a few pixels. Architecture also aligns near-aligned facing ports when `fromSide`/`toSide` are authored: a side is a direction contract, not a port position. Boxes in one row need not share a height.
+<!-- LOCAL END -->
 - Never accept an edge crossing an unrelated opaque node, an ambiguous shared corridor, or a relationship label masking another route.
 
 Read `references/authoring-contract.md` only when you need field enums, spacing math, geometry repair rules, repository evidence, or mode-specific placement.

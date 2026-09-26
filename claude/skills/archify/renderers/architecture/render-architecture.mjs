@@ -768,11 +768,8 @@ function alignFacingPorts(conn, from, to, start, end, fromSide, toSide, ports) {
   const fromSpread = Boolean(ports?.from);
   const toSpread = Boolean(ports?.to);
   if (fromSpread && toSpread) return { start, end };
-  const hasExplicitSides = (
-    (conn.fromSide && conn.fromSide !== 'auto')
-    || (conn.toSide && conn.toSide !== 'auto')
-  );
-  if (!fromSpread && !toSpread && hasExplicitSides) return { start, end };
+  // An authored side is a direction contract, not a port position: sliding a
+  // port along its facing side keeps the contract, so explicit sides align too.
 
   const alignmentDelta = horizontallyFacing
     ? Math.abs(start[1] - end[1])

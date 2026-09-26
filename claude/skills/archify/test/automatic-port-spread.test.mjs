@@ -374,3 +374,66 @@ test('skill and READMEs describe automatic port spread as bounded default behavi
   }
   assert.match(fs.readFileSync(path.join(repoRoot, 'README_ZH.md'), 'utf8'), /共享的自动端点会确定性展开/);
 });
+
+test('architecture: explicit facing sides still share one axis when near-aligned', () => {
+  const html = render('architecture', {
+    schema_version: 1,
+    diagram_type: 'architecture',
+    meta: { title: 'Explicit sides, near-aligned' },
+    components: [
+      { id: 'wrapper', type: 'backend', label: 'Wrapper', pos: [260, 300], size: [160, 64] },
+      { id: 'server', type: 'backend', label: 'Server', pos: [500, 300], size: [190, 72] },
+    ],
+    connections: [
+      { id: 'wrapper-server', from: 'wrapper', to: 'server', fromSide: 'right', toSide: 'left' },
+    ],
+  });
+
+  assert.deepEqual(connectionPoints(html, 'wrapper-server'), [[420, 332], [500, 332]]);
+});
+
+test('architecture: an exclusive two-way bundle centres on the shared span and stays straight', () => {
+  const html = render('architecture', {
+    schema_version: 1,
+    diagram_type: 'architecture',
+    meta: { title: 'Two-way bundle between unequal boxes' },
+    components: [
+      { id: 'session', type: 'frontend', label: 'Session', pos: [260, 300], size: [150, 64] },
+      { id: 'hooks', type: 'backend', label: 'Hooks', pos: [500, 300], size: [190, 72] },
+    ],
+    connections: [
+      { id: 'out', from: 'session', to: 'hooks', fromSide: 'right', toSide: 'left' },
+      { id: 'back', from: 'hooks', to: 'session', fromSide: 'left', toSide: 'right', variant: 'dashed' },
+    ],
+  });
+
+  const out = connectionPoints(html, 'out');
+  const back = connectionPoints(html, 'back');
+  assert.equal(out.length, 2, 'outbound link is one straight segment');
+  assert.equal(back.length, 2, 'return link is one straight segment');
+  assert.equal(out[0][1], out[1][1]);
+  assert.equal(back[0][1], back[1][1]);
+  assert.equal(Math.abs(out[0][1] - back[0][1]), 14, 'bundle keeps the standard spread spacing');
+  assert.equal((out[0][1] + back[0][1]) / 2, 332, 'bundle centres on the shared span');
+});
+
+test('architecture: a bundle that shares a side with other links keeps per-box spreading', () => {
+  const html = render('architecture', {
+    schema_version: 1,
+    diagram_type: 'architecture',
+    meta: { title: 'Non-exclusive bundle' },
+    components: [
+      { id: 'a', type: 'frontend', label: 'A', pos: [260, 300], size: [150, 64] },
+      { id: 'b', type: 'backend', label: 'B', pos: [500, 300], size: [190, 72] },
+      { id: 'c', type: 'backend', label: 'C', pos: [500, 480], size: [190, 72] },
+    ],
+    connections: [
+      { id: 'ab', from: 'a', to: 'b', fromSide: 'right', toSide: 'left' },
+      { id: 'ac', from: 'a', to: 'c', fromSide: 'right', toSide: 'left' },
+    ],
+  });
+
+  const ab = connectionPoints(html, 'ab');
+  const ac = connectionPoints(html, 'ac');
+  assert.notEqual(ab[0][1], ac[0][1], 'links leaving one side stay on distinct ports');
+});

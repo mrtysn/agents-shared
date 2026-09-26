@@ -9,6 +9,11 @@
   `assets/template.html` renders it as the lead of the node passport and the pinned
   relationship. Authoring guidance is in the `LOCAL`-fenced parts of `SKILL.md` and
   `references/authoring-contract.md`; tests are in `test/semantic-passport.test.mjs`.
+- **Straight links between near-aligned boxes**: `automaticPortSpread` in
+  `renderers/shared/geometry.mjs` centres an exclusive bundle (all links between the
+  same two boxes on facing sides) on the boxes' shared span, and `alignFacingPorts` in
+  `renderers/architecture/render-architecture.mjs` no longer skips authored
+  `fromSide`/`toSide`. Tests are in `test/automatic-port-spread.test.mjs`.
 
 ## On an upstream sync
 
