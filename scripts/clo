@@ -33,11 +33,18 @@ own picker. Reopening a session launches at once: it already has its model
 and effort.
 
 "search history", the top row of the first menu, searches every past session
-in every folder as you type (search-history.py, beside clo, keeps an index in
-~/.cache/search-history). A plain term matches anywhere, ignoring case; one
-with regex characters is a regex. Each hit shows its age, folder, topic and
-match count, and the side pane shows every match. Enter reopens it in its own
-folder.
+in every folder as you type: messages, subagents' work, and the commands and
+file paths Claude used (search-history.py, beside clo, keeps an index in
+~/.cache/search-history). Every word of a plain term must appear in a session,
+ignoring case; "a phrase" in quotes stays whole; a term with regex characters
+is one regex. A session whose title holds every word ranks first. Each hit
+shows its age, folder, topic and match count, and the side pane shows every
+match. "recent sessions", below it, lists every session in every folder by
+last activity; typing filters it.
+
+Every session clo reopens goes through recent-sessions.py (beside clo): in the
+session's own folder and Claude config, asking first when it looks live in
+another tab.
 
 The model menu is the stable aliases (always the latest of each family) plus any
 extra models your account is offered, read from Claude Code's own cache in
@@ -157,6 +164,7 @@ folder_menu() {
         printf '%s\t%s%-4s %-*s%s  \t%s\n' "$1" "$dim" "$t" "$tw" "$3" "$off" "$2"
     }
     row search "search history" ""
+    row recent "recent sessions" ""
     row "$DEV_ROOT" "${DEV_ROOT:t}" "${DEV_ROOT/#$HOME/~}"
     row "$PWD" "$here" ""
     for i in "${order[@]}"; do row "${paths[$i]}" "${names[$i]}" "${tags[$i]}"; done
@@ -204,8 +212,12 @@ start_rows() {
     # Session rows lead with an age column; the others leave it empty, so every
     # name starts in the same column.
     [[ -n "$sessions" ]] && pad="     "
-    # Search is offered in the first menu only; after a folder menu it is gone.
-    [[ "$(run_get ask_folder)" == 1 ]] || print -r -- "search"$'\t'"${pad}search history"
+    # Search and recent sessions span every folder, so they are offered in the
+# first menu only; after a folder menu they are gone.
+    if [[ "$(run_get ask_folder)" != 1 ]]; then
+        print -r -- "search"$'\t'"${pad}search history"
+        print -r -- "recent"$'\t'"${pad}recent sessions"
+    fi
     for r in "${(@f)$(menu)}"; do print -r -- "${r%%$'\t'*}"$'\t'"$pad${r#*$'\t'}"; done
     [[ -n "$sessions" ]] && print -r -- "$sessions"
     last_session_file "$1" >/dev/null || return 0
@@ -302,16 +314,25 @@ search_run() {
     return 0
 }
 
-# search_rows — the hits, most recently active first, as rows whose value is
-# hit:<session id>: age, folder, topic, hit count.
+# recent_run — every session, most recently active first, as rows: the
+# recent-sessions menu. It shares search.json and its rows with search.
+recent_run() {
+    run_set pos 1
+    "$search_py" --recent --json --limit 200 > "$CLO_RUN/search.json" 2> "$CLO_RUN/search.err" \
+        || rm -f -- "$CLO_RUN/search.json"
+    search_rows
+}
+
+# search_rows — the sessions in search.json, in its order, as rows whose value
+# is hit:<session id>: age, folder, topic, and for a search the hit count.
 search_rows() {
     [[ -s "$CLO_RUN/search.json" ]] || return 0
-    local dim=$'\e[2m' off=$'\e[0m' id at cwd topic n i fw=0 folder
-    local -a ids ats folders topics ns
-    while IFS=$'\x1f' read -r id at cwd topic n; do
+    local dim=$'\e[2m' off=$'\e[0m' id at cwd topic n t i fw=0 folder count
+    local -a ids ats folders topics ns ts
+    while IFS=$'\x1f' read -r id at cwd topic n t; do
         folder="${cwd:t}"; [[ "$cwd" == "$HOME" ]] && folder="~"
         (( ${#topic} > 60 )) && topic="${topic[1,59]}…"
-        ids+=("$id") ats+=("$at") folders+=("$folder") topics+=("$topic") ns+=("$n")
+        ids+=("$id") ats+=("$at") folders+=("$folder") topics+=("$topic") ns+=("$n") ts+=("$t")
         (( ${#folder} > fw )) && fw=${#folder}
     done < <(jq -r --slurpfile snap "$CLO_SNAPSHOT" "$known_jq"'
         | .results[]
@@ -319,13 +340,28 @@ search_rows() {
            ((.last // .started // "") | sub("\\.[0-9]+"; "") | try fromdateiso8601 catch 0 | tostring),
            (.cwd // "?"),
            ($known[.session_id].topic // .title // .preview // "untitled" | gsub("[\t\n\u001f]"; " ")),
-           (.match_count | tostring)]
+           (.match_count | tostring),
+           (if .title_match then "1" else "" end)]
         | join("\u001f")' "$CLO_RUN/search.json" 2>/dev/null)
     (( fw > 24 )) && fw=24
     for (( i = 1; i <= $#ids; i++ )); do
+        count=""
+        (( ns[$i] > 0 )) && count="${ns[$i]} $( (( ns[$i] == 1 )) && print hit || print hits)"
+        [[ -n "${ts[$i]}" ]] && count="in title${count:+ · $count}"
         printf 'hit:%s\t%s%-4s%s %-*s  %s  %s%s%s\n' "${ids[$i]}" "$dim" "$(ago "${ats[$i]}")" "$off" \
-            "$fw" "${folders[$i][1,$fw]}" "${topics[$i]}" "$dim" "${ns[$i]} $( (( ns[$i] == 1 )) && print hit || print hits)" "$off"
+            "$fw" "${folders[$i][1,$fw]}" "${topics[$i]}" "$dim" "$count" "$off"
     done
+}
+
+# recent_header — the recent-sessions menu's header, once its rows are in.
+recent_header() {
+    local n
+    n="$(jq -r '.total' "$CLO_RUN/search.json" 2>/dev/null || true)"
+    if [[ -z "$n" ]]; then
+        print -r -- "recent sessions: $(tail -n 1 "$CLO_RUN/search.err" 2>/dev/null || print "the listing failed")"
+    else
+        print -r -- "$n sessions, most recently active first$( (( n > 200 )) && print " · newest 200 shown") · type to filter · Enter reopens one"
+    fi
 }
 
 # search_header — the search step's header: what to do, or what the search found.
@@ -360,10 +396,16 @@ search_detail() {
                           (if $k == null then null elif $k.is_live then "live in another terminal" else "ended" end),
                           ((.last // "") | sub("\\.[0-9]+"; "") | try (fromdateiso8601 | localtime | strftime("%b %d %H:%M")) catch null)]
                          | map(select(. != null and . != "")) | join(" · ")) + "\u001b[0m",
-          "\u001b[2m" + (.match_count | tostring) + (if .match_count == 1 then " match" else " matches" end)
-              + (if .match_count > (.snippets | length) then ", first \(.snippets | length) shown" else "" end) + "\u001b[0m",
+          (if .match_count > 0 then
+              "\u001b[2m" + (.match_count | tostring) + (if .match_count == 1 then " match" else " matches" end)
+              + (if .match_count > (.snippets | length) then ", first \(.snippets | length) shown" else "" end)
+              + (if .title_match then " · in title" else "" end) + "\u001b[0m"
+           elif .title_match then "\u001b[2min title\u001b[0m" else empty end),
           "",
-          (.snippets[] | "\u001b[2m" + (if .role == "user" then "you" else "claude" end) + "\u001b[0m",
+          (if (.snippets | length) == 0 and .preview then "\u001b[2mopened with\u001b[0m", .preview, "" else empty end),
+          (.snippets[] | "\u001b[2m" + ({"user": "you", "asst": "claude", "tool": "claude ran",
+                                          "sub-user": "task given to a subagent", "sub-asst": "subagent",
+                                          "sub-tool": "subagent ran"}[.role] // .role) + "\u001b[0m",
                          .before + "\u001b[1;33m" + .match + "\u001b[0m" + .after,
                          "")' "$CLO_RUN/search.json" 2>/dev/null || true
 }
@@ -409,6 +451,7 @@ current_rows() {
                 mark_rows "$state_dir/last" "" "${(@f)$(start_rows "$dir")}" ;;
         effort) mark_rows "$(effort_state "$(run_get choice)")" unset "${effort_rows[@]}" ;;
         search) run_set pos 1; search_rows ;;
+        recent) recent_run ;;
     esac
 }
 
@@ -419,6 +462,7 @@ prompt_text() {
         model)  print -r -- "choose a model > " ;;
         effort) print -r -- "choose an effort level > " ;;
         search) print -r -- "search history > " ;;
+        recent) print -r -- "recent sessions > " ;;
     esac
 }
 
@@ -426,6 +470,7 @@ prompt_text() {
 header_text() {
     local step="$(run_get step)"
     [[ "$step" == search ]] && { search_header "$@"; return; }
+    [[ "$step" == recent ]] && return 0  # set once its rows are in, by --pos
     local -a c=()
     [[ "$step" != folder && "$(run_get ask_folder)" == 1 ]] && c+=("${$(run_get dir)/#$HOME/~}")
     [[ "$step" == effort ]] && c+=("$(label "$(run_get choice)" "${(@f)$(menu)}")")
@@ -437,8 +482,10 @@ header_text() {
 # rows, and wants a wider, wrapping side pane for the matches.
 show_actions() {
     local mode="enable-search+change-ghost()+change-preview-window(40%,nowrap)"
-    [[ "$(run_get step)" == search ]] \
-        && mode="disable-search+change-ghost(type to search every session)+change-preview-window(60%,wrap)"
+    case "$(run_get step)" in
+        search) mode="disable-search+change-ghost(type to search every session)+change-preview-window(60%,wrap)" ;;
+        recent) mode="enable-search+change-ghost(type to filter)+change-preview-window(60%,wrap)" ;;
+    esac
     print -r -- "change-prompt($(prompt_text))+clear-query+$mode+reload(${(q)self} --rows)+change-header:$(header_text)"
 }
 
@@ -460,11 +507,11 @@ search_next() {
 # Enter: record the pick, then show the next menu, or finish.
 handle_next() {
     local v="${1%$'\t'}" step="$(run_get step)"
-    [[ "$step" == search ]] && { search_next "$v"; return; }
+    [[ "$step" == search || "$step" == recent ]] && { search_next "$v"; return; }
     [[ -n "$v" ]] || return 0
     print -r -- "$step" >> "$CLO_RUN/history"
-    if [[ "$v" == search ]]; then
-        run_set step search; run_set term ""; rm -f -- "$CLO_RUN/search.json" "$CLO_RUN/search.err"
+    if [[ "$v" == search || "$v" == recent ]]; then
+        run_set step "$v"; run_set term ""; rm -f -- "$CLO_RUN/search.json" "$CLO_RUN/search.err"
         show_actions; return
     fi
     case "$step" in
@@ -496,16 +543,22 @@ handle_back() {
 # The side pane: the menus still to come if the row under the cursor were picked.
 handle_preview() {
     local v="${1%$'\t'}" step="$(run_get step)" dir="$(run_get dir)" model
-    if [[ "$step" == search ]]; then
+    if [[ "$step" == search || "$step" == recent ]]; then
         [[ "$v" == hit:* ]] && search_detail "${v#hit:}"
         return 0
     fi
-    if [[ "$v" == search ]]; then
-        print -r -- $'\e[2m'"search history"$'\e[0m'
-        print -r -- "  every past session, in every folder"
-        print -r -- "  Enter on a hit reopens it in its own folder"
-        return 0
-    fi
+    case "$v" in
+        search) print -r -- $'\e[2m'"search history"$'\e[0m'
+                print -r -- "  every past session, in every folder,"
+                print -r -- "  subagents and commands included"
+                print -r -- "  Enter on a hit reopens it in its own folder"
+                return 0 ;;
+        recent) print -r -- $'\e[2m'"recent sessions"$'\e[0m'
+                print -r -- "  every session in every folder, most"
+                print -r -- "  recently active first"
+                print -r -- "  Enter reopens one in its own folder"
+                return 0 ;;
+    esac
     model="$(run_get choice)"
     [[ -n "$model" && "$model" != resume* ]] || model="$(cat "$state_dir/last" 2>/dev/null || true)"
     [[ -n "$model" ]] || model="${${(f)"$(menu)"}[1]%%$'\t'*}"
@@ -529,12 +582,12 @@ handle_preview() {
 # The handlers fzf runs; they find the run through $CLO_RUN.
 case "${1:-}" in
     --rows)    current_rows; exit 0 ;;
-    --pos)     # The search step's header reports what the search found, once it has.
-               if [[ "$(run_get step)" == search ]]; then
-                   print -r -- "pos($(run_get pos))+change-header:$(search_header)"
-               else
-                   print -r -- "pos($(run_get pos))"
-               fi
+    --pos)     # The search and recent headers report what was found, once it has been.
+               case "$(run_get step)" in
+                   search) print -r -- "pos($(run_get pos))+change-header:$(search_header)" ;;
+                   recent) print -r -- "pos($(run_get pos))+change-header:$(recent_header)" ;;
+                   *)      print -r -- "pos($(run_get pos))" ;;
+               esac
                exit 0 ;;
     --search-run) search_run "${2:-}"; exit 0 ;;
     # Typing filters a menu, but in the search step it searches.
@@ -596,7 +649,11 @@ dir="$(run_get dir)" choice="$(run_get choice)" effort="$(run_get effort)"
 cd "$dir"
 case "$choice" in
     resume)   launch=(--resume) ;;
-    resume:*) launch=(--resume "${choice#resume:}") ;;
+    # recent-sessions resumes it in its own folder and Claude config, and asks
+    # first when it looks live in another tab.
+    resume:*) [[ -n "${CLO_CD_FILE:-}" ]] && print -r -- "$PWD" > "$CLO_CD_FILE"
+              rm -rf -- "$CLO_RUN"
+              exec "${self:h}/recent-sessions.py" --resume-id "${choice#resume:}" -- "$@" ;;
     *)        launch=(--model "$choice")
               [[ "$effort" != unset ]] && launch+=(--effort "$effort") ;;
 esac

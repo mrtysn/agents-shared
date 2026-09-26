@@ -116,8 +116,12 @@ def do_resume(number: int) -> None:
         else:
             print("Run recent-sessions (or search-history) first to populate the list.", file=sys.stderr)
         sys.exit(1)
-    sid = mapping[key]
+    resume_session(mapping[key])
 
+
+def resume_session(sid: str, claude_args: list[str] = ()) -> None:
+    """Resume <sid> the way every resume should: in its own folder and config,
+    after asking when it looks live in another tab. clo resumes through this."""
     path, config = find_transcript(sid)
     cwd = _session_cwd(path) if path else None
 
@@ -137,7 +141,7 @@ def do_resume(number: int) -> None:
         os.chdir(cwd)
     if config and config != DEFAULT_CONFIG_DIR:
         os.environ["CLAUDE_CONFIG_DIR"] = config
-    os.execvp("claude", ["claude", "--resume", sid])
+    os.execvp("claude", ["claude", "--resume", sid, *claude_args])
 
 
 def get_repo_root() -> str | None:
@@ -352,10 +356,16 @@ def main(argv: list[str]) -> int:
                    help="do not truncate prompt / file-path columns")
     p.add_argument("--resume", "-r", type=int, metavar="N",
                    help="resume session number N from the last run")
+    p.add_argument("--resume-id", metavar="ID",
+                   help="resume the session with this id; arguments after -- go to claude")
+    p.add_argument("claude_args", nargs="*", help=argparse.SUPPRESS)
     args = p.parse_args(argv)
 
     if args.resume is not None:
         do_resume(args.resume)
+        return 0  # unreachable; execvp replaces process
+    if args.resume_id:
+        resume_session(args.resume_id, args.claude_args)
         return 0  # unreachable; execvp replaces process
 
     cutoff = None

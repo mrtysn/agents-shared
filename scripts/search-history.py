@@ -206,16 +206,23 @@ def typed_prompt(text: str) -> str | None:
 
 
 # ─── Index ────────────────────────────────────────────────────────────────────
-# The message text of every transcript lives in one SQLite file. Transcripts
-# only grow at the end, so each file's read offset is kept and a refresh reads
-# only what was appended since: a search costs milliseconds, not a full read.
-# Deleting the file is always safe; the next search rebuilds it.
+# The message text of every transcript, its subagents' transcripts included,
+# lives in one SQLite file, along with the inputs of every tool call (commands,
+# file paths, patterns, URLs; never their output). Transcripts only grow at the
+# end, so each file's read offset is kept and a refresh reads only what was
+# appended since: a search costs milliseconds, not a full read. Deleting the
+# file is always safe; the next search rebuilds it.
 
 INDEX_FILE = CACHE_DIR / "index.db"
-INDEX_VERSION = 1
+INDEX_VERSION = 2
 
 # A plain term holds none of these; anything else is treated as a regex.
 REGEX_CHARS = set("\\.^$*+?{}[]|()")
+
+# The tool-call inputs worth finding a session by. Edit's old and new strings
+# and Write's content are code, and would double the index.
+TOOL_FIELDS = ("command", "file_path", "notebook_path", "path", "pattern", "glob",
+               "url", "query", "description", "prompt", "skill", "args")
 
 
 def open_index() -> sqlite3.Connection:
@@ -228,39 +235,64 @@ def open_index() -> sqlite3.Connection:
             DROP TABLE IF EXISTS files;
             DROP TABLE IF EXISTS sessions;
             DROP TABLE IF EXISTS messages;
-            CREATE TABLE files (path TEXT PRIMARY KEY, session_id TEXT, "offset" INTEGER);
+            CREATE TABLE files (
+                id INTEGER PRIMARY KEY, path TEXT UNIQUE, session_id TEXT,
+                subagent INTEGER, "offset" INTEGER);
             CREATE TABLE sessions (
                 session_id TEXT PRIMARY KEY, project_dir TEXT, cwd TEXT, branch TEXT,
                 started TEXT, last TEXT, ai_title TEXT, custom_title TEXT, first_prompt TEXT);
+            -- role: user, asst or tool; "sub-" in front for a subagent's
             CREATE VIRTUAL TABLE messages USING fts5(
-                text, session_id UNINDEXED, role UNINDEXED, tokenize = 'trigram');
+                text, session_id UNINDEXED, role UNINDEXED, file UNINDEXED, tokenize = 'trigram');
             PRAGMA user_version = {INDEX_VERSION};
         """)
     return db
 
 
-def forget_file(db: sqlite3.Connection, path: str, session_id: str):
-    db.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
-    db.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
-    db.execute("DELETE FROM files WHERE path = ?", (path,))
+def forget_file(db: sqlite3.Connection, file_id: int, session_id: str, subagent: bool):
+    db.execute("DELETE FROM messages WHERE file = ?", (file_id,))
+    if not subagent:
+        db.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+    db.execute("DELETE FROM files WHERE id = ?", (file_id,))
 
 
 SESSION_COLUMNS = ("session_id", "project_dir", "cwd", "branch", "started", "last",
                    "ai_title", "custom_title", "first_prompt")
 
 
-def ingest_file(db: sqlite3.Connection, f: Path):
-    """Index what <f> gained since the last refresh, up to its last complete line."""
-    path, session_id = str(f), f.stem
+def tool_calls(entry: dict) -> list[str]:
+    """Each tool call in an assistant entry, as "<tool>: <inputs>"."""
+    if entry.get("type") != "assistant":
+        return []
+    content = (entry.get("message") or {}).get("content")
+    if not isinstance(content, list):
+        return []
+    calls = []
+    for block in content:
+        if not isinstance(block, dict) or block.get("type") != "tool_use":
+            continue
+        inp = block.get("input") or {}
+        values = [str(inp[k])[:2000] for k in TOOL_FIELDS
+                  if isinstance(inp.get(k), (str, int)) and str(inp[k]).strip()]
+        if values:
+            calls.append(f"{block.get('name', 'tool')}: " + " · ".join(values))
+    return calls
+
+
+def ingest_file(db: sqlite3.Connection, f: Path, subagent: bool):
+    """Index what <f> gained since the last refresh, up to its last complete line.
+    A subagent's transcript adds messages to its parent session and nothing else."""
+    path = str(f)
+    session_id = f.parent.parent.name if subagent else f.stem
     try:
         size = f.stat().st_size
     except OSError:
         return
-    row = db.execute('SELECT "offset" FROM files WHERE path = ?', (path,)).fetchone()
-    offset = row[0] if row else 0
-    if size < offset:  # rewritten, not appended to: start over
-        forget_file(db, path, session_id)
-        offset = 0
+    row = db.execute('SELECT id, "offset" FROM files WHERE path = ?', (path,)).fetchone()
+    file_id, offset = row if row else (None, 0)
+    if file_id is not None and size < offset:  # rewritten, not appended to: start over
+        forget_file(db, file_id, session_id, subagent)
+        file_id, offset = None, 0
     if size == offset:
         return
     try:
@@ -272,11 +304,17 @@ def ingest_file(db: sqlite3.Connection, f: Path):
     end = chunk.rfind(b"\n") + 1  # a line still being written waits for the next refresh
     if end == 0:
         return
+    if file_id is None:
+        file_id = db.execute('INSERT INTO files (path, session_id, subagent, "offset") VALUES (?, ?, ?, 0)',
+                             (path, session_id, int(subagent))).lastrowid
 
-    row = db.execute(f"SELECT {', '.join(SESSION_COLUMNS)} FROM sessions WHERE session_id = ?",
-                     (session_id,)).fetchone()
-    s = dict(zip(SESSION_COLUMNS, row)) if row else \
-        {**dict.fromkeys(SESSION_COLUMNS), "session_id": session_id, "project_dir": f.parent.name}
+    s = None
+    if not subagent:
+        row = db.execute(f"SELECT {', '.join(SESSION_COLUMNS)} FROM sessions WHERE session_id = ?",
+                         (session_id,)).fetchone()
+        s = dict(zip(SESSION_COLUMNS, row)) if row else \
+            {**dict.fromkeys(SESSION_COLUMNS), "session_id": session_id, "project_dir": f.parent.name}
+    prefix = "sub-" if subagent else ""
     rows = []
     for line in chunk[:end].decode("utf-8", errors="replace").splitlines():
         if not line.strip():
@@ -285,35 +323,38 @@ def ingest_file(db: sqlite3.Connection, f: Path):
             entry = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if not s["branch"] and entry.get("gitBranch"):
-            s["branch"] = entry["gitBranch"]
-        if not s["cwd"] and entry.get("cwd"):
-            s["cwd"] = entry["cwd"]
-        if entry.get("type") == "ai-title" and entry.get("aiTitle"):
-            s["ai_title"] = entry["aiTitle"]
-        if entry.get("type") == "custom-title" and entry.get("customTitle"):
-            s["custom_title"] = entry["customTitle"]
-        ts = entry.get("timestamp")
-        if ts and (s["started"] is None or ts < s["started"]):
-            s["started"] = ts
-        if ts and (s["last"] is None or ts > s["last"]):
-            s["last"] = ts
+        if s is not None:
+            if not s["branch"] and entry.get("gitBranch"):
+                s["branch"] = entry["gitBranch"]
+            if not s["cwd"] and entry.get("cwd"):
+                s["cwd"] = entry["cwd"]
+            if entry.get("type") == "ai-title" and entry.get("aiTitle"):
+                s["ai_title"] = entry["aiTitle"]
+            if entry.get("type") == "custom-title" and entry.get("customTitle"):
+                s["custom_title"] = entry["customTitle"]
+            ts = entry.get("timestamp")
+            if ts and (s["started"] is None or ts < s["started"]):
+                s["started"] = ts
+            if ts and (s["last"] is None or ts > s["last"]):
+                s["last"] = ts
         # Skill bodies and other injected text are not part of the conversation.
         if entry.get("isMeta"):
             continue
+        for call in tool_calls(entry):
+            rows.append((call, session_id, prefix + "tool", file_id))
         text = extract_searchable_text(entry)
         if not text:
             continue
         role = "user" if entry.get("type") == "user" else "asst"
-        if s["first_prompt"] is None and role == "user":
+        if s is not None and s["first_prompt"] is None and role == "user":
             s["first_prompt"] = typed_prompt(text)
-        rows.append((text, session_id, role))
+        rows.append((text, session_id, prefix + role, file_id))
 
-    db.executemany("INSERT INTO messages (text, session_id, role) VALUES (?, ?, ?)", rows)
-    db.execute(f"INSERT OR REPLACE INTO sessions ({', '.join(SESSION_COLUMNS)}) "
-               f"VALUES ({', '.join('?' * len(SESSION_COLUMNS))})", [s[c] for c in SESSION_COLUMNS])
-    db.execute('INSERT OR REPLACE INTO files (path, session_id, "offset") VALUES (?, ?, ?)',
-               (path, session_id, offset + end))
+    db.executemany("INSERT INTO messages (text, session_id, role, file) VALUES (?, ?, ?, ?)", rows)
+    if s is not None:
+        db.execute(f"INSERT OR REPLACE INTO sessions ({', '.join(SESSION_COLUMNS)}) "
+                   f"VALUES ({', '.join('?' * len(SESSION_COLUMNS))})", [s[c] for c in SESSION_COLUMNS])
+    db.execute('UPDATE files SET "offset" = ? WHERE id = ?', (offset + end, file_id))
     # One commit per file: a search killed mid-build keeps what it indexed.
     db.commit()
 
@@ -326,14 +367,126 @@ def refresh_index(db: sqlite3.Connection):
             continue
         for f in root.glob("*/*.jsonl"):
             seen.add(str(f))
-            ingest_file(db, f)
-    for path, session_id in db.execute("SELECT path, session_id FROM files").fetchall():
+            ingest_file(db, f, subagent=False)
+        for f in root.glob("*/*/subagents/*.jsonl"):
+            seen.add(str(f))
+            ingest_file(db, f, subagent=True)
+    for file_id, path, session_id, subagent in db.execute(
+            "SELECT id, path, session_id, subagent FROM files").fetchall():
         if path not in seen:
-            forget_file(db, path, session_id)
+            forget_file(db, file_id, session_id, bool(subagent))
     db.commit()
 
 
 # ─── Search engine ────────────────────────────────────────────────────────────
+
+def parse_terms(keyword: str) -> list[str] | None:
+    """The words of a plain term, a "quoted phrase" kept whole; None for a regex."""
+    if set(keyword) & REGEX_CHARS:
+        return None
+    return [phrase or word for phrase, word in re.findall(r'"([^"]+)"|(\S+)', keyword)]
+
+
+def required_literal(regex: str) -> str | None:
+    """The longest run of plain text every match of <regex> must contain, so
+    the index can narrow the messages before the regex runs; None when that
+    cannot be read off safely (alternation or groups, which can make any part
+    optional)."""
+    if "|" in regex or "(" in regex:
+        return None
+    runs, run, i = [], "", 0
+    while i < len(regex):
+        c = regex[i]
+        if c == "\\":
+            runs.append(run)
+            run = ""
+            i += 2
+            continue
+        if c == "[":
+            runs.append(run)
+            run = ""
+            i = regex.find("]", i + 2) + 1 or len(regex)
+            continue
+        if c in "?*{":
+            run = run[:-1]  # the character before is optional or repeated
+        if c == "{":
+            runs.append(run)
+            run = ""
+            i = regex.find("}", i) + 1 or len(regex)
+            continue
+        if c in REGEX_CHARS:
+            runs.append(run)
+            run = ""
+        else:
+            run += c
+        i += 1
+    runs.append(run)
+    best = max(runs, key=len)
+    return best if len(best) >= 3 else None
+
+
+def session_filter(project_filter: str | None, current_only: bool, days: int):
+    """A predicate over session rows for the --project, --current and --days
+    flags; the session this runs inside never passes."""
+    this_session = os.environ.get("CLAUDE_CODE_SESSION_ID")
+    project_dir = None
+    if current_only:
+        repo_root = get_repo_root()
+        if not repo_root:
+            print("Error: --current requires a git repository", file=sys.stderr)
+            sys.exit(1)
+        project_dir = get_project_dir_for_repo(repo_root)
+    cutoff = None
+    if days > 0:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%S")
+
+    def keep(s: dict) -> bool:
+        return (s["session_id"] != this_session
+                and s["cwd"] is not None
+                and (not project_filter or project_filter.lower() in s["project_dir"].lower())
+                and (project_dir is None or s["project_dir"] == project_dir)
+                and (cutoff is None or (s["last"] or "") >= cutoff))
+    return keep
+
+
+def result_for(s: dict, match_count: int = 0, snippets: list | None = None,
+               title_match: bool = False) -> dict:
+    return {
+        "session_id": s["session_id"],
+        "cwd": s["cwd"],
+        "project_name": os.path.basename(s["cwd"].rstrip("/")) or s["cwd"],
+        "branch": s["branch"],
+        "started": s["started"],
+        "last": s["last"],
+        "title": s["custom_title"] or s["ai_title"],
+        "preview": s["first_prompt"],
+        "title_match": title_match,
+        "match_count": match_count,
+        "snippets": snippets or [],
+    }
+
+
+def load_sessions(db: sqlite3.Connection, keep) -> list[dict]:
+    return [s for s in (dict(zip(SESSION_COLUMNS, row)) for row in
+                        db.execute(f"SELECT {', '.join(SESSION_COLUMNS)} FROM sessions"))
+            if keep(s)]
+
+
+def run_recent(days: int = DEFAULT_DAYS, limit: int = DEFAULT_LIMIT,
+               project_filter: str | None = None, current_only: bool = False
+               ) -> tuple[list[dict], int, int]:
+    """Every session, most recently active first."""
+    db = open_index()
+    refresh_index(db)
+    sessions = load_sessions(db, session_filter(project_filter, current_only, days))
+    db.close()
+    sessions.sort(key=lambda s: s["last"] or "", reverse=True)
+    total = len(sessions)
+    results = [result_for(s) for s in (sessions[:limit] if limit > 0 else sessions)]
+    if results:
+        save_cache(results)
+    return results, len({r["project_name"] for r in results}), total
+
 
 def run_search(
     keyword: str,
@@ -345,101 +498,118 @@ def run_search(
     max_snippets: int = MAX_SNIPPETS_PER_SESSION,
 ) -> tuple[list[dict], int, int]:
     """Run search and return (results, n_projects_with_hits, total_found).
-    Results rank by how many messages match, discounted by age."""
-    plain = not (set(keyword) & REGEX_CHARS)
+
+    A plain term's words must each appear somewhere in a session: in a message,
+    a tool call, the session's title or its first prompt. A regex is one
+    pattern. Results rank by how many messages hold the rarest word, well ahead
+    when messages hold the words together as typed or the title holds every
+    word, discounted by age."""
     flags = 0 if case_sensitive else re.IGNORECASE
-    pattern = re.compile(re.escape(keyword) if plain else keyword, flags)
+    terms = parse_terms(keyword)
+    if terms == []:
+        return [], 0, 0
+    patterns = [re.compile(re.escape(t), flags) for t in terms] if terms else [re.compile(keyword, flags)]
+    # The words together as typed, when there are several: the strongest match.
+    phrase = re.compile(r"\s+".join(re.escape(t) for t in terms), flags) if terms and len(terms) > 1 else None
+    # One pattern for highlighting, the phrase and then the longest words
+    # first, so "comic strip" wins over "comic" where both match.
+    highlight = re.compile("|".join(([phrase.pattern] if phrase else []) +
+                                    [re.escape(t) for t in sorted(terms, key=len, reverse=True)]), flags) \
+        if terms else patterns[0]
 
     db = open_index()
     refresh_index(db)
-    db.create_function("regexp", 2, lambda _p, text: pattern.search(text) is not None,
+    regexes = {p.pattern: p for p in patterns + [highlight] + ([phrase] if phrase else [])}
+    db.create_function("regexp", 2, lambda p, text: regexes[p].search(text) is not None,
                        deterministic=True)
 
-    # A plain term is a case-insensitive substring, which the trigram index
+    # A plain word is a case-insensitive substring, which the trigram index
     # answers; case-sensitivity and regexes go through Python's re.
-    if plain:
-        like = keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-        match_sql, match_args = "m.text LIKE ? ESCAPE '\\'", [f"%{like}%"]
-        if case_sensitive:
-            match_sql += " AND m.text REGEXP ?"
-            match_args.append(keyword)
-    else:
-        match_sql, match_args = "m.text REGEXP ?", [keyword]
+    def match_sql(p: re.Pattern) -> tuple[str, list]:
+        if terms:
+            t = terms[patterns.index(p)] if p in patterns else None
+            like = t.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            sql, args = "text LIKE ? ESCAPE '\\'", [f"%{like}%"]
+            if case_sensitive:
+                sql += " AND text REGEXP ?"
+                args.append(p.pattern)
+            return sql, args
+        literal = required_literal(p.pattern)
+        if literal:
+            like = literal.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            return "text LIKE ? ESCAPE '\\' AND text REGEXP ?", [f"%{like}%", p.pattern]
+        return "text REGEXP ?", [p.pattern]
 
-    where, args = [match_sql], list(match_args)
-    this_session = os.environ.get("CLAUDE_CODE_SESSION_ID")
-    if this_session:
-        where.append("s.session_id != ?")
-        args.append(this_session)
-    if project_filter:
-        where.append("instr(lower(s.project_dir), lower(?)) > 0")
-        args.append(project_filter)
-    if current_only:
-        repo_root = get_repo_root()
-        if not repo_root:
-            print("Error: --current requires a git repository", file=sys.stderr)
-            sys.exit(1)
-        where.append("s.project_dir = ?")
-        args.append(get_project_dir_for_repo(repo_root))
-    if days > 0:
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%S")
-        where.append("s.last >= ?")
-        args.append(cutoff)
-
-    hits = db.execute(
-        f"SELECT s.*, count(*) FROM messages m JOIN sessions s ON s.session_id = m.session_id "
-        f"WHERE {' AND '.join(where)} GROUP BY s.session_id", args).fetchall()
+    counts: list[dict[str, int]] = []
+    for p in patterns:
+        sql, args = match_sql(p)
+        counts.append(dict(db.execute(
+            f"SELECT session_id, count(*) FROM messages WHERE {sql} GROUP BY session_id", args)))
+    phrase_sql, phrase_args = "0 = 1", []
+    phrase_counts: dict[str, int] = {}
+    if phrase:
+        like = " ".join(terms).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        phrase_sql, phrase_args = "text LIKE ? ESCAPE '\\' AND text REGEXP ?", [f"%{like}%", phrase.pattern]
+        phrase_counts = dict(db.execute(
+            f"SELECT session_id, count(*) FROM messages WHERE {phrase_sql} GROUP BY session_id", phrase_args))
 
     now = datetime.now(timezone.utc)
-
-    def score(row) -> float:
-        last = parse_timestamp(row[5])
+    hits = []
+    for s in load_sessions(db, session_filter(project_filter, current_only, days)):
+        heading = f"{s['custom_title'] or ''} {s['ai_title'] or ''} {s['first_prompt'] or ''}"
+        in_heading = [bool(p.search(heading)) for p in patterns]
+        if not all(c.get(s["session_id"]) or h for c, h in zip(counts, in_heading)):
+            continue
+        rarest = min(c.get(s["session_id"], 0) for c in counts)
+        together = phrase_counts.get(s["session_id"], 0)
+        title_match = all(in_heading)
+        last = parse_timestamp(s["last"])
         age_days = (now - last).total_seconds() / 86400 if last else 365
-        return math.log2(1 + row[-1]) - age_days / 14
+        score = (math.log2(1 + rarest) + 2 * math.log2(1 + together)
+                 + (3 if title_match else 0) - age_days / 14)
+        hits.append((score, s, title_match))
 
-    hits.sort(key=score, reverse=True)
+    hits.sort(key=lambda h: h[0], reverse=True)
     total_found = len(hits)
     if limit > 0:
         hits = hits[:limit]
 
-    results, projects = [], set()
-    for row in hits:
-        s = dict(zip(SESSION_COLUMNS, row))
-        name = os.path.basename(s["cwd"].rstrip("/")) if s["cwd"] else s["project_dir"]
-        projects.add(name)
+    clauses = [match_sql(p) for p in patterns]
+    any_sql = " OR ".join(f"({sql})" for sql, _ in clauses)
+    any_args = [a for _, args in clauses for a in args]
+    results = []
+    for _, s, title_match in hits:
         match_count, snippets = 0, []
         for text, role in db.execute(
-                f"SELECT m.text, m.role FROM messages m WHERE m.session_id = ? AND {match_sql} "
-                f"ORDER BY m.rowid", [s["session_id"], *match_args]):
-            for m in pattern.finditer(text):
+                f"SELECT text, role FROM messages WHERE session_id = ? AND ({any_sql}) "
+                f"ORDER BY ({phrase_sql}) DESC, rowid",
+                [s["session_id"], *any_args, *phrase_args]):
+            # A message holding the words together shows them together.
+            shown = phrase if phrase and phrase.search(text) else highlight
+            for m in highlight.finditer(text):
                 match_count += 1
+            for m in shown.finditer(text):
                 if len(snippets) < max_snippets:
-                    snippets.append((role, extract_snippet_parts(text, m, pattern)))
-        results.append({
-            "session_id": s["session_id"],
-            "cwd": s["cwd"],
-            "project_name": name,
-            "branch": s["branch"],
-            "started": s["started"],
-            "last": s["last"],
-            "title": s["custom_title"] or s["ai_title"],
-            "preview": s["first_prompt"],
-            "match_count": match_count,
-            "snippets": snippets,
-        })
+                    snippets.append((role, extract_snippet_parts(text, m, shown)))
+        results.append(result_for(s, match_count, snippets, title_match))
     db.close()
 
     if results:
         save_cache(results)
-    return results, len(projects), total_found
+    return results, len({r["project_name"] for r in results}), total_found
 
 
 # ─── Text rendering (non-interactive) ────────────────────────────────────────
 
-def render_output(results: list[dict], keyword: str, n_projects: int, total_found: int):
+ROLE_LABELS = {"user": "user", "asst": "asst", "tool": "tool",
+               "sub-user": "subagent task", "sub-asst": "subagent", "sub-tool": "subagent tool"}
+
+
+def render_output(results: list[dict], keyword: str | None, n_projects: int, total_found: int):
     n_shown = len(results)
     shown_note = f" (showing {n_shown})" if total_found > n_shown else ""
-    print(f'search-history · "{keyword}" · {n_projects} projects · {total_found} matches{shown_note}')
+    heading = f'"{keyword}"' if keyword else "recent"
+    print(f'search-history · {heading} · {n_projects} projects · {total_found} sessions{shown_note}')
     print()
 
     if not results:
@@ -459,29 +629,31 @@ def render_output(results: list[dict], keyword: str, n_projects: int, total_foun
         if len(branch) > 14:
             branch = branch[:13] + "…"
         hits = r["match_count"]
-        hit_label = f"{hits} hit" if hits == 1 else f"{hits} hits"
+        hit_label = f" · {hits} hit" if hits == 1 else f" · {hits} hits" if keyword else ""
+        if r["title_match"]:
+            hit_label += " · in title"
 
-        print(f"  #{i:<{num_w}}  {sid} · {date} · {project} · {branch} · {hit_label}")
+        print(f"  #{i:<{num_w}}  {sid} · {date} · {project} · {branch}{hit_label}")
 
         preview = r.get("title") or r.get("preview")
         if preview:
             cleaned = _truncate_preview(preview, 120)
             print(f"{indent}{cleaned}")
 
-        print(f"{indent}─")
-
+        if r["snippets"]:
+            print(f"{indent}─")
         for role, parts in r["snippets"]:
             display = _truncate_word("".join(parts), 200)
-            print(f"{indent}[{role}] {display}")
+            print(f"{indent}[{ROLE_LABELS.get(role, role)}] {display}")
 
         print()
 
     print(f"  Resume: search-history --resume N")
 
 
-def render_json(results: list[dict], keyword: str, n_projects: int, total_found: int):
+def render_json(results: list[dict], keyword: str | None, n_projects: int, total_found: int):
     keys = ("session_id", "cwd", "project_name", "branch", "started", "last",
-            "title", "preview", "match_count")
+            "title", "preview", "title_match", "match_count")
     out = {
         "keyword": keyword,
         "projects": n_projects,
@@ -505,7 +677,8 @@ def main():
         description="Search Claude Code conversation history by keyword"
     )
     parser.add_argument("keyword", nargs="?", default=None,
-                        help="Search term (regex-capable)")
+                        help='Search term: words that must all appear in a session, "a phrase" in '
+                             'quotes; with regex characters, one regex')
     parser.add_argument("--days", "-d", type=int, default=DEFAULT_DAYS,
                         help=f"Limit to last N days (default: {DEFAULT_DAYS}, 0=all)")
     parser.add_argument("--limit", "-n", type=int, default=DEFAULT_LIMIT,
@@ -518,6 +691,8 @@ def main():
                         help="Exact case matching")
     parser.add_argument("--json", action="store_true",
                         help="Print the results as JSON, with every match's snippet split for highlighting")
+    parser.add_argument("--recent", action="store_true",
+                        help="List sessions by last activity instead of searching")
     parser.add_argument("--resume", "-r", type=int, default=0,
                         help="Resume session N from the last run (via recent-sessions)")
     args = parser.parse_args()
@@ -526,15 +701,22 @@ def main():
         do_resume(args.resume)
         return
 
-    if not args.keyword:
-        parser.error("keyword is required (unless using --resume)")
+    render = render_json if args.json else render_output
+    if args.recent:
+        results, n_projects, total = run_recent(days=args.days, limit=args.limit,
+                                                project_filter=args.project, current_only=args.current)
+        render(results, None, n_projects, total)
+        return
 
-    flags = 0 if args.case_sensitive else re.IGNORECASE
-    try:
-        re.compile(args.keyword, flags)
-    except re.error as e:
-        print(f"Invalid regex: {e}", file=sys.stderr)
-        sys.exit(1)
+    if not args.keyword:
+        parser.error("keyword is required (unless using --resume or --recent)")
+
+    if parse_terms(args.keyword) is None:
+        try:
+            re.compile(args.keyword)
+        except re.error as e:
+            print(f"Invalid regex: {e}", file=sys.stderr)
+            sys.exit(1)
 
     results, n_projects, total_found = run_search(
         keyword=args.keyword,
@@ -545,10 +727,7 @@ def main():
         case_sensitive=args.case_sensitive,
         max_snippets=MAX_SNIPPETS_JSON if args.json else MAX_SNIPPETS_PER_SESSION,
     )
-    if args.json:
-        render_json(results, args.keyword, n_projects, total_found)
-    else:
-        render_output(results, args.keyword, n_projects, total_found)
+    render(results, args.keyword, n_projects, total_found)
 
 
 if __name__ == "__main__":
