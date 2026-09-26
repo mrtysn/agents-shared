@@ -7,8 +7,9 @@ argument-hint: <term> [-d 30 for last month, -c for current project, -p <project
 
 # search-history
 
-Search the user and assistant messages of every Claude Code session, across all
-projects. The search runs against an index in `~/.cache/search-history` that
+Search every Claude Code session across all projects: its messages, its
+subagents' messages, and the inputs of every tool call (commands, file paths,
+patterns, URLs; not tool output). The search runs against an index in `~/.cache/search-history` that
 refreshes itself with whatever the transcripts gained since the last search, so
 a search takes well under a second; the first one after the index is deleted
 takes several seconds while it rebuilds. The session you are running in is left
@@ -20,9 +21,11 @@ Run the script with `--json`:
 python3 "${AGENTS_SHARED:?run agents-shared/scripts/init-global.sh to set it}/scripts/search-history.py" --json $ARGUMENTS
 ```
 
-**The term:** a plain term matches anywhere in a message, ignoring case. A term
-containing any of `\ . ^ $ * + ? { } [ ] | ( )` is a Python regex instead; use
-`\bterm\b` when a plain term also matches inside longer words.
+**The term:** every word of a plain term must appear somewhere in the session
+(a message, a tool call, the title or the first prompt), ignoring case;
+`"a phrase"` in quotes stays whole. A term containing any of
+`\ . ^ $ * + ? { } [ ] | ( )` is one Python regex instead; use `\bterm\b` when a
+plain term also matches inside longer words.
 
 **Flags:**
 - `--days N` / `-d N`: only sessions active in the last N days (default: 0, all time)
@@ -32,11 +35,14 @@ containing any of `\ . ^ $ * + ? { } [ ] | ( )` is a Python regex instead; use
 - `--case-sensitive` / `-s`: exact case matching
 
 **The JSON:** `total` sessions matched; `results` are ranked by how many messages
-match, discounted by age. Each result has `session_id`, `cwd` (the folder it ran
-in), `last` (last activity, UTC), `title` (Claude Code's own title for the
-session), `preview` (the first prompt the user typed), `match_count`, and
-`snippets`: each has `role` (`user` or `asst`) and the text around one match,
-split into `before`, `match` and `after`.
+hold the rarest word, well ahead when the words appear together as typed or the
+title holds them all, discounted by age. Each result has `session_id`, `cwd`
+(the folder it ran in), `last` (last activity, UTC), `title` (Claude Code's own
+title for the session), `preview` (the first prompt the user typed),
+`title_match`, `match_count`, and `snippets`: each has `role` and the text
+around one match, split into `before`, `match` and `after`. `role` is `user`,
+`asst` or `tool` (a tool call Claude made); with `sub-` in front, it comes from
+a subagent of that session.
 
 ## Presenting the results
 
@@ -50,7 +56,8 @@ Do not paste the JSON. Read the snippets and answer the question the user asked:
    drawn from the snippets. No session IDs in the table.
 3. **How to reopen the one they most likely want**, in one line:
    `cd <cwd> && claude --resume <session_id>`. For browsing the rest, the
-   "search history" row at the top of `clo`'s first menu searches as you type.
+   "search history" row at the top of `clo`'s first menu searches as you type,
+   and "recent sessions" below it lists every session by last activity.
 
 If nothing matches, say so, then suggest what the results point to: a shorter
 or differently spelled term, a regex with alternatives (`easel|canvas`), or
