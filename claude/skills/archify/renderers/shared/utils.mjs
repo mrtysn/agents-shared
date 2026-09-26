@@ -108,6 +108,7 @@ const SUBTITLE_SLOT_RE = /^([ \t]*)<p class="subtitle">\[Subtitle description\]<
 const GUIDED_VIEWS_PLACEHOLDER = '<!-- ARCHIFY:GUIDED_VIEWS_DATA -->';
 const SOURCE_EVIDENCE_PLACEHOLDER = '    <!-- ARCHIFY:SOURCE_EVIDENCE_DATA -->';
 const I18N_PLACEHOLDER = '    <!-- ARCHIFY:I18N_DATA -->';
+const DETAILS_PLACEHOLDER = '    <!-- ARCHIFY:DETAILS_DATA -->';
 
 function serializeScriptJson(value) {
   return JSON.stringify(value)
@@ -132,6 +133,7 @@ export function applyTemplate(template, {
   visualPreset = 'classic',
   guidedViews = [],
   sourceEvidence = null,
+  details = null,
 }) {
   if (!SVG_SLOT_RE.test(template)) {
     throw new Error('applyTemplate: template missing ARCHIFY:SVG_SLOT sentinel');
@@ -150,6 +152,9 @@ export function applyTemplate(template, {
   // Keep existing custom templates compatible when evidence is not requested.
   // Silently dropping verified evidence would be misleading, so the new slot
   // becomes mandatory only for the opt-in evidence path.
+  if (details && !template.includes(DETAILS_PLACEHOLDER)) {
+    throw new Error(`applyTemplate: authored details require placeholder ${JSON.stringify(DETAILS_PLACEHOLDER)}`);
+  }
   if (sourceEvidence && !template.includes(SOURCE_EVIDENCE_PLACEHOLDER)) {
     throw new Error(`applyTemplate: repository evidence requires placeholder ${JSON.stringify(SOURCE_EVIDENCE_PLACEHOLDER)}`);
   }
@@ -179,6 +184,9 @@ export function applyTemplate(template, {
     .replace(GUIDED_VIEWS_PLACEHOLDER, () => `<script id="archify-guided-views-data" type="application/json">${guidedViewsJson}</script>`)
     .replace(SOURCE_EVIDENCE_PLACEHOLDER, () => sourceEvidence
       ? `    <script id="archify-source-evidence-data" type="application/json">${sourceEvidenceJson}</script>`
+      : '')
+    .replace(DETAILS_PLACEHOLDER, () => details
+      ? `    <script id="archify-details-data" type="application/json">${serializeScriptJson(details)}</script>`
       : '');
 }
 

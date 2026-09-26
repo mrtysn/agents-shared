@@ -176,6 +176,34 @@ Event/terminal column `N` aligns to the same x coordinate as main column
 `N + 2`. A recoverable failure needs a real transition back to an active state.
 A card or guided view saying “retry” is not topology.
 
+<!-- LOCAL: details on demand -->
+## Details on demand
+
+Every node (`components`, `nodes`, `participants`, `states`) and every
+relationship (`connections`, `edges`, `messages`, `flows`, `transitions`)
+accepts an optional `detail`:
+
+```json
+"detail": {
+  "summary": "What it is and why it is here, 1-3 sentences (≤320 chars).",
+  "points": ["≤6 facts the diagram cannot show (≤200 chars each)"],
+  "links": [{ "label": "Open inside", "href": "services.html#focus=save" }]
+}
+```
+
+The renderer writes all details to one JSON block beside the SVG, keyed by node
+id and by relationship index; the SVG, exports and share cards are unchanged.
+Clicking a node leads its passport with the summary, points and links, and
+dims kind, tag and id beneath them; pinning a relationship shows that
+relationship's detail. `href` accepts relative paths, `#fragments`, `http(s)` and
+`mailto`; script and data URLs fail validation. `#focus=<id>` opens the target
+diagram with that node focused, which is how an overview links to its drill-down.
+
+Write a summary where the passport would otherwise repeat the label. Filler
+("Handles requests") is worse than none: leave `detail` out of a node the label
+fully explains.
+<!-- LOCAL END -->
+
 ## Repository evidence
 
 When an architecture diagram must reflect real code, inspect repository

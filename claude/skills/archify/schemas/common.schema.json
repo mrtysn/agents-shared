@@ -95,6 +95,35 @@
         }
       }
     },
+    "detail": {
+      "description": "Details on demand for the Viewer passport. Kept out of the SVG so canonical exports stay unchanged. summary says what the element is and why it exists here; points carry concrete facts the diagram cannot show; links point at deeper diagrams (another.html#focus=id) or documents.",
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "summary": { "type": "string", "minLength": 1, "maxLength": 320 },
+        "points": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+        },
+        "links": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["label", "href"],
+            "properties": {
+              "label": { "type": "string", "minLength": 1, "maxLength": 60 },
+              "href": { "type": "string", "minLength": 1, "maxLength": 400, "pattern": "^(?:https?://|mailto:|#|[^:\\s/?#][^:\\s]*(?:[/?#].*)?$|\\.{0,2}/)" }
+            }
+          }
+        }
+      }
+    },
     "cards": {
       "type": "array",
       "items": {

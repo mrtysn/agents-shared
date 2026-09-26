@@ -1857,6 +1857,61 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
       white-space: nowrap;
     }
     .semantic-passport-detail[hidden] { display: none; }
+    .focus-chip[data-has-notes="true"] { width: min(27rem, calc(100% - 13rem)); }
+    .semantic-passport-notes {
+      display: block;
+      margin-top: 0.45rem;
+      max-height: min(17rem, 42vh);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding-right: 0.25rem;
+      white-space: normal;
+    }
+    .semantic-passport-notes[hidden] { display: none; }
+    .semantic-passport-notes-eyebrow {
+      display: block;
+      margin-bottom: 0.2rem;
+      color: var(--text-muted);
+      font-size: 0.5625rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .semantic-passport-notes-eyebrow[hidden] { display: none; }
+    .semantic-passport-summary {
+      margin: 0;
+      color: var(--toolbar-text);
+      font-size: 0.75rem;
+      line-height: 1.45;
+    }
+    .semantic-passport-points {
+      display: grid;
+      gap: 0.22rem;
+      margin: 0.4rem 0 0;
+      padding-left: 1rem;
+      color: var(--text-muted);
+      font-size: 0.6875rem;
+      line-height: 1.4;
+    }
+    .semantic-passport-points:empty { display: none; }
+    .semantic-passport-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      margin-top: 0.45rem;
+    }
+    .semantic-passport-links:empty { display: none; }
+    .semantic-passport-links a {
+      padding: 0.18rem 0.45rem;
+      border: 1px solid var(--toolbar-border);
+      border-radius: 0.35rem;
+      color: var(--backend-stroke);
+      font-size: 0.625rem;
+      text-decoration: none;
+    }
+    .semantic-passport-links a:hover,
+    .semantic-passport-links a:focus-visible { border-color: var(--backend-stroke); }
+    html[data-preset="blueprint"] .semantic-passport-links a { border-radius: 0.1rem; }
+    .focus-chip[data-has-notes="true"] .semantic-passport-meta { opacity: 0.72; }
     .semantic-passport-meta {
       display: flex;
       flex-wrap: wrap;
@@ -5088,6 +5143,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 
     <!-- ARCHIFY:GUIDED_VIEWS_DATA -->
     <!-- ARCHIFY:SOURCE_EVIDENCE_DATA -->
+    <!-- ARCHIFY:DETAILS_DATA -->
     <!-- ARCHIFY:I18N_DATA -->
     <div class="guided-views no-print" id="guided-views" hidden aria-label="{{i18n:viewer.guided.region}}">
       <button id="guided-view-prev" type="button" aria-label="{{i18n:viewer.guided.previous}}" title="{{i18n:viewer.guided.previous.title}}">&#8592;</button>
@@ -5358,6 +5414,12 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
             <span class="relationship-lens-eyebrow">{{i18n:viewer.passport.eyebrow}}</span>
             <strong class="relationship-lens-title" id="relationship-lens-title"><span id="focus-label"></span></strong>
             <span class="semantic-passport-detail" id="focus-detail" hidden></span>
+            <div class="semantic-passport-notes" id="focus-notes" hidden aria-live="polite">
+              <span class="semantic-passport-notes-eyebrow" id="focus-notes-eyebrow" hidden></span>
+              <p class="semantic-passport-summary" id="focus-notes-summary" hidden></p>
+              <ul class="semantic-passport-points" id="focus-notes-points"></ul>
+              <div class="semantic-passport-links" id="focus-notes-links"></div>
+            </div>
             <div class="semantic-passport-meta" id="focus-passport-meta" aria-label="{{i18n:viewer.passport.metadata}}">
               <span id="focus-kind" data-passport="kind"></span>
               <span id="focus-context" data-passport="context" hidden></span>
@@ -7456,6 +7518,38 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
       };
     })();
 
+    /* Authored details on demand. Like source evidence they live outside the
+       SVG, so every canonical visual export and share card stays unchanged.
+       Links are restricted to relative paths, fragments, http(s) and mailto. */
+    Archify.details = (function () {
+      var element = document.getElementById('archify-details-data');
+      var payload = { nodes: {}, relationships: {} };
+      if (element) {
+        try {
+          var parsed = JSON.parse(element.textContent || 'null');
+          if (parsed && typeof parsed === 'object') {
+            payload.nodes = parsed.nodes && typeof parsed.nodes === 'object' ? parsed.nodes : {};
+            payload.relationships = parsed.relationships && typeof parsed.relationships === 'object' ? parsed.relationships : {};
+          }
+        } catch (_) {}
+      }
+      function own(map, key) {
+        return Object.prototype.hasOwnProperty.call(map, key) ? map[key] : null;
+      }
+      function safeHref(href) {
+        var value = typeof href === 'string' ? href.trim() : '';
+        if (!value) return null;
+        if (/^(https?:\/\/|mailto:|#)/i.test(value)) return value;
+        if (/^[^:\s\/?#]*[:]/.test(value)) return null;
+        return value;
+      }
+      return {
+        node: function (id) { return own(payload.nodes, id); },
+        relationship: function (key) { return own(payload.relationships, key); },
+        safeHref: safeHref
+      };
+    })();
+
     /* Verified repository evidence is emitted only after the renderer checks
        the authored GitHub revision, source blobs, and optional line ranges
        against the explicit --repo-root. It remains outside the SVG so every
@@ -7539,6 +7633,12 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
       var chip = document.getElementById('focus-chip');
       var label = document.getElementById('focus-label');
       var detail = document.getElementById('focus-detail');
+      var notes = document.getElementById('focus-notes');
+      var notesEyebrow = document.getElementById('focus-notes-eyebrow');
+      var notesSummary = document.getElementById('focus-notes-summary');
+      var notesPoints = document.getElementById('focus-notes-points');
+      var notesLinks = document.getElementById('focus-notes-links');
+      var passportNodeId = null;
       var kind = document.getElementById('focus-kind');
       var context = document.getElementById('focus-context');
       var tag = document.getElementById('focus-tag');
@@ -7902,7 +8002,47 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         });
         evidence.hidden = false;
       }
+      function renderNotes(authored, eyebrowText) {
+        notesPoints.textContent = '';
+        notesLinks.textContent = '';
+        var entry = authored && typeof authored === 'object' ? authored : null;
+        setPassportValue(notesSummary, entry && typeof entry.summary === 'string' ? entry.summary : '');
+        (entry && Array.isArray(entry.points) ? entry.points : []).forEach(function (point) {
+          if (typeof point !== 'string' || !point.trim()) return;
+          var item = document.createElement('li');
+          item.textContent = point;
+          notesPoints.appendChild(item);
+        });
+        (entry && Array.isArray(entry.links) ? entry.links : []).forEach(function (link) {
+          var href = link && Archify.details.safeHref(link.href);
+          if (!href || typeof link.label !== 'string' || !link.label.trim()) return;
+          var anchor = document.createElement('a');
+          anchor.href = href;
+          anchor.textContent = link.label + ' \u2192';
+          if (/^https?:/i.test(href)) {
+            anchor.target = '_blank';
+            anchor.rel = 'noopener noreferrer';
+          }
+          notesLinks.appendChild(anchor);
+        });
+        var has = !notesSummary.hidden || notesPoints.childNodes.length > 0 || notesLinks.childNodes.length > 0;
+        setPassportValue(notesEyebrow, has ? eyebrowText || '' : '');
+        notes.hidden = !has;
+        if (has) chip.setAttribute('data-has-notes', 'true');
+        else chip.removeAttribute('data-has-notes');
+        notes.scrollTop = 0;
+      }
+      function renderRelationshipNotes(record) {
+        var authored = record ? Archify.details.relationship(record.key) : null;
+        if (authored) {
+          renderNotes(authored, record.fromLabel + ' \u2192 ' + record.toLabel);
+          return;
+        }
+        renderNotes(passportNodeId ? Archify.details.node(passportNodeId) : null, '');
+      }
       function renderPassport(id, node) {
+        passportNodeId = id;
+        renderNotes(Archify.details.node(id), '');
         setPassportValue(detail, node.getAttribute('data-node-sublabel'));
         setPassportValue(kind, viewerKindLabel(node.getAttribute('data-node-kind') || 'node'));
         setPassportValue(context, node.getAttribute('data-node-context'));
@@ -8221,9 +8361,11 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         svg.removeAttribute('data-relationship-preview-active');
         svg.removeAttribute('data-relationship-direct-active');
         if (options.clearPin === true) {
+          var hadPin = pinnedRelationshipKey !== null && pinnedRelationshipKey !== undefined;
           pinnedRelationship = null;
           pinnedRelationshipKey = null;
           svg.removeAttribute('data-relationship-pin-active');
+          if (hadPin) renderRelationshipNotes(null);
         }
         chip.removeAttribute('data-relationship-previewing');
         edges().forEach(function (edge) { edge.removeAttribute('data-relationship-preview'); });
@@ -8337,6 +8479,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         var target = relationshipHitTarget(key);
         if (target) target.setAttribute('aria-pressed', 'true');
         renderRelationshipCopyAction();
+        renderRelationshipNotes(record);
         summary.textContent = viewerText('viewer.passport.relationship.pinned', {
           from: record.fromLabel,
           to: record.toLabel,

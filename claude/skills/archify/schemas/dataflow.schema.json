@@ -125,6 +125,7 @@
           "type": {
             "$ref": "common.schema.json#/$defs/componentType"
           },
+          "detail": { "$ref": "common.schema.json#/$defs/detail" },
           "label": {
             "type": "string",
             "minLength": 1
@@ -180,6 +181,7 @@
           "to": {
             "$ref": "common.schema.json#/$defs/id"
           },
+          "detail": { "$ref": "common.schema.json#/$defs/detail" },
           "label": {
             "type": "string",
             "minLength": 1
