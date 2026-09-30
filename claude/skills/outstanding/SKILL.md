@@ -25,7 +25,7 @@ decisions, nothing else.
 4. **Blocked on you** — the next move needs a decision, credential, or answer only the user can give.
 
 **Set aside** — everything raised that is *not* a next target, reported separately below the
-table so that a wrong call is caught at a glance rather than lost:
+outstanding items so that a wrong call is caught at a glance rather than lost:
 
 - **Deferred** — the user postponed it in their own words ("later", "not now", "next pass", "after X"). Your guess that they will want it someday is not a postponement.
 - **Decided, not doing** — "leave it", "keep it", "no", "not needed", or an offer of yours they turned down. A settled decision, not a postponement.
@@ -63,35 +63,53 @@ Lead with a one-line verdict, then the account.
 
 **Done** — when the session accomplished real work, open with a short `**Done**` list before the outstanding items: one line per completed item, past tense, no elaboration. Skip the section entirely if nothing meaningful was completed or the user only asked what's left.
 
-Then the outstanding items. Group only if there are enough items to warrant it.
+Then the outstanding items and the set-aside list, together in **one fenced code block** —
+never a markdown table. The terminal renders a table too wide for its width as stacked rows,
+and plain markdown collapses the padding; a code block is monospace, so the columns align:
 
+````
 ```
-**Outstanding — <N> item(s)**
+Outstanding: 4
 
-| # | Item | State | Next step |
-|---|------|-------|-----------|
-| 1 | <what it is, in the user's terms> | Blocked / Uncommitted / Partial / Not started | <the single concrete action> |
+1. Blocked:     delete the safety copy ~/Downloads/elements-safety-copy (30 GB)
+                → Needs your go-ahead. Both items in it were re-verified against Elements.
+2. Uncommitted: repair-ntfs-drive/README.md, the added "Pitfalls" section
+                → git -C ~/dev/repair-ntfs-drive commit -am "document pitfalls" && git push
+3. Partial:     move the takeout zip (50 GB) to Elements pictures/photo-archive/
+                → The byte check is running. The original is deleted only on a match.
+4. Not started: delete the old UTM VM elements-chkdsk
+                → utmctl delete elements-chkdsk
+
+Set aside
+- uv cache ~/.cache/uv (15 GB). Decided, not doing: "Leave it"
 ```
+````
 
-Rules for the table:
+Layout, exactly:
+- Pad every state (with its colon) to 12 characters, the width of `Not started:`, so all
+  descriptions start in the same column. With 10 or more items, number with a leading
+  space (` 1.`) so the columns hold.
+- The next step goes on its own line, indented to the description's column, after `→ `.
+- No markdown inside the block: no bold, no backticks. Paths and commands are written plain.
+- The same shape at every size, one item included — never switch to a sentence or a table.
+
+Rules for the items:
 - **Item** — name it as the user named it. No embellishment.
 - **State** — exactly one of: Blocked, Uncommitted, Partial, Not started. Never Deferred: deferred items belong to Set aside.
 - **Next step** — one concrete, actionable move, anchored to where the work lives: a `file.cs:line`, a branch name, or the exact command. Not "finish it" — the actual edit or invocation. For a Blocked item, name the exact decision or answer you need.
 - Order by what the user should see first: Blocked (needs them), then Uncommitted (cheapest to close), Partial, Not started.
 - **Self-contained** — no session-local shorthand: no "option B", "the fix", bare codes, or truncated links. Full repo-relative paths, full URLs, and enough words that each row reads cold, weeks later, without this conversation open.
 - **Ownership** — if the user asks who does what ("which of these are you taking on yourself?"), split the report: **Mine** (items you will execute, and then execute them) vs **Yours** (decisions, commits, external steps). Never answer that question with an unowned task list.
-- **No deferral framing** — never soften an item with "latent", "can wait", "if it goes live", "nice to have". Every item is either outstanding or it isn't; if it's in the table, it's real work to be finished.
+- **No deferral framing** — never soften an item with "latent", "can wait", "if it goes live", "nice to have". Every item is either outstanding or it isn't; if it is in the Outstanding list, it is real work to be finished.
 
-If a single item dominates (e.g. only uncommitted changes remain), skip the table and state it in a sentence with the exact command to close it.
-
-Then, when anything was set aside, a separate list after the table — one line per item,
-no next step, no table, so it never reads as work:
+The set-aside list sits in the same block, after a blank line: one line per item, no next
+step, so it never reads as work:
 
 ```
-**Set aside**
-- <item, self-contained> — Decided, not doing: "<the user's words>"
-- <item> — Deferred: "<the user's words>"
-- <item> — Dropped: <what replaced it>
+Set aside
+- <item, self-contained>. Decided, not doing: "<the user's words>"
+- <item>. Deferred: "<the user's words>"
+- <item>. Dropped: <what replaced it>
 ```
 
 Quote the user's own words for Deferred and Decided, not doing, so a misreading is visible.
@@ -109,12 +127,12 @@ If the tree is clean but the session is thin (no real tasks tackled), say that i
 
 ## Bearing
 
-Direct and plain. No hedging, no padding, no "you might also consider" — only what genuinely remains. Produce the recap yourself, inline, in your reply — never hand it off to a subagent or point at a summary elsewhere; the user asked *you*, and the answer is the message. This skill reports; it does not act on the table by itself. After the report, run the last step below, then stop and wait for an explicit instruction before touching anything the user did not decide.
+Direct and plain. No hedging, no padding, no "you might also consider" — only what genuinely remains. Produce the recap yourself, inline, in your reply — never hand it off to a subagent or point at a summary elsewhere; the user asked *you*, and the answer is the message. This skill reports; it does not act on the list by itself. After the report, run the last step below, then stop and wait for an explicit instruction before touching anything the user did not decide.
 
 ## Last step: ask the open decisions
 
-The table records every item, Blocked ones included. Stop there and the user has to parse a
-table and answer its decisions by hand. So once the report is written, if anything in it
+The list records every item, Blocked ones included. Stop there and the user has to parse a
+list and answer its decisions by hand. So once the report is written, if anything in it
 needs a decision, approval, value, or answer from the user (Blocked rows, and any other row
 whose next step is theirs), invoke the `ask-open-decisions` skill with the Skill tool. It
 puts each one to the user through AskUserQuestion, self-contained, with your recommendation
