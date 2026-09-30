@@ -71,22 +71,26 @@ markdown list wraps with a hanging indent, and inline code colours only what it 
 ```
 **Outstanding: 4**
 
-1. `Blocked` Delete the safety copy ~/Downloads/elements-safety-copy (30 GB)
-   - Needs your go-ahead. Both items in it were re-verified against Elements.
+1. `Blocked    ` Delete the safety copy ~/Downloads/elements-safety-copy (30 GB)
+    - Needs your go-ahead. Both items in it were re-verified against Elements.
 2. `Uncommitted` repair-ntfs-drive/README.md, the added "Pitfalls" section
-   - git -C ~/dev/repair-ntfs-drive commit -am "document pitfalls" && git push
-3. `Partial` Move the takeout zip (50 GB) to Elements pictures/photo-archive/
-   - The byte check is running. The original is deleted only on a match.
+    - git -C ~/dev/repair-ntfs-drive commit -am "document pitfalls" && git push
+3. `Partial    ` Move the takeout zip (50 GB) to Elements pictures/photo-archive/
+    - The byte check is running. The original is deleted only on a match.
 4. `Not started` Delete the old UTM VM elements-chkdsk
-   - utmctl delete elements-chkdsk
+    - utmctl delete elements-chkdsk
 ```
 
 Layout, exactly:
 - The state is the only inline code in an item, so it is the only colour on the line and
   the eye can run down the states. Paths, commands and URLs are written plain; backticks
   on them would compete with it.
-- The next step is a nested `- ` bullet under its item, indented three spaces. No `→`:
-  the nesting already says it belongs to the item above.
+- Pad the state with spaces *inside* the backticks to 11 characters, the width of
+  `Not started` and `Uncommitted`, so every description starts in the same column. Claude
+  Code keeps those spaces.
+- The next step is a nested `- ` bullet under its item, indented four spaces — three is
+  enough for `1.` to `9.`, but from `10.` on a three-space bullet falls out of the item. No
+  `→`: the nesting already says it belongs to the item above.
 - One list, numbered 1 to N. Never split it under per-state headings: Claude Code drops the
   nested indent on the first item of a list that starts at any number but 1, and the
   numbers are how the user and `ask-open-decisions` refer back to items.
