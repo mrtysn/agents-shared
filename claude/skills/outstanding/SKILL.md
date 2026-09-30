@@ -2,7 +2,7 @@
 description: Recap the current session — what got done, what remains outstanding, and where each item stands. Use when the user asks "any outstanding tasks?", "are there any outstanding tasks we have not covered / finished yet?", "any outstanding work we haven't covered?", "remind me what's left", "where were we", "recap what you did", or "did it work or not". Scope is this session only — for sessions killed by an iTerm relaunch, point the user at /iterm-revive instead.
 argument-hint: [optional scope hint, e.g. "just code" or "include deploy"]
 user-invocable: true
-allowed-tools: Bash, Read, Glob, Grep
+allowed-tools: Bash, Read, Glob, Grep, Skill, AskUserQuestion
 ---
 
 The user wishes to know where this session stands. Survey the work and render a clean account: what was accomplished, and every item still outstanding — nothing more, nothing less.
@@ -85,4 +85,13 @@ If the tree is clean but the session is thin (no real tasks tackled), say that i
 
 ## Bearing
 
-Direct and plain. No hedging, no padding, no "you might also consider" — only what genuinely remains. Produce the recap yourself, inline, in your reply — never hand it off to a subagent or point at a summary elsewhere; the user asked *you*, and the answer is the message. This skill reports; it does not act. List the work, then stop — wait for an explicit instruction before touching any of it.
+Direct and plain. No hedging, no padding, no "you might also consider" — only what genuinely remains. Produce the recap yourself, inline, in your reply — never hand it off to a subagent or point at a summary elsewhere; the user asked *you*, and the answer is the message. This skill reports; it does not act on the table by itself. After the report, run the last step below, then stop and wait for an explicit instruction before touching anything the user did not decide.
+
+## Last step: ask the open decisions
+
+The table records every item, Blocked ones included. Stop there and the user has to parse a
+table and answer its decisions by hand. So once the report is written, if anything in it
+needs a decision, approval, value, or answer from the user (Blocked rows, and any other row
+whose next step is theirs), invoke the `ask-open-decisions` skill with the Skill tool. It
+puts each one to the user through AskUserQuestion, self-contained, with your recommendation
+first. If nothing needs the user, skip this step.
