@@ -19,11 +19,12 @@ An item is outstanding if any of these hold:
 2. **Started, not finished** — work begun but left partial (a stubbed function, a half-migrated pattern, a TODO left in the path).
 3. **Done, not committed** — changes made but not staged, committed, pushed, or deployed.
 4. **Blocked on you** — the next move needs a decision, credential, or answer only the user can give.
-5. **Deferred by decision** — something explicitly postponed ("later", "not now", "next pass") — record it so it is not forgotten.
+5. **Deferred by decision** — something the user postponed in their own words ("later", "not now", "next pass", "after X") — record it so it is not forgotten. Your guess that they will want it someday is not a postponement.
 
 An item is **not** outstanding if:
 
 - **A later decision removed it** — rescoped, replaced, or explicitly dropped ("HTTP only for now"). Dropped is not Deferred; it does not appear at all.
+- **The user decided not to do it** — "leave it", "keep it", "no", "not needed", or an offer of yours they turned down. That is a settled decision, not a postponement: it does not appear, not as Deferred and not with a "once X" next step. Re-listing it asks the user to decide again what they already decided.
 - **It comes from project docs, roadmaps, or TODOs** rather than this conversation. Doc-derived backlog resurfacing in every session's report is noise; only work raised or touched in this session qualifies.
 
 Do NOT invent work. If nothing is outstanding, say so plainly.
