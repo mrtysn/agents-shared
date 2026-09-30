@@ -63,34 +63,33 @@ Lead with a one-line verdict, then the account.
 
 **Done** — when the session accomplished real work, open with a short `**Done**` list before the outstanding items: one line per completed item, past tense, no elaboration. Skip the section entirely if nothing meaningful was completed or the user only asked what's left.
 
-Then the outstanding items and the set-aside list, together in **one fenced code block** —
-never a markdown table. The terminal renders a table too wide for its width as stacked rows,
-and plain markdown collapses the padding; a code block is monospace, so the columns align:
+Then the outstanding items as **one continuous numbered markdown list** — never a table,
+never a fenced code block. A table too wide for the terminal renders as stacked rows; a code
+block paints every character in the code colour and still wraps long lines to column 0. A
+markdown list wraps with a hanging indent, and inline code colours only what it wraps:
 
-````
 ```
-Outstanding: 4
+**Outstanding: 4**
 
-1. Blocked:     delete the safety copy ~/Downloads/elements-safety-copy (30 GB)
-                → Needs your go-ahead. Both items in it were re-verified against Elements.
-2. Uncommitted: repair-ntfs-drive/README.md, the added "Pitfalls" section
-                → git -C ~/dev/repair-ntfs-drive commit -am "document pitfalls" && git push
-3. Partial:     move the takeout zip (50 GB) to Elements pictures/photo-archive/
-                → The byte check is running. The original is deleted only on a match.
-4. Not started: delete the old UTM VM elements-chkdsk
-                → utmctl delete elements-chkdsk
-
-Set aside
-- uv cache ~/.cache/uv (15 GB). Decided, not doing: "Leave it"
+1. `Blocked` Delete the safety copy ~/Downloads/elements-safety-copy (30 GB)
+   - Needs your go-ahead. Both items in it were re-verified against Elements.
+2. `Uncommitted` repair-ntfs-drive/README.md, the added "Pitfalls" section
+   - git -C ~/dev/repair-ntfs-drive commit -am "document pitfalls" && git push
+3. `Partial` Move the takeout zip (50 GB) to Elements pictures/photo-archive/
+   - The byte check is running. The original is deleted only on a match.
+4. `Not started` Delete the old UTM VM elements-chkdsk
+   - utmctl delete elements-chkdsk
 ```
-````
 
 Layout, exactly:
-- Pad every state (with its colon) to 12 characters, the width of `Not started:`, so all
-  descriptions start in the same column. With 10 or more items, number with a leading
-  space (` 1.`) so the columns hold.
-- The next step goes on its own line, indented to the description's column, after `→ `.
-- No markdown inside the block: no bold, no backticks. Paths and commands are written plain.
+- The state is the only inline code in an item, so it is the only colour on the line and
+  the eye can run down the states. Paths, commands and URLs are written plain; backticks
+  on them would compete with it.
+- The next step is a nested `- ` bullet under its item, indented three spaces. No `→`:
+  the nesting already says it belongs to the item above.
+- One list, numbered 1 to N. Never split it under per-state headings: Claude Code drops the
+  nested indent on the first item of a list that starts at any number but 1, and the
+  numbers are how the user and `ask-open-decisions` refer back to items.
 - The same shape at every size, one item included — never switch to a sentence or a table.
 
 Rules for the items:
@@ -102,11 +101,11 @@ Rules for the items:
 - **Ownership** — if the user asks who does what ("which of these are you taking on yourself?"), split the report: **Mine** (items you will execute, and then execute them) vs **Yours** (decisions, commits, external steps). Never answer that question with an unowned task list.
 - **No deferral framing** — never soften an item with "latent", "can wait", "if it goes live", "nice to have". Every item is either outstanding or it isn't; if it is in the Outstanding list, it is real work to be finished.
 
-The set-aside list sits in the same block, after a blank line: one line per item, no next
-step, so it never reads as work:
+Then the set-aside list, after a blank line: a bold heading and one plain bullet per item,
+no state tag and no next step, so it never reads as work:
 
 ```
-Set aside
+**Set aside**
 - <item, self-contained>. Decided, not doing: "<the user's words>"
 - <item>. Deferred: "<the user's words>"
 - <item>. Dropped: <what replaced it>
