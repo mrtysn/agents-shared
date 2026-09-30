@@ -13,25 +13,35 @@ If that line is empty, report everything. If it narrows the request ("just code"
 
 ## What counts as outstanding
 
-An item is outstanding if any of these hold:
+Every item raised or touched in this session goes in exactly one of two lists. Nothing
+raised is ever silently omitted — a misjudged classification must still be visible.
+
+**Outstanding** — the only list the user glances at, so zero noise: next targets and open
+decisions, nothing else.
 
 1. **Discussed, not done** — a task, fix, or feature raised in this conversation that was never carried out.
 2. **Started, not finished** — work begun but left partial (a stubbed function, a half-migrated pattern, a TODO left in the path).
 3. **Done, not committed** — changes made but not staged, committed, pushed, or deployed.
 4. **Blocked on you** — the next move needs a decision, credential, or answer only the user can give.
-5. **Deferred by decision** — something the user postponed in their own words ("later", "not now", "next pass", "after X") — record it so it is not forgotten. Your guess that they will want it someday is not a postponement.
 
-An item is **not** outstanding if:
+**Set aside** — everything raised that is *not* a next target, reported separately below the
+table so that a wrong call is caught at a glance rather than lost:
 
-- **A later decision removed it** — rescoped, replaced, or explicitly dropped ("HTTP only for now"). Dropped is not Deferred; it does not appear at all.
-- **The user decided not to do it** — "leave it", "keep it", "no", "not needed", or an offer of yours they turned down. That is a settled decision, not a postponement: it does not appear, not as Deferred and not with a "once X" next step. Re-listing it asks the user to decide again what they already decided.
-- **It comes from project docs, roadmaps, or TODOs** rather than this conversation. Doc-derived backlog resurfacing in every session's report is noise; only work raised or touched in this session qualifies.
+- **Deferred** — the user postponed it in their own words ("later", "not now", "next pass", "after X"). Your guess that they will want it someday is not a postponement.
+- **Decided, not doing** — "leave it", "keep it", "no", "not needed", or an offer of yours they turned down. A settled decision, not a postponement.
+- **Dropped** — a later decision rescoped or replaced it ("HTTP only for now").
+
+When unsure whether an item is a next target or set aside, it is a next target: a false
+entry in Outstanding costs a glance, a missed task costs the task.
+
+Not reported at all: backlog that comes only from project docs, roadmaps, or TODOs rather
+than this conversation. Doc-derived backlog resurfacing in every session's report is noise.
 
 Do NOT invent work. If nothing is outstanding, say so plainly.
 
 ## Procedure
 
-1. **Scan this conversation** for the five categories above, and for completed work worth recalling. Prefer the user's own framing of each task over your paraphrase.
+1. **Scan this conversation** for every item in both lists above, and for completed work worth recalling. Prefer the user's own framing of each task over your paraphrase.
 
 2. **Check the working tree** for uncommitted or unpushed work (skip if not in a git repo, or if `$ARGUMENTS` scopes you away from it):
 
@@ -60,19 +70,32 @@ Then the outstanding items. Group only if there are enough items to warrant it.
 
 | # | Item | State | Next step |
 |---|------|-------|-----------|
-| 1 | <what it is, in the user's terms> | Blocked / Uncommitted / Partial / Not started / Deferred | <the single concrete action> |
+| 1 | <what it is, in the user's terms> | Blocked / Uncommitted / Partial / Not started | <the single concrete action> |
 ```
 
 Rules for the table:
 - **Item** — name it as the user named it. No embellishment.
-- **State** — exactly one of: Blocked, Uncommitted, Partial, Not started, Deferred.
+- **State** — exactly one of: Blocked, Uncommitted, Partial, Not started. Never Deferred: deferred items belong to Set aside.
 - **Next step** — one concrete, actionable move, anchored to where the work lives: a `file.cs:line`, a branch name, or the exact command. Not "finish it" — the actual edit or invocation. For a Blocked item, name the exact decision or answer you need.
-- Order by what the user should see first: Blocked (needs them), then Uncommitted (cheapest to close), Partial, Not started, Deferred last.
+- Order by what the user should see first: Blocked (needs them), then Uncommitted (cheapest to close), Partial, Not started.
 - **Self-contained** — no session-local shorthand: no "option B", "the fix", bare codes, or truncated links. Full repo-relative paths, full URLs, and enough words that each row reads cold, weeks later, without this conversation open.
 - **Ownership** — if the user asks who does what ("which of these are you taking on yourself?"), split the report: **Mine** (items you will execute, and then execute them) vs **Yours** (decisions, commits, external steps). Never answer that question with an unowned task list.
 - **No deferral framing** — never soften an item with "latent", "can wait", "if it goes live", "nice to have". Every item is either outstanding or it isn't; if it's in the table, it's real work to be finished.
 
 If a single item dominates (e.g. only uncommitted changes remain), skip the table and state it in a sentence with the exact command to close it.
+
+Then, when anything was set aside, a separate list after the table — one line per item,
+no next step, no table, so it never reads as work:
+
+```
+**Set aside**
+- <item, self-contained> — Decided, not doing: "<the user's words>"
+- <item> — Deferred: "<the user's words>"
+- <item> — Dropped: <what replaced it>
+```
+
+Quote the user's own words for Deferred and Decided, not doing, so a misreading is visible.
+Skip the section when nothing was set aside.
 
 ## When nothing is outstanding
 
