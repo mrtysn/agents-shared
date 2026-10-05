@@ -12,10 +12,23 @@
 - **Straight links between near-aligned boxes**: `automaticPortSpread` in
   `renderers/shared/geometry.mjs` centres an exclusive bundle (all links between the
   same two boxes on facing sides) on the boxes' shared span, and `alignFacingPorts` in
-  `renderers/architecture/render-architecture.mjs` no longer skips authored
+  `renderers/architecture/routing.mjs` no longer skips authored
   `fromSide`/`toSide`. Tests are in `test/automatic-port-spread.test.mjs`.
 
 ## On an upstream sync
+
+- Upstream adds and removes files between releases, which `sync-external-skills.sh`
+  does not handle (it only fetches the listed files). Merge in a clone of the release
+  tag instead: 3-way `git merge-file` each file (base `.upstream/`, ours the working
+  file, theirs the tag), copy new files, drop removed ones, then rewrite `.upstream/`,
+  `source.json` `files`/`commit`, and `override.patch` from the result.
+- `assets/template.html` is generated upstream from `viewer/` (outside the skill
+  directory) by `scripts/generate-viewer.mjs`. Port the details passport there, not
+  into the template: the CSS after `.semantic-passport-detail[hidden]` in
+  `viewer.css`, the `ARCHIFY:DETAILS_DATA` marker and `#focus-notes` markup in
+  `template.source.html`, the `Archify.details` IIFE at the end of
+  `motion-governor.js`, and `renderNotes`/`renderRelationshipNotes` plus their calls
+  in `focus.js`; then run `npm run generate:viewer` and copy the template back.
 
 - `renderers/shared/generated-validators.mjs` is one minified line, so any upstream
   schema change conflicts there. Never merge it by hand: take upstream's schemas plus
