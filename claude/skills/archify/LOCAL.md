@@ -34,8 +34,14 @@
   schema change conflicts there. Never merge it by hand: take upstream's schemas plus
   the `detail` insertions, then regenerate with `npm run generate:validators` in a
   clone of upstream that has its dev dependencies, and copy the file back.
-- The bundled `examples/*.html` are kept at upstream's bytes on purpose; regenerating
-  them would put the whole template into the patch once per example. Upstream's golden
-  test is the only consumer, and it cannot run in this vendored layout.
+- The bundled `examples/*.html` are re-rendered with the local template, so the golden
+  checks compare like with like. After a sync, in the release clone with the merged files
+  in place: `npm run render:examples`, `node scripts/render-examples.mjs`, copy
+  `../examples/web-app-rendered.html` over `../examples/web-app.html`, rerun the
+  Checkout `compare` into `../examples/checkout-platform-delta.{html,receipt.json}`
+  (base and head are `examples/checkout-platform.{base,head}.architecture.json`,
+  `--quality showcase`), `npm run build:gallery`, `npm run build:readme-showcase`. Only
+  the five `examples/*.html` come back into this directory; the rest exist so the suite
+  can pass.
 - Run the full suite in an upstream clone before copying files back: `npm test` in
-  `archify/` after `npm ci`.
+  `archify/` after `npm ci`. It passes with no failures.
