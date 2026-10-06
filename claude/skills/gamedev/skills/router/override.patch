@@ -42,7 +42,7 @@
  
  ## 2. Task classification (phrasing → category)
  
-@@ -82,32 +85,24 @@
+@@ -82,31 +85,24 @@
    words ("make a roguelike", "deckbuilder").
  - **workflows** (process/shipping): `game-jam`, `prototype-fast`, `steam-publish`,
    `itch-publish`. Triggered by process words ("publish on Steam", "vertical slice").
@@ -62,8 +62,7 @@
 -  `godot-nodes-scenes`, `godot-signals-groups`; 2D `godot-2d-movement`, `godot-tilemap`; 3D
 -  `godot-3d-essentials`; physics `godot-physics`; UI `godot-ui-control`; animation
 -  `godot-animation`; shaders `godot-shaders`; data `godot-resources`; audio `godot-audio`;
--  netcode `godot-multiplayer`; headless CLI tests `godot-gdscript-headless-testing`; ship
--  `godot-export`.
+-  netcode `godot-multiplayer`; ship `godot-export`.
 -- **Unity** (`skills/unity/`): scripting `unity-csharp-scripting`; input `unity-input-system`;
 -  physics `unity-physics`; animation `unity-animation`; data `unity-scriptableobjects`; 2D
 -  `unity-tilemap-2d`; AI nav `unity-navmesh`; ship `unity-build-pipeline`.
@@ -86,7 +85,7 @@
  
  ### 3b. Disciplines — load **with** the engine skill (concept ↔ engine API)
  
-@@ -154,15 +149,20 @@
+@@ -153,15 +149,20 @@
  `game-jam` (jam, 48-hour, Ludum Dare/GMTK) · `prototype-fast` (vertical slice, MVP, greybox) ·
  `steam-publish` (Steam, Steamworks, depot; `steam_appid.txt`) · `itch-publish` (itch.io, butler;
  `.itch.toml`).
@@ -110,7 +109,7 @@
     only those. Never bulk-load a whole category.
  3. **On demand:** read a skill's bundled `references/` files only when the subtask needs that
     depth (the skill body says when).
-@@ -195,8 +195,9 @@
+@@ -194,8 +195,9 @@
  2. If the task is a pure concept/genre/workflow question, route straight to the engine-agnostic
     discipline/genre/workflow skill — no engine needed ("what's a good save format?" → `save-systems`).
  3. Only if engine choice actually blocks the answer, ask **one** targeted question ("Which engine —
@@ -122,7 +121,7 @@
  4. Never invent an engine or load an engine skill on a guess.
  
  **Engine known but no skill covers the subtask:** load the closest engine skill plus the relevant
-@@ -221,6 +222,10 @@
+@@ -220,6 +222,10 @@
  | "the camera should follow my player smoothly" | (detected engine) | `camera-systems` (+ engine movement skill) |
  | "my Unity game drops to 30 FPS, optimize it" | Unity (`Assets/`+`ProjectSettings/`) | `performance-optimization` (profile first) → engine skill |
  | "make a cohesive pixel-art player and enemy set" | (detected engine) | `create-game-assets` → relevant engine import/rendering skill |
@@ -155,7 +154,7 @@
  (`files:`) are the cues that should select each skill. `*` in a binding is filled with the
  **detected** engine (router body §1); where an engine lacks the exact skill, see "Binding gaps".
  
-@@ -120,6 +120,9 @@
+@@ -119,6 +119,9 @@
  | `prototype-fast` | prototype fast, vertical slice, MVP game, greybox |
  | `steam-publish` | publish on Steam, Steamworks, store page, depot/build upload; `steam_appid.txt` |
  | `itch-publish` | publish on itch, itch.io page, `butler push`, upload build; `.itch.toml` |

@@ -1,23 +1,20 @@
 --- a/SKILL.md
 +++ b/SKILL.md
-@@ -37,9 +37,9 @@
+@@ -43,7 +43,7 @@
  
- Drive interactive state changes with CSS transitions or a motion library's springs, which retarget when the user reverses mid-flight. Keyframes run a fixed timeline and cannot reverse, so reserve them for sequences that run once. See [animations.md](animations.md).
+ Animate icons with `opacity`, `scale` and `blur` rather than toggling visibility. Use exactly these values: scale `0.25` to `1`, opacity `0` to `1`, blur `4px` to `0px`.
  
--## Press scales to 0.96
-+## Press scales down
+-With a motion library (`motion` or `framer-motion` in `package.json`), match that package's import path, or nearby imports where both exist. Use `transition: { type: "spring", duration: 0.3, bounce: 0 }`. Bounce is always `0`.
++With a motion library (`motion` or `framer-motion` in `package.json`), match that package's import path, or nearby imports where both exist. <!-- LOCAL: spring values are owned by /motion:animate -->Take the spring's duration and bounce from `/motion:animate`.<!-- LOCAL END -->
  
--A pressed button scales to `0.96` over `150ms` with `ease-out`, and a disabled one never scales. Give the button an opt-out where the motion would distract, through the component's existing variant API or a `static` prop. See [recipes for CSS, Tailwind and Motion](animations.md#scale-on-press).
-+A pressed button scales down slightly. <!-- LOCAL: the press scale value is owned by /motion:animate -->Take the value, duration and curve from `/motion:animate`.<!-- LOCAL END --> A disabled one never scales. Give the button an opt-out where the motion would distract, through the component's existing variant API or a `static` prop. See [recipes for CSS, Tailwind and Motion](animations.md#scale-on-press).
+ Without one, keep both icons in the DOM with one absolutely positioned, and cross-fade with `cubic-bezier(0.2, 0, 0, 1)`. That gives you enter and exit with no dependency. Both recipes are in [icon-transitions.md](icon-transitions.md).
  
- ## High-frequency interactions get no animation
+@@ -53,7 +53,7 @@
  
-@@ -65,7 +65,7 @@
+ ## Scale on press
  
- ## Cross-fade contextual icons with exact values
+-A `scale(0.96)` on click gives a button tactile feedback. Always `0.96`; anything below `0.95` feels exaggerated. Add a `static` prop to switch it off where motion would distract. See [recipes for CSS, Tailwind and Motion](animations.md#scale-on-press).
++A slight scale-down on click gives a button tactile feedback. <!-- LOCAL: the press scale value is owned by /motion:animate -->Take the value from `/motion:animate`.<!-- LOCAL END --> Add a `static` prop to switch it off where motion would distract. See [recipes for CSS, Tailwind and Motion](animations.md#scale-on-press).
  
--Where an icon swaps on an infrequent state change, such as play to pause or copy to copied, cross-fade it. Scale runs `0.25` to `1`, opacity `0` to `1` and blur `4px` to `0px`. With a motion library, use `{ type: "spring", duration: 0.3, bounce: 0 }`, and bounce is always `0`. Without one, keep both icons in the DOM and cross-fade over `300ms` with `cubic-bezier(0.2, 0, 0, 1)`.
-+Where an icon swaps on an infrequent state change, such as play to pause or copy to copied, cross-fade it. Scale runs `0.25` to `1`, opacity `0` to `1` and blur `4px` to `0px`. With a motion library, <!-- LOCAL: spring values are owned by /motion:animate -->take the spring's duration and bounce from `/motion:animate`<!-- LOCAL END -->. Without one, keep both icons in the DOM and cross-fade over `300ms` with `cubic-bezier(0.2, 0, 0, 1)`.
- 
- A tab's icon swap and the actions a row reveals on hover fall under **High-frequency interactions get no animation**. Both recipes are in [icon-transitions.md](icon-transitions.md).
+ ## Skip animation on page load
  

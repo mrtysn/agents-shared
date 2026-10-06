@@ -1,24 +1,34 @@
 # Performance
 
-Recipes for transition specificity and compositing hints.
+Transition specificity and GPU compositing hints.
 
 ## Transition only what changes
 
-`transition: all` animates properties nobody meant to animate, such as colors on a theme flip. On layout properties such as `width` and `padding` it re-runs layout on every frame. Tailwind's bare `transition` is a curated list rather than `all`, and still covers more than most elements change.
+Never use `transition: all` or Tailwind's `transition-all`. Always name the exact properties that change. Tailwind's bare `transition` maps to a curated list of colors, opacity, shadow and transforms rather than `all`, and naming what changes is still better.
+
+### Why
+
+- `transition: all` forces the browser to watch every property for changes
+- Causes unexpected transitions on properties you didn't intend to animate (colors, padding, shadows)
+- Prevents browser optimizations
+
+### CSS example
 
 ```css
-/* Good: only what changes */
+/* Good: only transition what changes */
 .button {
   transition-property: scale, background-color;
   transition-duration: 150ms;
   transition-timing-function: ease-out;
 }
 
-/* Bad: everything */
+/* Bad: transition everything */
 .button {
   transition: all 150ms ease-out;
 }
 ```
+
+### Tailwind
 
 ```tsx
 // Good: explicit properties
@@ -28,36 +38,51 @@ Recipes for transition specificity and compositing hints.
 <button className="transition-all duration-150 ease-out">
 ```
 
-In Tailwind 4, `transition-transform` covers `transform, translate, scale, rotate`, and in Tailwind 3 only `transform`. Use it when animating transforms alone. Mixing transform and other properties takes the bracket syntax, as in `transition-[scale,opacity,filter]`.
+### Tailwind `transition-transform` note
 
-## Use will-change sparingly
+`transition-transform` in Tailwind maps to `transition-property: transform, translate, scale, rotate`, covering every transform-related property rather than only `transform`. Use it when animating transforms alone. For several non-transform properties, use the bracket syntax `transition-[scale,opacity,filter]`.
 
-`will-change` promotes an element to its own compositing layer ahead of time. Without it the browser promotes when the animation starts, and that one-time promotion can stutter on the first frame. Each extra layer costs memory, so never add it preemptively.
+## Use `will-change` sparingly
+
+`will-change` hints the browser to pre-promote an element to its own GPU compositing layer. Without it the browser promotes only when the animation starts, and that one-time promotion can cause a micro-stutter on the first frame.
+
+It helps most for `scale`, `rotation` and movement through `transform`. For other properties it does little, because the browser cannot composite them on the GPU anyway.
+
+### Rules
 
 ```css
-/* Good: names the property that animates */
+/* Good: specific property that benefits from GPU compositing */
 .animated-card {
-  will-change: scale, opacity;
+  will-change: transform;
 }
 
-/* Bad: never all */
+/* Good: multiple compositor-friendly properties */
+.animated-card {
+  will-change: transform, opacity;
+}
+
+/* Bad: never use will-change: all */
 .animated-card {
   will-change: all;
 }
 
-/* Bad: these never composite */
+/* Bad: properties that can't be GPU-composited anyway */
 .animated-card {
   will-change: background-color, padding;
 }
 ```
 
-| Property | Worth `will-change` |
-| --- | --- |
-| `transform`, `translate`, `scale`, `rotate` | Yes |
-| `opacity` | Yes |
-| `filter` | Yes |
-| `clip-path` | Rarely, since compositing it is not reliable across browsers |
-| `top`, `left`, `width`, `height` | No |
-| `background`, `border`, `color` | No |
+### Useful properties
 
-`will-change` on a transform property or `filter` makes the element the containing block for its `position: fixed` descendants, so a fixed modal or tooltip inside it stops tracking the viewport. Any of these values also creates a stacking context, which can reorder `z-index` against siblings.
+| Property | GPU-compositable | Worth using `will-change` |
+| --- | --- | --- |
+| `transform` | Yes | Yes |
+| `opacity` | Yes | Yes |
+| `filter` (blur, brightness) | Yes | Yes |
+| `clip-path` | Newer Chromium only | Rarely; not reliable cross-browser |
+| `top`, `left`, `width`, `height` | No | No |
+| `background`, `border`, `color` | No | No |
+
+### When to skip
+
+Modern browsers optimize well on their own. Add `will-change` only when you see first-frame stutter, which Safari benefits from most. Never add it preemptively to every animated element, since each extra compositing layer costs memory.
