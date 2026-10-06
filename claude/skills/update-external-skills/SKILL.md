@@ -28,11 +28,19 @@ A 429, 403 or any refusal ends the run: stop and report.
    Report the counts and the behind skills, conflicts first. If nothing is behind, stop.
 3. **Sync.** `bash scripts/sync-external-skills.sh $ARGUMENTS`. For a very large set, sync
    by group so each commit stays reviewable.
-4. **Resolve conflicts.** A conflicted skill has markers (`<<<<<<< local`, `||||||| base`,
-   `>>>>>>> upstream`) in the working file and an un-advanced base. Read both sides,
-   keep our `<!-- LOCAL -->` change and take upstream's intent, remove the markers,
-   re-run the script for that skill to advance the base and regenerate `override.patch`.
-   Never leave markers committed and never overwrite a local override to make a conflict go away.
+4. **Resolve conflicts.** A conflicted skill has markers (`<<<<<<< local`, `=======`,
+   `>>>>>>> upstream@<short sha>`) in the working file and an un-advanced base. Read both
+   sides and keep our `<!-- LOCAL -->` intent. When upstream rewrote the section so the
+   markers cannot be merged line by line, fetch upstream's new file into the scratchpad,
+   take it whole, and re-apply our local edits onto it. Never leave markers committed and
+   never drop a local override to make a conflict go away.
+   **Re-running the script does not finish a conflict**: the working file already holds
+   upstream's change, so the merge would repeat it. Advance the skill by hand instead:
+   set `source.json`'s `commit` to the full SHA (`git ls-remote` it; it must start with the
+   short sha in the markers, else upstream moved and the merge must be redone) and `updated`
+   to today, then `bash scripts/sync-external-skills.sh --establish-base <name>`. That
+   refetches the files at the new pin into `.upstream/` and regenerates `override.patch`
+   from the resolved working files.
 5. **Check.** Read the diff of each updated skill that carries an `override.patch`:
    the local change must still be present and still make sense against the new text.
    If upstream renamed or removed a file, `source.json`'s `files` list needs the matching edit.
