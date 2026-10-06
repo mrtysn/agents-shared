@@ -44,5 +44,5 @@ A 429, 403 or any refusal ends the run: stop and report.
 ## Report
 
 Say per skill: updated, already current, conflicted-and-resolved, or failed, and name any
-override that needed manual merging. Failures (`ls-remote` or missing upstream file) are
+override that needed manual merging. Failures (a failed fetch or a missing upstream file) are
 listed with the reason and left alone.
