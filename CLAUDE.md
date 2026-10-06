@@ -110,11 +110,14 @@ as conflict markers in the working file and reported — never silently lost.
 2. Create `source.json` with `repo`, `path`, the current `commit` SHA, and (if multi-file) `files`
 3. Establish the pristine base: `bash scripts/sync-external-skills.sh --establish-base <name>` — fetches the files at the pinned commit into `.upstream/` and captures any local edits as `override.patch`
 
-**Updating external skills:**
+**Updating external skills:** run `/update-external-skills`, or by hand:
 ```bash
+bash scripts/sync-external-skills.sh --dry-run [<name>]  # preview only, writes nothing
 bash scripts/sync-external-skills.sh            # all → upstream HEAD
 bash scripts/sync-external-skills.sh <name>      # one
 ```
+`--dry-run` makes one `ls-remote` per distinct upstream repo and trial-merges each
+behind skill on temp copies, reporting `merges clean` or `CONFLICT`.
 
 The script reads each `source.json`, resolves upstream HEAD via `git ls-remote`
 (no clone — file contents come from raw.githubusercontent, so a huge upstream repo
