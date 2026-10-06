@@ -30,6 +30,10 @@ while [ $# -gt 0 ]; do
     esac
 done
 
+LOG=$(mktemp)
+trap 'rm -f "$LOG"' EXIT
+export SSH_REQUEST_GUARD_LOG=$LOG
+asks=0
 fail=0
 total=0
 while IFS=$'\t' read -r want cmd; do
@@ -41,6 +45,7 @@ while IFS=$'\t' read -r want cmd; do
     if [ -n "$out" ]; then
         got=$(printf '%s' "$out" | jq -r '.hookSpecificOutput.permissionDecision')
     fi
+    [ "$got" = ask ] && asks=$((asks + 1))
     if [ "$got" != "$want" ]; then
         fail=$((fail + 1))
         printf 'FAIL  want %-4s got %-4s  %s\n' "$want" "$got" "$cmd"
@@ -49,5 +54,16 @@ while IFS=$'\t' read -r want cmd; do
     fi
 done < "$CASES"
 
-echo "$((total - fail))/$total passed"
+# every ask, and nothing else, is one JSON line in the log, carrying the command it stopped
+logged=$(grep -c . "$LOG" || true)
+if [ "$logged" != "$asks" ]; then
+    fail=$((fail + 1))
+    printf 'FAIL  log holds %s lines for %s asks\n' "$logged" "$asks"
+fi
+if [ "$asks" -gt 0 ] && ! jq -e 'select(.command != "" and .reason != "" and .at != "")' "$LOG" >/dev/null 2>&1; then
+    fail=$((fail + 1))
+    echo "FAIL  a log line lacks command, reason or time"
+fi
+
+echo "$((total - fail))/$total passed, $asks asks logged"
 [ "$fail" = 0 ]

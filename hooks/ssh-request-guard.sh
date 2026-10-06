@@ -31,6 +31,12 @@
 #     cannot be read, so it asks: feed a script as a heredoc instead.
 #   Every other command in the same remote text must itself be free of network words.
 #
+# Every ask is also appended, as one JSON line (time, session, cwd, transcript, tool use id, command,
+# reason), to $SSH_REQUEST_GUARD_LOG, default $CLAUDE_CONFIG_DIR/ssh-request-guard/asks.jsonl, so the
+# commands it stops can be reviewed later: scripts/review-ssh-guard-asks.py joins each line with the
+# transcript to show whether the ask was approved or denied. Logging never blocks: a failed write is
+# ignored and the ask still fires. Passes are not logged.
+#
 # Known false positive, kept deliberately: a network word inside an argument asks too — e.g. `https`
 # in a grep pattern. Not covered: a remote script file (`ssh host ./fetch.sh`), which the hook cannot
 # read, and ssh inside a local script file (same carve-out as require-absolute-rm.sh).
@@ -52,7 +58,18 @@ SUB_RE='(^|[^[:alnum:]_.-])((docker|podman|nerdctl)([[:space:]][^;&|]*)?[[:space
 # bash's network redirection; followed by a host, so it has no word boundary after it
 DEV_RE='/dev/(tcp|udp)/'
 
+log_ask() {
+    local file=${SSH_REQUEST_GUARD_LOG:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/ssh-request-guard/asks.jsonl}
+    {
+        mkdir -p "$(dirname "$file")" &&
+        printf '%s' "$INPUT" | jq -c --arg r "$1" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{at: $at, session: (.session_id // ""), cwd: (.cwd // ""), transcript: (.transcript_path // ""),
+              tool_use_id: (.tool_use_id // ""), command: (.tool_input.command // ""), reason: $r}' >> "$file"
+    } 2>/dev/null || true
+}
+
 ask() {
+    log_ask "$1"
     jq -n --arg r "$1" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: $r}}'
     exit 0
 }
