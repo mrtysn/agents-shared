@@ -17,7 +17,9 @@
 # that launches a windowed app without it ever becoming active (open -g plus an
 # injected AppKit shim; see the window-focus rule). The verdict is a tolerance
 # for the interruption, not a licence: under either verdict a windowed launch
-# goes through quiet-open first, and only an app it cannot quiet becomes an ask.
+# only an agent looks at goes through quiet-open first, and only an app it cannot
+# quiet becomes an ask. An app launched for the user goes through plain open -g:
+# quiet-open leaves it without a Dock icon or any way to bring it forward.
 # --check and --verdict are consumed by scripts and stay exactly as they were.
 #
 # The allow-list lives outside this repository, as `focus-allow` in the Claude
@@ -74,7 +76,7 @@ else
 fi
 
 if [ "$VERDICT" = "allow" ]; then
-	CONTEXT="Focus policy: ALLOW${QUIET_NOTE}. The interruption is tolerated here, but a window that activates still hides a hotkey terminal: launch windowed apps through quiet-open (exit 0 + 'quiet: loaded' = focus untouched); an app it cannot quiet needs one ask per batch, stating the process count."
+	CONTEXT="Focus policy: ALLOW${QUIET_NOTE}. The interruption is tolerated here, but a window that activates still hides a hotkey terminal: launch windows only you look at (captures, checks) through quiet-open (exit 0 + 'quiet: loaded' = focus untouched); an app it cannot quiet needs one ask per batch, stating the process count. An app launched for the user to use goes through plain open -g, never quiet-open: quiet-open leaves it with no Dock icon and no way to bring it forward."
 else
 	# Assigned via `read`, not `$(cat <<EOF)`: bash 3.2, which macOS ships,
 	# mishandles a heredoc inside command substitution.
@@ -91,6 +93,9 @@ stealing focus interrupts them mid-sentence.
   in its output means the app never activated and no ask is needed. Off-screen
   \`--position\` and a small \`--resolution\` are not stealth; they do not stop
   activation.
+- An app launched for the user to use (a rebuilt tool they work in) goes
+  through plain \`open -g\`, never quiet-open: quiet-open leaves it with no Dock
+  icon and no way to bring it forward.
 - If quiet-open is not installed or cannot quiet that app, say so and ask first
   — one ask per batch, stating the process count. Then do it in ONE batched run
   rather than iterating.

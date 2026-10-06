@@ -1,7 +1,8 @@
 # Window focus
 
 **Never open a window that becomes the active app unless it went through
-`quiet-open`, or the user said yes to that batch.** Some machines are shared with
+`quiet-open`, is an app launched for the user to use (below), or the user said
+yes to that batch.** Some machines are shared with
 real work on the same screen; a game engine, a browser, or a simulator grabbing
 focus mid-sentence is a genuine interruption, and it is worse when it happens
 five times in a row during an iteration loop. A hotkey terminal makes it worse
@@ -22,9 +23,28 @@ window is harmless. It was ALLOW on the owner's machine on 2026-09-16 while
 thirty windowed launches each closed the hotkey terminal. So the verdict decides
 how loud to be about the exception, never whether a window may activate.
 
-## Under either verdict: `quiet-open` first
+## An app launched for the user is never quieted
 
-A windowed launch of a program goes through `quiet-open <App.app> [args…]`
+**`quiet-open` is for windows only an agent uses** — a frame capture, a
+screenshot check, a test run. Its shim forces the activation policy to
+Prohibited, so the app gets **no Dock icon and can never be brought forward**:
+an app the user is meant to look at or work in is unusable under it.
+
+When the launch is for the user — a rebuilt tool they are iterating on, an app
+they asked to see — start it with plain `open -g <App.app>`. It appears in the
+Dock and the app switcher and does not take focus at launch (an app that
+activates itself may still take it once; that is the price of handing over a
+usable window). Then check it is a normal app: System Events reports
+`background only` false for its process.
+
+Oct 2026: after a launcher rebuild the agent relaunched it through quiet-open
+for the user; it ran with no Dock icon and could not be reached: "if you opened
+it with quiet open for my use, then the rules about quiet open is lacking and
+you were misguided".
+
+## Agent-only windows: `quiet-open` first
+
+A windowed launch of a program that only the agent looks at goes through `quiet-open <App.app> [args…]`
 (the owner's `tools` repo, symlinked into `~/bin`; the hook line says whether it
 is installed). It launches through `open -g` with an AppKit shim injected into
 an ad-hoc re-signed copy of the app, so the app never becomes active. Read the

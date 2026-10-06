@@ -17,9 +17,11 @@ the user.
    - **Background agent, daemon, or menu bar app with no window** — restart it
      through the repo's install path. It takes no focus.
    - **A windowed app the user is actively iterating on in this session** —
-     restart it, launching through `quiet-open` per [window focus](window-focus.md).
-   - **A windowed app the user is not iterating on, or one `quiet-open` cannot
-     launch** — leave it running and say once: "rebuilt; quit and reopen X".
+     restart it with plain `open -g`, never `quiet-open`: quiet-open removes the
+     Dock icon and keeps the window from ever coming forward, so the user cannot
+     use it ([window focus](window-focus.md)).
+   - **A windowed app the user is not iterating on** — leave it running and say
+     once: "rebuilt; quit and reopen X".
 4. **Check that exactly one copy is running, and it is the new one.** An instance
    opened by hand outside the launch agent survives a reinstall and keeps the old
    build alive beside the new one.
