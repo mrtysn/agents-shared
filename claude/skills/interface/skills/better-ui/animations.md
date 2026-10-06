@@ -1,17 +1,22 @@
 # Animations
 
-Recipes for interruptible transitions, press feedback, first-render behavior, theme switches and the reduced-motion fallback. Staged entrances and exits live in [enter-exit.md](enter-exit.md), and icon swaps in [icon-transitions.md](icon-transitions.md).
+Interruptible transitions, press feedback and the restraint that decides whether to animate at all. Staged entrances and exits live in [enter-exit.md](enter-exit.md); icon swaps in [icon-transitions.md](icon-transitions.md).
 
 ## Interruptible animations
 
-| | CSS transitions | CSS keyframe animations |
+Users change intent mid-interaction. Animations that cannot be interrupted make the interface feel broken.
+
+### CSS transitions vs. keyframes
+
+| | CSS Transitions | CSS Keyframe Animations |
 | --- | --- | --- |
-| **Behavior** | Interpolate toward the latest state | Run on a fixed timeline |
-| **Interrupted** | Retarget mid-flight and reverse | Snap or restart from the beginning |
-| **Use for** | Hover, toggle, open and close | Sequences that run once, such as enters and loading |
+| **Behavior** | Interpolate toward latest state | Run on a fixed timeline |
+| **Interruptible** | Yes, retargets mid-animation | No, restarts from beginning |
+| **Use for** | Interactive state changes (hover, toggle, open/close) | Staged sequences that run once (enter animations, loading) |
+| **Duration** | Fixed; retargets the value mid-flight, not the timeline | Fixed timeline, restarts from the beginning |
 
 ```css
-/* Good: clicking again mid-animation reverses smoothly */
+/* Good: interruptible transition for a toggle */
 .drawer {
   transform: translateX(-100%);
   transition: transform 200ms ease-out;
@@ -20,13 +25,27 @@ Recipes for interruptible transitions, press feedback, first-render behavior, th
   transform: translateX(0);
 }
 
-/* Bad: closing mid-animation snaps */
+/* Clicking again mid-animation smoothly reverses, no jank */
+```
+
+```css
+/* Bad: keyframe animation for interactive element */
 .drawer.open {
   animation: slideIn 200ms ease-out forwards;
 }
+
+/* Closing mid-animation snaps or restarts, feels broken */
 ```
 
+Prefer CSS transitions for interactive elements. Reserve keyframes for one-shot sequences.
+
 ## Scale on press
+
+A subtle scale-down on click gives buttons tactile feedback. Always `scale(0.96)`, never below `0.95`, which feels exaggerated. Use CSS transitions so a release mid-press returns smoothly.
+
+Not every button needs it. Add a `static` prop that disables the scale where the motion would distract.
+
+### CSS example
 
 ```css
 .button {
@@ -35,29 +54,33 @@ Recipes for interruptible transitions, press feedback, first-render behavior, th
   transition-timing-function: ease-out;
 }
 
-.button:not(:disabled):active {
+.button:active {
   scale: 0.96;
 }
 ```
 
+### Tailwind example
+
 ```tsx
-// Tailwind
-<button className="transition-transform duration-150 ease-out enabled:active:scale-[0.96]">
+<button className="transition-transform duration-150 ease-out active:scale-[0.96]">
   Click me
 </button>
+```
 
-// Motion
-<motion.button whileTap={disabled ? undefined : { scale: 0.96 }} disabled={disabled}>
+### Motion example
+
+```tsx
+<motion.button whileTap={{ scale: 0.96 }}>
   Click me
 </motion.button>
 ```
 
 ### Static prop pattern
 
-Where the button has no variant API to carry the opt-out, apply the scale class conditionally on a `static` prop:
+Extract the scale class into a variable and apply it conditionally on a `static` prop:
 
 ```tsx
-const tapScale = "enabled:active:scale-[0.96]";
+const tapScale = "active:not-disabled:scale-[0.96]";
 
 function Button({ static: isStatic, className, children, ...props }) {
   return (
@@ -81,12 +104,32 @@ function Button({ static: isStatic, className, children, ...props }) {
 
 ## Skip animation on page load
 
-The icon recipe in [icon-transitions.md](icon-transitions.md#motion) shows `initial={false}` used correctly. It suits icon swaps, toggles, tabs and segmented controls, anything with a default state on page load.
+Use `initial={false}` on `AnimatePresence` to stop enter animations firing on first render. An element already in its default state animates on later state changes, not on page load.
 
-Setting it around a first-time entrance skips that entrance entirely. Check the component on a full page refresh before adding it.
+### When it works
 
 ```tsx
-// Bad: initial={false} skips the staggered page enter
+// Good: icon doesn't animate in on mount, only on state change
+<AnimatePresence initial={false} mode="popLayout">
+  <motion.span
+    key={isActive ? "active" : "inactive"}
+    initial={{ opacity: 0, scale: 0.25, filter: "blur(4px)" }}
+    animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+    exit={{ opacity: 0, scale: 0.25, filter: "blur(4px)" }}
+  >
+    <Icon />
+  </motion.span>
+</AnimatePresence>
+```
+
+Works well for icon swaps, toggles, tabs and segmented controls, anything with a default state on page load.
+
+### When it breaks
+
+Never use `initial={false}` where the component relies on its `initial` prop for a first-time enter animation, such as a staggered page hero or a loading state. Removing it skips the entire entrance.
+
+```tsx
+// Bad: initial={false} would skip the staggered page enter entirely
 <AnimatePresence initial={false}>
   <motion.div initial="hidden" animate="visible" variants={...}>
     ...
@@ -94,9 +137,13 @@ Setting it around a first-time entrance skips that entrance entirely. Check the 
 </AnimatePresence>
 ```
 
+Verify the component still looks right on a full page refresh before applying this.
+
 ## Suppress transitions on theme switch
 
-Inject a stylesheet that turns off every transition, force a style flush so the new colors commit while it applies, then remove it after the next frame:
+Flipping the theme changes `color`, `background-color`, `border-color` and `box-shadow` on nearly every element at once. Everything carrying a transition on those properties animates together, so the switch reads as a slow smear rather than an instant change. Disable transitions for the swap and restore them right after.
+
+Inject a stylesheet that turns off every transition, force a reflow so the new colors commit while it still applies, then drop it on the next frame:
 
 ```tsx
 "use client";
@@ -116,7 +163,7 @@ export function DisableThemeTransitions() {
       );
       document.head.append(style);
 
-      void document.body.offsetHeight; // forces a synchronous style flush
+      const _flushReflow = document.body.offsetHeight;
 
       requestAnimationFrame(() => {
         requestAnimationFrame(() => style.remove());
@@ -131,11 +178,17 @@ export function DisableThemeTransitions() {
 }
 ```
 
-The new theme resolves while the override is still in the document, so no transition starts. The nested `requestAnimationFrame` removes the override only after that paint.
+`document.body.offsetHeight` is read for its side effect, forcing a synchronous style flush so the new theme resolves while the override is still in the document and no transition starts. The nested `requestAnimationFrame` removes the override only after that paint, restoring transitions before the next interaction.
 
-That covers the OS-level change. An in-app toggle needs the same steps around its own flip: apply the override, change the theme, flush and remove. `next-themes` ships this as `disableTransitionOnChange`.
+That covers the OS-level change. An in-app toggle needs the same treatment around its own flip: apply the override, change the theme, flush, remove. `next-themes` ships this as `disableTransitionOnChange`.
 
-## High-frequency motion
+## Motion restraint
+
+Motion is a budget, not a garnish. Three rules decide whether an animation belongs at all:
+
+- **Give high-frequency interactions instant feedback instead of animation.** Every keystroke, every list-row hover, every tab switch in a work tool. Reserve expressive motion for infrequent moments (first load of a view, success states, empty states); high-frequency interactions get instant feedback or the subtlest possible transition (`opacity`/`background-color` at ≤150ms).
+- **Motion is never the only feedback channel.** Every state change an animation communicates stays visible when it doesn't run: a color change, an icon swap, a label. Users with reduced motion enabled and anyone who blinked still need to see what happened.
+- **Brief and precise beats prominent.** Where a shorter, smaller animation says the same thing, use it. When in doubt cut the duration, not the clarity.
 
 ```css
 /* Good: high-frequency hover gets a minimal transition */
@@ -150,21 +203,3 @@ That covers the OS-level change. An in-app toggle needs the same steps around it
 }
 ```
 
-## Reduced-motion fallback
-
-The opacity fade runs for everyone, and movement, scale and blur join it only without the preference:
-
-```css
-.panel {
-  transition: opacity 150ms ease-out;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .panel {
-    transition-property: opacity, translate, scale, filter;
-    transition-duration: 300ms;
-  }
-}
-```
-
-In Tailwind, prefix movement, scale and blur utilities with `motion-safe:`. In Motion, wrap the app in `<MotionConfig reducedMotion="user">`. It turns off transform and layout animations under the preference and keeps opacity. Blur still runs there, so branch on `useReducedMotion()` where a recipe animates `filter`.
