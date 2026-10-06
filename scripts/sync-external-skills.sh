@@ -14,8 +14,13 @@
 # working files, so local edits are replayed on top instead of clobbered. A genuine
 # conflict is left as markers in the working file and reported — never silently lost.
 #
-# No cloning: uses `git ls-remote` for the HEAD SHA and raw.githubusercontent for
-# file contents, so a huge upstream repo (e.g. anthropics/skills) costs a few GETs.
+# One blobless shallow fetch per distinct upstream repo (`--depth=1 --filter=blob:none`):
+# trees only, no file contents. Each vendored file's upstream blob SHA is compared with
+# the SHA of its `.upstream/` copy locally, so only files that really changed are
+# downloaded, and a repo shared by thirty skills costs one fetch, not thirty. A skill
+# whose files are all identical is "up to date" even when the repo's HEAD moved, and
+# its pin is left alone. (--establish-base still reads the pinned commit via
+# raw.githubusercontent.)
 #
 # Which files: source.json's optional "files" array (skill-dir-relative). Defaults
 # to ["SKILL.md"]. `.venv/` and other local-only artifacts are never listed, so
@@ -30,8 +35,8 @@
 #                                                            # behind upstream, and whether
 #                                                            # the 3-way merge would be clean.
 #                                                            # Writes nothing in the repo.
-#                                                            # One ls-remote per distinct repo,
-#                                                            # plus file GETs for behind skills.
+#                                                            # One blobless fetch per distinct
+#                                                            # repo, plus blobs of changed files.
 #   bash scripts/sync-external-skills.sh --establish-base [<name>]
 #                                                            # (re)build .upstream +
 #                                                            # override.patch from the
@@ -61,13 +66,19 @@ behind_clean=(); behind_conflict=()
 HEAD_CACHE=$(mktemp -d)
 trap 'rm -rf "$HEAD_CACHE"' EXIT
 
-# head_sha <repo> — upstream HEAD SHA, one ls-remote per distinct repo per run.
-head_sha() {
-    local key="$HEAD_CACHE/${1//\//__}"
-    if [[ ! -f "$key" ]]; then
-        git ls-remote "https://github.com/$1.git" HEAD 2>/dev/null | cut -f1 > "$key"
+# repo_head <repo> — blobless shallow fetch of upstream HEAD, once per distinct repo per
+# run, into $HEAD_CACHE/<repo>.git. Prints HEAD's SHA, or nothing on failure.
+repo_dir() { echo "$HEAD_CACHE/${1//\//__}.git"; }
+repo_head() {
+    local rd; rd=$(repo_dir "$1")
+    if [[ ! -f "$rd.sha" ]]; then
+        git init -q --bare "$rd" \
+            && git -C "$rd" remote add origin "https://github.com/$1.git" \
+            && git -C "$rd" fetch -q --depth=1 --filter=blob:none --no-tags origin HEAD 2>/dev/null \
+            && git -C "$rd" rev-parse FETCH_HEAD > "$rd.sha" \
+            || : > "$rd.sha"
     fi
-    cat "$key"
+    cat "$rd.sha"
 }
 
 raw_url() { echo "https://raw.githubusercontent.com/$1/$2/$3"; }
@@ -142,77 +153,73 @@ for source_file in "$SKILLS_DIR"/*/source.json "$SKILLS_DIR"/*/skills/*/source.j
         continue
     fi
 
-    # ── Sync mode: pull upstream HEAD, 3-way merge, preserve local edits ──────
+    # ── Sync / dry-run: compare blob SHAs locally, fetch only what changed ────
     [[ "$MODE" == "dry" ]] || echo "Syncing $skill_name from $repo..."
-    new_commit=$(head_sha "$repo")
+    new_commit=$(repo_head "$repo")
     if [[ -z "$new_commit" ]]; then
-        failed+=("$skill_name — ls-remote failed for $repo")
+        failed+=("$skill_name — fetch failed for $repo")
         continue
     fi
-
-    # ── Dry-run mode: report only, trial-merge on temp copies ─────────────────
-    if [[ "$MODE" == "dry" ]]; then
-        if [[ "$old_commit" == "$new_commit" ]]; then
-            skipped+=("$skill_name"); continue
-        fi
-        tmp_dry=$(mktemp -d); ok=1; conflict_files=()
-        for f in "${files[@]}"; do
-            fetch "$repo" "$new_commit" "$upstream_dir/$f" "$tmp_dry/new/$f" || { ok=0; break; }
-            if [[ -f "$base_dir/$f" ]]; then
-                mkdir -p "$tmp_dry/base/$(dirname "$f")"; cp "$base_dir/$f" "$tmp_dry/base/$f"
-            else
-                fetch "$repo" "$old_commit" "$upstream_dir/$f" "$tmp_dry/base/$f" || { ok=0; break; }
-            fi
-            if [[ -f "$skill_dir/$f" ]]; then
-                mkdir -p "$tmp_dry/work/$(dirname "$f")"; cp "$skill_dir/$f" "$tmp_dry/work/$f"
-                git merge-file -q "$tmp_dry/work/$f" "$tmp_dry/base/$f" "$tmp_dry/new/$f" || conflict_files+=("$f")
-            fi
-        done
-        rm -rf "$tmp_dry"
-        if [[ $ok -eq 0 ]]; then
-            failed+=("$skill_name — file not found upstream @ ${new_commit:0:7}")
-        elif [[ ${#conflict_files[@]} -gt 0 ]]; then
-            echo "  BEHIND  $skill_name ${old_commit:0:7} → ${new_commit:0:7}  CONFLICT: ${conflict_files[*]}"
-            behind_conflict+=("$skill_name (${conflict_files[*]})")
-        else
-            echo "  BEHIND  $skill_name ${old_commit:0:7} → ${new_commit:0:7}  merges clean"
-            behind_clean+=("$skill_name")
-        fi
-        continue
-    fi
+    rd=$(repo_dir "$repo")
+    up() { [[ "$upstream_dir" == "." ]] && echo "$1" || echo "$upstream_dir/$1"; }
 
     # Ensure a base exists (bootstrap from the pinned commit on first run).
     if [[ ! -d "$base_dir" ]]; then
+        if [[ "$MODE" == "dry" ]]; then
+            failed+=("$skill_name — no .upstream base; run --establish-base")
+            continue
+        fi
         ok=1
         for f in "${files[@]}"; do
-            fetch "$repo" "$old_commit" "$upstream_dir/$f" "$base_dir/$f" || { ok=0; break; }
+            fetch "$repo" "$old_commit" "$(up "$f")" "$base_dir/$f" || { ok=0; break; }
         done
         [[ $ok -eq 1 ]] || { failed+=("$skill_name — base bootstrap failed"); continue; }
     fi
 
-    # Fetch the new upstream files into a temp dir.
-    tmp_new=$(mktemp -d)
-    ok=1
+    # Which listed files differ from the base? SHAs only; no blob is downloaded here.
+    changed=(); new_shas=(); ok=1
     for f in "${files[@]}"; do
-        if ! fetch "$repo" "$new_commit" "$upstream_dir/$f" "$tmp_new/$f"; then
+        new_sha=$(git -C "$rd" rev-parse -q --verify "$new_commit:$(up "$f")" 2>/dev/null)
+        if [[ -z "$new_sha" ]]; then
             failed+=("$skill_name — file not found upstream: $f @ ${new_commit:0:7}")
             ok=0; break
         fi
+        if [[ ! -f "$base_dir/$f" ]] || [[ "$(git hash-object --no-filters "$base_dir/$f")" != "$new_sha" ]]; then
+            changed+=("$f"); new_shas+=("$new_sha")
+        fi
     done
-    if [[ $ok -eq 0 ]]; then rm -rf "$tmp_new"; continue; fi
+    [[ $ok -eq 1 ]] || continue
 
-    if [[ "$old_commit" == "$new_commit" ]]; then
-        echo "  Already up to date (${old_commit:0:7})"
-        regen_patch "$skill_dir" "${files[@]}"   # keep the patch fresh
+    if [[ ${#changed[@]} -eq 0 ]]; then
+        [[ "$MODE" == "dry" ]] || echo "  Already up to date (files identical to ${old_commit:0:7})"
+        [[ "$MODE" == "dry" ]] || regen_patch "$skill_dir" "${files[@]}"   # keep the patch fresh
         skipped+=("$skill_name")
-        rm -rf "$tmp_new"
         continue
     fi
 
-    # 3-way merge upstream's base->new change into each working file.
+    # Download only the changed blobs.
+    tmp_new=$(mktemp -d)
+    for i in "${!changed[@]}"; do
+        f="${changed[$i]}"
+        mkdir -p "$(dirname "$tmp_new/$f")"
+        git -C "$rd" cat-file blob "${new_shas[$i]}" > "$tmp_new/$f" 2>/dev/null || ok=0
+    done
+    if [[ $ok -eq 0 ]]; then
+        failed+=("$skill_name — blob download failed @ ${new_commit:0:7}")
+        rm -rf "$tmp_new"; continue
+    fi
+
+    # 3-way merge upstream's base->new change into each changed working file.
+    # Dry-run merges a temp copy of the working file, never the real one.
     conflict=0; conflict_files=()
-    for f in "${files[@]}"; do
+    for f in "${changed[@]}"; do
         work="$skill_dir/$f"; base="$base_dir/$f"; new="$tmp_new/$f"
+        if [[ "$MODE" == "dry" ]]; then
+            [[ -f "$work" && -f "$base" ]] || continue
+            trial="$tmp_new/.trial"; mkdir -p "$(dirname "$trial/$f")"; cp "$work" "$trial/$f"
+            git merge-file -q "$trial/$f" "$base" "$new" || { conflict=1; conflict_files+=("$f"); }
+            continue
+        fi
         if [[ ! -f "$work" ]]; then mkdir -p "$(dirname "$work")"; cp "$new" "$work"; continue; fi
         [[ -f "$base" ]] || cp "$new" "$base"   # no recorded base → assume no local edit
         if ! git merge-file -q \
@@ -224,6 +231,17 @@ for source_file in "$SKILLS_DIR"/*/source.json "$SKILLS_DIR"/*/skills/*/source.j
         fi
     done
 
+    if [[ "$MODE" == "dry" ]]; then
+        if [[ $conflict -eq 1 ]]; then
+            echo "  BEHIND  $skill_name (${#changed[@]} changed)  CONFLICT: ${conflict_files[*]}"
+            behind_conflict+=("$skill_name (${conflict_files[*]})")
+        else
+            echo "  BEHIND  $skill_name (${#changed[@]} changed)  merges clean"
+            behind_clean+=("$skill_name")
+        fi
+        rm -rf "$tmp_new"; continue
+    fi
+
     if [[ $conflict -eq 1 ]]; then
         echo "  CONFLICT in: ${conflict_files[*]}"
         echo "  Conflict markers left in the working file(s); base NOT advanced."
@@ -234,7 +252,7 @@ for source_file in "$SKILLS_DIR"/*/source.json "$SKILLS_DIR"/*/skills/*/source.j
     fi
 
     # Clean merge: advance base, refresh patch, bump provenance.
-    for f in "${files[@]}"; do
+    for f in "${changed[@]}"; do
         mkdir -p "$(dirname "$base_dir/$f")"
         cp "$tmp_new/$f" "$base_dir/$f"
     done
@@ -242,7 +260,7 @@ for source_file in "$SKILLS_DIR"/*/source.json "$SKILLS_DIR"/*/skills/*/source.j
     new_src=$(jq --arg c "$new_commit" --arg d "$today" '.commit=$c | .updated=$d' "$source_file")
     printf '%s\n' "$new_src" > "$source_file"
 
-    echo "  Updated: ${old_commit:0:7} → ${new_commit:0:7}"
+    echo "  Updated: ${old_commit:0:7} → ${new_commit:0:7} (${#changed[@]} file(s))"
     [[ -f "$skill_dir/override.patch" ]] && echo "  (local override preserved)"
     updated+=("$skill_name")
     rm -rf "$tmp_new"

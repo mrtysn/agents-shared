@@ -116,13 +116,15 @@ bash scripts/sync-external-skills.sh --dry-run [<name>]  # preview only, writes 
 bash scripts/sync-external-skills.sh            # all → upstream HEAD
 bash scripts/sync-external-skills.sh <name>      # one
 ```
-`--dry-run` makes one `ls-remote` per distinct upstream repo and trial-merges each
-behind skill on temp copies, reporting `merges clean` or `CONFLICT`.
+`--dry-run` trial-merges each behind skill on temp copies, reporting `merges clean`
+or `CONFLICT`.
 
-The script reads each `source.json`, resolves upstream HEAD via `git ls-remote`
-(no clone — file contents come from raw.githubusercontent, so a huge upstream repo
-costs a few GETs), 3-way merges each listed file, advances `.upstream/`, refreshes
-`override.patch`, and bumps `commit`/`updated`. On conflict it stops for that skill,
+The script reads each `source.json` and does one blobless shallow fetch per distinct
+upstream repo (trees only, no file contents). It compares each listed file's upstream
+blob SHA with its `.upstream/` copy locally, so only files that actually changed are
+downloaded; a skill whose files are identical stays "up to date" and its pin is not
+bumped, even when the repo's HEAD moved. Changed files are 3-way merged, `.upstream/`
+advanced, `override.patch` refreshed, and `commit`/`updated` bumped. On conflict it stops for that skill,
 leaves markers in the working file, and does not advance the base; resolve the
 markers and re-run, or `git checkout` the skill dir to abort.
 

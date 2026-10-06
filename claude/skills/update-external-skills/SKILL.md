@@ -16,8 +16,8 @@ Empty means every external skill.
 ## Traffic first
 
 These are requests to GitHub from the user's IP. Before the first run, say the count:
-one `ls-remote` per distinct upstream repo, plus one GET per vendored file of each
-skill that is behind. Never loop the script to test; run each mode once.
+one blobless fetch per distinct upstream repo (about 26 for everything), plus the blobs
+of files that actually changed. Never loop the script to test; run each mode once.
 A 429, 403 or any refusal ends the run: stop and report.
 
 ## Procedure
