@@ -26,6 +26,12 @@
 #   bash scripts/sync-external-skills.sh <name>              # sync one skill, or every
 #                                                            # skill in a group (<group>
 #                                                            # or <group>:<name>)
+#   bash scripts/sync-external-skills.sh --dry-run [<name>]  # preview: which skills are
+#                                                            # behind upstream, and whether
+#                                                            # the 3-way merge would be clean.
+#                                                            # Writes nothing in the repo.
+#                                                            # One ls-remote per distinct repo,
+#                                                            # plus file GETs for behind skills.
 #   bash scripts/sync-external-skills.sh --establish-base [<name>]
 #                                                            # (re)build .upstream +
 #                                                            # override.patch from the
@@ -44,12 +50,25 @@ filter=""
 for arg in "$@"; do
     case "$arg" in
         --establish-base) MODE="establish" ;;
+        --dry-run) MODE="dry" ;;
         *) filter="$arg" ;;
     esac
 done
 
 today=$(date +%Y-%m-%d)
 updated=(); established=(); skipped=(); failed=(); conflicted=()
+behind_clean=(); behind_conflict=()
+HEAD_CACHE=$(mktemp -d)
+trap 'rm -rf "$HEAD_CACHE"' EXIT
+
+# head_sha <repo> — upstream HEAD SHA, one ls-remote per distinct repo per run.
+head_sha() {
+    local key="$HEAD_CACHE/${1//\//__}"
+    if [[ ! -f "$key" ]]; then
+        git ls-remote "https://github.com/$1.git" HEAD 2>/dev/null | cut -f1 > "$key"
+    fi
+    cat "$key"
+}
 
 raw_url() { echo "https://raw.githubusercontent.com/$1/$2/$3"; }
 
@@ -88,7 +107,7 @@ for source_file in "$SKILLS_DIR"/*/source.json "$SKILLS_DIR"/*/skills/*/source.j
     skill_dir="$(dirname "$source_file")"
     skill_name="$(basename "$skill_dir")"
     group_name=""
-    if [[ "$(basename "$(dirname "$skill_dir")")" == "skills" || "$(basename "$(dirname "$skill_dir")")" == "off" ]]; then
+    if [[ "$(dirname "$skill_dir")" != "$SKILLS_DIR" ]] && [[ "$(basename "$(dirname "$skill_dir")")" == "skills" || "$(basename "$(dirname "$skill_dir")")" == "off" ]]; then
         group_name="$(basename "$(dirname "$(dirname "$skill_dir")")")"
         skill_name="$group_name:$skill_name"
     fi
@@ -124,10 +143,41 @@ for source_file in "$SKILLS_DIR"/*/source.json "$SKILLS_DIR"/*/skills/*/source.j
     fi
 
     # ── Sync mode: pull upstream HEAD, 3-way merge, preserve local edits ──────
-    echo "Syncing $skill_name from $repo..."
-    new_commit=$(git ls-remote "https://github.com/$repo.git" HEAD 2>/dev/null | cut -f1)
+    [[ "$MODE" == "dry" ]] || echo "Syncing $skill_name from $repo..."
+    new_commit=$(head_sha "$repo")
     if [[ -z "$new_commit" ]]; then
         failed+=("$skill_name — ls-remote failed for $repo")
+        continue
+    fi
+
+    # ── Dry-run mode: report only, trial-merge on temp copies ─────────────────
+    if [[ "$MODE" == "dry" ]]; then
+        if [[ "$old_commit" == "$new_commit" ]]; then
+            skipped+=("$skill_name"); continue
+        fi
+        tmp_dry=$(mktemp -d); ok=1; conflict_files=()
+        for f in "${files[@]}"; do
+            fetch "$repo" "$new_commit" "$upstream_dir/$f" "$tmp_dry/new/$f" || { ok=0; break; }
+            if [[ -f "$base_dir/$f" ]]; then
+                mkdir -p "$tmp_dry/base/$(dirname "$f")"; cp "$base_dir/$f" "$tmp_dry/base/$f"
+            else
+                fetch "$repo" "$old_commit" "$upstream_dir/$f" "$tmp_dry/base/$f" || { ok=0; break; }
+            fi
+            if [[ -f "$skill_dir/$f" ]]; then
+                mkdir -p "$tmp_dry/work/$(dirname "$f")"; cp "$skill_dir/$f" "$tmp_dry/work/$f"
+                git merge-file -q "$tmp_dry/work/$f" "$tmp_dry/base/$f" "$tmp_dry/new/$f" || conflict_files+=("$f")
+            fi
+        done
+        rm -rf "$tmp_dry"
+        if [[ $ok -eq 0 ]]; then
+            failed+=("$skill_name — file not found upstream @ ${new_commit:0:7}")
+        elif [[ ${#conflict_files[@]} -gt 0 ]]; then
+            echo "  BEHIND  $skill_name ${old_commit:0:7} → ${new_commit:0:7}  CONFLICT: ${conflict_files[*]}"
+            behind_conflict+=("$skill_name (${conflict_files[*]})")
+        else
+            echo "  BEHIND  $skill_name ${old_commit:0:7} → ${new_commit:0:7}  merges clean"
+            behind_clean+=("$skill_name")
+        fi
         continue
     fi
 
@@ -200,6 +250,18 @@ done
 
 # ── Summary ──────────────────────────────────────────────────────────────
 echo ""
+if [[ "$MODE" == "dry" ]]; then
+    echo "=== Dry Run (nothing written) ==="
+    echo "  Up to date:        ${#skipped[@]}"
+    echo "  Behind, clean:     ${#behind_clean[@]}"
+    echo "  Behind, conflict:  ${#behind_conflict[@]}"
+    echo "  Failed:            ${#failed[@]}"
+    if [[ ${#failed[@]} -gt 0 ]]; then
+        echo ""; echo "Failures:"
+        for f in "${failed[@]}"; do echo "  - $f"; done
+    fi
+    exit 0
+fi
 echo "=== Sync Summary ==="
 [[ "$MODE" == "establish" ]] && echo "  Base established: ${#established[@]}"
 echo "  Updated:    ${#updated[@]}"
