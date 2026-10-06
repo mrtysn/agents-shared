@@ -1,7 +1,11 @@
 {
   "repo": "humbleteam/design-review",
   "path": "SKILL.md",
-  "files": ["SKILL.md", "references/review-rubric.md", "LICENSE"],
-  "commit": "70a3bfda1e079af1880cc2b41a088ae3340ccf1f",
-  "updated": "2026-09-19"
+  "files": [
+    "SKILL.md",
+    "references/review-rubric.md",
+    "LICENSE"
+  ],
+  "commit": "60ee03fd5802ecc3957ef0b7ef1cd423c1b04008",
+  "updated": "2026-10-07"
 }

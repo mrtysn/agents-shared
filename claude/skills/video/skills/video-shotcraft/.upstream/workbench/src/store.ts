@@ -7,6 +7,8 @@ import { demoProject } from "./demoProject";
 import { MANIFEST } from "./cards/projectCards";
 import { manifestKey } from "./cards/manifest";
 import { buildProjectFromManifest } from "./projectImport";
+import { upgradeLegacyTheme } from './theme';
+import { t } from "./i18n";
 
 export { projectDuration } from "./types";
 
@@ -31,7 +33,8 @@ const loadSaved = (): ProjectData | null => {
  *    旧存档压进撤销栈（⌘Z 可找回改动）；是这一版的保留用户改动
  *  - 否则读存档；没有存档时用演示工程 */
 const loadInitial = (): { project: ProjectData; past: ProjectData[]; imported: boolean } => {
-  const saved = loadSaved();
+  const raw = loadSaved();
+  const saved = raw ? upgradeLegacyTheme(raw, MANIFEST, CARDS) : null;
   const params = new URLSearchParams(window.location.search);
   if (params.get("import") === "project" && MANIFEST) {
     window.history.replaceState(null, "", window.location.pathname);
@@ -77,6 +80,8 @@ interface WorkbenchState {
   redo: () => void;
 
   setProject: (p: ProjectData) => void;
+  /** Live palette edit; the caller commits once at the start of a gesture. */
+  setThemeColors: (colors: ProjectData["themeColors"]) => void;
   select: (id: string | null) => void;
   setPlayhead: (f: number) => void;
   setPlaying: (b: boolean) => void;
@@ -151,8 +156,10 @@ export const useStore = create<WorkbenchState>((set, get) => ({
 
   setProject: (p) => {
     get().commit();
-    set({ project: p, selectedClipId: null });
+    set({ project: upgradeLegacyTheme(p, MANIFEST, CARDS), selectedClipId: null });
   },
+  setThemeColors: (themeColors) =>
+    set((s) => ({ project: { ...s.project, themeColors }, previewItem: null })),
   select: (id) => set({ selectedClipId: id }),
   setPlayhead: (f) => set({ playhead: Math.max(0, Math.round(f)) }),
   setPlaying: (b) => set({ playing: b }),
@@ -164,7 +171,7 @@ export const useStore = create<WorkbenchState>((set, get) => ({
     get().commit();
     set((s) => ({
       project: mutateProject(s.project, (d) => {
-        d.tracks.unshift({ id: uid("track"), name: `轨道 ${d.tracks.length + 1}`, clips: [] });
+        d.tracks.unshift({ id: uid("track"), name: t("track.new", { n: d.tracks.length + 1 }), clips: [] });
       }),
     }));
   },
