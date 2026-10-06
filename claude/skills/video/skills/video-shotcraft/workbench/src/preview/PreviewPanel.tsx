@@ -6,24 +6,30 @@ import { projectDuration, useStore } from "../store";
 import type { PreviewItem } from "../store";
 import { fmtFrames } from "../time";
 import { CARDS } from "../cards/registry";
-import { cardFps, cardSize, defaultsOf } from "../cards/types";
+import { cardFps, cardSize } from "../cards/types";
+import { MANIFEST } from '../cards/projectCards';
+import { themedProps } from '../theme';
+import { cardName, t, useLocale, useT } from "../i18n";
 
 /** 素材库点击预览：占据画面区，循环播放；主工程 Player 保持挂载（display:none） */
 const ItemPreview: React.FC<{ item: NonNullable<PreviewItem>; onClose: () => void }> = ({
   item,
   onClose,
 }) => {
+  const themeId = useStore(s => s.project.themeId);
+  const themeColors = useStore(s => s.project.themeColors);
+  const t = useT();
   let body: React.ReactNode = null;
   let title = "";
   if (item.kind === "card") {
     const card = CARDS[item.cardId];
-    title = card?.name ?? item.cardId;
+    title = card ? cardName(card) : item.cardId;
     if (card && card.kind !== "audio") {
       const { width, height } = cardSize(card);
       body = (
         <Player
           component={card.component}
-          inputProps={defaultsOf(card)}
+          inputProps={themedProps(MANIFEST, card, themeId, {}, themeColors)}
           durationInFrames={Math.max(2, card.durationInFrames)}
           compositionWidth={width}
           compositionHeight={height}
@@ -38,7 +44,7 @@ const ItemPreview: React.FC<{ item: NonNullable<PreviewItem>; onClose: () => voi
         />
       );
     } else {
-      body = <div className="preview-audio">🔊 音频卡</div>;
+      body = <div className="preview-audio">{t("prev.audioCard")}</div>;
     }
   } else {
     title = item.label;
@@ -58,11 +64,11 @@ const ItemPreview: React.FC<{ item: NonNullable<PreviewItem>; onClose: () => voi
     <>
       <div className="preview-stage">{body}</div>
       <div className="transport">
-        <span className="preview-tag">素材预览</span>
+        <span className="preview-tag">{t("prev.tag")}</span>
         <b>{title}</b>
-        <span className="dim">拖拽素材到时间轨即可添加</span>
+        <span className="dim">{t("prev.dragHint")}</span>
         <button className="btn" style={{ marginLeft: "auto" }} onClick={onClose}>
-          ✕ 返回工程
+          {t("prev.back")}
         </button>
       </div>
     </>
@@ -101,10 +107,10 @@ const Transport: React.FC<{
 
   return (
     <div className="transport">
-      <button className="btn" title="回到开头" onClick={() => seekTo(0)}>
+      <button className="btn" title={t("prev.toStart")} onClick={() => seekTo(0)}>
         ⏮
       </button>
-      <button className="btn btn-play" title="播放/暂停（空格）" onClick={togglePlay}>
+      <button className="btn btn-play" title={t("prev.playPause")} onClick={togglePlay}>
         {playing ? "⏸" : "▶"}
       </button>
       <span className="timecode">
@@ -112,7 +118,7 @@ const Transport: React.FC<{
       </span>
       <label className="loop-toggle">
         <input type="checkbox" checked={loop} onChange={(e) => setLoop(e.target.checked)} />
-        循环
+        {t("prev.loop")}
       </label>
       <span className="dim" style={{ marginLeft: "auto" }}>
         {sizeLabel}
@@ -122,6 +128,7 @@ const Transport: React.FC<{
 };
 
 export const PreviewPanel: React.FC = () => {
+  useLocale((s) => s.locale); // 语言切换时连带走带条一起重渲染
   const project = useStore((s) => s.project);
   const previewItem = useStore((s) => s.previewItem);
   const setPreview = useStore((s) => s.setPreview);
