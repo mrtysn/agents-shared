@@ -34,12 +34,16 @@ from __future__ import annotations
 
 import copy
 import difflib
+import fnmatch
 import hashlib
 import json
 import os
 import re
 import shutil
 import subprocess
+import sys
+import tempfile
+import threading
 import time
 from pathlib import Path
 
@@ -548,6 +552,256 @@ def action_skill_enable(payload: dict) -> dict:
 
 
 
+# ── Upstream view: skills in upstream repos that we have not copied ─────────
+# The list comes from scripts/catalog-unvendored-skills.py (the only part that talks to GitHub besides
+# the vendor tool), cached outside the repo. Choices are queued in the browser; "plan" shows what an
+# apply would do and "apply" does it: ignore lines go to scripts/external-skills-ignore.txt, copies run
+# scripts/vendor-upstream-skill.py. Both recompute the plan from the cached list, so a request can only
+# act on a skill the list contains.
+
+AGENTS_ROOT = Path(__file__).resolve().parent.parent
+SCRIPTS = AGENTS_ROOT / "scripts"
+UP_CACHE = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "agents-shared"
+UP_DATA = UP_CACHE / "unvendored-skills.json"
+UP_STATUS = UP_CACHE / "unvendored-refresh.json"
+UP_LOG = UP_CACHE / "unvendored-refresh.log"
+UP_IGNORE = SCRIPTS / "external-skills-ignore.txt"
+_REPO_RE = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
+_UNSAFE_PATH = re.compile(r"[*?\[\]\\\n\r]")
+_refresh_proc = None
+
+
+def _skills_base() -> Path:
+    return AGENTS_ROOT / "claude" / "skills"
+
+
+def _up_sources() -> list[Path]:
+    out: list[Path] = []
+    for pat in ("*/source.json", "*/skills/*/source.json", "*/off/*/source.json"):
+        out += sorted(_skills_base().glob(pat))
+    return out
+
+
+def _up_vendored() -> tuple[set, dict]:
+    """(repo, SKILL.md path) pairs already vendored, and per repo how many sit flat or in each group."""
+    pairs, place = set(), {}
+    base = _skills_base()
+    for f in _up_sources():
+        try:
+            src = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        pairs.add((src.get("repo"), src.get("path")))
+        rel = f.relative_to(base).parts
+        where = "flat" if len(rel) == 2 else rel[0]
+        place.setdefault(src.get("repo"), {}).setdefault(where, 0)
+        place[src.get("repo")][where] += 1
+    return pairs, place
+
+
+def _up_groups() -> list[str]:
+    return sorted(p.parent.name for p in _skills_base().glob("*/skills") if p.is_dir())
+
+
+def _up_ignores() -> list[tuple[str, str]]:
+    rules = []
+    try:
+        for line in UP_IGNORE.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and len(line.split(None, 1)) == 2:
+                repo, glob = line.split(None, 1)
+                rules.append((repo, glob))
+    except OSError:
+        pass
+    return rules
+
+
+def _up_load() -> dict | None:
+    """The cached catalog minus whatever has been vendored or ignored since it was built."""
+    try:
+        data = json.loads(UP_DATA.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    pairs, _ = _up_vendored()
+    ign = _up_ignores()
+    data["items"] = [it for it in data.get("items", [])
+                     if (it["repo"], it["path"]) not in pairs
+                     and not any(r == it["repo"] and fnmatch.fnmatchcase(it["path"], g) for r, g in ign)]
+    return data
+
+
+def _up_drop(gone: set) -> None:
+    try:
+        data = json.loads(UP_DATA.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    data["items"] = [it for it in data.get("items", []) if (it["repo"], it["path"]) not in gone]
+    tmp = UP_DATA.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp, UP_DATA)
+
+
+def _up_status() -> dict:
+    try:
+        st = json.loads(UP_STATUS.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"state": "idle"}
+    if st.get("state") == "running":
+        alive = _refresh_proc is not None and _refresh_proc.poll() is None
+        if not alive:
+            return {"state": "error", "error": "the refresh was interrupted; start it again"}
+        try:
+            lines = [l for l in UP_LOG.read_text(encoding="utf-8").splitlines() if l.startswith("[")]
+            st["progress"] = lines[-1] if lines else "starting"
+        except OSError:
+            pass
+    return st
+
+
+def _wait_refresh(proc) -> None:
+    proc.wait()
+    state = {"state": "done" if proc.returncode == 0 else "error"}
+    if proc.returncode != 0:
+        try:
+            state["error"] = (UP_LOG.read_text(encoding="utf-8").strip().splitlines() or ["unknown"])[-1]
+        except OSError:
+            state["error"] = "unknown"
+    UP_STATUS.write_text(json.dumps(state), encoding="utf-8")
+
+
+def action_upstream(payload: dict) -> dict:
+    data = _up_load()
+    _, place = _up_vendored()
+    suggest = {repo: max(w.items(), key=lambda kv: kv[1])[0] for repo, w in place.items()}
+    return {"ok": True, "generated": data.get("generated") if data else None,
+            "items": data["items"] if data else [], "groups": _up_groups(), "suggest": suggest,
+            "repo_count": len(place), "refresh": _up_status()}
+
+
+def action_upstream_refresh(payload: dict) -> dict:
+    global _refresh_proc
+    if _refresh_proc is not None and _refresh_proc.poll() is None:
+        return {"ok": False, "error": "a refresh is already running"}
+    UP_CACHE.mkdir(parents=True, exist_ok=True)
+    UP_STATUS.write_text(json.dumps({"state": "running", "started": time.time()}), encoding="utf-8")
+    with open(UP_LOG, "w", encoding="utf-8") as log:
+        _refresh_proc = subprocess.Popen([sys.executable, str(SCRIPTS / "catalog-unvendored-skills.py"), "--json", str(UP_DATA)],
+                                         stdout=log, stderr=log, cwd=str(AGENTS_ROOT))
+    threading.Thread(target=_wait_refresh, args=(_refresh_proc,), daemon=True).start()
+    return {"ok": True}
+
+
+def action_upstream_status(payload: dict) -> dict:
+    return {"ok": True, "refresh": _up_status()}
+
+
+def _up_plan(choices: list) -> tuple[list, list, list]:
+    """Validate queued choices against the cached list. Returns (ignore lines, copies, problems)."""
+    data = _up_load()
+    known = {(it["repo"], it["path"]): it for it in (data["items"] if data else [])}
+    groups, base = set(_up_groups()), _skills_base()
+    ignore, vendor, problems, targets = [], [], [], set()
+    for c in choices:
+        repo, path, choice = c.get("repo", ""), c.get("path", ""), c.get("choice")
+
+        def bad(msg, repo=repo, path=path):
+            problems.append({"repo": repo, "path": path, "error": msg})
+
+        if (repo, path) not in known:
+            bad("not in the upstream list (already copied, ignored, or the list changed)")
+        elif choice == "ignore":
+            if not _REPO_RE.fullmatch(repo) or _UNSAFE_PATH.search(path):
+                bad("path has characters that cannot go in the ignore file")
+            else:
+                ignore.append({"repo": repo, "path": path})
+        elif choice == "copy":
+            dest, sdir = c.get("dest") or "flat", os.path.dirname(path)
+            if sdir in ("", "."):
+                bad("SKILL.md at the repo root: its directory is the whole repo")
+                continue
+            if dest != "flat" and dest not in groups:
+                bad("no such group: %s" % dest)
+                continue
+            name = os.path.basename(sdir)
+            target = base / name if dest == "flat" else base / dest / "skills" / name
+            if target.exists() or target in targets:
+                bad("a skill named %s already exists there" % name)
+                continue
+            targets.add(target)
+            vendor.append({"repo": repo, "path": path, "dest": dest, "name": name,
+                           "target": str(target.relative_to(AGENTS_ROOT))})
+        else:
+            bad("unknown choice")
+    return ignore, vendor, problems
+
+
+def action_upstream_plan(payload: dict) -> dict:
+    ignore, vendor, problems = _up_plan(payload.get("choices") or [])
+    return {"ok": True, "ignore": ignore, "vendor": vendor, "problems": problems,
+            "requests": 2 * len({v["repo"] for v in vendor})}
+
+
+def action_upstream_apply(payload: dict) -> dict:
+    ignore, vendor, problems = _up_plan(payload.get("choices") or [])
+    results = [dict(p, action="skip", ok=False) for p in problems]
+    note = ""
+    if ignore:
+        existing = UP_IGNORE.read_text(encoding="utf-8") if UP_IGNORE.is_file() else ""
+        have = {l.strip() for l in existing.splitlines()}
+        add = [f"{i['repo']} {i['path']}" for i in ignore if f"{i['repo']} {i['path']}" not in have]
+        if add:
+            with open(UP_IGNORE, "a", encoding="utf-8") as f:
+                if existing and not existing.endswith("\n"):
+                    f.write("\n")
+                f.write("\n".join(add) + "\n")
+        results += [dict(i, action="ignore", ok=True) for i in ignore]
+    if vendor:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as tf:
+            json.dump([{"repo": v["repo"], "path": v["path"], "dest": v["dest"]} for v in vendor], tf)
+        try:
+            run = subprocess.run([sys.executable, str(SCRIPTS / "vendor-upstream-skill.py"), "--plan", tf.name, "--root", str(AGENTS_ROOT)],
+                                 capture_output=True, text=True, timeout=1800, cwd=str(AGENTS_ROOT))
+            seen = set()
+            for line in run.stdout.splitlines():
+                try:
+                    r = json.loads(line)
+                except ValueError:
+                    continue
+                seen.add((r["repo"], r["path"]))
+                results.append({"repo": r["repo"], "path": r["path"], "action": "copy", "ok": bool(r.get("ok")),
+                                "error": r.get("error"), "dest": r.get("dest")})
+            for v in vendor:
+                if (v["repo"], v["path"]) not in seen:
+                    results.append({"repo": v["repo"], "path": v["path"], "action": "copy", "ok": False,
+                                    "error": (run.stderr.strip().splitlines() or ["the vendor tool produced no result"])[-1]})
+        except subprocess.TimeoutExpired:
+            results += [{"repo": v["repo"], "path": v["path"], "action": "copy", "ok": False, "error": "timed out"}
+                        for v in vendor]
+        finally:
+            os.unlink(tf.name)
+        copied = [r for r in results if r["action"] == "copy" and r["ok"]]
+        if any(r.get("dest") == "flat" for r in copied):
+            init = subprocess.run(["bash", str(SCRIPTS / "init-global.sh")], capture_output=True, text=True,
+                                  cwd=str(AGENTS_ROOT))
+            note = "Linked new flat skills into ~/.claude/skills. " if init.returncode == 0 \
+                else "init-global.sh failed: run it by hand. "
+        if copied:
+            note += "Open sessions pick up new skills on /reload-plugins."
+    _up_drop({(r["repo"], r["path"]) for r in results if r["ok"]})
+    forget()
+    return {"ok": all(r["ok"] for r in results), "results": results, "note": note}
+
+
+def _asset(name: str) -> str:
+    return (Path(__file__).resolve().parent / name).read_text(encoding="utf-8")
+
+
+UPSTREAM_HELP = r"""
+ <h3>Upstream skills</h3>
+ <p>The Upstream skills button lists skills that exist in the GitHub projects we copy from but are not copied here, each with its own description. Pick Copy it, Ignore or Decide later for each; picks are only queued in this browser. Apply shows exactly what will change, then writes the ignore lines or copies the skills from GitHub (paced, a couple of requests per project). Copied skills land flat (always loaded) or in a group you choose.</p>
+"""
+
+
 # ── front end ────────────────────────────────────────────────────────────────
 # Hooks on local-repos-list's shared tree view (window.LRL). The base draws the folder lane
 # (each folder's node_state arrives as f.state = {on, has_project, has_local}) and owns the
@@ -658,9 +912,14 @@ SKIN = {
         "override": action_override,
         "skill": action_skill,
         "skill-enable": action_skill_enable,
+        "upstream": action_upstream,
+        "upstream-refresh": action_upstream_refresh,
+        "upstream-status": action_upstream_status,
+        "upstream-plan": action_upstream_plan,
+        "upstream-apply": action_upstream_apply,
     },
-    "css": CSS,
-    "controls": CONTROLS,
-    "help": HELP,
-    "client_js": CLIENT_JS,
+    "css": CSS + _asset("skill_tree_upstream.css"),
+    "controls": CONTROLS + '<button type="button" id="up-open" class="plain">Upstream skills</button>',
+    "help": HELP + UPSTREAM_HELP,
+    "client_js": CLIENT_JS + _asset("skill_tree_upstream.js"),
 }

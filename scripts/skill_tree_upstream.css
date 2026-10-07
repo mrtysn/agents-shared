@@ -1,0 +1,23 @@
+.up{position:fixed;inset:0;z-index:50;background:var(--bg);color:var(--ink);display:flex;flex-direction:column}
+.up[hidden],.up [hidden]{display:none!important}
+.up-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--line)}
+.up-top input[type=search]{flex:1;min-width:180px}.up-stat{color:var(--ink2)}
+.up-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 16px;background:var(--sel);border-bottom:1px solid var(--line)}
+.up-list{flex:1;overflow:auto;padding:12px 16px;max-width:1000px;width:100%;margin:0 auto}
+.up-empty{color:var(--ink2);padding:24px 0}
+.up-repo{border:1px solid var(--line);border-radius:8px;background:var(--card);margin:0 0 12px}
+.up-repo>summary{cursor:pointer;padding:9px 12px;font-weight:600}.up-n{color:var(--ink2);font-weight:400}
+.up-bulk{display:flex;gap:8px;padding:0 12px 8px}
+.up-skill{padding:9px 12px;border-top:1px solid var(--line2);border-left:4px solid transparent}
+.up-skill.copy{border-left-color:var(--on)}.up-skill.ignore{border-left-color:var(--off)}
+.up-path{color:var(--ink2);font-size:11px;word-break:break-all}
+.up-desc{margin:4px 0;color:var(--ink);white-space:pre-wrap;max-height:4.4em;overflow:hidden;cursor:pointer}.up-desc.open{max-height:none}
+.up-choice{display:flex;gap:14px;align-items:center;flex-wrap:wrap}.up-choice label{cursor:pointer}
+.up-copy{color:var(--on)}.up-ignore{color:var(--ink2)}
+.up-foot{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 16px;border-top:1px solid var(--line);color:var(--ink2)}
+.up-apply:not(:disabled){border-color:var(--on);color:var(--on);font-weight:600}.up-apply:disabled{opacity:.5}
+.up-modal{position:absolute;inset:0;background:rgba(0,0,0,.45);display:grid;place-items:center;padding:16px}
+.up-box{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;max-width:640px;max-height:80vh;overflow:auto;width:100%}
+.up-box h2{font-size:15px;margin:0 0 8px}.up-box h3{font-size:13px;margin:12px 0 2px}.up-box ul{margin:4px 0 4px 18px;padding:0}
+.up-note{color:var(--ink2);margin:2px 0}.up-err{color:#b32d1c}@media(prefers-color-scheme:dark){.up-err{color:#ff8b74}}
+.up-actions{display:flex;gap:10px;margin-top:14px}
