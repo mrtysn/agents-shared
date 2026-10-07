@@ -1,0 +1,13 @@
+{
+  "kind": "symlinks-into-home",
+  "name": "Agents shared",
+  "tool": "agents-shared",
+  "symlinks_into_home": {
+    "links": [
+      {"from": "claude/commands/*", "to": "~/.claude/commands/"},
+      {"from": "claude/skills/*", "to": "~/.claude/skills/"},
+      {"from": "claude/rules/*", "to": "~/.claude/rules/"}
+    ],
+    "install_command": ["bash", "scripts/init-global.sh"]
+  }
+}

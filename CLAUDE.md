@@ -53,6 +53,8 @@ Command instructions here. Use $ARGUMENTS for user-provided arguments.
 Skills support additional features: reference files, templates, and advanced frontmatter (`context: fork`, `agent`, etc.).
 
 After adding, renaming, or deleting a skill, run `bash scripts/init-global.sh`
+(or `project-lifecycle install`, which runs it from `project-lifecycle.json`;
+`project-lifecycle status` checks every link's target)
 so `~/.claude/` picks up the change — symlinks are per-entry, so a pure edit to
 an existing file needs no re-run, but a new or removed directory does.
 
