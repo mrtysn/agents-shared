@@ -454,6 +454,7 @@ Updates preserve local edits the way oh-my-zsh's `upgrade_oh_my_zsh_custom` does
 bash scripts/sync-external-skills.sh            # all external skills → upstream HEAD
 bash scripts/sync-external-skills.sh caveman     # specific skill only
 bash scripts/sync-external-skills.sh --dry-run [name]  # preview: behind upstream? merge clean? writes nothing
+bash scripts/sync-external-skills.sh --adopt-listing name  # make source.json's file list match upstream's skill dir, then sync
 bash scripts/sync-external-skills.sh --establish-base [name]  # (re)build base + patch from the pin
 ```
 

@@ -26,6 +26,11 @@ A 429, 403 or any refusal ends the run: stop and report.
    Otherwise a sync's diff cannot be told from earlier work. Stop and say so.
 2. **Preview.** `bash scripts/sync-external-skills.sh --dry-run $ARGUMENTS`. Writes nothing.
    Report the counts and the behind skills, conflicts first. If nothing is behind, stop.
+   The summary's **Listing drift** section names skills where upstream added or deleted files
+   compared with `source.json`'s `files`. A listed file deleted upstream makes that skill fail
+   until the list is adopted. Whether to adopt is the user's decision, per skill: ask with
+   AskUserQuestion, naming the files added and removed. On yes:
+   `bash scripts/sync-external-skills.sh --adopt-listing <name>`.
 3. **Sync.** `bash scripts/sync-external-skills.sh $ARGUMENTS`. For a very large set, sync
    by group so each commit stays reviewable.
 4. **Resolve conflicts.** A conflicted skill has markers (`<<<<<<< local`, `=======`,
