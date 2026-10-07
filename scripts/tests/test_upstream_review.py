@@ -56,6 +56,7 @@ class UpstreamReview(unittest.TestCase):
         (root / "scripts" / "init-global.sh").write_text("#!/bin/sh\ntouch \"$(dirname \"$0\")/init-ran\"\n")
         (root / "scripts" / "external-skills-ignore.txt").write_text("# header\n")
         self.root = root
+        self.make_installed(root)
 
         self.m = load_skin()
         m = self.m
@@ -68,6 +69,85 @@ class UpstreamReview(unittest.TestCase):
                  for n in ("foo", "bar", "baz")]
         items.append({"repo": "owner/repo", "path": "SKILL.md", "name": "top", "desc": "root"})
         m.UP_DATA.write_text(json.dumps({"generated": "2026-10-07T00:00:00", "items": items}))
+
+    def make_installed(self, root):
+        """An installed skill in a group (with a local override), a flat one, and one of our own; all committed."""
+        skills = root / "claude" / "skills"
+        (skills / "interface" / ".claude-plugin").mkdir(parents=True)
+        (skills / "interface" / ".claude-plugin" / "plugin.json").write_text('{"name": "interface"}')
+
+        def skill(path, name, source=None, patch=None):
+            path.mkdir(parents=True)
+            (path / "SKILL.md").write_text(f"---\nname: {name}\ndescription: the {name} skill\n---\nbody\n")
+            if source:
+                (path / "source.json").write_text(json.dumps(source))
+            if patch:
+                (path / "override.patch").write_text(patch)
+
+        skill(skills / "interface" / "skills" / "ext", "ext",
+              {"repo": "owner/repo", "path": "skills/ext/SKILL.md", "commit": "abcdef1234", "updated": "2026-09-01", "files": ["SKILL.md"]},
+              "--- a/SKILL.md\n+++ b/SKILL.md\n@@ -1 +1 @@\n-old\n+new\n+more\n")
+        skill(skills / "flatx", "flatx", {"repo": "owner/repo", "path": "skills/flatx/SKILL.md", "commit": "1234567", "updated": "2026-09-02", "files": ["SKILL.md"]})
+        skill(skills / "own", "own")
+        git("init", "-q", ".", cwd=root)
+        git("add", "-A", cwd=root)
+        git("commit", "-qm", "installed skills", cwd=root)
+
+    def by_name(self, name):
+        return next(s for s in self.m.action_installed({})["skills"] if s["name"] == name)
+
+    def test_installed_lists_everything_with_source_override_and_dates(self):
+        names = {s["name"]: s for s in self.m.action_installed({})["skills"]}
+        self.assertEqual(set(names), {"ext", "flatx", "own"})
+        ext = names["ext"]
+        self.assertEqual((ext["group"], ext["external"], ext["repo"], ext["synced"], ext["pinned"]),
+                         ("interface", True, "owner/repo", "2026-09-01", "abcdef1"))
+        self.assertEqual(ext["override"], {"files": 1, "lines": 3})
+        self.assertIsNone(names["flatx"]["override"])
+        self.assertFalse(names["own"]["external"])
+        self.assertTrue(ext["changed"], "last-changed time comes from git history")
+        self.assertFalse(ext["dirty"])
+
+    def test_uncommitted_changes_are_flagged(self):
+        (self.root / "claude" / "skills" / "flatx" / "SKILL.md").write_text("edited\n")
+        self.assertTrue(self.by_name("flatx")["dirty"])
+        self.assertFalse(self.by_name("ext")["dirty"])
+
+    def test_remove_plan_warns_and_refuses_what_it_should(self):
+        (self.root / "claude" / "skills" / "flatx" / "SKILL.md").write_text("edited\n")
+        r = self.m.action_upstream_plan({"choices": [
+            {"choice": "remove", "dir": "claude/skills/interface/skills/ext"},
+            {"choice": "remove", "dir": "claude/skills/flatx"},
+            {"choice": "remove", "dir": "claude/skills/own"},
+            {"choice": "remove", "dir": "claude/skills/../../scripts"},
+            {"choice": "remove", "dir": "claude/skills/ghost"}]})
+        self.assertEqual({x["name"] for x in r["remove"]}, {"ext", "flatx"})
+        warns = {x["name"]: x["warnings"] for x in r["remove"]}
+        self.assertIn("3 lines of local changes", warns["ext"][0])
+        self.assertIn("uncommitted", warns["flatx"][0])
+        self.assertEqual(len(r["problems"]), 3)
+        self.assertTrue(any("own skill" in p["error"] for p in r["problems"]))
+
+    def test_remove_deletes_the_folder_ignores_it_and_relinks_flat_skills(self):
+        r = self.m.action_upstream_apply({"choices": [
+            {"choice": "remove", "dir": "claude/skills/interface/skills/ext"},
+            {"choice": "remove", "dir": "claude/skills/flatx"}]})
+        self.assertTrue(r["ok"], r)
+        skills = self.root / "claude" / "skills"
+        self.assertFalse((skills / "interface" / "skills" / "ext").exists())
+        self.assertFalse((skills / "flatx").exists())
+        self.assertTrue((skills / "own").is_dir(), "an own skill is never removed")
+        ignore = self.m.UP_IGNORE.read_text()
+        self.assertIn("owner/repo skills/ext/SKILL.md", ignore)
+        self.assertIn("owner/repo skills/flatx/SKILL.md", ignore)
+        self.assertTrue((self.root / "scripts" / "init-ran").exists(), "removing a flat skill must relink")
+        self.assertEqual({s["name"] for s in self.m.action_installed({})["skills"]}, {"own"})
+
+    def test_the_remover_refuses_anything_that_is_not_a_skill_folder(self):
+        for rel in ("claude/skills", "scripts", "claude/skills/interface", ".."):
+            with self.assertRaises(ValueError):
+                self.m._remove_skill(rel)
+        self.assertTrue((self.root / "scripts").is_dir())
 
     def choices(self, *rows):
         return {"choices": [dict(repo="owner/repo", path=p, choice=c, dest=d) for p, c, d in rows]}
