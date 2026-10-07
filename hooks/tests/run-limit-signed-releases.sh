@@ -50,6 +50,8 @@ check "a repo's release.zsh"                       pass 1 'tools/release.zsh'
 check "zsh running a release.zsh"                  pass 1 'zsh ./tools/release.zsh'
 check "curl to AMO's upload API"                   pass 1 'curl -X POST https://addons.mozilla.org/api/v5/addons/upload/ -F upload=@x.xpi'
 # What does not.
+check "a release script's dry run"                 pass 0 'tools/release.zsh --dry-run'
+check "a release script's help"                    pass 0 'zsh tools/release.zsh --help' 
 check "an unrelated command"                       pass 0 'ls -la'
 check "web-ext run and lint"                       pass 0 'npx web-ext run && npx web-ext lint'
 check "a quoted mention in a commit message"       pass 0 'git commit -m "ship web-ext sign batch"'
