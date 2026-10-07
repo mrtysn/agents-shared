@@ -22,7 +22,7 @@
 .up-note{color:var(--ink2);margin:2px 0}.up-err{color:#b32d1c}@media(prefers-color-scheme:dark){.up-err{color:#ff8b74}}
 .up-actions{display:flex;gap:10px;margin-top:14px}
 .up-tabs{display:flex;gap:0}.up-tabs button{border-radius:0}.up-tabs button:first-child{border-radius:6px 0 0 6px}.up-tabs button:last-child{border-radius:0 6px 6px 0;margin-left:-1px}
-.up-tabs button[aria-selected=true]{background:var(--sel);border-color:var(--focus);font-weight:600}
+.up-tabs button{position:relative}.up-tabs button[aria-selected=true]{background:var(--sel);border-color:var(--focus);font-weight:600;z-index:1}
 .up-badges{display:flex;gap:6px;flex-wrap:wrap;margin:3px 0}
 .up-badge{font-size:11px;padding:1px 7px;border:1px solid var(--line);border-radius:10px;color:var(--ink2)}
 .up-badge.mod{border-color:var(--focus);color:var(--focus)}.up-badge.dirty{border-color:#b32d1c;color:#b32d1c}.up-badge.own{border-style:dashed}
