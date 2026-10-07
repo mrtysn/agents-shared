@@ -50,6 +50,8 @@
 #                                                            # deleted upstream are dropped),
 #                                                            # then sync. Needs a name: lists are
 #                                                            # often deliberately partial.
+#   bash scripts/sync-external-skills.sh --list-new-skills   # a full run, printing every new
+#                                                            # upstream skill path, not per-repo counts
 #   bash scripts/sync-external-skills.sh --check-links [<name>]
 #                                                            # no network: report relative links in
 #                                                            # vendored .md files whose target is
@@ -70,6 +72,7 @@ SKILLS_DIR="$AGENTS_DIR/claude/skills"
 
 MODE="sync"
 ADOPT=0
+LIST_NEW=0
 filter=""
 for arg in "$@"; do
     case "$arg" in
@@ -77,6 +80,7 @@ for arg in "$@"; do
         --dry-run) MODE="dry" ;;
         --adopt-listing) ADOPT=1 ;;
         --check-links) MODE="links" ;;
+        --list-new-skills) LIST_NEW=1 ;;
         *) filter="$arg" ;;
     esac
 done
@@ -397,7 +401,13 @@ done
 print_findings() {
     if [[ ${#new_skills[@]} -gt 0 ]]; then
         echo ""; echo "New upstream skills (SKILL.md in a repo we fetch, not vendored, not in external-skills-ignore.txt):"
-        local n; for n in "${new_skills[@]}"; do echo "  - $n"; done
+        if [[ $LIST_NEW -eq 1 ]]; then
+            local n; for n in "${new_skills[@]}"; do echo "  - $n"; done
+        else
+            printf '%s\n' "${new_skills[@]}" | awk '{c[$1]++; if (c[$1] <= 3) ex[$1] = ex[$1] " " $2}
+                END {for (r in c) printf "  - %s: %d unvendored (e.g.%s)\n", r, c[r], ex[r]}' | sort
+            echo "    (--list-new-skills prints every path; ignore one with \"<repo> <glob>\" in scripts/external-skills-ignore.txt)"
+        fi
     fi
     if [[ ${#dangling[@]} -gt 0 ]]; then
         echo ""; echo "Dangling links (relative link in a vendored .md whose target is missing):"
