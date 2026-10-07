@@ -129,14 +129,14 @@
         s._node.hidden = !vis;
         if (vis) shown++;
       }
-      stat.textContent = `${items.length} skills` + (c ? `, ${c} to copy` : '') + (i ? `, ${i} ignored` : '');
+      stat.textContent = `${items.length} skill${items.length === 1 ? '' : 's'}` + (c ? `, ${c} to copy` : '') + (i ? `, ${i} ignored` : '');
       det.hidden = shown === 0;
       if (view.q && shown) det.open = true;
       copy += c; ign += i;
     }
     const total = D.items.length;
     const st = document.getElementById('up-stat');
-    if (st) st.textContent = `${total} undecided · ${copy} to copy · ${ign} to ignore` + (D.generated ? ` · list from ${D.generated.slice(0, 10)}` : '');
+    if (st) st.textContent = `${total - copy - ign} undecided of ${total} · ${copy} to copy · ${ign} to ignore` + (D.generated ? ` · list from ${D.generated.slice(0, 10)}` : '');
     const q = document.getElementById('up-queue');
     if (q) q.textContent = queued() ? `${queued()} choice${queued() === 1 ? '' : 's'} queued; nothing changes until you apply them.` : 'No choices queued.';
     const ap = document.getElementById('up-apply');
@@ -200,7 +200,9 @@
     const m = modal(
       h('h2', {}, 'Apply your choices?'),
       r.ignore.length ? h('div', {}, h('h3', {}, `Ignore ${r.ignore.length} skill${r.ignore.length === 1 ? '' : 's'}`),
-        h('p', { class: 'up-note' }, 'One line per skill is added to scripts/external-skills-ignore.txt; the update tool then stops listing them. No network.')) : null,
+        h('p', { class: 'up-note' }, 'One line per skill is added to scripts/external-skills-ignore.txt; the update tool then stops listing them. No network.'),
+        h('details', {}, h('summary', {}, 'Show the skills'),
+          h('ul', {}, r.ignore.map(i => h('li', {}, h('span', { class: 'mono' }, i.repo + ' ' + i.path)))))) : null,
       r.vendor.length ? h('div', {}, h('h3', {}, `Copy ${r.vendor.length} skill${r.vendor.length === 1 ? '' : 's'} from GitHub`),
         h('p', { class: 'up-note' }, `About ${r.requests} GitHub requests from your IP, paced. Each skill becomes an external skill (source.json, pristine .upstream copy) kept current by the update tool.`),
         h('ul', {}, r.vendor.map(v => h('li', {}, h('span', { class: 'mono' }, v.name), ' → ', v.target)))) : null,
