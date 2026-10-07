@@ -50,6 +50,11 @@ def segments(command):
         yield seg
 
 
+def dry(args):
+    """A release script asked only to describe itself signs nothing."""
+    return any(a in ("--dry-run", "--help", "-h") for a in args)
+
+
 def is_web_ext(tok):
     return re.fullmatch(r"(.*/)?web-ext(@\S+)?", tok) is not None
 
@@ -70,9 +75,9 @@ def signs(seg):
             rest = seg[i + 1:]
             if "-c" in rest and rest.index("-c") + 1 < len(rest):
                 return is_signing(rest[rest.index("-c") + 1])
-            return any(t.endswith("release.zsh") for t in rest)
+            return any(t.endswith("release.zsh") for t in rest) and not dry(rest)
         if tok.endswith("release.zsh"):
-            return True
+            return not dry(seg[i + 1:])
         if is_web_ext(tok):
             for arg in seg[i + 1:]:
                 if not arg.startswith("-"):
