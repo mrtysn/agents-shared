@@ -4,10 +4,46 @@
   "tool": "agents-shared",
   "symlinks_into_home": {
     "links": [
-      {"from": "claude/commands/*", "to": "~/.claude/commands/"},
-      {"from": "claude/skills/*", "to": "~/.claude/skills/"},
-      {"from": "claude/rules/*", "to": "~/.claude/rules/"}
+      {
+        "from": "claude/commands/*",
+        "to": "~/.claude/commands/"
+      },
+      {
+        "from": "claude/skills/*",
+        "to": "~/.claude/skills/"
+      },
+      {
+        "from": "claude/rules/*",
+        "to": "~/.claude/rules/"
+      }
     ],
-    "install_command": ["bash", "scripts/init-global.sh"]
-  }
+    "install_command": [
+      "bash",
+      "scripts/init-global.sh"
+    ]
+  },
+  "test": [
+    {
+      "name": "skills and rules",
+      "run": [
+        "scripts/check-skills.zsh"
+      ]
+    },
+    {
+      "name": "hook tests",
+      "run": [
+        "bash",
+        "-c",
+        "for t in memory-lint require-absolute-rm ssh-request-guard system-one-bash system-one-receipts; do bash hooks/tests/run-$t.sh || exit 1; done"
+      ]
+    },
+    {
+      "name": "external skill links",
+      "run": [
+        "bash",
+        "scripts/sync-external-skills.sh",
+        "--check-links"
+      ]
+    }
+  ]
 }
