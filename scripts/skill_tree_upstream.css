@@ -3,7 +3,8 @@
 .up-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--line)}
 .up-top input[type=search]{flex:1;min-width:180px}.up-stat{color:var(--ink2)}
 .up-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 16px;background:var(--sel);border-bottom:1px solid var(--line)}
-.up-list{flex:1;overflow:auto;padding:12px 16px;max-width:1000px;width:100%;margin:0 auto}
+.up-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(14rem,19rem) minmax(0,1fr)}
+.up-list{min-width:0;overflow:auto;padding:12px 20px}.up-list>div{max-width:980px}
 .up-empty{color:var(--ink2);padding:24px 0}
 .up-repo{border:1px solid var(--line);border-radius:8px;background:var(--card);margin:0 0 12px}
 .up-repo>summary{cursor:pointer;padding:9px 12px;font-weight:600}.up-n{color:var(--ink2);font-weight:400}
@@ -40,3 +41,16 @@
 .up-seg.up-remove[aria-pressed=true]{border-color:#b32d1c;color:#b32d1c}
 @media(prefers-color-scheme:dark){.up-seg.up-remove[aria-pressed=true]{border-color:#ff8b74;color:#ff8b74}}
 .up-fixed{font-weight:600}
+.up-side{overflow:auto;background:var(--card);border-right:1px solid var(--line);font-size:12.5px;min-height:0}
+.up-gh{display:flex;gap:.5rem;width:100%;position:sticky;top:0;z-index:1;background:var(--card);border:0;border-bottom:1px solid var(--line2);padding:.55rem .75rem;font:inherit;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink2);cursor:pointer;text-align:left}
+.up-gh .t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.up-gh .n{font-variant-numeric:tabular-nums}
+.up-side ul{list-style:none;margin:0;padding:.15rem .3rem .45rem}
+.up-sr{display:grid;grid-template-columns:minmax(0,1fr) 1rem;gap:.5rem;width:100%;padding:.27rem .45rem;background:none;border:0;border-radius:.4rem;text-align:left;font:inherit;color:var(--ink);cursor:pointer}
+@media(hover:hover){.up-sr:hover{background:var(--line2)}}
+.up-sr[aria-current=true]{background:var(--sel);font-weight:600;box-shadow:inset 3px 0 0 var(--focus)}
+.up-sr .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.up-sr .m{text-align:center;font-weight:700}
+.up-sr.copy .m{color:var(--on)}.up-sr.ignore .m{color:var(--ink2)}.up-sr.remove .m{color:#b32d1c}.up-sr.mod .m{color:var(--focus);font-size:9px}
+.up-sr.remove .t{text-decoration:line-through}
+@media(prefers-color-scheme:dark){.up-sr.remove .m{color:#ff8b74}}
+.up-skill.up-cur{outline:2px solid var(--focus);outline-offset:-2px}
+@media(max-width:52rem){.up-body{grid-template-columns:minmax(0,1fr)}.up-side{display:none}}
