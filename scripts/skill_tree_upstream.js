@@ -2,6 +2,7 @@
 //   "Not copied": upstream skills we have not copied, each with Copy it / Ignore / Decide later.
 //   "Installed": every skill in this checkout with its source, local changes and timestamps, each with
 //                Keep / Remove (only skills copied from upstream can be removed).
+//   "Review":    every queued choice in one editable list; "Continue to apply" opens the Apply dialog.
 // Choices are queued in this browser and only change files when "Apply" is confirmed. Appended to the
 // skin's client_js (same page, after the skin registered itself); it must not call LRL.register again.
 (function () {
@@ -78,7 +79,8 @@
         h('strong', {}, 'Skills'),
         h('div', { class: 'up-tabs', role: 'tablist' },
           h('button', { class: 'plain', id: 'up-t-new', role: 'tab', onclick: () => setTab('new') }, 'Not copied'),
-          h('button', { class: 'plain', id: 'up-t-inst', role: 'tab', onclick: () => setTab('installed') }, 'Installed')),
+          h('button', { class: 'plain', id: 'up-t-inst', role: 'tab', onclick: () => setTab('installed') }, 'Installed'),
+          h('button', { class: 'plain', id: 'up-t-rev', role: 'tab', onclick: () => setTab('review') }, 'Review')),
         h('span', { class: 'up-stat', id: 'up-stat' }),
         search, und, mod,
         h('button', { class: 'plain', id: 'up-refresh', onclick: askRefresh }, 'Refresh from GitHub'),
@@ -87,7 +89,7 @@
       (listBox = h('div', { class: 'up-list', id: 'up-list' })),
       h('div', { class: 'up-foot' },
         h('span', { id: 'up-queue' }),
-        h('button', { class: 'plain up-apply', id: 'up-apply', onclick: planApply }, 'Apply choices')));
+        h('button', { class: 'plain up-apply', id: 'up-apply', onclick: () => { if (tab === 'review') planApply(); else setTab('review'); } }, 'Review choices')));
     document.body.append(ov);
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && ov && !ov.hidden && !document.querySelector('.up-modal')) ov.hidden = true; });
     buildNew();
@@ -96,16 +98,15 @@
 
   async function setTab(t) {
     tab = t;
-    if (t === 'installed' && !INST) await loadInstalled();
+    if ((t === 'installed' || (t === 'review' && Object.keys(choices).some(k => k.startsWith('rm\t')))) && !INST) await loadInstalled();
     document.getElementById('up-t-new').setAttribute('aria-selected', String(t === 'new'));
     document.getElementById('up-t-inst').setAttribute('aria-selected', String(t === 'installed'));
     document.getElementById('up-t-new').textContent = `Not copied${D ? ` (${D.items.length})` : ''}`;
     document.getElementById('up-t-inst').textContent = `Installed${INST ? ` (${INST.length})` : ''}`;
+    document.getElementById('up-t-rev').setAttribute('aria-selected', String(t === 'review'));
     document.getElementById('up-f-und').hidden = t !== 'new';
     document.getElementById('up-f-mod').hidden = t !== 'installed';
     document.getElementById('up-refresh').hidden = t !== 'new';
-    const pane = (id, on) => { const p = document.getElementById(id); if (p) p.hidden = !on; };
-    pane('up-pane-new', t === 'new'); pane('up-pane-inst', t === 'installed');
     update();
   }
 
@@ -217,10 +218,11 @@
   // ── redraw both tabs from the queue ───────────────────────────────────────
   function update() {
     if (!D) return;
-    for (const [id, on] of [['up-pane-new', tab === 'new'], ['up-pane-inst', tab === 'installed']]) {
+    for (const [id, on] of [['up-pane-new', tab === 'new'], ['up-pane-inst', tab === 'installed'], ['up-pane-review', tab === 'review']]) {
       const p = document.getElementById(id);
       if (p) p.hidden = !on;
     }
+    if (tab === 'review') buildReview();
     let copy = 0, ign = 0, rem = 0;
     for (const { det, stat, items } of newCards) {
       let shown = 0, c = 0, i = 0;
@@ -262,16 +264,99 @@
       rem += r; mods += m;
     }
     const total = D.items.length;
+    const rv = document.getElementById('up-t-rev');
+    if (rv) rv.textContent = `Review (${queued()})`;
     const st = document.getElementById('up-stat');
     if (st) {
-      st.textContent = tab === 'new'
+      st.textContent = tab === 'review' ? `${queued()} queued · ${copy} to copy · ${ign} to ignore · ${rem} to remove`
+        : tab === 'new'
         ? `${total - copy - ign} undecided of ${total} · ${copy} to copy · ${ign} to ignore` + (D.generated ? ` · list from ${day(D.generated)}` : '')
         : INST ? `${INST.length} installed · ${INST.filter(s => s.override || s.dirty).length} with local changes · ${rem} to remove` : '';
     }
     const q = document.getElementById('up-queue');
     if (q) q.textContent = queued() ? `${plural(queued(), 'choice')} queued; nothing changes until you apply them.` : 'No choices queued.';
     const ap = document.getElementById('up-apply');
-    if (ap) { ap.disabled = !queued(); ap.textContent = queued() ? `Apply ${plural(queued(), 'choice')}` : 'Apply choices'; }
+    if (ap) {
+      ap.disabled = !queued();
+      ap.textContent = tab === 'review' ? 'Continue to apply' : queued() ? `Review ${plural(queued(), 'choice')}` : 'Review choices';
+    }
+  }
+
+  // ── tab: review ────────────────────────────────────────────────────────────
+  function reviewRows() {
+    const byNew = new Map((D ? D.items : []).map(s => [key(s), s]));
+    const byDir = new Map((INST || []).map(s => ['rm\t' + s.dir, s]));
+    const rows = [];
+    for (const [k, v] of Object.entries(choices)) {
+      if (k.startsWith('rm\t')) {
+        const s = byDir.get(k);
+        rows.push({ k, kind: 'remove', s, name: s ? s.name : k.slice(3), path: k.slice(3).replace(/^claude\/skills\//, ''), src: s ? (s.repo || '') : '', desc: s ? s.description : '' });
+      } else {
+        const s = byNew.get(k);
+        if (s) rows.push({ k, kind: v.c, s, name: s.name, path: s.path, src: s.repo, desc: s.desc, dest: v.d });
+      }
+    }
+    return rows.sort((a, b) => (a.src + a.name).localeCompare(b.src + b.name));
+  }
+
+  function setChoice(r, val) {
+    if (!val) delete choices[r.k];
+    else if (r.k.startsWith('rm\t')) choices[r.k] = { c: 'remove' };
+    else choices[r.k] = val === 'copy' ? { c: 'copy', d: r.dest || (D.suggest[r.s.repo] || 'flat') } : { c: 'ignore' };
+    saveChoices();
+    update();
+  }
+
+  function reviewRow(r) {
+    const inst = r.k.startsWith('rm\t');
+    const opt = (v, label) => h('option', { value: v }, label);
+    const act = h('select', { 'aria-label': `Choice for ${r.name}`, onchange: e => setChoice(r, e.target.value) },
+      inst ? [opt('remove', 'Remove'), opt('', 'Keep (take out of the queue)')]
+        : [opt('copy', 'Copy it'), opt('ignore', 'Ignore'), opt('', 'Decide later (take out of the queue)')]);
+    act.value = r.kind;
+    const controls = [act];
+    if (r.kind === 'copy') {
+      const dest = h('select', { 'aria-label': `Where to put ${r.name}`, onchange: e => { choices[r.k] = { c: 'copy', d: e.target.value }; saveChoices(); update(); } },
+        opt('flat', 'flat (always loaded)'), D.groups.map(g => opt(g, `group: ${g}`)));
+      dest.value = r.dest || 'flat';
+      controls.push(dest);
+    }
+    controls.push(h('button', { class: 'plain', onclick: () => setChoice(r, '') }, 'Take out'));
+    const warn = [];
+    if (r.kind === 'remove' && r.s) {
+      if (r.s.override) warn.push(h('span', { class: 'up-badge mod' }, `local changes lost: ${plural(r.s.override.lines, 'line')} in ${plural(r.s.override.files, 'file')}`));
+      if (r.s.dirty) warn.push(h('span', { class: 'up-badge dirty' }, 'uncommitted changes lost'));
+    }
+    return h('div', { class: 'up-skill ' + r.kind },
+      h('div', { class: 'up-name' }, h('strong', {}, r.name), ' ', h('span', { class: 'up-path mono' }, r.path), r.src ? h('span', { class: 'up-badge' }, r.src) : null),
+      warn.length ? h('div', { class: 'up-badges' }, warn) : null,
+      h('div', { class: 'up-desc', title: 'Click to expand', onclick: e => e.currentTarget.classList.toggle('open') }, r.desc || '(no description)'),
+      h('div', { class: 'up-choice' }, controls));
+  }
+
+  function buildReview() {
+    const pane = mount('up-pane-review');
+    if (!queued()) {
+      pane.append(h('p', { class: 'up-empty' }, 'Nothing is queued. Choose Copy it, Ignore or Remove in the other tabs and every pick shows up here to review and change before you apply.'));
+      return;
+    }
+    const rows = reviewRows().filter(r => !view.q || (r.name + ' ' + r.path + ' ' + r.src + ' ' + r.desc).toLowerCase().includes(view.q));
+    pane.append(h('div', { class: 'up-bulk' },
+      h('button', { class: 'plain', onclick: askClearAll }, 'Take everything out of the queue'),
+      h('span', { class: 'up-note' }, 'Nothing has been applied yet. Change a pick with its menu, or take it out.')));
+    if (!rows.length) pane.append(h('p', { class: 'up-empty' }, 'No queued choice matches the search.'));
+    for (const [kind, title] of [['copy', 'Copy from GitHub'], ['ignore', 'Ignore'], ['remove', 'Remove installed skills']]) {
+      const sec = rows.filter(r => r.kind === kind);
+      if (!sec.length) continue;
+      pane.append(h('h3', { class: 'up-sec' + (kind === 'remove' ? ' up-warnh' : '') }, `${title} (${sec.length})`));
+      sec.forEach(r => pane.append(reviewRow(r)));
+    }
+  }
+
+  function askClearAll() {
+    bar(h('span', {}, `Take all ${plural(queued(), 'choice')} out of the queue? Nothing has been applied, so no file changes.`),
+      h('button', { class: 'plain', onclick: () => { choices = {}; saveChoices(); bar(); update(); } }, 'Take them all out'),
+      h('button', { class: 'plain', onclick: () => bar() }, 'Cancel'));
   }
 
   // ── refresh the not-copied list from GitHub ───────────────────────────────
@@ -370,7 +455,7 @@
       h('div', { class: 'up-actions' }, h('button', { class: 'plain', onclick: () => m.remove() }, 'OK'))));
     INST = null;
     await loadData();
-    if (tab === 'installed') await loadInstalled();
+    if (tab !== 'new') await loadInstalled();
     await L.refresh();
   }
 

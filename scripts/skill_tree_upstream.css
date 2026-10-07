@@ -31,3 +31,5 @@
 .up-skill.remove{border-left-color:#b32d1c}@media(prefers-color-scheme:dark){.up-skill.remove{border-left-color:#ff8b74}}
 .up-remove{color:#b32d1c}@media(prefers-color-scheme:dark){.up-remove{color:#ff8b74}}
 .up-warnh{color:#b32d1c}@media(prefers-color-scheme:dark){.up-warnh{color:#ff8b74}}
+.up-sec{font-size:13px;margin:16px 0 6px;padding-top:4px}.up-name .up-badge{margin-left:8px}
+.up-choice select{max-width:100%}

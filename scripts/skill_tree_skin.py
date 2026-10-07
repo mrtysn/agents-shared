@@ -940,7 +940,7 @@ def _asset(name: str) -> str:
 UPSTREAM_HELP = r"""
  <h3>Upstream skills</h3>
  <p>The Upstream skills button has two tabs. <b>Not copied</b> lists skills that exist in the GitHub projects we copy from but are not copied here, each with its own description: Copy it, Ignore or Decide later. <b>Installed</b> lists every skill in this checkout with where it came from, how many lines of local changes it carries (override.patch), whether git shows uncommitted changes, when it was last synced from upstream and last changed here; skills copied from upstream can be marked Remove.</p>
- <p>Picks are only queued in this browser. Apply shows exactly what will change, then writes the ignore lines, copies skills from GitHub (paced, a couple of requests per project) or deletes the folders you marked Remove (a removed skill is also ignored so it is not offered as new again). Nothing is committed for you. Copied skills land flat (always loaded) or in a group you choose.</p>
+ <p>Picks are only queued in this browser. The <b>Review</b> tab lists every queued pick in one place, where you can switch a pick between Copy it / Ignore / Remove, change where a copy goes, or take it out; its Continue to apply button then shows exactly what will change, then writes the ignore lines, copies skills from GitHub (paced, a couple of requests per project) or deletes the folders you marked Remove (a removed skill is also ignored so it is not offered as new again). Nothing is committed for you. Copied skills land flat (always loaded) or in a group you choose.</p>
 """
 
 
