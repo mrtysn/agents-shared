@@ -3,6 +3,8 @@
 //   "Installed": every skill in this checkout with its source, local changes and timestamps, each with
 //                Keep / Remove (only skills copied from upstream can be removed).
 //   "Review":    every queued choice in one editable list; "Continue to apply" opens the Apply dialog.
+// Every tab has a left-hand list of its skills, grouped, with marks for queued picks; a click scrolls the
+// main list to that skill.
 // Choices are queued in this browser and only change files when "Apply" is confirmed. Appended to the
 // skin's client_js (same page, after the skin registered itself); it must not call LRL.register again.
 (function () {
@@ -10,7 +12,9 @@
   const KEY = 'upstream';
   let D = null, INST = null, ov = null, listBox = null, pollTimer = null;
   let tab = 'new';
-  let newCards = [], instCards = [];
+  let newCards = [], instCards = [], reviewIndex = [];
+  let cur = null;   // id of the skill the left-hand list points at
+  const sideClosed = new Set(L.store.get('sideClosed', []));
   let choices = L.store.get(KEY, {});
   const view = { q: '', undecided: false, modified: false };
 
@@ -86,7 +90,9 @@
         h('button', { class: 'plain', id: 'up-refresh', onclick: askRefresh }, 'Refresh from GitHub'),
         h('button', { class: 'plain', onclick: () => { ov.hidden = true; } }, 'Close')),
       h('div', { class: 'up-bar', id: 'up-bar', hidden: true }),
-      (listBox = h('div', { class: 'up-list', id: 'up-list' })),
+      h('div', { class: 'up-body' },
+        h('aside', { class: 'up-side', id: 'up-side', 'aria-label': 'Skills in this tab' }),
+        (listBox = h('div', { class: 'up-list', id: 'up-list' }))),
       h('div', { class: 'up-foot' },
         h('span', { id: 'up-queue' }),
         h('button', { class: 'plain up-apply', id: 'up-apply', onclick: () => { if (tab === 'review') planApply(); else setTab('review'); } }, 'Review choices')));
@@ -98,6 +104,7 @@
 
   async function setTab(t) {
     tab = t;
+    cur = null;
     if ((t === 'installed' || (t === 'review' && Object.keys(choices).some(k => k.startsWith('rm\t')))) && !INST) await loadInstalled();
     document.getElementById('up-t-new').setAttribute('aria-selected', String(t === 'new'));
     document.getElementById('up-t-inst').setAttribute('aria-selected', String(t === 'installed'));
@@ -138,7 +145,7 @@
         h('button', { class: 'plain', onclick: () => { items.forEach(s => { choices[key(s)] = { c: 'ignore' }; }); saveChoices(); update(); } }, 'Ignore all in this repo'),
         h('button', { class: 'plain', onclick: () => { items.forEach(s => { delete choices[key(s)]; }); saveChoices(); update(); } }, 'Clear this repo')));
       for (const s of items) det.append(newCard(s));
-      newCards.push({ det, stat, items });
+      newCards.push({ det, stat, items, title: repo });
       pane.append(det);
     }
     update();
@@ -179,7 +186,7 @@
       const stat = h('span', { class: 'up-n' });
       const det = h('details', { class: 'up-repo' }, h('summary', {}, h('span', { class: 'mono' }, g === 'flat' ? 'flat skills (always loaded)' : `group: ${g}`), ' ', stat));
       for (const s of items) det.append(instCard(s));
-      instCards.push({ det, stat, items });
+      instCards.push({ det, stat, items, title: g === 'flat' ? 'flat (always loaded)' : g });
       pane.append(det);
     }
     update();
@@ -281,6 +288,53 @@
       ap.disabled = !queued();
       ap.textContent = tab === 'review' ? 'Continue to apply' : queued() ? `Review ${plural(queued(), 'choice')}` : 'Review choices';
     }
+    renderSide();
+  }
+
+  // ── the left-hand list: this tab's skills, grouped, with marks for queued picks ──
+  function sideGroups() {
+    if (tab === 'new') return newCards.map(c => ({ title: c.title, entries: c.items.map(s => {
+      const ch = choices[key(s)];
+      return { id: key(s), name: s.name, node: s._node, det: c.det, mark: ch ? (ch.c === 'copy' ? '✓' : '✕') : '', cls: ch ? ch.c : '' };
+    }) }));
+    if (tab === 'installed') return instCards.map(c => ({ title: c.title, entries: c.items.map(s => {
+      const rm = !!choices[rmKey(s)], mod = !!(s.override || s.dirty);
+      return { id: 'rm\t' + s.dir, name: s.name, node: s._node, det: c.det, mark: rm ? '✕' : mod ? '●' : '', cls: rm ? 'remove' : mod ? 'mod' : '' };
+    }) }));
+    return reviewIndex;
+  }
+
+  function renderSide() {
+    const box = document.getElementById('up-side');
+    if (!box) return;
+    const groups = sideGroups();
+    document.querySelectorAll('.up-cur').forEach(n => n.classList.remove('up-cur'));
+    const kids = [];
+    for (const g of groups) {
+      const shown = g.entries.filter(e => !e.node.hidden);
+      if (!shown.length) continue;
+      const id = tab + ':' + g.title;
+      const closed = sideClosed.has(id);
+      kids.push(h('button', { class: 'up-gh', 'aria-expanded': String(!closed), onclick: () => {
+        if (closed) sideClosed.delete(id); else sideClosed.add(id);
+        L.store.set('sideClosed', [...sideClosed]); renderSide(); } },
+        h('span', { class: 't' }, (closed ? '▸ ' : '▾ ') + g.title), h('span', { class: 'n' }, String(shown.length))));
+      if (!closed) kids.push(h('ul', {}, shown.map(e => h('li', {}, h('button', {
+        class: 'up-sr ' + e.cls, 'aria-current': cur === e.id ? 'true' : null, onclick: () => go(e),
+        title: e.name }, h('span', { class: 't' }, e.name), h('span', { class: 'm' }, e.mark))))));
+      for (const e of g.entries) if (cur === e.id) e.node.classList.add('up-cur');
+    }
+    if (!kids.length) kids.push(h('p', { class: 'up-note', style: 'padding:12px' }, 'Nothing to list.'));
+    box.replaceChildren(...kids);
+  }
+
+  function go(e) {
+    cur = e.id;
+    if (e.det) e.det.open = true;
+    renderSide();
+    // jump straight to it: set the list's scroll position from where the card sits now
+    const list = document.getElementById('up-list');
+    list.scrollTop += e.node.getBoundingClientRect().top - list.getBoundingClientRect().top - 8;
   }
 
   // ── tab: review ────────────────────────────────────────────────────────────
@@ -338,6 +392,7 @@
 
   function buildReview() {
     const pane = mount('up-pane-review');
+    reviewIndex = [];
     if (!queued()) {
       pane.append(h('p', { class: 'up-empty' }, 'Nothing is queued. Choose Copy it, Ignore or Remove in the other tabs and every pick shows up here to review and change before you apply.'));
       return;
@@ -347,11 +402,16 @@
       h('button', { class: 'plain', onclick: askClearAll }, 'Take everything out of the queue'),
       h('span', { class: 'up-note' }, 'Nothing has been applied yet. Change a pick with its menu, or take it out.')));
     if (!rows.length) pane.append(h('p', { class: 'up-empty' }, 'No queued choice matches the search.'));
-    for (const [kind, title] of [['copy', 'Copy from GitHub'], ['ignore', 'Ignore'], ['remove', 'Remove installed skills']]) {
+    reviewIndex = [];
+    for (const [kind, title, side] of [['copy', 'Copy from GitHub', 'Copy'], ['ignore', 'Ignore', 'Ignore'], ['remove', 'Remove installed skills', 'Remove']]) {
       const sec = rows.filter(r => r.kind === kind);
       if (!sec.length) continue;
       pane.append(h('h3', { class: 'up-sec' + (kind === 'remove' ? ' up-warnh' : '') }, `${title} (${sec.length})`));
-      sec.forEach(r => pane.append(reviewRow(r)));
+      reviewIndex.push({ title: side, entries: sec.map(r => {
+        const node = reviewRow(r);
+        pane.append(node);
+        return { id: r.k, name: r.name, node, mark: kind === 'copy' ? '✓' : '✕', cls: kind };
+      }) });
     }
   }
 
