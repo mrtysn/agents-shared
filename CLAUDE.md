@@ -108,7 +108,7 @@ as conflict markers in the working file and reported — never silently lost.
 - `files` — optional, skill-dir-relative list of every vendored file. Defaults to `["SKILL.md"]`. List only upstream-tracked files; local-only artifacts (`.venv/`, gitignored) are never listed and never touched.
 - `ignore` — optional, skill-dir-relative globs for upstream files deliberately not vendored. They stay out of the drift report and out of `--adopt-listing`. A file already in `files` is never dropped by `ignore`.
 
-**Adding a new external skill:**
+**Adding a new external skill** (`scripts/vendor-upstream-skill.py <owner/repo> <path/to/SKILL.md> --group <name>|--flat` does all of this in one go; by hand:)
 1. Copy the upstream skill's files into `claude/skills/<name>/`, or into `claude/skills/<group>/skills/<name>/` for a pack
 2. Create `source.json` with `repo`, `path`, the current `commit` SHA, and (if multi-file) `files`
 3. Establish the pristine base: `bash scripts/sync-external-skills.sh --establish-base <name>` — fetches the files at the pinned commit into `.upstream/` and captures any local edits as `override.patch`
@@ -129,10 +129,13 @@ is a per-skill decision.
 A full run (no name) also lists `SKILL.md` files in the upstream repos that no `source.json`
 vendors (new upstream skills such as a repo's new sibling skills), one path per line
 (`--new-skills-summary` prints per-repo counts instead). Decide them with
-`scripts/catalog-unvendored-skills.py --out <absolute html path>`: it builds a local page showing each
-skill's own description with a copy / ignore / later choice, and exports the choices. Ignored ones go
-in `scripts/external-skills-ignore.txt` as `<owner/repo> <glob>`; copied ones become external skills,
-so both drop out of the report.
+the **Upstream skills** button in Skill Tree (`scripts/skill_tree_skin.py`): each skill with its own
+description and a Copy it / Ignore / Decide later choice. Choices are queued in the browser; Apply shows
+what will change, then appends ignore lines to `scripts/external-skills-ignore.txt` (`<owner/repo> <glob>`)
+and copies skills with `scripts/vendor-upstream-skill.py`. Both drop out of the report. The list is
+cached at `$XDG_CACHE_HOME/agents-shared/unvendored-skills.json` and rebuilt by the view's Refresh button
+(`scripts/catalog-unvendored-skills.py --json`, paced GitHub fetches). `--out <absolute html path>` builds
+a standalone page instead.
 `bash scripts/sync-external-skills.sh --check-links [<name>]` needs no network: it reports relative
 links in a skill's `SKILL.md` (and the vendored `.md` files it links to) whose target is not in the
 repo. It also runs on every skill a sync updates, so a merge that introduces a link to a file we

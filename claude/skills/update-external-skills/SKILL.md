@@ -32,9 +32,9 @@ A 429, 403 or any refusal ends the run: stop and report.
    AskUserQuestion, naming the files added and removed. On yes:
    `bash scripts/sync-external-skills.sh --adopt-listing <name>`.
    The summary can also list **New upstream skills** (a `SKILL.md` in a repo we fetch that
-   no `source.json` vendors) and **Dangling links**. For a new skill, ask whether to vendor
-   it (the "Adding a new external skill" steps in CLAUDE.md) or add `<repo> <glob>` to
-   `scripts/external-skills-ignore.txt`. A dangling link means the merge pulled in a link to a
+   no `source.json` vendors) and **Dangling links**. New skills are the user's call, per skill, with each skill's own description in front
+   of them: point them at the **Upstream skills** button in Skill Tree rather than deciding or
+   asking in bulk. A dangling link means the merge pulled in a link to a
    file we do not vendor: add that file to `files` and sync again.
 3. **Sync.** `bash scripts/sync-external-skills.sh $ARGUMENTS`. For a very large set, sync
    by group so each commit stays reviewable.

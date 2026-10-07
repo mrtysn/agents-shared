@@ -407,7 +407,7 @@ print_findings() {
         else
             local n; for n in "${new_skills[@]}"; do echo "  - $n"; done
         fi
-        echo "    Decide each with scripts/catalog-unvendored-skills.py; a decided skill is vendored or listed in scripts/external-skills-ignore.txt and drops out."
+        echo "    Decide each with the Upstream skills button in Skill Tree; a decided skill is vendored or listed in scripts/external-skills-ignore.txt and drops out."
     fi
     if [[ ${#dangling[@]} -gt 0 ]]; then
         echo ""; echo "Dangling links (relative link in a vendored .md whose target is missing):"
