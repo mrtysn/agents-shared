@@ -186,7 +186,6 @@
   }
 
   function instCard(s) {
-    const name = `ui-${Math.random().toString(36).slice(2, 9)}`;
     const badges = [];
     if (s.override) badges.push(h('span', { class: 'up-badge mod', title: 'override.patch: our edits on top of upstream' }, `local changes: ${plural(s.override.lines, 'line')} in ${plural(s.override.files, 'file')}`));
     if (s.dirty) badges.push(h('span', { class: 'up-badge dirty', title: 'git status shows uncommitted changes in this skill' }, 'uncommitted changes'));
@@ -196,20 +195,22 @@
     const times = s.external
       ? `Last synced from upstream: ${when(s.synced)} · pinned ${s.pinned} · last changed in this repo: ${when(s.changed)}`
       : `Last changed in this repo: ${when(s.changed)}`;
-    const radio = (val, label) => {
-      const r = h('input', { type: 'radio', name, value: val, onchange: () => {
-        if (val) choices[rmKey(s)] = { c: 'remove' }; else delete choices[rmKey(s)];
-        saveChoices(); update(); } });
-      s['_i_' + val] = r;
-      return h('label', { class: val ? 'up-remove' : 'up-keep' }, r, ' ' + label);
-    };
+    // Keep / Remove is mouse-only: the buttons never take keyboard focus (so arrow keys, Tab, Space and
+    // Enter cannot reach them), and a click that did not come from a pointer (detail 0) is ignored.
+    const mk = (label, remove) => h('button', { type: 'button', class: 'plain up-seg ' + (remove ? 'up-remove' : 'up-keep'),
+      tabindex: '-1', 'aria-pressed': 'false', onmousedown: e => e.preventDefault(),
+      onclick: e => {
+        if (e.detail === 0) return;
+        if (remove) choices[rmKey(s)] = { c: 'remove' }; else delete choices[rmKey(s)];
+        saveChoices(); update(); } }, label);
+    s._keep = mk('Keep', false); s._rm = mk('Remove', true);
     const node = h('div', { class: 'up-skill' },
       h('div', { class: 'up-name' }, h('strong', {}, s.name), ' ', (s.dir.split('/').pop() === s.name && s.group === 'flat') ? null : h('span', { class: 'up-path mono' }, s.dir.replace(/^claude\/skills\//, ''))),
       h('div', { class: 'up-badges' }, badges),
       h('div', { class: 'up-desc', title: 'Click to expand', onclick: e => e.currentTarget.classList.toggle('open') }, s.description || '(no description)'),
       h('div', { class: 'up-times' }, times),
       s.external
-        ? h('div', { class: 'up-choice' }, radio('', 'Keep'), radio('remove', 'Remove'))
+        ? h('div', { class: 'up-choice' }, h('div', { class: 'up-segs', role: 'group', 'aria-label': `Keep or remove ${s.name}` }, s._keep, s._rm))
         : h('div', { class: 'up-times' }, 'Your own skill: not copied from upstream, so it is removed by hand.'));
     s._node = node;
     return node;
@@ -248,7 +249,7 @@
       let shown = 0, r = 0, m = 0;
       for (const s of items) {
         const cur = choices[rmKey(s)] ? 'remove' : '';
-        if (s.external) s['_i_' + cur].checked = true;
+        if (s.external) { s._keep.setAttribute('aria-pressed', String(!cur)); s._rm.setAttribute('aria-pressed', String(!!cur)); }
         s._node.className = 'up-skill' + (cur ? ' remove' : '');
         if (cur) r++;
         const modified = !!(s.override || s.dirty);
@@ -310,10 +311,11 @@
   function reviewRow(r) {
     const inst = r.k.startsWith('rm\t');
     const opt = (v, label) => h('option', { value: v }, label);
-    const act = h('select', { 'aria-label': `Choice for ${r.name}`, onchange: e => setChoice(r, e.target.value) },
-      inst ? [opt('remove', 'Remove'), opt('', 'Keep (take out of the queue)')]
-        : [opt('copy', 'Copy it'), opt('ignore', 'Ignore'), opt('', 'Decide later (take out of the queue)')]);
-    act.value = r.kind;
+    // A removal has no menu to flip: it can only be taken out, with the Take out button.
+    const act = inst ? h('span', { class: 'up-remove up-fixed' }, 'Remove')
+      : h('select', { 'aria-label': `Choice for ${r.name}`, onchange: e => setChoice(r, e.target.value) },
+        [opt('copy', 'Copy it'), opt('ignore', 'Ignore'), opt('', 'Decide later (take out of the queue)')]);
+    if (!inst) act.value = r.kind;
     const controls = [act];
     if (r.kind === 'copy') {
       const dest = h('select', { 'aria-label': `Where to put ${r.name}`, onchange: e => { choices[r.k] = { c: 'copy', d: e.target.value }; saveChoices(); update(); } },
