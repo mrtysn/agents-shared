@@ -190,7 +190,7 @@ for source_file in "$SKILLS_DIR"/*/source.json "$SKILLS_DIR"/*/skills/*/source.j
     fi
     if [[ ${#added[@]} -gt 0 || ${#removed[@]} -gt 0 ]]; then
         [[ $ADOPT -eq 1 && "$MODE" == "sync" ]] \
-            || drift+=("$skill_name: ${#added[@]} added, ${#removed[@]} removed upstream")
+            || drift+=("$skill_name: ${#added[@]} added, ${#removed[@]} removed upstream — +${added[*]:-} -${removed[*]:-}")
         if [[ $ADOPT -eq 1 && "$MODE" == "sync" ]]; then
             for f in ${removed[@]+"${removed[@]}"}; do rm -f "$skill_dir/$f" "$base_dir/$f"; done
             files=(); while IFS= read -r f; do [[ -n "$f" ]] && files+=("$f"); done < "$HEAD_CACHE/up.lst"
