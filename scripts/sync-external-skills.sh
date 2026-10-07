@@ -19,7 +19,8 @@
 # the SHA of its `.upstream/` copy locally, so only files that really changed are
 # downloaded, and a repo shared by thirty skills costs one fetch, not thirty. A skill
 # whose files are all identical is "up to date" even when the repo's HEAD moved, and
-# its pin is left alone. The same tree is compared with source.json's `files` list, so
+# its pin is left alone. Fetches are paced (SYNC_FETCH_DELAY seconds, default 2) and the
+# first failed fetch stops all further contact with GitHub for that run. The same tree is compared with source.json's `files` list, so
 # files added upstream are reported, and a listed file deleted upstream stops that skill
 # with a clear message instead of a bare fetch error. (--establish-base still reads the pinned commit via
 # raw.githubusercontent.)
@@ -87,11 +88,14 @@ repo_dir() { echo "$HEAD_CACHE/${1//\//__}.git"; }
 repo_head() {
     local rd; rd=$(repo_dir "$1")
     if [[ ! -f "$rd.sha" ]]; then
+        # First refusal ends it: after one failed fetch, no further repo is contacted this run.
+        if [[ -f "$HEAD_CACHE/abort" ]]; then : > "$rd.sha"; cat "$rd.sha"; return; fi
+        sleep "${SYNC_FETCH_DELAY:-2}"
         git init -q --bare "$rd" \
             && git -C "$rd" remote add origin "https://github.com/$1.git" \
             && git -C "$rd" fetch -q --depth=1 --filter=blob:none --no-tags origin HEAD 2>/dev/null \
             && git -C "$rd" rev-parse FETCH_HEAD > "$rd.sha" \
-            || : > "$rd.sha"
+            || { : > "$rd.sha"; touch "$HEAD_CACHE/abort"; }
     fi
     cat "$rd.sha"
 }
