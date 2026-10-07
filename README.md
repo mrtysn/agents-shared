@@ -59,6 +59,7 @@ config dir (`$CLAUDE_CONFIG_DIR`, else `~/.claude`).
 | Hook | Event | Description |
 |------|-------|-------------|
 | `hooks/block-tree-discard.sh` | PreToolUse | Refuses git commands that discard uncommitted work; only `git checkout -- <one tracked file>` passes |
+| `hooks/limit-signed-releases.py` | PreToolUse (`Bash`) | Refuses a Firefox add-on signing (`web-ext sign`, a repo's `release.zsh`, AMO's upload API) that addons.mozilla.org would throttle: 3 a minute, 10 an hour, 24 in 24 hours per account. Each signing is appended to `<config>/signed-releases.log` (or `$SIGNED_RELEASE_LOG`); past a limit, the user signs in their own shell. Cases in `hooks/tests/run-limit-signed-releases.sh` |
 | `hooks/focus-policy.sh` | SessionStart | Tells the session whether this machine tolerates a window stealing keyboard focus |
 | `hooks/memory-lint.sh` | PreToolUse (`Edit\|Write`) | Keeps auto-memory index lines topic-only and refuses a memory that duplicates a rule |
 | `hooks/dump-hook-stdin.sh` | any | Probe: writes the JSON a hook event receives to a file, then allows the call |
