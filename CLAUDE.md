@@ -104,6 +104,7 @@ as conflict markers in the working file and reported — never silently lost.
 ```
 - `path` — upstream-repo path of the primary file. Its dirname is the upstream skill directory.
 - `files` — optional, skill-dir-relative list of every vendored file. Defaults to `["SKILL.md"]`. List only upstream-tracked files; local-only artifacts (`.venv/`, gitignored) are never listed and never touched.
+- `ignore` — optional, skill-dir-relative globs for upstream files deliberately not vendored. They stay out of the drift report and out of `--adopt-listing`. A file already in `files` is never dropped by `ignore`.
 
 **Adding a new external skill:**
 1. Copy the upstream skill's files into `claude/skills/<name>/`, or into `claude/skills/<group>/skills/<name>/` for a pack
@@ -123,6 +124,13 @@ Every run also compares upstream's skill directory with `files` and reports file
 upstream (never fetched otherwise) and listed files deleted upstream (which stop that skill).
 `--adopt-listing` takes a name on purpose: lists are often deliberately partial, so adopting
 is a per-skill decision.
+A full run (no name) also lists `SKILL.md` files in the upstream repos that no `source.json`
+vendors (new upstream skills such as a repo's new sibling skills). Ones you decide not to take go
+in `scripts/external-skills-ignore.txt` as `<owner/repo> <glob>`.
+`bash scripts/sync-external-skills.sh --check-links [<name>]` needs no network: it reports relative
+links in a skill's `SKILL.md` (and the vendored `.md` files it links to) whose target is not in the
+repo. It also runs on every skill a sync updates, so a merge that introduces a link to a file we
+never vendored is named at once.
 
 The script reads each `source.json` and does one blobless shallow fetch per distinct
 upstream repo (trees only, no file contents). It compares each listed file's upstream

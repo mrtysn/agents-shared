@@ -455,6 +455,7 @@ bash scripts/sync-external-skills.sh            # all external skills → upstre
 bash scripts/sync-external-skills.sh caveman     # specific skill only
 bash scripts/sync-external-skills.sh --dry-run [name]  # preview: behind upstream? merge clean? writes nothing
 bash scripts/sync-external-skills.sh --adopt-listing name  # make source.json's file list match upstream's skill dir, then sync
+bash scripts/sync-external-skills.sh --check-links [name]  # no network: relative links whose target is not vendored
 bash scripts/sync-external-skills.sh --establish-base [name]  # (re)build base + patch from the pin
 ```
 
