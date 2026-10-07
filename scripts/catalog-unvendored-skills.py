@@ -131,6 +131,7 @@ def main():
             run(["git", "clone", "-q", "--depth=1", "--filter=blob:none", "--no-checkout",
                  "https://github.com/%s.git" % repo, d])
             tree = run(["git", "ls-tree", "-r", "--name-only", "HEAD"], cwd=d).split("\n")
+            repo_updated = run(["git", "log", "-1", "--format=%cI"], cwd=d).strip()
             paths = [p for p in tree if re.search(r"(^|/)SKILL\.md$", p)]
             wanted = [p for p in paths if (repo, p) not in vendored
                       and not any(r == repo and fnmatch.fnmatchcase(p, g) for r, g in ignores)]
@@ -152,6 +153,7 @@ def main():
                 "repo": repo, "path": p,
                 "name": fm.get("name") or os.path.basename(os.path.dirname(p)) or "(root)",
                 "desc": fm.get("description", "(no description in frontmatter)"),
+                "repo_updated": repo_updated,
             })
 
     items.sort(key=lambda x: (x["repo"], x["path"]))
