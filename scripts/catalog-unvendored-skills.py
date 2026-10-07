@@ -17,7 +17,10 @@ SKILL.md blobs (sparse checkout), paced by --delay seconds. The first failed git
 stops all further contact with GitHub.
 
 Usage:
-    scripts/catalog-unvendored-skills.py --out /absolute/path/catalog.html [--delay 2]
+    scripts/catalog-unvendored-skills.py [--out /absolute/catalog.html] [--json /absolute/data.json] [--delay 2]
+
+--json writes {"generated": <iso time>, "items": [{repo, path, name, desc}, ...]}, which the Upstream
+view in Skill Tree reads. At least one of --out and --json is required.
 """
 import argparse
 import fnmatch
@@ -99,11 +102,15 @@ def parse_frontmatter(text):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", required=True, help="absolute path of the HTML file to write")
+    ap.add_argument("--out", help="absolute path of the HTML file to write")
+    ap.add_argument("--json", help="absolute path of the JSON data file to write")
     ap.add_argument("--delay", type=float, default=2.0, help="seconds between repos")
     args = ap.parse_args()
-    if not os.path.isabs(args.out):
-        sys.exit("--out must be an absolute path")
+    if not (args.out or args.json):
+        sys.exit("give --out and/or --json")
+    for given in (args.out, args.json):
+        if given and not os.path.isabs(given):
+            sys.exit("%s must be an absolute path" % given)
 
     vendored, repos = set(), []
     for sf in source_files():
@@ -148,12 +155,19 @@ def main():
             })
 
     items.sort(key=lambda x: (x["repo"], x["path"]))
-    data = json.dumps(items).replace("<", "\\u003c")
-    page = PAGE.replace("__DATA__", data).replace("__COUNT__", str(len(items)))
-    with open(args.out, "w", encoding="utf-8") as f:
-        f.write(page)
-    print("wrote %d skills from %d repos to %s%s" % (
-        len(items), len(repos), args.out, " (%d unreadable)" % skipped if skipped else ""))
+    note = " (%d unreadable)" % skipped if skipped else ""
+    if args.json:
+        tmp = args.json + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump({"generated": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "items": items}, f, ensure_ascii=False)
+        os.replace(tmp, args.json)
+        print("wrote %d skills from %d repos to %s%s" % (len(items), len(repos), args.json, note))
+    if args.out:
+        data = json.dumps(items).replace("<", "\\u003c")
+        page = PAGE.replace("__DATA__", data).replace("__COUNT__", str(len(items)))
+        with open(args.out, "w", encoding="utf-8") as f:
+            f.write(page)
+        print("wrote %d skills from %d repos to %s%s" % (len(items), len(repos), args.out, note))
 
 
 PAGE = r"""<!doctype html>
