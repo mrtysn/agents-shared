@@ -19,7 +19,9 @@
 # the SHA of its `.upstream/` copy locally, so only files that really changed are
 # downloaded, and a repo shared by thirty skills costs one fetch, not thirty. A skill
 # whose files are all identical is "up to date" even when the repo's HEAD moved, and
-# its pin is left alone. (--establish-base still reads the pinned commit via
+# its pin is left alone. The same tree is compared with source.json's `files` list, so
+# files added upstream are reported, and a listed file deleted upstream stops that skill
+# with a clear message instead of a bare fetch error. (--establish-base still reads the pinned commit via
 # raw.githubusercontent.)
 #
 # Which files: source.json's optional "files" array (skill-dir-relative). Defaults
@@ -37,6 +39,13 @@
 #                                                            # Writes nothing in the repo.
 #                                                            # One blobless fetch per distinct
 #                                                            # repo, plus blobs of changed files.
+#   bash scripts/sync-external-skills.sh --adopt-listing <name>
+#                                                            # make source.json's `files` match
+#                                                            # upstream's skill directory (files
+#                                                            # added upstream come in, files
+#                                                            # deleted upstream are dropped),
+#                                                            # then sync. Needs a name: lists are
+#                                                            # often deliberately partial.
 #   bash scripts/sync-external-skills.sh --establish-base [<name>]
 #                                                            # (re)build .upstream +
 #                                                            # override.patch from the
@@ -51,18 +60,24 @@ AGENTS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SKILLS_DIR="$AGENTS_DIR/claude/skills"
 
 MODE="sync"
+ADOPT=0
 filter=""
 for arg in "$@"; do
     case "$arg" in
         --establish-base) MODE="establish" ;;
         --dry-run) MODE="dry" ;;
+        --adopt-listing) ADOPT=1 ;;
         *) filter="$arg" ;;
     esac
 done
+if [[ $ADOPT -eq 1 && -z "$filter" ]]; then
+    echo "--adopt-listing needs a skill or group name: file lists are often deliberately partial." >&2
+    exit 2
+fi
 
 today=$(date +%Y-%m-%d)
 updated=(); established=(); skipped=(); failed=(); conflicted=()
-behind_clean=(); behind_conflict=()
+behind_clean=(); behind_conflict=(); drift=()
 HEAD_CACHE=$(mktemp -d)
 trap 'rm -rf "$HEAD_CACHE"' EXIT
 
@@ -162,6 +177,31 @@ for source_file in "$SKILLS_DIR"/*/source.json "$SKILLS_DIR"/*/skills/*/source.j
     fi
     rd=$(repo_dir "$repo")
     up() { [[ "$upstream_dir" == "." ]] && echo "$1" || echo "$upstream_dir/$1"; }
+
+    # Listing drift: files in upstream's skill directory vs source.json's `files`.
+    # Skipped for a skill at the repo root, whose directory is the whole repo.
+    added=(); removed=()
+    if [[ "$upstream_dir" != "." ]]; then
+        git -C "$rd" ls-tree -r --name-only "$new_commit" -- "$upstream_dir" 2>/dev/null \
+            | sed "s#^$upstream_dir/##" | sort > "$HEAD_CACHE/up.lst"
+        printf '%s\n' "${files[@]}" | sort > "$HEAD_CACHE/ours.lst"
+        while IFS= read -r f; do [[ -n "$f" ]] && added+=("$f"); done < <(comm -13 "$HEAD_CACHE/ours.lst" "$HEAD_CACHE/up.lst")
+        while IFS= read -r f; do [[ -n "$f" ]] && removed+=("$f"); done < <(comm -23 "$HEAD_CACHE/ours.lst" "$HEAD_CACHE/up.lst")
+    fi
+    if [[ ${#added[@]} -gt 0 || ${#removed[@]} -gt 0 ]]; then
+        [[ $ADOPT -eq 1 && "$MODE" == "sync" ]] \
+            || drift+=("$skill_name: ${#added[@]} added, ${#removed[@]} removed upstream")
+        if [[ $ADOPT -eq 1 && "$MODE" == "sync" ]]; then
+            for f in ${removed[@]+"${removed[@]}"}; do rm -f "$skill_dir/$f" "$base_dir/$f"; done
+            files=(); while IFS= read -r f; do [[ -n "$f" ]] && files+=("$f"); done < "$HEAD_CACHE/up.lst"
+            jq --argjson l "$(jq -R . < "$HEAD_CACHE/up.lst" | jq -s .)" '.files=$l' "$source_file" > "$source_file.tmp" \
+                && mv "$source_file.tmp" "$source_file"
+            echo "  listing adopted: +${#added[@]} -${#removed[@]}"
+        elif [[ ${#removed[@]} -gt 0 ]]; then
+            failed+=("$skill_name — listed file(s) removed upstream (${removed[0]}${removed[1]+, …}); rerun with --adopt-listing $skill_name")
+            continue
+        fi
+    fi
 
     # Ensure a base exists (bootstrap from the pinned commit on first run).
     if [[ ! -d "$base_dir" ]]; then
@@ -266,6 +306,12 @@ for source_file in "$SKILLS_DIR"/*/source.json "$SKILLS_DIR"/*/skills/*/source.j
     rm -rf "$tmp_new"
 done
 
+print_drift() {
+    [[ ${#drift[@]} -gt 0 ]] || return 0
+    echo ""; echo "Listing drift (files added/removed upstream vs source.json; adopt with --adopt-listing <name>):"
+    local d; for d in "${drift[@]}"; do echo "  - $d"; done
+}
+
 # ── Summary ──────────────────────────────────────────────────────────────
 echo ""
 if [[ "$MODE" == "dry" ]]; then
@@ -278,6 +324,7 @@ if [[ "$MODE" == "dry" ]]; then
         echo ""; echo "Failures:"
         for f in "${failed[@]}"; do echo "  - $f"; done
     fi
+    print_drift
     exit 0
 fi
 echo "=== Sync Summary ==="
@@ -298,3 +345,4 @@ fi
 if [[ ${#updated[@]} -gt 0 ]]; then
     echo ""; echo "Skills updated. Review the diff (incl. override.patch) and commit."
 fi
+print_drift

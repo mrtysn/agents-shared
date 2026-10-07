@@ -115,9 +115,14 @@ as conflict markers in the working file and reported — never silently lost.
 bash scripts/sync-external-skills.sh --dry-run [<name>]  # preview only, writes nothing
 bash scripts/sync-external-skills.sh            # all → upstream HEAD
 bash scripts/sync-external-skills.sh <name>      # one
+bash scripts/sync-external-skills.sh --adopt-listing <name>  # make `files` match upstream's skill dir, then sync
 ```
 `--dry-run` trial-merges each behind skill on temp copies, reporting `merges clean`
 or `CONFLICT`.
+Every run also compares upstream's skill directory with `files` and reports files added
+upstream (never fetched otherwise) and listed files deleted upstream (which stop that skill).
+`--adopt-listing` takes a name on purpose: lists are often deliberately partial, so adopting
+is a per-skill decision.
 
 The script reads each `source.json` and does one blobless shallow fetch per distinct
 upstream repo (trees only, no file contents). It compares each listed file's upstream
