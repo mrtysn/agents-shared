@@ -47,6 +47,7 @@ Command instructions here. Use $ARGUMENTS for user-provided arguments.
 2. Add frontmatter with description
 3. Write clear, imperative instructions
 4. Optionally add supporting files (references, templates)
+5. Run `project-lifecycle test` before committing a skill: `scripts/check-skills.zsh` checks every skill's layout and frontmatter, the rules' links, and the `~/.claude` symlinks.
 
 **Naming:** Use lowercase kebab-case (e.g., `my-skill/SKILL.md` → `/my-skill`).
 
