@@ -1,8 +1,9 @@
 ---
-description: Suggest a short tab title for the current chat, sized for the iTerm2 tab strip, as a ready-to-paste /rename line. Suggests only — never touches the terminal.
+description: Suggest a short tab title for the current chat, sized for the iTerm2 tab strip, as a ready-to-paste /rename line. Suggests only — never touches the terminal. Use when the user says "name this tab", "tab title", "suggest a title", or asks what to /rename the chat.
 user-invocable: true
 disable-model-invocation: true
 argument-hint: [ignored]
+allowed-tools: ""
 ---
 
 # tab-title

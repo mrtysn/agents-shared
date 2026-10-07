@@ -1,5 +1,7 @@
 ---
 description: Systematic refactoring with full cleanup. Use when extracting services, eliminating patterns, or cleaning up magic strings.
+argument-hint: [pattern or area to refactor]
+allowed-tools: Bash, Read, Edit, Grep, Glob
 ---
 
 # Refactor Skill

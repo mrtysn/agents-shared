@@ -1,6 +1,8 @@
 ---
 name: finance-import
 description: Import freshly downloaded İş Bankası and Yapı Kredi exports into Firefly III and refresh the burn/runway report. Use when the user says they downloaded bank files, wants the monthly finance refresh, or invokes /finance-import — typically right after the monthly Telegram reminder.
+argument-hint: (none)
+allowed-tools: Bash, Read, Edit
 ---
 
 # Finance import — monthly refresh

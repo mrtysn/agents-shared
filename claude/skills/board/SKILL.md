@@ -2,6 +2,7 @@
 description: Show the Jira sprint board as a TUI kanban. Use when user asks to see the board, sprint, tickets, or kanban view.
 user-invocable: true
 allowed-tools: Bash, mcp__atlassian__getJiraIssue, Grep, Glob, Read
+argument-hint: [ticket key | project key | Jira URL] [--me] [--assignee "Name"] [--json]
 ---
 
 Render the current Jira sprint as a TUI kanban board, or dive into a specific ticket.

@@ -1,15 +1,9 @@
 ---
 name: game-harness
-description: >
-  Make a game inspectable by an agent, then investigate it that way: a state hook tests can
-  read, named scenes to jump to, draw and frame counters, headless capture that is identical
-  run to run, and tests that drive the real controls through the main interactions. Checks a
-  game repo for the five parts, adds the missing ones, and runs every problem as reproduce →
-  inspect → trace → change → rerun the same check. Use before the first feature of a new game,
-  when a bug can only be described in words, when a performance claim has no before/after, or
-  when the user says test scene, state hook, headless capture, screenshot test, "let the agent
-  play it", or "I can't tell you what's wrong, look at it yourself".
+description: Make a game inspectable by an agent, then investigate it that way: a state hook tests can read, named scenes to jump to, draw and frame counters, headless capture that is identical run to run, and tests that drive the real controls through the main interactions. Checks a game repo for the five parts, adds the missing ones, and runs every problem as reproduce → inspect → trace → change → rerun the same check. Use when starting a new game before its first feature, when a bug can only be described in words, when a performance claim has no before/after, or when the user says test scene, state hook, headless capture, screenshot test, "let the agent play it", or "I can't tell you what's wrong, look at it yourself".
 disable-model-invocation: true
+argument-hint: [game repo path]
+allowed-tools: Bash, Read, Write, Edit, Grep, Glob
 ---
 
 # Game harness
