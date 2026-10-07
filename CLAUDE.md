@@ -127,9 +127,12 @@ upstream (never fetched otherwise) and listed files deleted upstream (which stop
 `--adopt-listing` takes a name on purpose: lists are often deliberately partial, so adopting
 is a per-skill decision.
 A full run (no name) also lists `SKILL.md` files in the upstream repos that no `source.json`
-vendors (new upstream skills such as a repo's new sibling skills), as a per-repo count with examples;
-`--list-new-skills` prints every path. Ones you decide not to take go in
-`scripts/external-skills-ignore.txt` as `<owner/repo> <glob>`.
+vendors (new upstream skills such as a repo's new sibling skills), one path per line
+(`--new-skills-summary` prints per-repo counts instead). Decide them with
+`scripts/catalog-unvendored-skills.py --out <absolute html path>`: it builds a local page showing each
+skill's own description with a copy / ignore / later choice, and exports the choices. Ignored ones go
+in `scripts/external-skills-ignore.txt` as `<owner/repo> <glob>`; copied ones become external skills,
+so both drop out of the report.
 `bash scripts/sync-external-skills.sh --check-links [<name>]` needs no network: it reports relative
 links in a skill's `SKILL.md` (and the vendored `.md` files it links to) whose target is not in the
 repo. It also runs on every skill a sync updates, so a merge that introduces a link to a file we
