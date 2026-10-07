@@ -47,6 +47,9 @@ import threading
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import skill_tree_insights as insights  # noqa: E402
+
 CONFIG_DIR = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude")
 SKILLS_DIR = CONFIG_DIR / "skills"
 SCOPES = ("user", "project", "local")
@@ -135,7 +138,23 @@ def skill_record(skill_dir: Path, group: str | None) -> dict | None:
         "repo": external.get("repo") if external else None,
         "has_override": (skill_dir / "override.patch").is_file(),
         "enabled": skill_dir.parent.name != "off",
+        **_insights(group, name),
     }
+
+
+def _insights(group: str | None, name: str) -> dict:
+    """usage and findings for one skill; pack skills are keyed 'pack:skill', flat ones by name."""
+    key = f"{group}:{name}" if group else name
+    use = insights.usage_by_skill()
+    return {"usage": use.get(key) or {"count": 0, "last": None},
+            "findings": insights.findings_by_skill().get(key) or {"problems": [], "warnings": []}}
+
+
+def _refresh_insights(groups: list[dict], flat: list[dict]) -> None:
+    """The collect cache is keyed on the skills tree, so usage (which moves with every
+    transcript) is laid over the copy each time; the insights module caches the real work."""
+    for k in [k for g in groups for k in g["skills"]] + flat:
+        k.update(_insights(k["group"], k["name"]))
 
 
 def _collect() -> tuple[list[dict], list[dict]]:
@@ -257,7 +276,9 @@ def collect() -> tuple[list[dict], list[dict]]:
     if not hit or hit[0] != sig:
         hit = (sig, _load_or_collect(sig))
         _memo["collect"] = hit
-    return copy.deepcopy(hit[1])
+    groups, flat = copy.deepcopy(hit[1])
+    _refresh_insights(groups, flat)
+    return groups, flat
 
 
 def _groups_view() -> list[tuple[str, str]]:
@@ -952,6 +973,7 @@ UPSTREAM_HELP = r"""
 
 CSS = r"""
 .node.group rect{stroke:var(--on);stroke-width:1.2}.node.group.off rect{stroke:var(--off);stroke-dasharray:3 2}
+.node .chip.use text{fill:var(--ink2)}.node .chip.find.bad text{fill:#d33}.node .chip.find.warn text{fill:#d89a00}.node .chip.find .cr{stroke:none;fill:none}
 .node.skill rect{rx:10}.node.skill.slash rect{stroke-dasharray:3 2}.node.skill.off rect{stroke:var(--off);fill:none}.node.skill.off text{text-decoration:line-through;fill:var(--ink2)}
 table.skills{border-collapse:collapse;width:100%;table-layout:fixed}table.skills th{text-align:left;font-weight:600;font-size:11px;color:var(--ink2);padding:2px 4px 4px;border-bottom:1px solid var(--line);letter-spacing:.01em}table.skills th:not(:first-child){width:5.2em}table.skills td{padding:1px 4px;vertical-align:middle;height:28px}table.skills td.name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}table.skills td.name button.link{text-decoration:none;text-overflow:ellipsis;overflow:hidden;white-space:nowrap;max-width:100%;display:block}table.skills .sw{padding:2px 0;gap:4px}table.skills .sw .lab{min-width:2.6em}
 .details{color:var(--ink2);font-size:12px;display:grid;gap:4px;margin-top:4px}.details .sc{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -983,6 +1005,11 @@ const rootOn=g=>onOf(L.root)[g];
 function scope(){return $('#scope').value}
 async function act(name,body,done){L.say('');const r=await L.api(name,body);if(!r.ok){L.say(r.error,'err');return}L.say(done);await L.refresh()}
 async function load({ctx,force}){if(!force&&stateFor===ctx&&S)return;const r=await L.api('state',{project:ctx||null});if(r.error){L.reset();return load({ctx:'',force:true})}S=r;stateFor=ctx}
+// grey count chip (last date in the tooltip) and, when check-skills has findings, a red or amber dot
+function insightNode(k){const u=k.usage||{count:0,last:null},f=k.findings||{problems:[],warnings:[]};
+ const chips=[{text:String(u.count),cls:'use'}];const tip=[u.count?`Invoked ${u.count} time${u.count===1?'':'s'}, last ${u.last||'date unknown'}`:'Never invoked'];
+ if(f.problems.length||f.warnings.length){chips.push({text:'●',cls:'find '+(f.problems.length?'bad':'warn')});f.problems.forEach(x=>tip.push('Problem: '+x));f.warnings.forEach(x=>tip.push('Warning: '+x))}
+ return{chips,title:tip.join('\n')}}
 function graph(){const gn=GN();const nodes=[],skills=[],edges=[];let gy=30;
  S.groups.forEach(g=>{const open=!gopen[g.name];const n=open?g.skills.length:0;const h=Math.max(1,n)*ROW;
   nodes.push({id:'g:'+g.name,lane:1,x:XG,y:gy+h/2-ROW/2,w:WG,cls:'group'+(g.enabled?'':' off'),label:g.name,sub:(g.enabled?'on':'off')+(gopen[g.name]?` · ${g.skills.length}`:''),
@@ -990,7 +1017,7 @@ function graph(){const gn=GN();const nodes=[],skills=[],edges=[];let gy=30;
   if(open)g.skills.forEach((k,j)=>skills.push({g,k,y:gy+j*ROW}));gy+=h+(open?14:6)});
  L.folders.forEach(f=>{const on=onOf(f);gn.forEach(g=>{const o=!!on[g];if(f.isRoot){if(o)edges.push({a:'f:'+f.path,b:'g:'+g,on:true})}else if(o!==!!rootOn(g))edges.push({a:'f:'+f.path,b:'g:'+g,on:o})})});
  skills.forEach(({g,k})=>edges.push({a:'g:'+g.name,b:'s:'+g.name+':'+k.name,on:g.enabled&&!k.slash_only}));
- skills.forEach(({g,k,y})=>{const on=g.enabled&&k.enabled;nodes.push({id:'s:'+g.name+':'+k.name,lane:2,x:XS,y,w:WS,cls:'skill'+(on?(k.slash_only?' slash':''):' off'),label:k.name,sub:on?(k.slash_only?'slash':''):'off'})});
+ skills.forEach(({g,k,y})=>{const on=g.enabled&&k.enabled;nodes.push({id:'s:'+g.name+':'+k.name,lane:2,x:XS,y,w:WS,cls:'skill'+(on?(k.slash_only?' slash':''):' off'),label:k.name,sub:on?(k.slash_only?'slash':''):'off',...insightNode(k)})});
  return{lanes:[{x:XG,title:'groups'},{x:XS,title:'skills'}],nodes,edges}}
 function decorate(f){const gn=GN();const on=onOf(f);const st=f.state||{};const n=gn.filter(g=>on[g]).length;
  const sub=f.isRoot?'user scope':`${(st.has_local||st.has_project)?'⚙ ':''}${n}/${gn.length}`;

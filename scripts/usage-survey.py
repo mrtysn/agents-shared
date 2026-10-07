@@ -215,8 +215,8 @@ def scan_transcript(path, slug, sidechain=False):
         "first_ts": None, "last_ts": None,
         "typed_prompts": 0, "assistant_msgs": 0,
         "tools": collections.Counter(),
-        "skills": collections.Counter(),
-        "slash": collections.Counter(),
+        "skills": collections.Counter(), "skills_last": {},
+        "slash": collections.Counter(), "slash_last": {},
         "bash_primary": collections.Counter(),
         "bash_all": collections.Counter(),
         "prompt_class": collections.Counter(),
@@ -320,8 +320,10 @@ def scan_transcript(path, slug, sidechain=False):
                     m = COMMAND_NAME_RE.search(text)
                     if m:
                         s["slash"][m.group(1)] += 1
+                        note_last(s["slash_last"], m.group(1), ts)
                     elif text.startswith("/"):
                         s["slash"][text.split()[0].lstrip("/")] += 1
+                        note_last(s["slash_last"], text.split()[0].lstrip("/"), ts)
                     if cls not in ("slash", "url", "error-paste") and ws:
                         s["openers"][" ".join(ws[:3])] += 1
                     # stall: previous prompt had no tool use after it
@@ -409,6 +411,7 @@ def scan_transcript(path, slug, sidechain=False):
                             s["bash_all"][v] += 1
                     elif name == "Skill":
                         s["skills"][inp.get("skill") or "?"] += 1
+                        note_last(s["skills_last"], inp.get("skill") or "?", ts)
                     elif name in ("Agent", "Task"):
                         s["agent_spawns"].append({
                             "type": inp.get("subagent_type") or "general-purpose",
@@ -470,6 +473,12 @@ def scan_history(cfg, since):
 
 # ---------------------------------------------------------------- aggregate
 
+def note_last(store: dict, name: str, ts) -> None:
+    """Remember the newest timestamp seen for name."""
+    if ts and (name not in store or ts > store[name]):
+        store[name] = ts
+
+
 def merge_counter(dst, src):
     for k, v in src.items():
         dst[k] += v
@@ -488,6 +497,7 @@ def aggregate(sessions, history):
         "tools": collections.Counter(), "tools_subagent": collections.Counter(),
         "tools_per_project": collections.defaultdict(collections.Counter),
         "skills": collections.Counter(), "slash": collections.Counter(),
+        "skills_last": {}, "slash_last": {},
         "bash_primary": collections.Counter(), "bash_all": collections.Counter(),
         "prompt_class": collections.Counter(), "prompt_len": collections.Counter(),
         "openers": collections.Counter(), "judgments": collections.Counter(),
@@ -520,6 +530,9 @@ def aggregate(sessions, history):
                     "prompt_len", "openers", "judgments", "hook_blocks", "hook_asks",
                     "memory_writes", "model_tokens", "correction_terms"):
             merge_counter(agg[key], s[key if key != "model_tokens" else "models"])
+        for key in ("skills_last", "slash_last"):
+            for name, when in s[key].items():
+                note_last(agg[key], name, when)
         for key in ("user_interrupts", "stalls", "stalls_after_question", "question_then_edit",
                     "typed_prompts", "assistant_msgs", "assistant_questions",
                     "ask_user_question", "queued_user_msgs", "compactions", "bash_heredocs"):
