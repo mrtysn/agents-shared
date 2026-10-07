@@ -140,6 +140,7 @@
     "test/clean-skill-staging.test.mjs",
     "test/cli-output-types.test.mjs",
     "test/cli.test.mjs",
+    "test/community-packages.test.mjs",
     "test/community-proof-intake.test.mjs",
     "test/compact-header-clearance.test.mjs",
     "test/copy-site-assets.test.mjs",
@@ -170,7 +171,6 @@
     "test/fixtures/architecture-viewport/readable-scroll-worldscope.architecture.json",
     "test/fixtures/architecture-viewport/route-expanded-worldscope.architecture.json",
     "test/fixtures/automatic-routing-node-border-clearance.workflow.json",
-    "test/fixtures/fail-migration-cleanup.mjs",
     "test/fixtures/issue-126/custom-widths.workflow.json",
     "test/fixtures/issue-126/explicit-route.workflow.json",
     "test/fixtures/issue-126/explicit-viewbox.workflow.json",
@@ -261,6 +261,7 @@
     "test/renderer-diagnostic-boundary.test.mjs",
     "test/renderer-import-isolation.test.mjs",
     "test/repair-receipt.test.mjs",
+    "test/repair-rounds.test.mjs",
     "test/repository-evidence-replacement.test.mjs",
     "test/repository-evidence-types-browser.test.mjs",
     "test/repository-evidence-types.test.mjs",
@@ -288,6 +289,7 @@
     "test/sidecar-path-length.test.mjs",
     "test/site-language-continuity.test.mjs",
     "test/site-language-integration.mjs",
+    "test/skill-installation.test.mjs",
     "test/skill-metadata.test.mjs",
     "test/spatial-grid.test.mjs",
     "test/spread-regression.test.mjs",
@@ -315,6 +317,6 @@
     "test/workflow-vertical-label.test.mjs",
     "THIRD_PARTY_NOTICES.md"
   ],
-  "commit": "2ab3cae7ac2c2a55d7386ca789d03c4fcd31816c",
-  "updated": "2026-10-05"
+  "commit": "73aaa0696e8f72c232ea710e6fa94fd953f3e773",
+  "updated": "2026-10-07"
 }
