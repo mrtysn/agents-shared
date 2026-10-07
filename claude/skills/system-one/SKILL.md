@@ -1,6 +1,8 @@
 ---
 name: system-one
 description: Use when a session needs a bounded judgment over some text - classify, route, triage, a yes/no gate, a score on an ordered scale, or pick one of N options - with a confidence attached, cheaply and locally, instead of reasoning it out in prose or spawning an LLM sub-agent for it. Covers routing, filtering, labelling loops, and replacing a throwaway `claude -p` yes/no check. Not for generation, multi-step reasoning, or pixel/coordinate precision.
+argument-hint: (none)
+allowed-tools: Bash
 ---
 
 # system-one

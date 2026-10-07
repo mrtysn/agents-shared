@@ -1,5 +1,5 @@
 ---
-description: Triage Claude Code sessions across open iTerm2 tabs after a relaunch — which are live, which were killed by the restart, which tabs moved on. Offers resume one-liners, per-session summaries, and handoff prompts for finishing leftover work in a fresh session. Covers all claude config dirs. iTerm2-only.
+description: Triage Claude Code sessions across open iTerm2 tabs after a relaunch — which are live, which were killed by the restart, which tabs moved on. Offers resume one-liners, per-session summaries, and handoff prompts for finishing leftover work in a fresh session. Covers all claude config dirs. iTerm2-only. Use when iTerm2 was relaunched or crashed, or the user says "revive my sessions", "which tabs were killed", or "resume what I was doing".
 user-invocable: true
 disable-model-invocation: true
 allowed-tools: Bash, Read, Glob, Grep, Agent

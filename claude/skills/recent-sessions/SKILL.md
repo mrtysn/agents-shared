@@ -1,5 +1,5 @@
 ---
-description: List Claude Code sessions by recency with opening prompts and primary file. Use for recovering context after a crash, restart, or lost iTerm window — shows what was being worked on, when, and in which project.
+description: List Claude Code sessions by recency with opening prompts and primary file. Use when recovering context after a crash, restart, or lost iTerm window, or when the user says "what was I working on" or "recent sessions" — shows what was being worked on, when, and in which project.
 user-invocable: true
 allowed-tools: Bash, Read
 argument-hint: [-d 3 for last 3 days, -n 25 to limit, -c for current project, -p <name>, --prompts N, --full, -r N to resume]

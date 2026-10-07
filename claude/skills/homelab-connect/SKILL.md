@@ -1,6 +1,7 @@
 ---
 description: Fetch the node01 operator runbook before any homelab work. Use when working on node01, the Hetzner box, the shared Caddy reverse proxy, a Docker Compose app stack, or a self-hosted app deploy. Loads the guide so deploys follow the canonical pattern and avoid the known footguns.
 allowed-tools: Bash, Read
+argument-hint: (none)
 ---
 
 # Homelab Connect — node01 Operator Guide

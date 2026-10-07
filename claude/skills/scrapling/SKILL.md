@@ -1,17 +1,8 @@
 ---
 name: scrapling
-description: >
-  Fetch and parse HTML from sites that refuse plain clients — a 403 or 1020 from
-  curl/requests, a Cloudflare "checking your browser" page, a JS-rendered page that
-  arrives empty, or any scrape that needs browser-grade TLS/headers — using the
-  Scrapling Python library (curl_cffi impersonation, Playwright, or a stealth
-  Chromium), with the response saved once and all parsing done offline. Use this
-  whenever a session is about to scrape, crawl, screen-scrape, or "just fetch the
-  page and pull out X" against a site that is not a plain API and not one of
-  agent-reach's named platforms, even if the user says curl or requests — and
-  always when a first plain fetch was blocked. Not for logged-in pages, posting,
-  or anything needing the user's cookies.
+description: Fetch and parse HTML from sites that refuse plain clients — a 403 or 1020 from curl/requests, a Cloudflare "checking your browser" page, a JS-rendered page that arrives empty, or any scrape that needs browser-grade TLS/headers — using the Scrapling Python library (curl_cffi impersonation, Playwright, or a stealth Chromium), with the response saved once and all parsing done offline. Use when a session is about to scrape, crawl, screen-scrape, or "just fetch the page and pull out X" against a site that is not a plain API and not one of agent-reach's named platforms, even if the user says curl or requests — and always when a first plain fetch was blocked. Not for logged-in pages, posting, or anything needing the user's cookies.
 allowed-tools: Bash, Read, Write, Edit
+argument-hint: [url]
 ---
 
 # Scrapling — blocked-site fetching and offline parsing
