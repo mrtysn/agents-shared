@@ -2,5 +2,8 @@
   "repo": "JuliusBrussee/caveman",
   "path": "skills/caveman/SKILL.md",
   "commit": "99aafe151a1be72be783e662858e8a0955add59f",
-  "updated": "2026-10-07"
+  "updated": "2026-10-07",
+  "ignore": [
+    "README.md"
+  ]
 }

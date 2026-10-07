@@ -1,3 +1,35 @@
+--- a/references/engine-detection.md
++++ b/references/engine-detection.md
+@@ -34,7 +34,7 @@
+ | LÖVE | `conf.lua` version when declared, then the installed runtime |
+ | Roblox | platform APIs are rolling; inspect current Creator Hub documentation for unstable APIs |
+ 
+-For a new project use the baseline in `../../docs/VERSION-SUPPORT.md`. For an existing project,
++For a new project use the current stable release of the chosen engine <!-- LOCAL: upstream points at its docs/VERSION-SUPPORT.md, which is not vendored -->. For an existing project,
+ preserve the detected version unless the user explicitly requests migration.
+ 
+ ## Disambiguation rules (must-handle ambiguities)
+--- a/references/routing-table.md
++++ b/references/routing-table.md
+@@ -1,7 +1,7 @@
+ # Full routing table — every authored skill
+ 
+ The exhaustive `task → category → skill` lookup the router body summarizes. Every name here is
+-a real folder at `skills/<category>/<name>/SKILL.md`. Trigger words (`says:`) and file signals
++a real folder at `skills/<name>/SKILL.md` <!-- LOCAL: flat layout; engine sections below list skills that are not installed -->. Trigger words (`says:`) and file signals
+ (`files:`) are the cues that should select each skill. `*` in a binding is filled with the
+ **detected** engine (router body §1); where an engine lacks the exact skill, see "Binding gaps".
+ 
+@@ -120,6 +120,9 @@
+ | `prototype-fast` | prototype fast, vertical slice, MVP game, greybox |
+ | `steam-publish` | publish on Steam, Steamworks, store page, depot/build upload; `steam_appid.txt` |
+ | `itch-publish` | publish on itch, itch.io page, `butler push`, upload build; `.itch.toml` |
++<!-- LOCAL -->
++| `game-harness` | test scene, state hook, headless capture, screenshot test, journey test, frame percentiles, "let the agent play it", "look at it yourself"; `tests/scenes/`, `tests/journeys/` |
++<!-- LOCAL END -->
+ 
+ ## Binding gaps (be honest; do not fabricate a skill)
+ 
 --- a/SKILL.md
 +++ b/SKILL.md
 @@ -46,26 +46,29 @@
@@ -132,36 +164,4 @@
 +<!-- LOCAL END -->
  
  ## References
- 
---- a/references/engine-detection.md
-+++ b/references/engine-detection.md
-@@ -34,7 +34,7 @@
- | LÖVE | `conf.lua` version when declared, then the installed runtime |
- | Roblox | platform APIs are rolling; inspect current Creator Hub documentation for unstable APIs |
- 
--For a new project use the baseline in `../../docs/VERSION-SUPPORT.md`. For an existing project,
-+For a new project use the current stable release of the chosen engine <!-- LOCAL: upstream points at its docs/VERSION-SUPPORT.md, which is not vendored -->. For an existing project,
- preserve the detected version unless the user explicitly requests migration.
- 
- ## Disambiguation rules (must-handle ambiguities)
---- a/references/routing-table.md
-+++ b/references/routing-table.md
-@@ -1,7 +1,7 @@
- # Full routing table — every authored skill
- 
- The exhaustive `task → category → skill` lookup the router body summarizes. Every name here is
--a real folder at `skills/<category>/<name>/SKILL.md`. Trigger words (`says:`) and file signals
-+a real folder at `skills/<name>/SKILL.md` <!-- LOCAL: flat layout; engine sections below list skills that are not installed -->. Trigger words (`says:`) and file signals
- (`files:`) are the cues that should select each skill. `*` in a binding is filled with the
- **detected** engine (router body §1); where an engine lacks the exact skill, see "Binding gaps".
- 
-@@ -120,6 +120,9 @@
- | `prototype-fast` | prototype fast, vertical slice, MVP game, greybox |
- | `steam-publish` | publish on Steam, Steamworks, store page, depot/build upload; `steam_appid.txt` |
- | `itch-publish` | publish on itch, itch.io page, `butler push`, upload build; `.itch.toml` |
-+<!-- LOCAL -->
-+| `game-harness` | test scene, state hook, headless capture, screenshot test, journey test, frame percentiles, "let the agent play it", "look at it yourself"; `tests/scenes/`, `tests/journeys/` |
-+<!-- LOCAL END -->
- 
- ## Binding gaps (be honest; do not fabricate a skill)
  

@@ -2,5 +2,10 @@
   "repo": "ayghri/i-have-adhd",
   "path": "skills/i-have-adhd/SKILL.md",
   "commit": "723af7d9afaf43eb871dbcce6129e2bf80de90d5",
-  "updated": "2026-10-07"
+  "updated": "2026-10-07",
+  "files": [
+    "agents/gemini.toml",
+    "agents/openai.yaml",
+    "SKILL.md"
+  ]
 }

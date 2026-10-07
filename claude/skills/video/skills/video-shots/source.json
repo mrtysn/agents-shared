@@ -17,5 +17,8 @@
     "examples/demo-track.json"
   ],
   "commit": "18f2f63987337df0975a89973d38d50f3231ee31",
-  "updated": "2026-09-15"
+  "updated": "2026-09-15",
+  "ignore": [
+    "assets/*.png"
+  ]
 }
