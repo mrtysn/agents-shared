@@ -31,6 +31,11 @@ A 429, 403 or any refusal ends the run: stop and report.
    until the list is adopted. Whether to adopt is the user's decision, per skill: ask with
    AskUserQuestion, naming the files added and removed. On yes:
    `bash scripts/sync-external-skills.sh --adopt-listing <name>`.
+   The summary can also list **New upstream skills** (a `SKILL.md` in a repo we fetch that
+   no `source.json` vendors) and **Dangling links**. For a new skill, ask whether to vendor
+   it (the "Adding a new external skill" steps in CLAUDE.md) or add `<repo> <glob>` to
+   `scripts/external-skills-ignore.txt`. A dangling link means the merge pulled in a link to a
+   file we do not vendor: add that file to `files` and sync again.
 3. **Sync.** `bash scripts/sync-external-skills.sh $ARGUMENTS`. For a very large set, sync
    by group so each commit stays reviewable.
 4. **Resolve conflicts.** A conflicted skill has markers (`<<<<<<< local`, `=======`,

@@ -19,7 +19,10 @@
 # the SHA of its `.upstream/` copy locally, so only files that really changed are
 # downloaded, and a repo shared by thirty skills costs one fetch, not thirty. A skill
 # whose files are all identical is "up to date" even when the repo's HEAD moved, and
-# its pin is left alone. Fetches are paced (SYNC_FETCH_DELAY seconds, default 2) and the
+# its pin is left alone. source.json may carry `"ignore": ["glob", ...]` (skill-dir-relative)
+# for upstream files deliberately not vendored; they are left out of the drift report and
+# of --adopt-listing. A full run (no name) also lists SKILL.md files in the upstream repos
+# that no source.json vendors, minus scripts/external-skills-ignore.txt ("<repo> <glob>"). Fetches are paced (SYNC_FETCH_DELAY seconds, default 2) and the
 # first failed fetch stops all further contact with GitHub for that run. The same tree is compared with source.json's `files` list, so
 # files added upstream are reported, and a listed file deleted upstream stops that skill
 # with a clear message instead of a bare fetch error. (--establish-base still reads the pinned commit via
@@ -47,6 +50,11 @@
 #                                                            # deleted upstream are dropped),
 #                                                            # then sync. Needs a name: lists are
 #                                                            # often deliberately partial.
+#   bash scripts/sync-external-skills.sh --check-links [<name>]
+#                                                            # no network: report relative links in
+#                                                            # vendored .md files whose target is
+#                                                            # missing locally. Also run on every
+#                                                            # skill a sync updates.
 #   bash scripts/sync-external-skills.sh --establish-base [<name>]
 #                                                            # (re)build .upstream +
 #                                                            # override.patch from the
@@ -68,6 +76,7 @@ for arg in "$@"; do
         --establish-base) MODE="establish" ;;
         --dry-run) MODE="dry" ;;
         --adopt-listing) ADOPT=1 ;;
+        --check-links) MODE="links" ;;
         *) filter="$arg" ;;
     esac
 done
@@ -78,7 +87,8 @@ fi
 
 today=$(date +%Y-%m-%d)
 updated=(); established=(); skipped=(); failed=(); conflicted=()
-behind_clean=(); behind_conflict=(); drift=()
+behind_clean=(); behind_conflict=(); drift=(); new_skills=(); dangling=()
+IGNORE_FILE="$SCRIPT_DIR/external-skills-ignore.txt"
 HEAD_CACHE=$(mktemp -d)
 trap 'rm -rf "$HEAD_CACHE"' EXIT
 
@@ -129,6 +139,59 @@ regen_patch() {
     fi
 }
 
+# link_targets <md> <skill_dir> — absolute-ish paths of the relative links in one .md file
+# (markdown links, and {baseDir}/… references). Code-like targets are dropped.
+link_targets() {
+    local md="$1" d="$2"
+    { grep -o -E '\]\([^)[:space:]]+\)' "$md" 2>/dev/null | sed -E 's/^\]\(//; s/\)$//' \
+        | grep -v -E '^(https?:|mailto:|#|/)' | sed -E 's/[#?].*$//' | grep -E '\.[A-Za-z0-9]+$' \
+        | while IFS= read -r t; do echo "$(dirname "$md")/$t"; done
+      grep -o -E '\{baseDir\}/[^[:space:]`)"'"'"']+' "$md" 2>/dev/null | sed -E 's#^\{baseDir\}/##' \
+        | while IFS= read -r t; do echo "$d/$t"; done
+    } | grep -v -E '[][*<>$(){}]'
+}
+
+# check_links <skill_dir> — print "<md> -> <target>" for each relative link in SKILL.md, and in
+# the vendored .md files SKILL.md links to, whose target does not exist locally. README/AGENTS
+# docs and anything further down the chain are not what the skill loads, so they are not read.
+# Local files only; no network.
+check_links() {
+    local d="$1" md t
+    [[ -f "$d/SKILL.md" ]] || return 0
+    local scan=("$d/SKILL.md")
+    while IFS= read -r t; do
+        [[ "$t" == *.md && -f "$t" && "$t" != "$d/SKILL.md" ]] && scan+=("$t")
+    done < <(link_targets "$d/SKILL.md" "$d" | sort -u)
+    for md in "${scan[@]}"; do
+        link_targets "$md" "$d" | sort -u | while IFS= read -r t; do
+            [[ -e "$t" ]] || echo "${md#$d/} -> ${t#$d/}"
+        done
+    done
+}
+
+# scan_new_skills — SKILL.md files in the upstream repos we fetched that no source.json
+# vendors and the ignore file does not mention. Full runs only.
+scan_new_skills() {
+    [[ -z "$filter" && ( "$MODE" == "sync" || "$MODE" == "dry" ) && -f "$HEAD_CACHE/seen.lst" ]] || return 0
+    local vend="$HEAD_CACHE/vend.lst" repo rd sha p ir ip ignored
+    jq -r '.repo + " " + .path' "$SKILLS_DIR"/*/source.json "$SKILLS_DIR"/*/skills/*/source.json \
+        "$SKILLS_DIR"/*/off/*/source.json 2>/dev/null | sort -u > "$vend"
+    while IFS= read -r repo; do
+        rd=$(repo_dir "$repo"); sha=$(cat "$rd.sha" 2>/dev/null); [[ -n "$sha" ]] || continue
+        while IFS= read -r p; do
+            grep -Fxq "$repo $p" "$vend" && continue
+            ignored=0
+            if [[ -f "$IGNORE_FILE" ]]; then
+                while read -r ir ip; do
+                    [[ -n "$ir" && "$ir" == "$repo" && "$p" == $ip ]] && ignored=1
+                done < <(grep -v '^#' "$IGNORE_FILE")
+            fi
+            [[ $ignored -eq 0 ]] && new_skills+=("$repo $p")
+        done < <(git -C "$rd" ls-tree -r --name-only "$sha" | grep -E '(^|/)SKILL\.md$')
+    done < <(sort -u "$HEAD_CACHE/seen.lst")
+    return 0
+}
+
 # Skills live either flat (claude/skills/<name>/) or inside a group plugin
 # (claude/skills/<group>/skills/<name>/, or <group>/off/<name>/ when switched off). A filter matches a skill's own name or
 # its group's name, so one argument can sync a whole group.
@@ -150,6 +213,12 @@ for source_file in "$SKILLS_DIR"/*/source.json "$SKILLS_DIR"/*/skills/*/source.j
     files=()
     while IFS= read -r f; do files+=("$f"); done < <(jq -r '(.files // ["SKILL.md"])[]' "$source_file")
     base_dir="$skill_dir/.upstream"
+
+    # ── Link check: local only, no network ───────────────────────────────────
+    if [[ "$MODE" == "links" ]]; then
+        while IFS= read -r l; do dangling+=("$skill_name: $l"); done < <(check_links "$skill_dir")
+        continue
+    fi
 
     # ── Establish-base mode: rebuild base + patch from the pinned commit ──────
     if [[ "$MODE" == "establish" ]]; then
@@ -180,6 +249,7 @@ for source_file in "$SKILLS_DIR"/*/source.json "$SKILLS_DIR"/*/skills/*/source.j
         continue
     fi
     rd=$(repo_dir "$repo")
+    echo "$repo" >> "$HEAD_CACHE/seen.lst"
     up() { [[ "$upstream_dir" == "." ]] && echo "$1" || echo "$upstream_dir/$1"; }
 
     # Listing drift: files in upstream's skill directory vs source.json's `files`.
@@ -189,6 +259,19 @@ for source_file in "$SKILLS_DIR"/*/source.json "$SKILLS_DIR"/*/skills/*/source.j
         git -C "$rd" ls-tree -r --name-only "$new_commit" -- "$upstream_dir" 2>/dev/null \
             | sed "s#^$upstream_dir/##" | sort > "$HEAD_CACHE/up.lst"
         printf '%s\n' "${files[@]}" | sort > "$HEAD_CACHE/ours.lst"
+        # Drop upstream files matching source.json's "ignore" globs, unless already listed.
+        ignore=(); while IFS= read -r f; do [[ -n "$f" ]] && ignore+=("$f"); done < <(jq -r '(.ignore // [])[]' "$source_file")
+        if [[ ${#ignore[@]} -gt 0 ]]; then
+            : > "$HEAD_CACHE/up.f"
+            while IFS= read -r f; do
+                keep=1
+                if ! grep -Fxq -- "$f" "$HEAD_CACHE/ours.lst"; then
+                    for pat in "${ignore[@]}"; do [[ "$f" == $pat ]] && keep=0; done
+                fi
+                [[ $keep -eq 1 ]] && echo "$f" >> "$HEAD_CACHE/up.f"
+            done < "$HEAD_CACHE/up.lst"
+            mv "$HEAD_CACHE/up.f" "$HEAD_CACHE/up.lst"
+        fi
         while IFS= read -r f; do [[ -n "$f" ]] && added+=("$f"); done < <(comm -13 "$HEAD_CACHE/ours.lst" "$HEAD_CACHE/up.lst")
         while IFS= read -r f; do [[ -n "$f" ]] && removed+=("$f"); done < <(comm -23 "$HEAD_CACHE/ours.lst" "$HEAD_CACHE/up.lst")
     fi
@@ -304,17 +387,36 @@ for source_file in "$SKILLS_DIR"/*/source.json "$SKILLS_DIR"/*/skills/*/source.j
     new_src=$(jq --arg c "$new_commit" --arg d "$today" '.commit=$c | .updated=$d' "$source_file")
     printf '%s\n' "$new_src" > "$source_file"
 
+    while IFS= read -r l; do dangling+=("$skill_name: $l"); done < <(check_links "$skill_dir")
     echo "  Updated: ${old_commit:0:7} → ${new_commit:0:7} (${#changed[@]} file(s))"
     [[ -f "$skill_dir/override.patch" ]] && echo "  (local override preserved)"
     updated+=("$skill_name")
     rm -rf "$tmp_new"
 done
 
+print_findings() {
+    if [[ ${#new_skills[@]} -gt 0 ]]; then
+        echo ""; echo "New upstream skills (SKILL.md in a repo we fetch, not vendored, not in external-skills-ignore.txt):"
+        local n; for n in "${new_skills[@]}"; do echo "  - $n"; done
+    fi
+    if [[ ${#dangling[@]} -gt 0 ]]; then
+        echo ""; echo "Dangling links (relative link in a vendored .md whose target is missing):"
+        local d; for d in "${dangling[@]}"; do echo "  - $d"; done
+    fi
+}
+
 print_drift() {
     [[ ${#drift[@]} -gt 0 ]] || return 0
     echo ""; echo "Listing drift (files added/removed upstream vs source.json; adopt with --adopt-listing <name>):"
     local d; for d in "${drift[@]}"; do echo "  - $d"; done
 }
+
+if [[ "$MODE" == "links" ]]; then
+    echo "=== Link check (no network) ==="
+    echo "  Dangling: ${#dangling[@]}"
+    print_findings
+    [[ ${#dangling[@]} -eq 0 ]]; exit $?
+fi
 
 # ── Summary ──────────────────────────────────────────────────────────────
 echo ""
@@ -328,7 +430,9 @@ if [[ "$MODE" == "dry" ]]; then
         echo ""; echo "Failures:"
         for f in "${failed[@]}"; do echo "  - $f"; done
     fi
+    scan_new_skills
     print_drift
+    print_findings
     exit 0
 fi
 echo "=== Sync Summary ==="
@@ -350,3 +454,5 @@ if [[ ${#updated[@]} -gt 0 ]]; then
     echo ""; echo "Skills updated. Review the diff (incl. override.patch) and commit."
 fi
 print_drift
+scan_new_skills
+print_findings

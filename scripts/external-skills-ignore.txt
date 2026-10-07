@@ -1,0 +1,2 @@
+# Upstream SKILL.md files deliberately not vendored. One per line: "<owner/repo> <glob>",
+# the glob matched against the SKILL.md path inside that repo. Reported otherwise as new upstream skills.
