@@ -1,6 +1,7 @@
 #!/bin/zsh
 # DESC: Offline structural check of claude/skills, rules and commands (frontmatter, links, installed symlinks)
 set -euo pipefail
+setopt extendedglob
 
 if [[ "${1:-}" == (-h|--help) ]]; then
   cat <<'USAGE'
