@@ -129,8 +129,10 @@ is a per-skill decision.
 A full run (no name) also lists `SKILL.md` files in the upstream repos that no `source.json`
 vendors (new upstream skills such as a repo's new sibling skills), one path per line
 (`--new-skills-summary` prints per-repo counts instead). Decide them with
-the **Upstream skills** button in Skill Tree (`scripts/skill_tree_skin.py`): each skill with its own
-description and a Copy it / Ignore / Decide later choice. Choices are queued in the browser; Apply shows
+the **Upstream skills** button in Skill Tree (`scripts/skill_tree_skin.py`). Its *Not copied* tab shows each
+skill with its own description and a Copy it / Ignore / Decide later choice; its *Installed* tab lists every
+skill here with source, local-change count (override.patch), uncommitted-change flag and sync/change dates,
+and lets an external skill be marked Remove (folder deleted, skill ignored, nothing committed). Choices are queued in the browser; Apply shows
 what will change, then appends ignore lines to `scripts/external-skills-ignore.txt` (`<owner/repo> <glob>`)
 and copies skills with `scripts/vendor-upstream-skill.py`. Both drop out of the report. The list is
 cached at `$XDG_CACHE_HOME/agents-shared/unvendored-skills.json` and rebuilt by the view's Refresh button

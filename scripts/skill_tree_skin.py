@@ -695,19 +695,136 @@ def action_upstream_status(payload: dict) -> dict:
     return {"ok": True, "refresh": _up_status()}
 
 
-def _up_plan(choices: list) -> tuple[list, list, list]:
-    """Validate queued choices against the cached list. Returns (ignore lines, copies, problems)."""
+def _git(*args: str) -> str:
+    r = subprocess.run(["git", "-C", str(AGENTS_ROOT), *args], capture_output=True, text=True)
+    return r.stdout if r.returncode == 0 else ""
+
+
+def _override_stats(skill_dir: Path) -> dict | None:
+    patch = skill_dir / "override.patch"
+    if not patch.is_file():
+        return None
+    files = lines = 0
+    for l in patch.read_text(encoding="utf-8", errors="replace").splitlines():
+        if l.startswith("--- a/"):
+            files += 1
+        elif l[:1] in ("+", "-") and not l.startswith(("+++", "---")):
+            lines += 1
+    return {"files": files, "lines": lines}
+
+
+def _skill_dirs():
+    """(group or 'flat', switched off?, directory) for every skill folder in this checkout."""
+    base = _skills_base()
+    for entry in sorted(base.iterdir()):
+        if not entry.is_dir():
+            continue
+        if (entry / ".claude-plugin" / "plugin.json").is_file():
+            for sub in ("skills", "off"):
+                d = entry / sub
+                if d.is_dir():
+                    for sd in sorted(d.iterdir()):
+                        if sd.is_dir() and (sd / "SKILL.md").is_file():
+                            yield entry.name, sub == "off", sd
+        elif (entry / "SKILL.md").is_file():
+            yield "flat", False, entry
+
+
+_changed_memo: tuple[str, dict] = ("", {})
+
+
+def _last_changed(rels: set) -> dict:
+    """Commit time of the last change under each skill directory, from one pass over history.
+    Memoised on HEAD, so it is recomputed only after a commit."""
+    global _changed_memo
+    head = _git("rev-parse", "HEAD").strip()
+    if head and _changed_memo[0] == head and rels <= set(_changed_memo[1]):
+        return _changed_memo[1]
+    found: dict = {}
+    date = None
+    for line in _git("log", "--format=%x00%cI", "--name-only", "--", "claude/skills").splitlines():
+        if line.startswith("\0"):
+            date = line[1:]
+        elif line and date:
+            parts = line.split("/")
+            for n in range(len(parts) - 1, 1, -1):
+                cand = "/".join(parts[:n])
+                if cand in rels and cand not in found:
+                    found[cand] = date
+                    break
+        if len(found) == len(rels):
+            break
+    _changed_memo = (head, found)
+    return found
+
+
+def _installed() -> list[dict]:
+    """Every skill in the checkout with where it came from, local modifications and timestamps."""
+    status = _git("status", "--porcelain=v1", "-z", "--", "claude/skills")
+    dirty_paths = [e[3:] for e in status.split("\0") if len(e) > 3]
+    out = []
+    dirs = list(_skill_dirs())
+    changed = _last_changed({str(sd.relative_to(AGENTS_ROOT)) for _, _, sd in dirs})
+    for group, off, sd in dirs:
+        rec = skill_record(sd, group)
+        if not rec:
+            continue
+        rel = str(sd.relative_to(AGENTS_ROOT))
+        src = {}
+        if (sd / "source.json").is_file():
+            try:
+                src = json.loads((sd / "source.json").read_text(encoding="utf-8"))
+            except ValueError:
+                pass
+        out.append({
+            "dir": rel, "name": rec["name"], "group": group, "off": off,
+            "description": rec["description"], "slash_only": rec["slash_only"],
+            "external": bool(src), "repo": src.get("repo"), "path": src.get("path"),
+            "pinned": (src.get("commit") or "")[:7], "synced": src.get("updated"),
+            "changed": changed.get(rel),
+            "override": _override_stats(sd),
+            "dirty": any(p == rel or p.startswith(rel + "/") for p in dirty_paths),
+        })
+    return out
+
+
+def action_installed(payload: dict) -> dict:
+    return {"ok": True, "skills": _installed(), "head": _git("rev-parse", "--short", "HEAD").strip()}
+
+
+def _up_plan(choices: list) -> dict:
+    """Validate queued choices. Copies and ignores are checked against the cached upstream list;
+    removals against the installed external skills."""
     data = _up_load()
     known = {(it["repo"], it["path"]): it for it in (data["items"] if data else [])}
     groups, base = set(_up_groups()), _skills_base()
-    ignore, vendor, problems, targets = [], [], [], set()
+    ignore, vendor, remove, problems, targets = [], [], [], [], set()
+    installed = None
     for c in choices:
         repo, path, choice = c.get("repo", ""), c.get("path", ""), c.get("choice")
+        label = c.get("dir") if choice == "remove" else path
 
-        def bad(msg, repo=repo, path=path):
-            problems.append({"repo": repo, "path": path, "error": msg})
+        def bad(msg, repo=repo, label=label):
+            problems.append({"repo": repo, "path": label, "error": msg})
 
-        if (repo, path) not in known:
+        if choice == "remove":
+            if installed is None:
+                installed = {s["dir"]: s for s in _installed()}
+            s = installed.get(c.get("dir", ""))
+            if not s:
+                bad("not an installed skill")
+            elif not s["external"]:
+                bad("an own skill, not copied from upstream; remove it by hand")
+            else:
+                warn = []
+                if s["override"]:
+                    warn.append("has %d lines of local changes in %d file%s that will be lost"
+                                % (s["override"]["lines"], s["override"]["files"], "" if s["override"]["files"] == 1 else "s"))
+                if s["dirty"]:
+                    warn.append("has uncommitted changes that git cannot restore")
+                remove.append({"dir": s["dir"], "name": s["name"], "repo": s["repo"], "path": s["path"],
+                               "group": s["group"], "warnings": warn})
+        elif (repo, path) not in known:
             bad("not in the upstream list (already copied, ignored, or the list changed)")
         elif choice == "ignore":
             if not _REPO_RE.fullmatch(repo) or _UNSAFE_PATH.search(path):
@@ -732,34 +849,58 @@ def _up_plan(choices: list) -> tuple[list, list, list]:
                            "target": str(target.relative_to(AGENTS_ROOT))})
         else:
             bad("unknown choice")
-    return ignore, vendor, problems
+    return {"ignore": ignore, "vendor": vendor, "remove": remove, "problems": problems}
 
 
 def action_upstream_plan(payload: dict) -> dict:
-    ignore, vendor, problems = _up_plan(payload.get("choices") or [])
-    return {"ok": True, "ignore": ignore, "vendor": vendor, "problems": problems,
-            "requests": 2 * len({v["repo"] for v in vendor})}
+    p = _up_plan(payload.get("choices") or [])
+    return dict(p, ok=True, requests=2 * len({v["repo"] for v in p["vendor"]}))
+
+
+def _remove_skill(rel: str) -> None:
+    base = _skills_base().resolve()
+    target = (AGENTS_ROOT / rel).resolve()
+    if target == base or base not in target.parents or not (target / "SKILL.md").is_file():
+        raise ValueError("refusing to delete %s" % rel)
+    shutil.rmtree(target)
 
 
 def action_upstream_apply(payload: dict) -> dict:
-    ignore, vendor, problems = _up_plan(payload.get("choices") or [])
-    results = [dict(p, action="skip", ok=False) for p in problems]
+    plan = _up_plan(payload.get("choices") or [])
+    ignore, vendor, remove = plan["ignore"], plan["vendor"], plan["remove"]
+    results = [dict(p, action="skip", ok=False) for p in plan["problems"]]
     note = ""
-    if ignore:
+    # a removed skill is also ignored, or it would come straight back as "new upstream"
+    lines = [i for i in ignore] + [{"repo": r["repo"], "path": r["path"]} for r in remove
+                                   if r["repo"] and r["path"] and _REPO_RE.fullmatch(r["repo"]) and not _UNSAFE_PATH.search(r["path"])]
+    if lines:
         existing = UP_IGNORE.read_text(encoding="utf-8") if UP_IGNORE.is_file() else ""
         have = {l.strip() for l in existing.splitlines()}
-        add = [f"{i['repo']} {i['path']}" for i in ignore if f"{i['repo']} {i['path']}" not in have]
+        add = []
+        for i in lines:
+            line = f"{i['repo']} {i['path']}"
+            if line not in have and line not in add:
+                add.append(line)
         if add:
             with open(UP_IGNORE, "a", encoding="utf-8") as f:
                 if existing and not existing.endswith("\n"):
                     f.write("\n")
                 f.write("\n".join(add) + "\n")
         results += [dict(i, action="ignore", ok=True) for i in ignore]
+    for r in remove:
+        try:
+            _remove_skill(r["dir"])
+            results.append({"repo": r["repo"], "path": r["path"], "dir": r["dir"], "action": "remove", "ok": True,
+                            "group": r["group"]})
+        except (ValueError, OSError) as e:
+            results.append({"repo": r["repo"], "path": r["path"], "dir": r["dir"], "action": "remove", "ok": False,
+                            "error": str(e)})
     if vendor:
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as tf:
             json.dump([{"repo": v["repo"], "path": v["path"], "dest": v["dest"]} for v in vendor], tf)
         try:
-            run = subprocess.run([sys.executable, str(SCRIPTS / "vendor-upstream-skill.py"), "--plan", tf.name, "--root", str(AGENTS_ROOT)],
+            run = subprocess.run([sys.executable, str(SCRIPTS / "vendor-upstream-skill.py"), "--plan", tf.name,
+                                  "--root", str(AGENTS_ROOT)],
                                  capture_output=True, text=True, timeout=1800, cwd=str(AGENTS_ROOT))
             seen = set()
             for line in run.stdout.splitlines():
@@ -779,15 +920,15 @@ def action_upstream_apply(payload: dict) -> dict:
                         for v in vendor]
         finally:
             os.unlink(tf.name)
-        copied = [r for r in results if r["action"] == "copy" and r["ok"]]
-        if any(r.get("dest") == "flat" for r in copied):
-            init = subprocess.run(["bash", str(SCRIPTS / "init-global.sh")], capture_output=True, text=True,
-                                  cwd=str(AGENTS_ROOT))
-            note = "Linked new flat skills into ~/.claude/skills. " if init.returncode == 0 \
-                else "init-global.sh failed: run it by hand. "
-        if copied:
-            note += "Open sessions pick up new skills on /reload-plugins."
-    _up_drop({(r["repo"], r["path"]) for r in results if r["ok"]})
+    copied = [r for r in results if r["action"] == "copy" and r["ok"]]
+    removed = [r for r in results if r["action"] == "remove" and r["ok"]]
+    if any(r.get("dest") == "flat" for r in copied) or any(r.get("group") == "flat" for r in removed):
+        init = subprocess.run(["bash", str(SCRIPTS / "init-global.sh")], capture_output=True, text=True,
+                              cwd=str(AGENTS_ROOT))
+        note = "Updated the links in ~/.claude/skills. " if init.returncode == 0 else "init-global.sh failed: run it by hand. "
+    if copied or removed:
+        note += "Open sessions pick up the change on /reload-plugins. Nothing is committed: review it in git."
+    _up_drop({(r["repo"], r["path"]) for r in results if r["ok"] and r["action"] != "remove"})
     forget()
     return {"ok": all(r["ok"] for r in results), "results": results, "note": note}
 
@@ -798,7 +939,8 @@ def _asset(name: str) -> str:
 
 UPSTREAM_HELP = r"""
  <h3>Upstream skills</h3>
- <p>The Upstream skills button lists skills that exist in the GitHub projects we copy from but are not copied here, each with its own description. Pick Copy it, Ignore or Decide later for each; picks are only queued in this browser. Apply shows exactly what will change, then writes the ignore lines or copies the skills from GitHub (paced, a couple of requests per project). Copied skills land flat (always loaded) or in a group you choose.</p>
+ <p>The Upstream skills button has two tabs. <b>Not copied</b> lists skills that exist in the GitHub projects we copy from but are not copied here, each with its own description: Copy it, Ignore or Decide later. <b>Installed</b> lists every skill in this checkout with where it came from, how many lines of local changes it carries (override.patch), whether git shows uncommitted changes, when it was last synced from upstream and last changed here; skills copied from upstream can be marked Remove.</p>
+ <p>Picks are only queued in this browser. Apply shows exactly what will change, then writes the ignore lines, copies skills from GitHub (paced, a couple of requests per project) or deletes the folders you marked Remove (a removed skill is also ignored so it is not offered as new again). Nothing is committed for you. Copied skills land flat (always loaded) or in a group you choose.</p>
 """
 
 
@@ -913,6 +1055,7 @@ SKIN = {
         "skill": action_skill,
         "skill-enable": action_skill_enable,
         "upstream": action_upstream,
+        "installed": action_installed,
         "upstream-refresh": action_upstream_refresh,
         "upstream-status": action_upstream_status,
         "upstream-plan": action_upstream_plan,

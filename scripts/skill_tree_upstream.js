@@ -1,13 +1,17 @@
-// The Upstream view of the Skill Tree skin: a full-page overlay listing the upstream skills we have
-// not copied, with a Copy / Ignore / Later choice per skill. Choices are queued in this browser and
-// only change files when "Apply" is confirmed. Appended to the skin's client_js (same page, after the
-// skin registered itself); it must not call LRL.register again.
+// The Upstream view of the Skill Tree skin: a full-page overlay with two tabs.
+//   "Not copied": upstream skills we have not copied, each with Copy it / Ignore / Decide later.
+//   "Installed": every skill in this checkout with its source, local changes and timestamps, each with
+//                Keep / Remove (only skills copied from upstream can be removed).
+// Choices are queued in this browser and only change files when "Apply" is confirmed. Appended to the
+// skin's client_js (same page, after the skin registered itself); it must not call LRL.register again.
 (function () {
   const L = window.LRL;
   const KEY = 'upstream';
-  let D = null, cards = [], ov = null, list = null, pollTimer = null;
+  let D = null, INST = null, ov = null, listBox = null, pollTimer = null;
+  let tab = 'new';
+  let newCards = [], instCards = [];
   let choices = L.store.get(KEY, {});
-  const view = { q: '', undecided: false };
+  const view = { q: '', undecided: false, modified: false };
 
   const h = (tag, props, ...kids) => {
     const e = document.createElement(tag);
@@ -21,9 +25,18 @@
     return e;
   };
   const key = s => s.repo + '\t' + s.path;
+  const rmKey = s => 'rm\t' + s.dir;
   const saveChoices = () => L.store.set(KEY, choices);
   const queued = () => Object.keys(choices).length;
   const say = (t, cls) => L.say(t, cls);
+  const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const day = iso => (iso || '').slice(0, 10);
+  const ago = iso => {
+    if (!iso) return '';
+    const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+    return d <= 0 ? 'today' : d === 1 ? 'yesterday' : d < 60 ? `${d} days ago` : `${Math.round(d / 30)} months ago`;
+  };
+  const when = iso => iso ? `${day(iso)} (${ago(iso)})` : 'unknown';
 
   function updateButton() {
     const b = document.getElementById('up-open');
@@ -35,41 +48,80 @@
     if (!r.ok) { say(r.error || 'could not read the upstream list', 'err'); return; }
     D = r;
     const known = new Set(D.items.map(key));
-    for (const k of Object.keys(choices)) if (!known.has(k)) delete choices[k];
+    for (const k of Object.keys(choices)) if (!k.startsWith('rm\t') && !known.has(k)) delete choices[k];
     saveChoices();
     updateButton();
-    if (ov) buildList();
+    if (ov) buildNew();
     if (D.refresh && D.refresh.state === 'running') watchRefresh();
+  }
+
+  async function loadInstalled() {
+    const r = await L.api('installed', {});
+    if (!r.ok) { say(r.error || 'could not read the installed skills', 'err'); return; }
+    INST = r.skills;
+    const known = new Set(INST.map(s => 'rm\t' + s.dir));
+    for (const k of Object.keys(choices)) if (k.startsWith('rm\t') && !known.has(k)) delete choices[k];
+    saveChoices();
+    if (ov) buildInstalled();
   }
 
   // ── overlay shell ──────────────────────────────────────────────────────────
   function openOverlay() {
     if (ov) { ov.hidden = false; return; }
     ov = h('div', { class: 'up', role: 'dialog', 'aria-label': 'Upstream skills' });
-    const search = h('input', { type: 'search', placeholder: 'Search name, path or description', 'aria-label': 'Search upstream skills',
+    const search = h('input', { type: 'search', placeholder: 'Search name, path or description', 'aria-label': 'Search skills',
       oninput: e => { view.q = e.target.value.toLowerCase(); update(); } });
-    const und = h('input', { type: 'checkbox', onchange: e => { view.undecided = e.target.checked; update(); } });
+    const und = h('label', { id: 'up-f-und' }, h('input', { type: 'checkbox', onchange: e => { view.undecided = e.target.checked; update(); } }), ' only undecided');
+    const mod = h('label', { id: 'up-f-mod' }, h('input', { type: 'checkbox', onchange: e => { view.modified = e.target.checked; update(); } }), ' only with local changes');
     ov.append(
       h('div', { class: 'up-top' },
-        h('strong', {}, 'Upstream skills'), h('span', { class: 'up-stat', id: 'up-stat' }),
-        search, h('label', {}, und, ' only undecided'),
+        h('strong', {}, 'Skills'),
+        h('div', { class: 'up-tabs', role: 'tablist' },
+          h('button', { class: 'plain', id: 'up-t-new', role: 'tab', onclick: () => setTab('new') }, 'Not copied'),
+          h('button', { class: 'plain', id: 'up-t-inst', role: 'tab', onclick: () => setTab('installed') }, 'Installed')),
+        h('span', { class: 'up-stat', id: 'up-stat' }),
+        search, und, mod,
         h('button', { class: 'plain', id: 'up-refresh', onclick: askRefresh }, 'Refresh from GitHub'),
         h('button', { class: 'plain', onclick: () => { ov.hidden = true; } }, 'Close')),
       h('div', { class: 'up-bar', id: 'up-bar', hidden: true }),
-      (list = h('div', { class: 'up-list', id: 'up-list' })),
+      (listBox = h('div', { class: 'up-list', id: 'up-list' })),
       h('div', { class: 'up-foot' },
         h('span', { id: 'up-queue' }),
         h('button', { class: 'plain up-apply', id: 'up-apply', onclick: planApply }, 'Apply choices')));
     document.body.append(ov);
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && ov && !ov.hidden && !document.querySelector('.up-modal')) ov.hidden = true; });
-    buildList();
+    buildNew();
+    setTab(tab);
   }
 
-  function buildList() {
-    list.replaceChildren();
-    cards = [];
+  async function setTab(t) {
+    tab = t;
+    if (t === 'installed' && !INST) await loadInstalled();
+    document.getElementById('up-t-new').setAttribute('aria-selected', String(t === 'new'));
+    document.getElementById('up-t-inst').setAttribute('aria-selected', String(t === 'installed'));
+    document.getElementById('up-t-new').textContent = `Not copied${D ? ` (${D.items.length})` : ''}`;
+    document.getElementById('up-t-inst').textContent = `Installed${INST ? ` (${INST.length})` : ''}`;
+    document.getElementById('up-f-und').hidden = t !== 'new';
+    document.getElementById('up-f-mod').hidden = t !== 'installed';
+    document.getElementById('up-refresh').hidden = t !== 'new';
+    const pane = (id, on) => { const p = document.getElementById(id); if (p) p.hidden = !on; };
+    pane('up-pane-new', t === 'new'); pane('up-pane-inst', t === 'installed');
+    update();
+  }
+
+  function mount(id) {
+    let p = document.getElementById(id);
+    if (!p) { p = h('div', { id }); listBox.append(p); }
+    p.replaceChildren();
+    return p;
+  }
+
+  // ── tab: not copied ────────────────────────────────────────────────────────
+  function buildNew() {
+    const pane = mount('up-pane-new');
+    newCards = [];
     if (!D || !D.items.length) {
-      list.append(h('p', { class: 'up-empty' },
+      pane.append(h('p', { class: 'up-empty' },
         D && D.generated ? 'Nothing undecided: every upstream skill we know of is copied or ignored.'
           : 'No upstream list yet. Use "Refresh from GitHub" to build it (a few minutes, paced requests).'));
       update();
@@ -79,19 +131,20 @@
     for (const s of D.items) { if (!byRepo.has(s.repo)) byRepo.set(s.repo, []); byRepo.get(s.repo).push(s); }
     for (const [repo, items] of byRepo) {
       const stat = h('span', { class: 'up-n' });
-      const det = h('details', { class: 'up-repo' }, h('summary', {}, h('span', { class: 'mono' }, repo), ' ', stat));
+      const upd = items[0].repo_updated ? ` · upstream last commit ${day(items[0].repo_updated)}` : '';
+      const det = h('details', { class: 'up-repo' }, h('summary', {}, h('span', { class: 'mono' }, repo), ' ', stat, h('span', { class: 'up-n' }, upd)));
       det.append(h('div', { class: 'up-bulk' },
         h('button', { class: 'plain', onclick: () => { items.forEach(s => { choices[key(s)] = { c: 'ignore' }; }); saveChoices(); update(); } }, 'Ignore all in this repo'),
         h('button', { class: 'plain', onclick: () => { items.forEach(s => { delete choices[key(s)]; }); saveChoices(); update(); } }, 'Clear this repo')));
-      for (const s of items) det.append(card(s));
-      cards.push({ det, stat, items });
-      list.append(det);
+      for (const s of items) det.append(newCard(s));
+      newCards.push({ det, stat, items });
+      pane.append(det);
     }
     update();
   }
 
-  function card(s) {
-    const name = `up-${cards.length}-${Math.random().toString(36).slice(2, 7)}`;
+  function newCard(s) {
+    const name = `up-${newCards.length}-${Math.random().toString(36).slice(2, 7)}`;
     const desc = h('div', { class: 'up-desc', title: 'Click to expand', onclick: e => e.currentTarget.classList.toggle('open') }, s.desc);
     const dest = h('select', { 'aria-label': `Where to put ${s.name}`, onchange: e => { choices[key(s)] = { c: 'copy', d: e.target.value }; saveChoices(); update(); } },
       h('option', { value: 'flat' }, 'flat (always loaded)'),
@@ -112,10 +165,64 @@
     return node;
   }
 
+  // ── tab: installed ─────────────────────────────────────────────────────────
+  function buildInstalled() {
+    const pane = mount('up-pane-inst');
+    instCards = [];
+    if (!INST || !INST.length) { pane.append(h('p', { class: 'up-empty' }, 'No installed skills found.')); update(); return; }
+    const byGroup = new Map();
+    for (const s of INST) { if (!byGroup.has(s.group)) byGroup.set(s.group, []); byGroup.get(s.group).push(s); }
+    const order = [...byGroup.keys()].sort((a, b) => a === 'flat' ? -1 : b === 'flat' ? 1 : a.localeCompare(b));
+    for (const g of order) {
+      const items = byGroup.get(g).sort((a, b) => a.name.localeCompare(b.name));
+      const stat = h('span', { class: 'up-n' });
+      const det = h('details', { class: 'up-repo' }, h('summary', {}, h('span', { class: 'mono' }, g === 'flat' ? 'flat skills (always loaded)' : `group: ${g}`), ' ', stat));
+      for (const s of items) det.append(instCard(s));
+      instCards.push({ det, stat, items });
+      pane.append(det);
+    }
+    update();
+  }
+
+  function instCard(s) {
+    const name = `ui-${Math.random().toString(36).slice(2, 9)}`;
+    const badges = [];
+    if (s.override) badges.push(h('span', { class: 'up-badge mod', title: 'override.patch: our edits on top of upstream' }, `local changes: ${plural(s.override.lines, 'line')} in ${plural(s.override.files, 'file')}`));
+    if (s.dirty) badges.push(h('span', { class: 'up-badge dirty', title: 'git status shows uncommitted changes in this skill' }, 'uncommitted changes'));
+    if (s.off) badges.push(h('span', { class: 'up-badge' }, 'switched off'));
+    if (s.slash_only) badges.push(h('span', { class: 'up-badge' }, 'slash-only'));
+    badges.push(h('span', { class: 'up-badge' + (s.external ? '' : ' own') }, s.external ? s.repo : 'own skill'));
+    const times = s.external
+      ? `Last synced from upstream: ${when(s.synced)} · pinned ${s.pinned} · last changed in this repo: ${when(s.changed)}`
+      : `Last changed in this repo: ${when(s.changed)}`;
+    const radio = (val, label) => {
+      const r = h('input', { type: 'radio', name, value: val, onchange: () => {
+        if (val) choices[rmKey(s)] = { c: 'remove' }; else delete choices[rmKey(s)];
+        saveChoices(); update(); } });
+      s['_i_' + val] = r;
+      return h('label', { class: val ? 'up-remove' : 'up-keep' }, r, ' ' + label);
+    };
+    const node = h('div', { class: 'up-skill' },
+      h('div', { class: 'up-name' }, h('strong', {}, s.name), ' ', (s.dir.split('/').pop() === s.name && s.group === 'flat') ? null : h('span', { class: 'up-path mono' }, s.dir.replace(/^claude\/skills\//, ''))),
+      h('div', { class: 'up-badges' }, badges),
+      h('div', { class: 'up-desc', title: 'Click to expand', onclick: e => e.currentTarget.classList.toggle('open') }, s.description || '(no description)'),
+      h('div', { class: 'up-times' }, times),
+      s.external
+        ? h('div', { class: 'up-choice' }, radio('', 'Keep'), radio('remove', 'Remove'))
+        : h('div', { class: 'up-times' }, 'Your own skill: not copied from upstream, so it is removed by hand.'));
+    s._node = node;
+    return node;
+  }
+
+  // ── redraw both tabs from the queue ───────────────────────────────────────
   function update() {
     if (!D) return;
-    let copy = 0, ign = 0;
-    for (const { det, stat, items } of cards) {
+    for (const [id, on] of [['up-pane-new', tab === 'new'], ['up-pane-inst', tab === 'installed']]) {
+      const p = document.getElementById(id);
+      if (p) p.hidden = !on;
+    }
+    let copy = 0, ign = 0, rem = 0;
+    for (const { det, stat, items } of newCards) {
       let shown = 0, c = 0, i = 0;
       for (const s of items) {
         const ch = choices[key(s)];
@@ -129,21 +236,45 @@
         s._node.hidden = !vis;
         if (vis) shown++;
       }
-      stat.textContent = `${items.length} skill${items.length === 1 ? '' : 's'}` + (c ? `, ${c} to copy` : '') + (i ? `, ${i} ignored` : '');
+      stat.textContent = plural(items.length, 'skill') + (c ? `, ${c} to copy` : '') + (i ? `, ${i} ignored` : '');
       det.hidden = shown === 0;
       if (view.q && shown) det.open = true;
       copy += c; ign += i;
     }
+    let mods = 0;
+    for (const { det, stat, items } of instCards) {
+      let shown = 0, r = 0, m = 0;
+      for (const s of items) {
+        const cur = choices[rmKey(s)] ? 'remove' : '';
+        if (s.external) s['_i_' + cur].checked = true;
+        s._node.className = 'up-skill' + (cur ? ' remove' : '');
+        if (cur) r++;
+        const modified = !!(s.override || s.dirty);
+        if (modified) m++;
+        const hit = !view.q || (s.name + ' ' + s.dir + ' ' + (s.repo || '') + ' ' + s.description).toLowerCase().includes(view.q);
+        const vis = hit && !(view.modified && !modified);
+        s._node.hidden = !vis;
+        if (vis) shown++;
+      }
+      stat.textContent = plural(items.length, 'skill') + (m ? `, ${m} with local changes` : '') + (r ? `, ${r} to remove` : '');
+      det.hidden = shown === 0;
+      if (view.q && shown) det.open = true;
+      rem += r; mods += m;
+    }
     const total = D.items.length;
     const st = document.getElementById('up-stat');
-    if (st) st.textContent = `${total - copy - ign} undecided of ${total} · ${copy} to copy · ${ign} to ignore` + (D.generated ? ` · list from ${D.generated.slice(0, 10)}` : '');
+    if (st) {
+      st.textContent = tab === 'new'
+        ? `${total - copy - ign} undecided of ${total} · ${copy} to copy · ${ign} to ignore` + (D.generated ? ` · list from ${day(D.generated)}` : '')
+        : INST ? `${INST.length} installed · ${INST.filter(s => s.override || s.dirty).length} with local changes · ${rem} to remove` : '';
+    }
     const q = document.getElementById('up-queue');
-    if (q) q.textContent = queued() ? `${queued()} choice${queued() === 1 ? '' : 's'} queued; nothing changes until you apply them.` : 'No choices queued.';
+    if (q) q.textContent = queued() ? `${plural(queued(), 'choice')} queued; nothing changes until you apply them.` : 'No choices queued.';
     const ap = document.getElementById('up-apply');
-    if (ap) { ap.disabled = !queued(); ap.textContent = queued() ? `Apply ${queued()} choice${queued() === 1 ? '' : 's'}` : 'Apply choices'; }
+    if (ap) { ap.disabled = !queued(); ap.textContent = queued() ? `Apply ${plural(queued(), 'choice')}` : 'Apply choices'; }
   }
 
-  // ── refresh the list from GitHub ───────────────────────────────────────────
+  // ── refresh the not-copied list from GitHub ───────────────────────────────
   function bar(...kids) {
     const b = document.getElementById('up-bar');
     b.replaceChildren(...kids.flat());
@@ -184,8 +315,15 @@
   }
 
   // ── plan and apply ─────────────────────────────────────────────────────────
-  const picked = () => D.items.filter(s => choices[key(s)]).map(s => ({
-    repo: s.repo, path: s.path, choice: choices[key(s)].c, dest: choices[key(s)].d || null }));
+  const picked = () => {
+    const out = [];
+    for (const [k, v] of Object.entries(choices)) {
+      if (k.startsWith('rm\t')) { out.push({ choice: 'remove', dir: k.slice(3) }); continue; }
+      const [repo, path] = k.split('\t');
+      out.push({ repo, path, choice: v.c, dest: v.d || null });
+    }
+    return out;
+  };
 
   function modal(...kids) {
     document.querySelectorAll('.up-modal').forEach(m => m.remove());
@@ -199,17 +337,21 @@
     if (!r.ok) { say(r.error || 'could not plan', 'err'); return; }
     const m = modal(
       h('h2', {}, 'Apply your choices?'),
-      r.ignore.length ? h('div', {}, h('h3', {}, `Ignore ${r.ignore.length} skill${r.ignore.length === 1 ? '' : 's'}`),
+      r.remove.length ? h('div', {}, h('h3', { class: 'up-warnh' }, `Remove ${plural(r.remove.length, 'installed skill')}`),
+        h('p', { class: 'up-note' }, 'The folder is deleted from this repo (committed history keeps it, so git can restore it) and the skill is added to scripts/external-skills-ignore.txt so it is not offered as new again. Nothing is committed for you.'),
+        h('ul', {}, r.remove.map(x => h('li', {}, h('span', { class: 'mono' }, x.name), ' (', x.dir.replace(/^claude\/skills\//, ''), ')',
+          x.warnings.map(w => h('div', { class: 'up-err' }, 'Warning: ' + w)))))) : null,
+      r.ignore.length ? h('div', {}, h('h3', {}, `Ignore ${plural(r.ignore.length, 'skill')}`),
         h('p', { class: 'up-note' }, 'One line per skill is added to scripts/external-skills-ignore.txt; the update tool then stops listing them. No network.'),
         h('details', {}, h('summary', {}, 'Show the skills'),
           h('ul', {}, r.ignore.map(i => h('li', {}, h('span', { class: 'mono' }, i.repo + ' ' + i.path)))))) : null,
-      r.vendor.length ? h('div', {}, h('h3', {}, `Copy ${r.vendor.length} skill${r.vendor.length === 1 ? '' : 's'} from GitHub`),
+      r.vendor.length ? h('div', {}, h('h3', {}, `Copy ${plural(r.vendor.length, 'skill')} from GitHub`),
         h('p', { class: 'up-note' }, `About ${r.requests} GitHub requests from your IP, paced. Each skill becomes an external skill (source.json, pristine .upstream copy) kept current by the update tool.`),
         h('ul', {}, r.vendor.map(v => h('li', {}, h('span', { class: 'mono' }, v.name), ' → ', v.target)))) : null,
       r.problems.length ? h('div', {}, h('h3', { class: 'up-err' }, `${r.problems.length} cannot be applied`),
         h('ul', {}, r.problems.map(p => h('li', {}, h('span', { class: 'mono' }, p.path), ': ', p.error)))) : null,
       h('div', { class: 'up-actions' },
-        h('button', { class: 'plain up-apply', disabled: !(r.ignore.length || r.vendor.length), onclick: () => runApply(m) }, 'Apply'),
+        h('button', { class: 'plain up-apply', disabled: !(r.ignore.length || r.vendor.length || r.remove.length), onclick: () => runApply(m) }, 'Apply'),
         h('button', { class: 'plain', onclick: () => m.remove() }, 'Back')));
   }
 
@@ -217,16 +359,18 @@
     m.replaceChildren(h('div', { class: 'up-box' }, h('p', {}, 'Applying... copying skills can take a few minutes.')));
     const r = await L.api('upstream-apply', { choices: picked() });
     const res = r.results || [];
-    for (const x of res) if (x.ok) delete choices[x.repo + '\t' + x.path];
+    for (const x of res) if (x.ok) delete choices[x.action === 'remove' ? 'rm\t' + x.dir : x.repo + '\t' + x.path];
     saveChoices();
     const bad = res.filter(x => !x.ok);
     m.replaceChildren(h('div', { class: 'up-box' },
       h('h2', {}, r.ok ? 'Done' : 'Finished with problems'),
       h('p', {}, `${res.filter(x => x.ok).length} applied, ${bad.length} failed.`),
-      bad.length ? h('ul', {}, bad.map(x => h('li', {}, h('span', { class: 'mono' }, x.path), ': ', x.error))) : null,
+      bad.length ? h('ul', {}, bad.map(x => h('li', {}, h('span', { class: 'mono' }, x.dir || x.path), ': ', x.error))) : null,
       r.note ? h('p', { class: 'up-note' }, r.note) : null,
       h('div', { class: 'up-actions' }, h('button', { class: 'plain', onclick: () => m.remove() }, 'OK'))));
+    INST = null;
     await loadData();
+    if (tab === 'installed') await loadInstalled();
     await L.refresh();
   }
 
