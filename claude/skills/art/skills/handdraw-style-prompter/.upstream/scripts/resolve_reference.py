@@ -4,14 +4,8 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
+import re
 from pathlib import Path
-
-
-ROOT = Path(__file__).resolve().parents[2]
-ROOT_SCRIPTS = ROOT / "scripts"
-if str(ROOT_SCRIPTS) not in sys.path:
-    sys.path.insert(0, str(ROOT_SCRIPTS))
 
 from style_asset_paths import grid_path, single_path
 
@@ -33,8 +27,17 @@ def load_style(number: str) -> dict:
 def positive_traits(traits: str) -> str:
     if not traits:
         return ""
-    parts = [part.strip() for part in traits.replace("。", "；").split("；")]
-    kept = [part for part in parts if part and not any(word in part for word in ("避免", "不要", "不准"))]
+    parts = re.split(r"[；;。\n]+", traits)
+    kept = []
+    for part in parts:
+        part = part.strip(" ，,、：:。；;\t")
+        if not part:
+            continue
+        if any(word in part for word in ("避免", "不要", "不准", "禁止")):
+            continue
+        if re.search(r"无(?:写实纹理|精细材质|真实纹理)", part):
+            continue
+        kept.append(part)
     return "；".join(kept)
 
 
@@ -45,23 +48,46 @@ def get_reference_path(number: str) -> str:
 
 def resolve(model: str, style: str, policy: dict | None = None) -> dict:
     styles = json.loads(STYLES.read_text(encoding="utf-8"))
-    max_num = len(styles)
-    if not style.isdigit() or not 1 <= int(style) <= max_num:
-        raise ValueError(f"Style must be a number from 001 to {max_num:03}.")
-    number = f"{int(style):03}"
+    alias_file = SKILL / "references" / "style_alias_map.json"
+    alias_map = json.loads(alias_file.read_text(encoding="utf-8")) if alias_file.exists() else {}
+    legacy_to_new = alias_map.get("legacy_to_new", {})
+    new_to_legacy = alias_map.get("new_to_legacy", {})
+
+    style_clean = str(style).strip()
+    if style_clean.isdigit():
+        num_str = f"{int(style_clean):03}"
+        canonical = legacy_to_new.get(num_str, num_str)
+    else:
+        m = re.match(r"^([A-Za-z]{2})[-_]?(\d+)$", style_clean)
+        if m:
+            canonical = f"{m.group(1).upper()}-{int(m.group(2)):03}"
+        else:
+            canonical = style_clean.upper()
+
+    style_record = next((item for item in styles if item["number"] == canonical), None)
+    if not style_record and canonical in legacy_to_new:
+        canonical = legacy_to_new[canonical]
+        style_record = next((item for item in styles if item["number"] == canonical), None)
+
+    if not style_record:
+        raise ValueError(f"Style '{style}' not found. Use a valid ID like FA-001 or legacy number.")
+
+    number = canonical
+    legacy_number = new_to_legacy.get(number, "")
     policy = policy or load_policy()
-    style_record = next(item for item in styles if item["number"] == number)
     fallback = dict(policy["default"])
     profile = policy.get("models", {}).get(model)
     entry = dict(fallback)
     if profile:
         entry.update({key: value for key, value in profile.items() if key != "styles"})
-        entry.update(profile.get("styles", {}).get(number, {}))
+        style_entry = profile.get("styles", {}).get(number) or profile.get("styles", {}).get(legacy_number, {})
+        entry.update(style_entry)
     name_activation = entry.get("name_activation", "unknown")
     traits_activation = entry.get("traits_activation", "unknown")
     if name_activation not in ALLOWED or traits_activation not in ALLOWED:
         raise ValueError("Invalid name_activation or traits_activation")
-    traits = positive_traits(style_record.get("traits", ""))
+    keep_raw = number in ("FE-048", "FE-049", "FE-051", "FH-050", "FD-042") or legacy_number in ("240", "242", "257", "259", "260")
+    traits = style_record.get("traits", "") if keep_raw else positive_traits(style_record.get("traits", ""))
     if name_activation == "strong":
         activation_source = "name+style"
         use_reference_image = False
@@ -71,9 +97,13 @@ def resolve(model: str, style: str, policy: dict | None = None) -> dict:
         use_reference_image = False
         prompt_traits = traits
     else:
-        activation_source = "reference-image"
         use_reference_image = True
-        prompt_traits = ""
+        prompt_traits = traits
+        activation_source = (
+            "name+style+traits+reference-image"
+            if prompt_traits
+            else "name+style+reference-image"
+        )
     return {
         "model": model,
         "style": number,
@@ -90,7 +120,7 @@ def resolve(model: str, style: str, policy: dict | None = None) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", required=True)
+    parser.add_argument("--model", default="gpt-image-2", help="Target model identifier (default: gpt-image-2)")
     parser.add_argument("--style", required=True)
     args = parser.parse_args()
     print(json.dumps(resolve(args.model, args.style), ensure_ascii=False))
