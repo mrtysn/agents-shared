@@ -2,9 +2,10 @@
   "repo": "gamedev-skills/awesome-gamedev-agent-skills",
   "path": "router/SKILL.md",
   "files": [
-    "SKILL.md",
+    "agents/openai.yaml",
     "references/engine-detection.md",
-    "references/routing-table.md"
+    "references/routing-table.md",
+    "SKILL.md"
   ],
   "commit": "d4b0e35550c55ae70bdfcab4ef5a0e94610438a9",
   "updated": "2026-10-07"

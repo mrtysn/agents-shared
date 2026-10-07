@@ -2,8 +2,9 @@
   "repo": "jakubkrehel/skills",
   "path": "skills/break/SKILL.md",
   "files": [
-    "SKILL.md",
-    "scenarios.md"
+    "agents/openai.yaml",
+    "scenarios.md",
+    "SKILL.md"
   ],
   "commit": "d574cc8a576dc24256ad38268b8d03d86724a1b3",
   "updated": "2026-10-07"

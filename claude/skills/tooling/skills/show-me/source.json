@@ -2,6 +2,7 @@
   "repo": "humanlayer/skills",
   "path": "plugins/show-me/skills/show-me/SKILL.md",
   "files": [
+    "agents/openai.yaml",
     "SKILL.md"
   ],
   "commit": "ca7c8088db69e315a8b2deea43820270457f8f3c",

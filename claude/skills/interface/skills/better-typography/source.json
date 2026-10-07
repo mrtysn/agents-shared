@@ -2,10 +2,11 @@
   "repo": "jakubkrehel/skills",
   "path": "skills/better-typography/SKILL.md",
   "files": [
-    "SKILL.md",
+    "agents/openai.yaml",
     "choosing-fonts.md",
     "css-cheat-sheet.md",
     "details-and-accessibility.md",
+    "SKILL.md",
     "spacing-and-sizing.md",
     "variable-fonts-and-opentype.md",
     "wrapping-and-punctuation.md"

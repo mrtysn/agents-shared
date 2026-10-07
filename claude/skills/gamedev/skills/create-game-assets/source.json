@@ -2,7 +2,7 @@
   "repo": "gamedev-skills/awesome-gamedev-agent-skills",
   "path": "skills/disciplines/create-game-assets/SKILL.md",
   "files": [
-    "SKILL.md",
+    "agents/openai.yaml",
     "assets/art-direction-brief.md",
     "assets/asset-manifest.json",
     "references/art-direction.md",
@@ -11,8 +11,9 @@
     "references/three-d-pipeline.md",
     "scripts/asset_report.py",
     "scripts/build_preview_sheet.py",
-    "scripts/requirements.txt"
+    "scripts/requirements.txt",
+    "SKILL.md"
   ],
-  "commit": "b105e1cf617adf0b68ed98790a716bbb60993179",
-  "updated": "2026-09-15"
+  "commit": "d4b0e35550c55ae70bdfcab4ef5a0e94610438a9",
+  "updated": "2026-10-07"
 }
