@@ -44,6 +44,12 @@ user's budget, and these hold for any third-party service:
   "sorry" page means stop and report. No retry, no header variations, no second
   host to try from — each of those is another request against a service that
   already said no.
+- **A burst limit you caused is pacing, not a refusal.** When a search or research
+  tool the session itself calls (Exa, web search) answers 429 because the agent sent
+  too many calls at once, slow down and continue: send the remaining queries one or
+  two at a time, never more than about five in parallel. Abandoning the research over
+  your own burst is the wrong lesson. This does not cover a target site's 429, which
+  still ends requests to that site.
 - **Production code backs off by itself.** Anything shipped that calls a
   third-party service caches what it fetched, and after a refusal stops calling
   for a cool-down period instead of trying again on the next run.
@@ -67,3 +73,8 @@ test run, the undocumented decoding endpoint hit repeatedly, and node01 kept
 probing past a consent wall. Google answered 429 from both addresses. The rule
 above had exempted sessionless fetches; that exemption is what the section
 replaces.
+
+Oct 9 2026: fifteen parallel Exa searches hit its ten-per-second limit and the
+session dropped the five failed lookups under "the first refusal ends it". The
+user: "you can pace your queries, dont stop searching for info cos of a mistake
+you made". The burst-limit clause above is the result.
