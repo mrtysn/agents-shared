@@ -4,16 +4,37 @@
   "version": "1.0",
   "tool": "skill-tree",
   "test": [
-    {"name": "launcher-syntax", "run": ["zsh", "-n", "write-launcher.zsh"]},
-    {"name": "server-compiles", "run": ["python3", "-m", "py_compile", "../scripts/skill-tree.py"]}
+    {
+      "name": "launcher-syntax",
+      "run": [
+        "zsh",
+        "-n",
+        "write-launcher.zsh"
+      ]
+    },
+    {
+      "name": "server-compiles",
+      "run": [
+        "python3",
+        "-m",
+        "py_compile",
+        "../scripts/skill-tree.py"
+      ]
+    }
   ],
   "mac_app": {
     "bundle_id": "local.skill-tree",
-    "build_command": ["zsh", "write-launcher.zsh"],
+    "build_command": [
+      "zsh",
+      "write-launcher.zsh"
+    ],
     "binary": "build/skill-tree",
     "executable": "skill-tree",
     "menu_bar_only": true,
     "signing": "local-certificate",
-    "info_plist": {"AgentsSharedDir": "{repo}/.."}
+    "info_plist": {
+      "AgentsSharedDir": "{repo}/.."
+    },
+    "icon": "AppIcon.icns"
   }
 }
