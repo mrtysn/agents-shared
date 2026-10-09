@@ -1,7 +1,7 @@
 ---
 description: Register a script as a toolbelt entry — add a DESC comment, ensure executable, link it into ~/bin through the tools repo's installer so it shows in `toolbelt`. Use when the user asks to add a script to their toolbelt or wants a one-line invocation for an existing script.
 argument-hint: [script-path] [one-line description]
-allowed-tools: Bash, Read, Edit, Write
+allowed-tools: Bash, Read, Edit, Write, AskUserQuestion
 ---
 
 # New Tool Skill
@@ -11,6 +11,9 @@ Register a script with the user's `toolbelt` system. The toolbelt scans `~/bin` 
 **Register into `~/bin`, never `~/.local/bin`.** `~/bin` is the directory the user owns. `~/.local/bin` is the install target for uv, pipx, and most language package managers — they contend over it and refuse to overwrite each other's names, so a hand-placed symlink there is liable to be clobbered by an unrelated install.
 
 ## Required inputs (ask if missing)
+
+Ask with AskUserQuestion, in one call, for what the user will type or see: the tool name and the DESC.
+Propose both from the script, recommended option first.
 
 1. **Script path** — the absolute path to the script being registered. May already exist or may be one you're about to write. Source files live in a repo, chosen by the placement rule in `persist-useful-tooling`; `~/bin` holds only symlinks.
 2. **Tool name** — the invocation name (no extension). Defaults to the basename of the script with any `.sh` / `.py` / `.rb` extension stripped. Confirm before symlinking.
@@ -24,11 +27,15 @@ If the user names an existing path, use it. For a fresh script, pick its home wi
 
 Confirm the tool is missing from `~/bin` before proceeding — registering one twice produces a second entry that shadows the first. `tools/install.sh` links everything in `tools/bin/` in bulk, so a script already placed there and installed needs nothing further.
 
-### 2. Verify shebang and DESC line
+### 2. Hold it to the repo bar, and verify the DESC line
 
-Read the first 20 lines of the script:
-- Line 1 must be a `#!` shebang.
-- Somewhere in the first 20 lines there must be a `# DESC: <text>` line.
+A script becomes repo code, so it meets the bar in `persist-useful-tooling` before it is linked.
+Read the file and fix what fails:
+- Line 1 is a `#!` shebang; `#!/bin/zsh` unless it must be portable (a different one needs a stated reason).
+- Somewhere in the first 20 lines there is a `# DESC: <text>` line.
+- `set -euo pipefail` and quoted expansions in anything non-trivial.
+- No hardcoded absolute or machine-specific path: take an argument or derive it.
+- A `--help` if it takes arguments.
 
 If DESC is missing, insert it as **line 2** (immediately after the shebang). This is the existing convention — see `toolbelt`, `repo-survey`, `ffmpeg-progress`, etc.
 
@@ -57,14 +64,14 @@ grep -E '^<tool-name>[[:space:]]' "$DEV_ROOT/tools/links.txt"
 ```
 
 (`-e` alone misses broken symlinks; the `-L` clause catches dangling links too.)
-If either finds something, stop and ask the user. Then run:
+If either finds something, stop and ask the user. Then link through the repo's own entry point:
 
 ```bash
-"$DEV_ROOT/tools/install.sh"
+project-lifecycle -C "$DEV_ROOT/tools" install
 ```
 
-It never replaces a `~/bin` entry that points elsewhere — it prints a `!` line
-instead. The `tools` repo now has a change to commit.
+It runs `install.sh`, which never replaces a `~/bin` entry that points elsewhere (it prints a
+`!` line instead).
 
 ### 5. Verify
 
@@ -72,9 +79,23 @@ Run `toolbelt` and confirm the entry appears with the correct name, type (`bash`
 
 ```bash
 toolbelt | grep "<tool-name>"
+project-lifecycle -C "$DEV_ROOT/tools" status
 ```
 
+`status` must show `up_to_date: True` with nothing missing or wrong. Then run the tool once
+(`<tool-name> --help` when it takes arguments, otherwise its harmless default) and confirm it exits 0.
+
 If the entry doesn't appear, the most likely causes are: missing `# DESC:` line, DESC line beyond line 20, or the symlink landing outside `~/bin`.
+
+### 6. Commit and push
+
+The `tools` repo now has changes (the script if it is new, `links.txt` if edited). Stage only
+those, commit as one lowercase clause starting with a verb (`add repo-survey, the repo size
+lister`), and push. If the script lives in another repo, that repo gets its own commit.
+
+### 7. Report
+
+The tool name, the absolute path of the source, the DESC line, and the commit made.
 
 ## Pitfalls
 
