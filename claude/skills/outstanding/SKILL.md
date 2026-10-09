@@ -51,7 +51,7 @@ Do NOT invent work. If nothing is outstanding, say so plainly.
 
    Uncommitted changes → category 3. An `ahead` count → unpushed commits. Absence of a git repo is not an error; just omit this section.
 
-3. **Check for background shells.** Run `scripts/list-session-background-shells.sh --session <this session's id>` (the id is the UUID in the scratchpad path). Each line it prints is a still-running shell: list it as a `Running` item (pid, elapsed, command) whose next step is to stop it or confirm it is still wanted. No output, no item.
+3. **Check for background shells.** Run `list-session-background-shells.sh --session <this session's id>` (in agents-shared `scripts/`, found by resolving the `~/.claude/skills/<this skill>` symlink) (the id is the UUID in the scratchpad path). Each line it prints is a still-running shell: list it as a `Running` item (pid, elapsed, command) whose next step is to stop it or confirm it is still wanted. No output, no item.
 
 4. **Verify before asserting.** Conversation memory is a hypothesis, not evidence — items get closed out-of-band while this session sits idle. Before listing an item, check it against current state: `git log --oneline -15` for work committed since it was discussed, and re-read the actual file for any "still stubbed / still missing" claim. A state you could not verify is written as `Partial?` with a note, never asserted flat. The inverse also holds — before declaring "nothing outstanding" or "we are done", re-check the categories against the tree, not against your recollection.
 
