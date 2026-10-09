@@ -35,20 +35,31 @@ Then one AskUserQuestion call with two questions:
 | Mode | What it means |
 |---|---|
 | Guided (Recommended) | One question at a time. Each phase ends with what was decided, and the user confirms before the next. |
-| Brisk | Related questions batched, up to four in one call. Only the three routed forcing questions. Confirmation at the concept pick and before writing the page. |
-| You drive | Ask only for a one-sentence brief, platform, team and scope, and the pick among three concepts. Draft every other phase. The page marks each drafted field `drafted, not challenged` and lists the unasked forcing questions. |
+| Brisk | Related choices batched, up to four per call. Phases are confirmed only at the concept pick and before writing the page. |
+| You drive | Ask only for the brief (a sentence at levels 0 and 1, the user's material at levels 2 and 3), platform, team and scope. At levels 0 and 1, draft three concept cards and ask for the pick. At levels 2 and 3, draft the missing sections from the material and ask the user only to confirm the twist and the pillars. The page marks each drafted field `drafted, not challenged` and lists the unasked forcing questions. |
 
 **Where is the idea?** Sets the maturity level, which sets the entry phase and the questions.
 
 | Answer | Level | Start at | Forcing questions |
 |---|---|---|---|
 | Nothing yet | 0 | 1 Fantasy | Q1, Q3, Q5 |
-| A one-line pitch | 1 | 3 Loop | Q2, Q3, Q4 |
-| A written concept or design doc | 2 | 4 Twist | Q2, Q5, Q6 |
-| A prototype or playtest data | 3 | 8 Forcing questions | Q1, Q4, Q6 |
+| A one-line pitch | 1 | 3 Three concepts | Q2, Q3, Q4 |
+| A written concept or design doc | 2 | 5 Twist and comps | Q2, Q5, Q6 |
+| A prototype or playtest data | 3 | 7 Player and scope | Q1, Q4, Q6 |
 
-At level 3 ask once whether it is a prototype nobody else has played, or one with playtest
-notes; the second skips Q6 and reads the notes instead.
+The routed three are asked in every mode, one at a time; forcing questions are open probes and
+are never batched.
+
+**Material.** Phases a level skips are not left empty: their content comes from what the user
+already has. Ask for it in plain text and read it before the entry phase.
+
+- Level 1: the pitch itself, which becomes one of the three concept cards.
+- Level 2: the path of the document. Read it and fill Fantasy, Core loop and Pillars from it.
+- Level 3: whatever exists (design doc, build notes, playtest notes). At level 3 ask once whether
+  anyone else has played it; if playtest notes exist, read them instead of asking Q6.
+
+On the page, mark every section filled this way `from the user's material, not challenged`, and
+challenge it only where a later phase or a forcing question calls for it.
 
 ## 1. Fantasy
 
@@ -62,14 +73,19 @@ and what caused it, or ask them to finish "I want the player to feel ___ when th
 A feature list is not a fantasy. Say so and ask for the feeling: "That is what the player does.
 What do they feel while doing it?" Keep pushing until the answer is a feeling.
 
+At level 0, first ask in plain text which three games they have spent the most time in and what
+kept them coming back; taste is the raw material when nothing else exists.
+
 Read it back as one sentence, with its dominant aesthetic and the player behaviours it implies,
-and get confirmation. Every later phase has to trace back to this sentence.
+and get confirmation. Test the sentence before moving on: if two different games could share it,
+it is too generic; if it implies no emotion, it is a genre label. Every later phase has to trace
+back to this sentence.
 
 ## 2. Landscape check (optional)
 
 Ask first. One AskUserQuestion, with the number and shape of the requests in the question:
 
-- **Search** (Recommended): 2 or 3 web searches in standard mode, generic terms only, such as
+- **Search** (Recommended): 2 or 3 web searches, generic terms only, such as
   "<genre> games <year>" and "<core mechanic> <genre> market". Never the concept's name or
   anything proprietary.
 - **Skip**: work from what the model already knows, and say the page has no market evidence.
@@ -92,8 +108,9 @@ Each concept is one card: working title, two-sentence pitch, core verb, fantasy,
 and also Y", where the "also" must change play, not only look), dominant aesthetic, scope
 (small, medium, large), why it could work, biggest risk.
 
-The user picks one, combines, or asks for fresh directions. For a level 1 pitch, one card
-should be the pitch itself, so the other two measure it.
+Ask with four options: the three cards and "Combine elements". A request for fresh directions
+arrives through Other; then generate three new cards. For a level 1 pitch, one card is the
+pitch itself, so the other two measure it.
 
 When the user is stuck or wants more raw ideas, offer a deepener from
 `references/techniques.md` (relative to this skill's directory). Offer two or three that fit,
@@ -108,8 +125,8 @@ means it is not distilled yet.
 Then nest it, one level at a time:
 
 - **30 seconds**: what the hands do most. Is it satisfying with no reward, progression or
-  story? "Shooting in Hades feels good with nothing attached." If the user cannot say it in
-  fifteen seconds the concept needs work.
+  story? "Shooting in Hades feels good with nothing attached." If the user cannot say it in one
+  sentence the concept needs work.
 - **5 minutes**: what structures the 30-second action into cycles; where "one more run" starts;
   which choices live here.
 - **A session**: a natural stopping point **and** a reason to return. Both are required.
@@ -134,9 +151,10 @@ comp) and ask: lock it in, explore alternatives (back to 3), or adjust one part.
 
 Three to five pillars, as a working range. Each has a name, a one-sentence definition and a
 **design test**: "when we are debating X versus Y, this pillar says choose ___". Each must be
-**testable** (a prototype could check it) and **actionable** ("fun" is neither; "tense survival
-under resource pressure" is). Pillars that never pull against each other are not doing work, so
-name at least one real tension.
+**testable** (a prototype could check it) and **actionable** ("fun" is neither; "every shortcut
+costs something the player needs later" is). Pillars that never pull against each other are not
+doing work, so name at least one real tension. Two more checks: do the pillars set this game
+apart from the comps, and would each one settle a real disagreement about a feature?
 
 Then three or more **anti-pillars**: what this game refuses to be. Each "no" protects a "yes".
 
@@ -174,10 +192,12 @@ page.
 
 Every session ends with one assignment the user can start today, never "go build it":
 
-- Level 0 or 1: show a five-slide pitch or a one-paragraph pitch to five people in the target
-  audience, and watch whether they ask when they can play.
-- Level 2: a paper prototype of the core loop, or a 48 to 72 hour greybox; a digital greybox can
-  start from `/gamedev:prototype-fast`.
+- Level 0 or 1: show a five-slide pitch or a one-paragraph pitch to five to ten people in the
+  target audience, and watch whether they ask when they can play.
+- Level 2: a paper prototype of the core loop, or a 48 to 72 hour greybox. A digital greybox can
+  start from `/gamedev:prototype-fast`, which exists only where the gamedev group is enabled
+  (`claude plugin enable gamedev@skills-dir --scope project` turns it on for one repo); where it
+  is off, describe the greybox in plain words.
 - Level 3: a blind playtest: hand over the controls, say nothing, write down where they stall,
   quit or replay.
 
@@ -202,8 +222,11 @@ user will open, so it lives in a repo, never in the scratchpad.
 | Twist and comps | The twist, the three comps with the gap each leaves |
 | Pillars | Each pillar with its design test, the tension, the anti-pillars |
 | Player and scope | Audience and non-audience, platform, session length, the two scope numbers |
-| Risks and open questions | Biggest risk, hardest unknown, each forcing question with the answer, skipped ones named; every claim labelled observed or imagined |
+| Risks and open questions | A one-line standing first: forcing questions answered out of those routed, whether the verb test passed, how many claims are observed rather than imagined. Then the biggest risk, the hardest unknown, each forcing question with its answer, skipped ones named; every claim labelled observed or imagined |
 | Next test | The assignment and its pass or fail line |
+
+When the session refined an earlier concept page, open the new page with a line
+`Supersedes: <path of the earlier page>`.
 
 Fill them with semantic HTML only. Then render and read the page as `/new-html-page` step 4
 says, and hand over the absolute path on its own line. Do not publish it.
@@ -216,18 +239,27 @@ says, and hand over the absolute path on its own line. Do not publish it.
 - **Say the hard thing first**, then the reason. Name the failure pattern when you see one.
 - **Concrete over vague.** Replace "engaging", "immersive" and "balanced" with the mechanic and
   the feeling it causes.
-- **Concepts are the user's.** Offer, recommend, never decide a direction for them.
+- **Concepts are the user's.** Offer, recommend, never decide a direction for them. The one
+  exception is You drive, where drafted choices are allowed and every one is labelled as drafted.
 - **Stuck three times** on the core fun: send them to play three competitors and return with
   notes. **Contradicting itself after two rewrites:** stop ideating and paper-prototype.
 - **No telemetry, no state outside the page**; the session writes one file.
 
 ## Provenance
 
-The structure is new; the ideas come from MIT-licensed skills and a couple of unlicensed ones,
-and none of their text is copied. Maturity entry, forcing questions and the push-back posture
-follow gstack-game's game-ideation. The three generation techniques, loop levels, pillars with
-design tests and anti-pillars follow Donchitos' Claude-Code-Game-Studios brainstorm. The
-technique deepeners follow BMAD game-dev-studio's technique table. The testable-and-actionable
-pillar check and loop distillation follow rbergman's game-vision. The thresholds in this skill
-(five or six verbs, three to five pillars, ten to one) are rules of thumb from those sources, not
-measured figures.
+The structure is new. Three sources are MIT-licensed, and short phrases from them are reused:
+gstack-game's game-ideation (fagemx/gstack-game), Claude-Code-Game-Studios' brainstorm
+(Donchitos), and the technique table of BMAD game-dev-studio (bmad-code-org; "BMad" is a trademark
+of BMad Code, LLC). One source, rbergman's game-vision, carries no clear licence, so only its ideas
+are used, none of its wording.
+
+- From gstack-game: maturity entry, the six forcing questions and the push-back posture, the
+  three nested loop levels with the verb test, the landscape check, the next-test table.
+- From Donchitos: the three generation techniques and the concept card, pillars with design tests,
+  anti-pillars.
+- From BMAD: the technique deepeners in `references/techniques.md`.
+- From game-vision: the testable-and-actionable pillar check, the generic-fantasy test and loop
+  distillation.
+
+The thresholds in this skill (five or six verbs, three to five pillars, ten to one) are rules of
+thumb from those sources, not measured figures.
