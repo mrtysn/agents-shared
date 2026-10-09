@@ -1,7 +1,7 @@
 ---
 description: Create a new GitHub repository under the active `gh` account, scaffolding standard files and pushing an initial commit. Use when the user asks to create a new repo for an existing or empty local directory.
 argument-hint: [repo-name] [one-line description]
-allowed-tools: Bash, Read, Write, Edit
+allowed-tools: Bash, Read, Write, Edit, AskUserQuestion
 ---
 
 # New Repo Skill
@@ -9,6 +9,10 @@ allowed-tools: Bash, Read, Write, Edit
 Create a fresh GitHub repository for the current working directory (or a new directory) and push an initial commit. Nothing about the user is hardcoded — read identity and paths from the environment.
 
 ## Required inputs (ask if missing)
+
+Every question below goes through AskUserQuestion, recommended option first, one call per batch
+(the `gh` account question in step 0 comes first and alone). Each carries its own facts: the
+account, the repo name, the description and the visibility.
 
 1. **Repo name** — defaults to the basename of the current working directory if not given. Confirm.
 2. **One-line description** — propose one from the project contents (README, package manifests, top-level source), then confirm with the user before using it.
@@ -24,9 +28,7 @@ This is the first action of the skill. Do not run any other `gh` command before 
 gh auth status
 ```
 
-Capture the account name on the line marked `Active account: true`. Ask the user **verbatim**:
-
-> Is `<account>` the account you'd like to use for this repo?
+Capture the account name on the line marked `Active account: true`. Ask with AskUserQuestion, "Is `<account>` the account you'd like to use for this repo?", options: use it (Recommended) / I'll switch accounts.
 
 Wait for an explicit yes. If the user names a different account, stop and instruct them to run `gh auth switch` themselves (it is interactive — do not run it). Re-run `gh auth status` after they switch, then ask the question again.
 
@@ -106,7 +108,7 @@ on this machine.
 
 ### 5. Confirm visibility, then create remote and push
 
-Re-confirm visibility with the user. Echo back: account, repo name, description, visibility — then wait for a clear go-ahead.
+Re-confirm with AskUserQuestion, in one question that states account, repo name, description and visibility, and wait for the pick. A public repo is its own option, never the default.
 
 ```bash
 gh repo create <repo-name> \
@@ -119,6 +121,12 @@ gh repo create <repo-name> \
 Swap `--private` for `--public` only after explicit user confirmation in this turn (a prior approval does not carry forward).
 
 Report the resulting URL from `gh repo create`'s stdout.
+
+### 6. Prove it
+
+`git status -sb` shows the branch tracking `origin/<branch>` with nothing ahead, and
+`gh repo view --json visibility,url` returns the visibility that was confirmed. If either
+fails, report it as it is.
 
 ## License
 
