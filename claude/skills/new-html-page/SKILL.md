@@ -41,5 +41,7 @@ Pages are local files (see the artifacts rule): never publish to Anthropic.
 - **Never write CSS for the page.** If the layout needs something web-shared lacks, add it to
   web-shared (`src/styles/components.css`), not to the page.
 - **The column lists `<h2>` sections only**; a page whose headings are `<h3>` has no column.
+- **Links are set up by the head**: every link except an in-page `#anchor` opens in a new tab
+  with `rel="noopener noreferrer"`. Write plain `<a href>`; never add `target` yourself.
 - A diagram (`/archify`) or a long data table is a section's content, not a reason to skip
   the scaffold.
