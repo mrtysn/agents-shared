@@ -38,6 +38,8 @@ Compose the final handoff message from the sub-agent's structured summary. Do no
 
 Compose the handoff from this conversation.
 
+First run `scripts/list-session-background-shells.sh --session <this session's id>` (the id is the UUID in the scratchpad path). Each line it prints is a **Running** shell: stop it before handing off, or name it in the handoff (pid, command, why it lives) so the next session does not inherit it unseen. No output, nothing to add.
+
 `$ARGUMENTS`, when present, governs **scope and length** — not merely emphasis:
 
 - "brief" / "short" / "quick" caps the body at ~200 words and licenses dropping any section that has nothing load-bearing to say.
