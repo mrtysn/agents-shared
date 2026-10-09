@@ -96,6 +96,37 @@ INPUT=$(cat)
 PROMPT=$(printf '%s' "$INPUT" | jq -r '.prompt // empty' 2>/dev/null)
 [ -n "$PROMPT" ] || exit 0
 SESSION=$(printf '%s' "$INPUT" | jq -r '.session_id // ""' 2>/dev/null)
+
+# Stale background shells: a Stop hook cannot reach the model without blocking,
+# so the warning rides on the next prompt. Independent of system-one's mode and
+# config. Lists this session's background shells running over 60 minutes (the
+# lister, scripts/list-session-background-shells.sh; SESSION_SHELLS_LISTER
+# overrides it) and adds one line to additionalContext. Silent when none.
+SHELLS_WARN=""
+SHELLS_EMITTED=0
+SHELLS_LISTER="${SESSION_SHELLS_LISTER:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../scripts/list-session-background-shells.sh}"
+# The lister costs about 100 ms, so its verdict is cached per session for 5 minutes.
+SHELLS_CACHE="${TMPDIR:-/tmp}/session-shells-warn-$(printf '%s' "$SESSION" | tr -dc 'A-Za-z0-9_-')"
+if [ -n "$SESSION" ] && [ -x "$SHELLS_LISTER" ]; then
+    if [ -n "$(find "$SHELLS_CACHE" -mmin -5 2>/dev/null)" ]; then
+        SHELLS_WARN=$(cat "$SHELLS_CACHE" 2>/dev/null)
+    else
+        STALE=$("$SHELLS_LISTER" --session "$SESSION" --older-than 60 2>/dev/null)
+        if [ -n "$STALE" ]; then
+            STALE_N=$(printf '%s\n' "$STALE" | wc -l | tr -d ' ')
+            STALE_FIRST=$(printf '%s\n' "$STALE" | head -1 | cut -c1-120)
+            SHELLS_WARN="This session has $STALE_N background shell(s) running over 60 minutes (first: $STALE_FIRST). Check whether each is still needed and stop the rest."
+        fi
+        printf '%s' "$SHELLS_WARN" > "$SHELLS_CACHE" 2>/dev/null
+    fi
+fi
+# Every early exit below passes through here, so the warning is never lost.
+shells_warn_on_exit() {
+    [ -n "$SHELLS_WARN" ] && [ "$SHELLS_EMITTED" = 0 ] || return 0
+    jq -cn --arg c "$SHELLS_WARN" '{hookSpecificOutput: {hookEventName: "UserPromptSubmit", additionalContext: $c}}'
+}
+trap shells_warn_on_exit EXIT
+
 TRANSCRIPT=$(printf '%s' "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -473,5 +504,10 @@ $line"
     fi
 done
 [ -n "$OUT" ] || exit 0
+if [ -n "$SHELLS_WARN" ]; then
+    OUT="$OUT
+$SHELLS_WARN"
+    SHELLS_EMITTED=1
+fi
 jq -cn --arg c "$OUT" '{hookSpecificOutput: {hookEventName: "UserPromptSubmit", additionalContext: $c}}'
 exit 0
