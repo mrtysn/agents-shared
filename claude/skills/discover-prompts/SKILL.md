@@ -1,7 +1,7 @@
 ---
 description: Search public sources for an existing prompt or instruction file for coding agents (CLAUDE.md, AGENTS.md, rules files, system prompts, slash-command prompts) matching a need. Use when user asks "is there a prompt for X", wants to find/discover prompts or instruction files, or before writing a new rule or CLAUDE.md section from scratch.
 context: fork
-allowed-tools: WebSearch, WebFetch, Read, Glob, Grep, Bash(gh search:*), Bash(gh api:*), Bash(ls:*)
+allowed-tools: WebSearch, WebFetch, Read, Glob, Grep, Bash(gh search:*), Bash(gh api:*), Bash(ls:*), Bash(curl:*), Bash(grep:*)
 argument-hint: <what the prompt should make the agent do>
 ---
 
@@ -9,10 +9,12 @@ argument-hint: <what the prompt should make the agent do>
 
 Find existing prompts for coding agents across public sources for: **$ARGUMENTS**
 
-"Prompt" here means instructions an agent loads: a `CLAUDE.md` / `AGENTS.md`, a rules
-file (`.cursorrules`, `.claude/rules/*.md`), a system prompt, or a slash-command body.
-General prompt libraries are searched too, for topics that are not about coding. Packaged
-skills are `/discover-skills`.
+"Prompt" here means any reusable instruction text an agent follows: a `CLAUDE.md` /
+`AGENTS.md`, a rules file (`.cursorrules`, `.claude/rules/*.md`), a system prompt, a
+slash-command body, or a skill or workflow module whose text is the value. A skill counts
+as a find; record its kind and what adopting it would take (installer, scripts, telemetry,
+framework). General prompt libraries are searched too, for topics that are not about
+coding. For a skill to install as-is, `/discover-skills` is the dedicated search.
 
 If no arguments were given, return immediately asking for a description of what the
 prompt should make the agent do — do not search on a guessed query.
@@ -56,7 +58,9 @@ Notes:
 
 ## Evaluating candidates
 
-Fetch the actual prompt and check:
+Fetch the **whole** prompt text of every candidate (the full file, not a README line or
+the opening) before it can appear in the table. A hit you could not read in full goes in
+a separate `Seen but not read:` line with the reason, never in the table. Then check:
 
 1. **Does it do the asked thing** — not merely adjacent keywords
 2. **Portable** — flag instructions tied to one project's paths, stack, or private tooling; say what would have to be rewritten
@@ -66,7 +70,7 @@ Fetch the actual prompt and check:
 
 ## Output
 
-A short table of the best matches (max 5): name, source link (to the file, not just the repo), one-line what-it-does, caveats.
+A short table of the best matches (max 5): name, kind (rule, skill, command, system prompt), source link (to the file, not just the repo), one-line what-it-does, caveats.
 Order it by how many independent sources surfaced it, then by stars, then by last commit.
 
 Then a one-line recommendation: best candidate, or "nothing good exists — worth writing"
