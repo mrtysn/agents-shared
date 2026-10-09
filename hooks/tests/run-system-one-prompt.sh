@@ -57,7 +57,8 @@ TMP=$(mktemp -d "${TMPDIR:-/tmp}/system-one-prompt-test.XXXXXX")
 trap 'rm -rf -- "$TMP"' EXIT
 export SYSTEM_ONE_STATE_DIR="$TMP"
 export SYSTEM_ONE_MODE=shadow
-
+# The background-shell lister is tested by run-system-one-prompt-shells.sh; here it is stubbed out so latency stays the classifier's.
+export SESSION_SHELLS_LISTER=/usr/bin/true
 fail=0 total=0 max_ms=0 sum_ms=0
 n=0
 while IFS=$'\t' read -r kind wants_action prompt prev; do
