@@ -50,6 +50,12 @@ user's budget, and these hold for any third-party service:
   "sorry" page means stop and report. No retry, no header variations, no second
   host to try from — each of those is another request against a service that
   already said no.
+- **A refusal is never written down as a verdict on the site.** "Ends it" covers
+  requests from this session, nothing more. Do not record the host as excluded,
+  blocked, banned or "failed" in a skill, rule, memory, script or doc; a one-off
+  429 or 403 says nothing about the site tomorrow. A skill's source list is
+  changed only when the user asks, and a source you could not use is reported in
+  that reply, not removed from the list.
 - **A burst limit you caused is pacing, not a refusal.** When a search or research
   tool the session itself calls (Exa, web search) answers 429 because the agent sent
   too many calls at once, slow down and continue: send the remaining queries one or
