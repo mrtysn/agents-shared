@@ -53,7 +53,7 @@ that live inside real projects.
 
 Notes:
 - `gh search code` is rate-limited to ~10 requests/minute. Two code searches are listed; if they return empty, that is the limit, not the absence of results.
-- Sources deliberately **not** in this table: `cursor.directory` (answered HTTP 429 on the first probe) and `promptbase.com` (HTTP 403) — a refusal ends requests to that host; `flowgpt`, `PromptHub` and `PromptDen` (accounts or client-rendered, no verified query URL); and Anthropic's published system-prompt page (a fixed document, not searchable by topic — fetch it directly only when the user asks about Claude's own system prompt).
+- Sources deliberately **not** in this table: `flowgpt`, `PromptHub` and `PromptDen` (accounts or client-rendered, no verified query URL); and Anthropic's published system-prompt page (a fixed document, not searchable by topic — fetch it directly only when the user asks about Claude's own system prompt).
 - Every hit ultimately points at a GitHub repo or a page. Resolve to the source and judge the actual prompt text, not the listing. Collapse hits that resolve to the same file or repo; evaluate each once.
 
 ## Evaluating candidates
