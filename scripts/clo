@@ -8,6 +8,9 @@ clo — pick a folder, Claude model and effort level, then launch Claude Code.
 
 Usage:
   clo [claude args...]    Open the picker; extra args go to `claude` (e.g. clo --chrome)
+  clo f [question]        Fast mode: no menus, launch in $DEV_ROOT/notebook with
+                          Sonnet at medium effort; the question, if given, is
+                          sent as the first prompt. `fclo` is the same thing.
   clo --list              Print the menu entries and exit
   clo --init zsh          Print the shell function that leaves your terminal in
                           the launched folder; add to .zshrc: eval "$(clo --init zsh)"
@@ -82,6 +85,7 @@ menu() {
 # printed here runs clo, then cds to the folder the session was launched in.
 init_zsh() {
     cat <<'EOF'
+fclo() { clo f "$@"; }
 clo() {
     local f rc d
     f="$(mktemp "${TMPDIR:-/tmp}/clo.XXXXXX")" || return
@@ -97,6 +101,12 @@ EOF
 
 case "${1:-}" in
     -h|--help) usage; exit 0 ;;
+    f)         shift
+               [[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT/notebook" ]] \
+                   || { print -u2 "clo f: needs DEV_ROOT with a notebook folder inside it"; exit 1; }
+               cd -- "$DEV_ROOT/notebook"
+               [[ -n "${CLO_CD_FILE:-}" ]] && print -r -- "$PWD" > "$CLO_CD_FILE"
+               exec claude --model sonnet --effort medium "$@" ;;
     --list)    menu | cut -f2; exit 0 ;;
     --init)    [[ "${2:-}" == zsh ]] || { print -u2 "clo: --init supports zsh only"; exit 1; }
                init_zsh; exit 0 ;;
