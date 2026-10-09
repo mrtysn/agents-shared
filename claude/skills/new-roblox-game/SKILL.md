@@ -1,12 +1,12 @@
 ---
-description: Start a new Roblox game in the robloj framework through the project-lifecycle pipeline — robloj creates games/<slug>/ (Rojo project, source tree, one Lune test, asphalt and mantle config) and the manifest gives it test, build, deploy, status and run. Use when the user asks for a new Roblox game, experience, place or demo.
+description: Start a new Roblox game in the robloj framework through the project-lifecycle pipeline — robloj creates games/<game>/ (Rojo project, source tree, one Lune test, asphalt and mantle config) and the manifest gives it test, build, deploy, status and run. Use when the user asks for a new Roblox game, experience, place or demo.
 argument-hint: [game name]
 allowed-tools: Bash, Read, Write, Edit, AskUserQuestion, Skill
 ---
 
 # New Roblox Game Skill
 
-robloj owns how a game starts: `tools/robloj.py init --name <slug>` writes `games/<slug>/` with
+robloj owns how a game starts: `tools/robloj.py init --name <game>` writes `games/<game>/` with
 the Rojo project, the source tree, `asphalt.toml`, `mantle.yml` and one Lune test. This skill
 asks for the name, lets robloj make the game through `project-lifecycle init roblox-game`,
 proves it with `project-lifecycle test`, and commits in robloj. It never copies a template.
@@ -15,8 +15,9 @@ proves it with `project-lifecycle test`, and commits in robloj. It never copies 
 
 Ask with AskUserQuestion only for what the user will see or type:
 
-1. **Game name** — what the game is called (`Gum Gum Pop`). The directory under robloj's
-   `games/` and the tool slug both derive from it (`gum-gum-pop`).
+1. **Game name** — what the game is called (`Gum Gum Pop`). It becomes the title players see
+   (the manifest's name, the start place's name). The directory under robloj's `games/` derives
+   from it with underscores (`gum_gum_pop`), since robloj's game names are `[a-z][a-z0-9_]*`.
 
 Do not ask for the universe or place id: they exist only once the experience is created on
 Roblox, and `init` takes `--universe-id` and `--place-id` later, or they are added to the
@@ -28,14 +29,14 @@ manifest by hand. Do not ask about a repo: the game lives in robloj.
    `robloj_root` setting on this machine (`~/.config/project-lifecycle/config.json`).
 2. **Create it**, with `-C` on the game's directory in the checkout, which does not exist yet:
 
-       project-lifecycle -C <robloj_root>/games/<slug> init roblox-game --name "<Game Name>" --json
+       project-lifecycle -C <robloj_root>/games/<game> init roblox-game --name "<Game Name>" --json
 
-   It runs `robloj.py init --name <slug> --json` in the checkout, which writes `games/<slug>/`
+   It runs `robloj.py init --name <game> --json` in the checkout, which writes `games/<game>/`
    with its manifest, then confirms that manifest (kind and game) and writes `CLAUDE.md` beside
    it; `created_in_robloj.written` in the output lists what robloj wrote. Run anywhere else,
    it writes the manifest into the current directory instead; the game still lives in robloj.
-3. **Prove it**: `project-lifecycle -C <robloj_root>/games/<slug> test` must pass (it runs
-   `robloj.py check --game <slug>`: Selene, StyLua, luau-lsp analyze, Lune tests). Then
+3. **Prove it**: `project-lifecycle -C <robloj_root>/games/<game> test` must pass (it runs
+   `robloj.py check --game <game>`: Selene, StyLua, luau-lsp analyze, Lune tests). Then
    `status` shows whether the `.rbxl` is built and current, the pinned tool versions, and
    what Mantle deployed.
 4. **Commit in robloj** the new game the way its CLAUDE.md says (its check is the gate), and
