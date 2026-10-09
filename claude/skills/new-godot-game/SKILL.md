@@ -25,7 +25,7 @@ Ask with AskUserQuestion, in one call, only for what the user will see or type:
 
 ## Steps
 
-1. **Read oj's rules**: `/Users/mrtysn/dev/oj/CLAUDE.md` ("Where a game lives") before
+1. **Read oj's rules**: `$DEV_ROOT/oj/CLAUDE.md` ("Where a game lives") before
    anything, and its `/new-demo` skill if the arcade path is chosen.
 2. **Arcade path**: invoke `/new-demo` with the Skill tool (it scaffolds the demo and wires
    the registry and chooser). No manifest: an arcade entry is tested and shipped as part of
