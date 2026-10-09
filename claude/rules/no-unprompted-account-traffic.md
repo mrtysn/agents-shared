@@ -14,8 +14,9 @@ platforms act on.
 - Bare links go onto a worklist. That costs nothing and loses nothing.
 - Content arrives when the user captures pages themselves, or when they run the
   fetcher. Both already exist; neither is yours to trigger.
-- Never propose a bulk fetch against the user's own session. If they want it,
-  they will say so.
+- When links pile up, an agent may say once, in a line, that the fetcher exists
+  and how many links are waiting. It never runs the fetcher, never starts it for
+  the user, and never repeats the mention in the same session.
 
 ## No session attached is not a free pass
 
@@ -31,6 +32,11 @@ user's budget, and these hold for any third-party service:
 - **State the count before a loop.** Before any command that makes more than a
   handful of requests to one service, say how many and to what. Tens against one
   host within an hour is already too many for testing.
+- **Public code and docs hosts are ordinary reads.** Raw files and pages on GitHub, GitLab
+  and official docs sites need no count stated up front, up to about 15 distinct URLs per
+  task, each fetched once and saved. Past that, state the count first. The first 429 or 403
+  still ends it. This does not cover search-engine pages, undocumented endpoints, anything
+  behind a login, or any run on a server.
 - **Never test network code on a server.** Running a script over ssh — `docker exec` into a
   production container included — sends its requests from that server's IP, where nothing counts
   them and a ban hits production. Test locally against a saved response; run network code on a
