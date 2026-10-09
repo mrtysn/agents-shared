@@ -51,9 +51,11 @@ Do NOT invent work. If nothing is outstanding, say so plainly.
 
    Uncommitted changes → category 3. An `ahead` count → unpushed commits. Absence of a git repo is not an error; just omit this section.
 
-3. **Verify before asserting.** Conversation memory is a hypothesis, not evidence — items get closed out-of-band while this session sits idle. Before listing an item, check it against current state: `git log --oneline -15` for work committed since it was discussed, and re-read the actual file for any "still stubbed / still missing" claim. A state you could not verify is written as `Partial?` with a note, never asserted flat. The inverse also holds — before declaring "nothing outstanding" or "we are done", re-check the categories against the tree, not against your recollection.
+3. **Check for background shells.** Run `scripts/list-session-background-shells.sh --session <this session's id>` (the id is the UUID in the scratchpad path). Each line it prints is a still-running shell: list it as a `Running` item (pid, elapsed, command) whose next step is to stop it or confirm it is still wanted. No output, no item.
 
-4. **Surface anything blocked on the user first.** If closing an item needs a decision or answer only the user can give (category 4), it leads the report — the user is the bottleneck and should see it before anything they can't act on.
+4. **Verify before asserting.** Conversation memory is a hypothesis, not evidence — items get closed out-of-band while this session sits idle. Before listing an item, check it against current state: `git log --oneline -15` for work committed since it was discussed, and re-read the actual file for any "still stubbed / still missing" claim. A state you could not verify is written as `Partial?` with a note, never asserted flat. The inverse also holds — before declaring "nothing outstanding" or "we are done", re-check the categories against the tree, not against your recollection.
+
+5. **Surface anything blocked on the user first.** If closing an item needs a decision or answer only the user can give (category 4), it leads the report — the user is the bottleneck and should see it before anything they can't act on.
 
 ## Output format
 
@@ -98,9 +100,9 @@ Layout, exactly:
 
 Rules for the items:
 - **Item** — name it as the user named it. No embellishment.
-- **State** — exactly one of: Blocked, Uncommitted, Partial, Not started. Never Deferred: deferred items belong to Set aside.
+- **State** — exactly one of: Blocked, Uncommitted, Partial, Running, Not started. Never Deferred: deferred items belong to Set aside.
 - **Next step** — one concrete, actionable move, anchored to where the work lives: a `file.cs:line`, a branch name, or the exact command. Not "finish it" — the actual edit or invocation. For a Blocked item, name the exact decision or answer you need.
-- Order by what the user should see first: Blocked (needs them), then Uncommitted (cheapest to close), Partial, Not started.
+- Order by what the user should see first: Blocked (needs them), then Uncommitted (cheapest to close), Partial, Running, Not started.
 - **Self-contained** — no session-local shorthand: no "option B", "the fix", bare codes, or truncated links. Full repo-relative paths, full URLs, and enough words that each row reads cold, weeks later, without this conversation open.
 - **Ownership** — if the user asks who does what ("which of these are you taking on yourself?"), split the report: **Mine** (items you will execute, and then execute them) vs **Yours** (decisions, commits, external steps). Never answer that question with an unowned task list.
 - **No deferral framing** — never soften an item with "latent", "can wait", "if it goes live", "nice to have". Every item is either outstanding or it isn't; if it is in the Outstanding list, it is real work to be finished.
