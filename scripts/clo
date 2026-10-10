@@ -11,6 +11,9 @@ Usage:
   clo f [question]        Fast mode: no menus, launch in $DEV_ROOT/notebook with
                           Sonnet at medium effort; the question, if given, is
                           sent as the first prompt. `fclo` is the same thing.
+  clo 1|2|3|4             Fast mode with a fixed model: 1 Haiku, 2 Sonnet, 3 Opus,
+                          4 Fable. Same folder, medium effort and optional first
+                          prompt as `clo f`.
   clo --list              Print the menu entries and exit
   clo --init zsh          Print the shell function that leaves your terminal in
                           the launched folder; add to .zshrc: eval "$(clo --init zsh)"
@@ -101,12 +104,14 @@ EOF
 
 case "${1:-}" in
     -h|--help) usage; exit 0 ;;
-    f)         shift
+    f|1|2|3|4) fast_model=sonnet
+               case "$1" in 1) fast_model=haiku ;; 3) fast_model=opus ;; 4) fast_model=fable ;; esac
+               shift
                [[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT/notebook" ]] \
-                   || { print -u2 "clo f: needs DEV_ROOT with a notebook folder inside it"; exit 1; }
+                   || { print -u2 "clo: fast mode needs DEV_ROOT with a notebook folder inside it"; exit 1; }
                cd -- "$DEV_ROOT/notebook"
                [[ -n "${CLO_CD_FILE:-}" ]] && print -r -- "$PWD" > "$CLO_CD_FILE"
-               exec claude --model sonnet --effort medium "$@" ;;
+               exec claude --model "$fast_model" --effort medium "$@" ;;
     --list)    menu | cut -f2; exit 0 ;;
     --init)    [[ "${2:-}" == zsh ]] || { print -u2 "clo: --init supports zsh only"; exit 1; }
                init_zsh; exit 0 ;;
