@@ -1,5 +1,5 @@
 ---
-description: Ask the user every decision still open in this session with the AskUserQuestion tool — one self-contained question per decision, your recommendation first — instead of leaving them listed in prose or a table. Use when the user invokes /ask-open-decisions, says "ask me the questions", "ask me the open questions", "ask them via the ask user question tool", or when a long reply listed decisions the user now has to answer by hand. /outstanding runs it as its last step.
+description: Ask the user every decision still open in this session with the AskUserQuestion tool — one self-contained question per decision, your recommendation first — instead of leaving them listed in prose or a table, then ask which outstanding items to proceed with and start on them. Use when the user invokes /ask-open-decisions, says "ask me the questions", "ask me the open questions", "ask them via the ask user question tool", or when a long reply listed decisions the user now has to answer by hand. /outstanding runs it as its last step.
 argument-hint: [optional scope hint, e.g. "just the deploy ones"]
 user-invocable: true
 allowed-tools: AskUserQuestion, Bash, Read, Glob, Grep
@@ -60,16 +60,37 @@ accurate it is.
    A question the user answered with a counter-question or a note is still open: answer
    it and ask it again, rewritten with what was learned.
 
-5. **Close with a record** of what was decided: a short table, one row per decision,
-   `Decision | Chosen | What happens next`. Then carry out the chosen actions that
-   belong to this session's work. A pick is an instruction, and the user already chose.
-   Outward-facing or irreversible actions were themselves the question, so an explicit
-   pick of one is the confirmation.
+5. **Finish with the proceed question.** Answering the decisions is the last step before
+   moving forward, so the final question asks what to build next. It is asked every run,
+   including when no decision is open.
+   - **Items** are the outstanding work in this session: tasks listed as not started or
+     unfinished, and next steps already agreed. Take them in the order the session's own
+     list shows; that order is the execution order, so there is no ranking question.
+   - `multiSelect: true`. One option per item: the label names the item in full, the
+     description says the concrete action that will be taken. Items you recommend doing
+     carry `(Recommended)`, and in practice that is usually all of them. Last option:
+     `Stop here`, which does nothing.
+   - **Four options at most.** With more than three items, the first three get their own
+     option and the rest share one labelled with what it covers.
+   - **Same call as the decisions** when a slot is free (the limit is four questions). If
+     a decision's answer changes what the items are, or the slots are full, ask it as its
+     own round straight after, with no prose in between.
+   - Parked or deferred items the user already set aside are not offered again.
+
+6. **Close with a record** of what was decided: a short table, one row per decision,
+   `Decision | Chosen | What happens next`, plus a row for the items picked to proceed.
+   Then carry out the chosen actions that belong to this session's work, picked items in
+   the session's listed order, without waiting for another message. A pick is an
+   instruction, and the user already chose. Outward-facing or irreversible actions were
+   themselves the question, so an explicit pick of one is the confirmation.
 
 ## When there is nothing to ask
 
-Say so in one line: `No open decisions in this session.` Do not invent questions to
-have something to ask.
+With no open decision and no outstanding item, say so in one line:
+`No open decisions in this session.` Do not invent questions to have something to ask.
+
+With no open decision but outstanding items, there is still the proceed question. Do not
+stop at "no open decisions".
 
 ## Bearing
 
