@@ -69,7 +69,8 @@ user pastes JSON from a form opened from disk, write it to `<FORM>.answers.json`
 ## Pitfalls
 
 - **Never write CSS or script for the page.** If the layout needs something web-shared lacks, add
-  it to web-shared (`src/styles/components.css`), not to the page. The scripts page-new emits
+  it to web-shared (`src/styles/components.css`) in the standalone clone that the
+  `web_shared_root` setting names, never in a site's submodule, and not to the page. The scripts page-new emits
   itself (theme, links, contents highlight, the decision form's) are part of the tool.
 - **The column lists `<h2>` sections only**; a page whose headings are `<h3>` has no column.
 - **Links are set up by the head**: every link except an in-page `#anchor` opens in a new tab
