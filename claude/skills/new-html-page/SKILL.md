@@ -14,26 +14,49 @@ Pages are local files (see the artifacts rule): never publish to Anthropic.
 
 ## Steps
 
-1. **Pick the sections first.** The headings are the contents column, so decide them before
-   scaffolding: two to eight, each a noun phrase (`Findings`, `Open questions`). No question
-   to the user unless the content itself is undecided.
-2. **Scaffold** into the repo or folder the page belongs in (notebook pages are
+1. **Pick the mode from the content.** What the page presents decides its shape:
+
+   | Mode | When the content is |
+   |---|---|
+   | `report` | findings, a write-up (default) |
+   | `decision-brief` | a recommendation among options: verdict first |
+   | `dashboard` | numbers: headline figures, a breakdown, a table |
+   | `guide` | a procedure: steps in order, with pictures |
+   | `card-board` | items grouped by category or interval |
+   | `schedule` | events by day, filterable by track |
+   | `gallery` | images or videos to browse |
+   | `status-board` | where work stands: waiting, active, done, blocked |
+   | `link-collection` | links worth keeping, grouped |
+   | `status-grid` | where things are and how many copies or owners each has |
+   | `tool` | a calculator: inputs, live results |
+
+   Each mode has default sections; give `--section` to name your own (`schedule` and
+   `link-collection` always need them: the days, the groups).
+2. **Pick the sections.** The headings are the contents column: two to eight, each a noun
+   phrase. No question to the user unless the content itself is undecided.
+3. **Scaffold** into the repo or folder the page belongs in (notebook pages are
    `YYYY-MM-DD-slug.html`):
 
-       project-lifecycle page-new --title "<two to four words>" --section "<Heading>" … \
-         --repo <repo the page describes> --session <this session's id> --out <FILE>.html
+       project-lifecycle page-new --mode <mode> --title "<two to four words>" [--section "<Heading>" …] \
+         [--palette warm|pastel|slate|FILE] --repo <repo> --session <this session's id> --out <FILE>.html
 
-   It prints the file's absolute path and refuses to overwrite. `--layout plain` only for a
-   page with a single section or one that must be bare.
-3. **Fill the sections.** Edit the file: replace each empty `<p></p>` with the content, in
-   plain semantic HTML (headings, lists, `<table>` of three or four short columns,
-   `<blockquote>`, `<code>`). No classes of your own; web-shared styles the elements. Add
-   `<h3>` inside a section freely; the contents column lists only the `<h2>` sections.
-4. **Look at it** before saying it is done: render at about 1300 and 600 px wide
+   It prints the file's absolute path and refuses to overwrite. Two or more sections get the
+   contents column, one section is plain. `--palette` recolours: web-shared's `warm` (cream,
+   violet), `pastel` (peach, rounded type), `slate` (neutral, system type), or a file of custom
+   properties; a repo's own `page-palette.css` is used without asking. No palette is the house
+   style, and the right default.
+4. **Fill the sections.** Edit the file. The scaffold's markup names web-shared's classes and
+   its HTML comments say how to fill them: replace each placeholder, repeat the item markup
+   (a card, an event, a status row) as often as needed. Outside those, plain semantic HTML
+   (headings, lists, `<table>` of three or four short columns, `<blockquote>`, `<code>`). Any
+   page may use any mode's components (`ws-callout`, `ws-facts`, `ws-stats--tiles`, tags with
+   `data-tone="1"`…`"6"`); README of web-shared and `components.css` list them. Add `<h3>`
+   inside a section freely; the contents column lists only the `<h2>` sections.
+5. **Look at it** before saying it is done: render at about 1300 and 600 px wide
    (`"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new
    --screenshot=OUT.png --window-size=1300,900 file://FILE`, OUT in the scratchpad) and read
    the PNGs. The column sits left on wide, stacks on top when narrow.
-5. **Hand over** the absolute path on its own line. Mention once that `notes-publish` can
+6. **Hand over** the absolute path on its own line. Mention once that `notes-publish` can
    serve it, never run it unprompted.
 
 ## Decision form: asking the user on a page
@@ -71,7 +94,12 @@ user pastes JSON from a form opened from disk, write it to `<FORM>.answers.json`
 - **Never write CSS or script for the page.** If the layout needs something web-shared lacks, add
   it to web-shared (`src/styles/components.css`) in the standalone clone that the
   `web_shared_root` setting names, never in a site's submodule, and not to the page. The scripts page-new emits
-  itself (theme, links, contents highlight, the decision form's) are part of the tool.
+  itself (theme, links, contents highlight, filters, the decision form's) are part of the tool.
+  The one exception is the `tool` mode's script block, which holds the page's calculation.
+- **A value shown as data rides in a custom property** (`style="--value: 42%"` on a `.ws-bar`),
+  never a style rule.
+- **No `<aside>` in the main column**: classless.css floats it into the margin as a sidenote.
+  Use `<div class="ws-callout">`.
 - **The column lists `<h2>` sections only**; a page whose headings are `<h3>` has no column.
 - **Links are set up by the head**: every link except an in-page `#anchor` opens in a new tab
   with `rel="noopener noreferrer"`. Write plain `<a href>`; never add `target` yourself.
