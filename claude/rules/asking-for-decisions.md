@@ -22,6 +22,28 @@ has not been communicated.
 - **Put the recommended option first** and mark it `(Recommended)`.
 - **Batch related decisions** into one call rather than asking serially.
 
+## Pick the medium by the decision, not by habit
+
+**Most questions stay in AskUserQuestion.** A short choice with one line of
+substance per option reads fine in the terminal.
+
+**A decision goes to an HTML decision form when the terminal would distort it:**
+
+- **It turns on something seen** — screenshots, renders, layouts, colours, two
+  designs side by side. A described image is not the image.
+- **Its context runs past a few sentences.** The question text renders as one bold
+  block; a paragraph of findings in bold is not readable, and cutting it to fit
+  breaks "each question must stand alone".
+
+The form carries the same contract as the tool: each question self-contained,
+options explained inside the option, the recommendation first, free text for
+"other". Write it with `/new-html-page` in its decision-form mode and wait with
+`project-lifecycle decision-wait` as a background command, as that skill says;
+never ask the user to transcribe the answers.
+
+Mixed batches split: the short questions go through the tool, the visual or
+long ones through the form, in the same turn.
+
 ## When not to ask
 
 Routine judgment calls, conventional defaults, and anything answerable by reading
