@@ -1,5 +1,5 @@
 ---
-description: Start a new HTML page — a report, document, diagram wrapper or write-up — on the house style, with a sticky contents column on the left built from its section headings. Use whenever the user asks for an HTML page, report or visual output, so the left nav is there without being asked. Also the decision form — questions put to the user on a page, with screenshots and long context, answered back to the agent — for decisions AskUserQuestion would show badly.
+description: Start a new HTML page — a report, document, diagram wrapper or write-up — on the house style, with a sticky contents column on the left built from its section headings. Use whenever the agent writes anything for the user to read (a report, survey, comparison, plan or write-up), whenever the user asks for an HTML page or visual output, and to turn a skill's Markdown report into a page (--from-markdown). Also the decision form — questions put to the user on a page, with screenshots and long context, answered back to the agent — for decisions AskUserQuestion would show badly.
 argument-hint: [title] [section headings…]
 allowed-tools: Bash, Read, Write, Edit, Skill
 ---
@@ -39,6 +39,11 @@ Pages are local files (see the artifacts rule): never publish to Anthropic.
 
        project-lifecycle page-new --mode <mode> --title "<two to four words>" [--section "<Heading>" …] \
          [--palette warm|pastel|slate|FILE] --repo <repo> --session <this session's id> --out <FILE>.html
+
+   From a Markdown report (one a skill wrote, or your own draft), skip choosing sections:
+   `page-new --from-markdown <FILE>.md --mode <mode> … --out <FILE>.html` takes the title from
+   its `#` heading and the sections from its `##` headings; then finish it as in step 4 with
+   the mode's components (a verdict callout, tiles, tags) that Markdown has no syntax for.
 
    It prints the file's absolute path and refuses to overwrite. Two or more sections get the
    contents column, one section is plain. `--palette` recolours: web-shared's `warm` (cream,
