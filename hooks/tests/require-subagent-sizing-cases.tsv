@@ -1,0 +1,22 @@
+# Cases for require-subagent-sizing.sh — one per line: <verdict><TAB><tool_input JSON>
+#
+# verdict is `pass` (hook exits 0) or `block` (hook exits 2).
+
+# --- no model is the failure the hook exists for
+block	{"description":"x","prompt":"x"}
+block	{"description":"x","prompt":"x","subagent_type":"general-purpose"}
+block	{"description":"x","prompt":"x","effort":"low"}
+block	{"description":"x","prompt":"x","model":""}
+# --- haiku and sonnet need an effort
+block	{"description":"x","prompt":"x","model":"haiku"}
+block	{"description":"x","prompt":"x","model":"sonnet"}
+pass	{"description":"x","prompt":"x","model":"haiku","effort":"low"}
+pass	{"description":"x","prompt":"x","model":"sonnet","effort":"medium"}
+# --- the top row omits effort
+pass	{"description":"x","prompt":"x","model":"opus"}
+pass	{"description":"x","prompt":"x","model":"fable"}
+pass	{"description":"x","prompt":"x","model":"opus","effort":"high"}
+# --- fork ignores model and effort
+pass	{"description":"x","prompt":"x","subagent_type":"fork"}
+# --- an unknown model string is not this hook's business
+pass	{"description":"x","prompt":"x","model":"claude-opus-5-5"}
