@@ -42,6 +42,10 @@ Use the actual loaded skill directory as `<director-skill-dir>`. Resolve sibling
 The three generator skills above (`threejs-3d-generator`, `threejs-image-generator`, `threejs-audio-generator`) and `scripts/probe_asset_credentials.sh` are not installed here: they call paid external services. Treat every "external generation" step below as out of scope. Author assets procedurally or from files the user supplies, skip the credential probe, and spend nothing.
 <!-- LOCAL END -->
 
+<!-- LOCAL: threej games -->
+In the user's threej repo the repo's own CLAUDE.md governs: start a game with `./tools/threej.ts init`, not `create_threejs_game.py`; read and drive a running game through `./tools/threej.ts bridge`, take repeatable captures with `capture`, and finish with `./tools/threej.ts check`, whose size report says what the game weighs. Its services in `core/` are used, not rewritten.
+<!-- LOCAL END -->
+
 For complete games and broad upgrades, read all five production skills before implementing, plus generators whose trigger surfaces exist. Read each phase's required references at phase entry. For narrow edits, load the affected specialists and references, preserving unrelated systems. Record actual loaded resources when reporting skill use; a phase label is not a skill invocation.
 
 ## Continuity and early quality
