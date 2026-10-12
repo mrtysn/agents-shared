@@ -19,6 +19,11 @@ catches a spawn that reaches the tool another way.
 are not checked mid-run, so edits never go in the haiku row. `medium` is the model
 default on Sonnet; `high` is their level for fixing a bug in an existing codebase.
 
+An omitted `effort` resolves for the sub-agent's own model, not the parent's: an
+`opus` spawn with no effort from a Fable session at high ran at medium (verified
+2026-10-12 from the sub-agent transcript, which records model and effort per request).
+Every model is pinned to medium in settings, so "omit" means medium.
+
 Where a task could sit in two rows and its difficulty is a genuine unknown, start in
 the lower row: its report is the evidence that settles it, and you move up only if the
 report falls short. A task you can already tell is hard goes straight to the higher
