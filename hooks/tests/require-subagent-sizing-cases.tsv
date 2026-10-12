@@ -1,17 +1,24 @@
 # Cases for require-subagent-sizing.sh — one per line: <verdict><TAB><tool_input JSON>
 #
-# verdict is `pass` (hook exits 0) or `block` (hook exits 2).
+# verdict is `pass` (hook exits 0, no rewrite), `block` (hook exits 2), or
+# `effort=<level>` (hook exits 0 and its updatedInput carries that effort).
 
 # --- no model is the failure the hook exists for
 block	{"description":"x","prompt":"x"}
 block	{"description":"x","prompt":"x","subagent_type":"general-purpose"}
 block	{"description":"x","prompt":"x","effort":"low"}
 block	{"description":"x","prompt":"x","model":""}
-# --- haiku and sonnet need an effort
-block	{"description":"x","prompt":"x","model":"haiku"}
-block	{"description":"x","prompt":"x","model":"sonnet"}
+# --- the built-in Explore and Plan types inherit the session model, so they need one too
+block	{"description":"x","prompt":"x","subagent_type":"Explore"}
+block	{"description":"x","prompt":"x","subagent_type":"Plan"}
+pass	{"description":"x","prompt":"x","subagent_type":"Explore","model":"haiku","effort":"low"}
+pass	{"description":"x","prompt":"x","subagent_type":"Plan","model":"opus"}
+# --- haiku and sonnet without an effort get the rule's value filled in
+effort=low	{"description":"x","prompt":"x","model":"haiku"}
+effort=medium	{"description":"x","prompt":"x","model":"sonnet"}
 pass	{"description":"x","prompt":"x","model":"haiku","effort":"low"}
 pass	{"description":"x","prompt":"x","model":"sonnet","effort":"medium"}
+pass	{"description":"x","prompt":"x","model":"sonnet","effort":"high"}
 # --- the top row omits effort
 pass	{"description":"x","prompt":"x","model":"opus"}
 pass	{"description":"x","prompt":"x","model":"fable"}
