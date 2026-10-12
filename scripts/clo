@@ -8,16 +8,17 @@ clo — pick a folder, Claude model and effort level, then launch Claude Code.
 
 Usage:
   clo [claude args...]    Open the picker; extra args go to `claude` (e.g. clo --chrome)
-  clo f [question]        Fast mode: no menus, launch in $DEV_ROOT/notebook with
-                          Sonnet at medium effort; the question, if given, is
-                          sent as the first prompt. `fclo` is the same thing.
-  clo 1|2|3|4             Fast mode with a fixed model: 1 Haiku, 2 Sonnet, 3 Opus,
-                          4 Fable. Same folder, medium effort and optional first
-                          prompt as `clo f`.
+  clo f [--prompt text]   Fast mode: no menus, launch in $DEV_ROOT/notebook with
+                          Sonnet at medium effort; --prompt, if given, is sent
+                          as the first message. `fclo` is the same thing.
+  clo 1|2|3|4 [--prompt text]
+                          Fast mode with a fixed model: 1 Haiku, 2 Sonnet, 3 Opus,
+                          4 Fable. Same folder, medium effort and first message
+                          as `clo f`.
   clo here [1|2|3|4] [--prompt text]
                           Fast mode in the current folder instead of notebook:
                           no menus, Sonnet at medium effort unless a model
-                          number is given; --prompt is sent as the first message.
+                          number is given; --prompt works as in `clo f`.
   clo --list              Print the menu entries and exit
   clo --init zsh          Print the shell function that leaves your terminal in
                           the launched folder; add to .zshrc: eval "$(clo --init zsh)"
@@ -115,7 +116,7 @@ case "${1:-}" in
                case "$1" in 1) fast_model=haiku ;; 3) fast_model=opus ;; 4) fast_model=fable ;; esac
                shift
                first_prompt=()
-               if (( fast_here )) && [[ "${1:-}" == --prompt ]]; then
+               if [[ "${1:-}" == --prompt ]]; then
                    first_prompt=("${2:?clo: --prompt needs the first message}"); shift 2
                fi
                if (( ! fast_here )); then
