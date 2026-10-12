@@ -65,5 +65,24 @@ if [ "$asks" -gt 0 ] && ! jq -e 'select(.command != "" and .reason != "" and .at
     echo "FAIL  a log line lacks command, reason or time"
 fi
 
+# a host cleared for one session passes in that session only, and tunnels still ask
+CFG=$(mktemp -d)
+trap 'rm -f "$LOG"; rm -rf "$CFG"' EXIT
+mkdir -p "$CFG/ssh-request-guard/session-allow"
+echo deck > "$CFG/ssh-request-guard/session-allow/sess-a"
+session_case() {
+    local want=$1 sid=$2 cmd=$3 out got=pass
+    total=$((total + 1))
+    out=$(jq -n --arg c "$cmd" --arg s "$sid" '{session_id: $s, tool_input: {command: $c}}' | CLAUDE_CONFIG_DIR=$CFG "$HOOK")
+    [ -n "$out" ] && got=$(printf '%s' "$out" | jq -r '.hookSpecificOutput.permissionDecision')
+    [ "$got" = ask ] && asks=$((asks + 1))
+    if [ "$got" != "$want" ]; then fail=$((fail + 1)); printf 'FAIL  want %-4s got %-4s  [%s] %s\n' "$want" "$got" "$sid" "$cmd"; fi
+}
+session_case pass sess-a "ssh deck 'uv sync'"
+session_case pass sess-a "ssh me@deck 'curl -s example.com'"
+session_case ask  sess-b "ssh deck 'uv sync'"
+session_case ask  sess-a "ssh node01 'uv sync'"
+session_case ask  sess-a "ssh -D 1080 deck"
+
 echo "$((total - fail))/$total passed, $asks asks logged"
 [ "$fail" = 0 ]

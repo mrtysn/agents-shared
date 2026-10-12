@@ -1,0 +1,24 @@
+#!/bin/zsh
+# DESC: Clear one ssh host for one Claude session so ssh-request-guard stops asking about it
+#
+# Run by the user, never by an agent: the guard exists to put a person between an agent and a
+# remote host's IP.
+
+set -euo pipefail
+
+if [[ $# -ne 2 || $1 == -h || $1 == --help ]]; then
+    print -u2 "usage: allow-ssh-host-for-session HOST SESSION_ID
+  HOST        the name as typed after ssh, e.g. deck
+  SESSION_ID  the session's UUID (its transcript file name under ~/.claude/projects/<repo>/)
+Tunnels (-D, -L to a remote host) still ask. The clearance ends with the session."
+    exit 2
+fi
+
+host=$1
+session=$2
+[[ $session =~ '^[0-9a-f-]{36}$' ]] || { print -u2 "not a session UUID: $session"; exit 2; }
+
+dir=${CLAUDE_CONFIG_DIR:-$HOME/.claude}/ssh-request-guard/session-allow
+mkdir -p "$dir"
+grep -Fxq -- "$host" "$dir/$session" 2>/dev/null || print -r -- "$host" >> "$dir/$session"
+print "cleared $host for session $session"

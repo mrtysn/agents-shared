@@ -37,6 +37,10 @@
 # transcript to show whether the ask was approved or denied. Logging never blocks: a failed write is
 # ignored and the ask still fires. Passes are not logged.
 #
+# A host the user has cleared for one session skips the network-word and stdin-script asks (tunnels
+# still ask): its name is a line in $CLAUDE_CONFIG_DIR/ssh-request-guard/session-allow/<session id>,
+# written by scripts/allow-ssh-host-for-session, which the user runs. An agent never writes it.
+#
 # Known false positive, kept deliberately: a network word inside an argument asks too — e.g. `https`
 # in a grep pattern. Not covered: a remote script file (`ssh host ./fetch.sh`), which the hook cannot
 # read, and ssh inside a local script file (same carve-out as require-absolute-rm.sh).
@@ -72,6 +76,16 @@ ask() {
     log_ask "$1"
     jq -n --arg r "$1" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: $r}}'
     exit 0
+}
+
+SESSION_ID=$(printf '%s' "$INPUT" | jq -r '.session_id // empty')
+
+# 0 when the user cleared this host for the current session. The host is matched as typed, with any
+# user@ prefix dropped.
+host_allowed_for_session() {
+    local file=${CLAUDE_CONFIG_DIR:-$HOME/.claude}/ssh-request-guard/session-allow/$SESSION_ID
+    [ -n "$SESSION_ID" ] && [ -n "$1" ] && [ -f "$file" ] || return 1
+    grep -Fxq -- "${1##*@}" "$file"
 }
 
 NET_REASON="Whatever it fetches leaves from that host's IP, outside this machine's agent-request-limiter and uncounted, and a rate limit or ban lands on that server. To test code that makes requests: fetch once locally, save the response, and test against the saved copy. Run network code on a server only when the user asked for exactly that."
@@ -334,6 +348,8 @@ check_segment() {
             ask "This forwards a local port to $fh through ${host:-the remote host} (ssh -L). Those connections leave from that host's IP, outside this machine's agent-request-limiter. Ask the user before tunnelling through a server." ;;
         esac
     done
+
+    if host_allowed_for_session "$host"; then return 0; fi
 
     local rtext="${remote[*]}" hit
     hit=$(net_hit "$rtext")
