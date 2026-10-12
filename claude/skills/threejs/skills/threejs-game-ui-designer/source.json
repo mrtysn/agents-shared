@@ -1,0 +1,11 @@
+{
+  "repo": "majidmanzarpour/threejs-game-skills",
+  "path": "skills/threejs-game-ui-designer/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "agents/openai.yaml",
+    "references/ui-patterns.md"
+  ],
+  "commit": "8286774b22a2566bf894dbc825825c16921866af",
+  "updated": "2026-10-12"
+}

@@ -1,0 +1,8 @@
+{
+  "name": "threejs",
+  "description": "Building, polishing and shipping three.js browser games: a director that routes to gameplay, graphics, UI, debugging and QA/release skills, with a Vite + TypeScript + Playwright scaffold.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Mert Yaşin"
+  }
+}

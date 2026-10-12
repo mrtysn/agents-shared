@@ -1,0 +1,17 @@
+{
+  "repo": "majidmanzarpour/threejs-game-skills",
+  "path": "skills/threejs-game-director/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "agents/openai.yaml",
+    "references/asset-recovery.md",
+    "references/evidence-manifest.md",
+    "references/workflow-evaluations.md",
+    "scripts/check_evidence.py"
+  ],
+  "commit": "8286774b22a2566bf894dbc825825c16921866af",
+  "updated": "2026-10-12",
+  "ignore": [
+    "scripts/probe_asset_credentials.sh"
+  ]
+}

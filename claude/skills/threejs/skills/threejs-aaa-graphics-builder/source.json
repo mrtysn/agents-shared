@@ -1,0 +1,17 @@
+{
+  "repo": "majidmanzarpour/threejs-game-skills",
+  "path": "skills/threejs-aaa-graphics-builder/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "agents/openai.yaml",
+    "assets/scorecard-anchors/scene-1.jpg",
+    "assets/scorecard-anchors/scene-2.jpg",
+    "assets/scorecard-anchors/scene-3.jpg",
+    "references/authoring-recipes.md",
+    "references/shader-cookbook.md",
+    "references/technical-art.md",
+    "references/visual-scorecard.md"
+  ],
+  "commit": "8286774b22a2566bf894dbc825825c16921866af",
+  "updated": "2026-10-12"
+}

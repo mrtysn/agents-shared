@@ -1,0 +1,13 @@
+--- a/SKILL.md
++++ b/SKILL.md
+@@ -38,6 +38,10 @@
+ | Concepts, textures, skies, logos, icons, GUI art, image-to-3D inputs | `threejs-image-generator` |
+ | SFX, music, ambience, UI sounds, announcer and dialogue | `threejs-audio-generator` |
+ 
++<!-- LOCAL: the generators are not installed -->
++The three generator skills above (`threejs-3d-generator`, `threejs-image-generator`, `threejs-audio-generator`) and `scripts/probe_asset_credentials.sh` are not installed here: they call paid external services. Treat every "external generation" step below as out of scope. Author assets procedurally or from files the user supplies, skip the credential probe, and spend nothing.
++<!-- LOCAL END -->
++
+ For complete games and broad upgrades, read all five production skills before implementing, plus generators whose trigger surfaces exist. Read each phase's required references at phase entry. For narrow edits, load the affected specialists and references, preserving unrelated systems. Record actual loaded resources when reporting skill use; a phase label is not a skill invocation.
+ 
+ ## Continuity and early quality
