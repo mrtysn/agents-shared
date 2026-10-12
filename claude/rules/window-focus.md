@@ -55,6 +55,11 @@ result, not the feeling:
 - Exit 2 — the shim did not load and that window took focus. Stop; do not
   retry in a loop.
 
+`quiet-open` also moves each window to the first non-main display (the one
+without the menu bar), so it never lands where the owner is working; with one
+display nothing moves. `--screen main` keeps the app's own placement. An app's
+own `--screen`/`--position` flags are overridden, so do not pass them.
+
 Only an app `quiet-open` cannot quiet — one that needs entitlements an ad-hoc
 re-sign cannot carry (keychain, sandbox, camera) — becomes an ask: **one
 AskUserQuestion per batch, stating the process count**, before the first
