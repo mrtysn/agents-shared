@@ -14,6 +14,10 @@ Usage:
   clo 1|2|3|4             Fast mode with a fixed model: 1 Haiku, 2 Sonnet, 3 Opus,
                           4 Fable. Same folder, medium effort and optional first
                           prompt as `clo f`.
+  clo here [1|2|3|4] [question]
+                          Fast mode in the current folder instead of notebook:
+                          no menus, Sonnet at medium effort unless a model
+                          number is given.
   clo --list              Print the menu entries and exit
   clo --init zsh          Print the shell function that leaves your terminal in
                           the launched folder; add to .zshrc: eval "$(clo --init zsh)"
@@ -104,12 +108,17 @@ EOF
 
 case "${1:-}" in
     -h|--help) usage; exit 0 ;;
-    f|1|2|3|4) fast_model=sonnet
+    here|f|1|2|3|4)
+               fast_here=0
+               if [[ "$1" == here ]]; then fast_here=1; shift; [[ "${1:-}" == [1-4] ]] || set -- f "$@"; fi
+               fast_model=sonnet
                case "$1" in 1) fast_model=haiku ;; 3) fast_model=opus ;; 4) fast_model=fable ;; esac
                shift
-               [[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT/notebook" ]] \
-                   || { print -u2 "clo: fast mode needs DEV_ROOT with a notebook folder inside it"; exit 1; }
-               cd -- "$DEV_ROOT/notebook"
+               if (( ! fast_here )); then
+                   [[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT/notebook" ]] \
+                       || { print -u2 "clo: fast mode needs DEV_ROOT with a notebook folder inside it"; exit 1; }
+                   cd -- "$DEV_ROOT/notebook"
+               fi
                [[ -n "${CLO_CD_FILE:-}" ]] && print -r -- "$PWD" > "$CLO_CD_FILE"
                exec claude --model "$fast_model" --effort medium "$@" ;;
     --list)    menu | cut -f2; exit 0 ;;
