@@ -2,15 +2,22 @@
 
 **Every `Agent` call sets `model`, and `effort` for every row below except the last.**
 Omitting them runs the sub-agent at the parent's size, which spends tokens the task
-does not need. Token efficiency is a hard constraint, not a preference.
+does not need. Token efficiency is a hard constraint, not a preference. The hook
+`hooks/require-subagent-sizing.sh` refuses a call with no `model` and fills in the
+row's `effort` when it is missing; `CLAUDE_CODE_SUBAGENT_MODEL=sonnet` in settings
+catches a spawn that reaches the tool another way.
 
 ## Pick by the work
 
 | The sub-agent does | `model` | `effort` |
 |---|---|---|
-| Search or survey of more than about five tool calls, mechanical edits, formatting, a page from a finished spec | `haiku` | low |
-| Ordinary implementation, a bounded fix, a review of a diff under about 200 changed lines | `sonnet` | medium |
+| Read-only work: a search or survey of more than about five tool calls, cataloguing, a report from files already named | `haiku` | low |
+| Ordinary implementation, mechanical edits, formatting, a page from a finished spec, a review of a diff under about 200 changed lines | `sonnet` | medium; high for a bug fix or where edge cases matter |
 | Design, review of a larger change, judgment across a codebase or between options | `opus` (`fable` only for the hardest cross-codebase judgment) | omit |
+
+`low` is Anthropic's level for work a human checks step by step; a sub-agent's edits
+are not checked mid-run, so edits never go in the haiku row. `medium` is the model
+default on Sonnet; `high` is their level for fixing a bug in an existing codebase.
 
 Where a task could sit in two rows and its difficulty is a genuine unknown, start in
 the lower row: its report is the evidence that settles it, and you move up only if the
