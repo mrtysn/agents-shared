@@ -1,0 +1,10 @@
+{
+  "repo": "gamedev-skills/awesome-gamedev-agent-skills",
+  "path": "skills/web-engines/threejs-gltf-loading/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "references/loaders-and-animation.md"
+  ],
+  "commit": "0a70cfc64672d512c5b5b6006b5dcb5cf90dbdbd",
+  "updated": "2026-10-12"
+}
