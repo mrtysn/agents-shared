@@ -27,10 +27,10 @@ defaults in settings.json are untouched. The model menu opens on your last
 model, and the effort menu on the effort you last used with that model.
 "unset" passes no --effort, so Claude Code's own default applies.
 
-Launched outside $DEV_ROOT, clo first asks where to launch: $DEV_ROOT itself,
+clo first asks where to launch, from any folder: $DEV_ROOT itself,
 the current folder (shown as its path, where the cursor starts), or any folder
 local-repos-list reports, with its tags. Folders you last used Claude in come
-first, with how long ago. Inside $DEV_ROOT it launches in the current folder.
+first, with how long ago.
 
 The model menu lists the models, each starting a new session, then the
 folder's sessions from cc-statusline (the list Agent Bar Hopping shows), each
@@ -648,10 +648,7 @@ fi
 # quits from the first; Ctrl-C quits from any.
 run_set start "$PWD"
 run_set ask_folder 0
-if [[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT" ]]; then
-    dev="${DEV_ROOT:A}"
-    [[ "${PWD:A}" != "$dev" && "${PWD:A}" != "$dev"/* ]] && run_set ask_folder 1
-fi
+[[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT" ]] && run_set ask_folder 1
 if [[ "$(run_get ask_folder)" == 1 ]]; then
     run_set step folder
 else
