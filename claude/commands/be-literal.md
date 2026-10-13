@@ -1,7 +1,6 @@
 ---
-description: Take the question literally. Answer what was asked.
+description: Answer the question literally, exactly as asked. Runs only when the user asks for it by name (/be-literal) or tells the agent to answer literally; never on the agent's own initiative.
 argument-hint: [the question to re-answer]
-disable-model-invocation: true
 allowed-tools: Read, Glob, Grep
 ---
 
