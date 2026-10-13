@@ -31,4 +31,26 @@ LOG_DIR="${LOG_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/log-buried-go-ahead}"
 mkdir -p "$LOG_DIR" 2>/dev/null || exit 0
 jq -cn --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg s "$SESSION" --arg p "$PHRASE" --arg t "$TAIL" \
     '{ts: $ts, session_id: $s, phrase: $p, tail: $t}' >> "$LOG_DIR/$SESSION.jsonl" 2>/dev/null
+
+# Once REVIEW_AT_ROWS rows are logged, run the review script in the background
+# and post one notification with its verdict, then never again (.review-sent).
+# A "not enough data" verdict leaves the marker unset, so a later row retries.
+# REVIEW_SCRIPT and NOTIFY_CMD are test seams.
+SENT="$LOG_DIR/.review-sent"
+if [ ! -e "$SENT" ]; then
+    ROWS=$(cat "$LOG_DIR"/*.jsonl 2>/dev/null | wc -l | tr -d ' ')
+    if [ "${ROWS:-0}" -ge "${REVIEW_AT_ROWS:-20}" ] && mkdir "$SENT.lock" 2>/dev/null; then
+        HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+        (
+            OUT=$("${REVIEW_SCRIPT:-$HERE/../scripts/review-buried-go-ahead-log.py}" --log-dir "$LOG_DIR" 2>&1)
+            if ! printf '%s' "$OUT" | grep -q "not enough data"; then
+                RATE=$(printf '%s' "$OUT" | grep -o 'true-match rate: [0-9.]*' | head -1)
+                VERDICT=$(printf '%s' "$OUT" | grep -o 'verdict: .*' | head -1 | sed 's/ (.*//')
+                ${NOTIFY_CMD:-"$HOME/bin/notify"} go-ahead-hook 0 "Go-ahead requests buried in prose: ${RATE:-no rate}; ${VERDICT:-no verdict}" >/dev/null 2>&1
+                touch "$SENT"
+            fi
+            rmdir "$SENT.lock" 2>/dev/null
+        ) >/dev/null 2>&1 &
+    fi
+fi
 exit 0

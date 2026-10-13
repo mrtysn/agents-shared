@@ -74,7 +74,7 @@ launched from a login shell, which is not true for desktop-app launches.
 `hooks/log-buried-go-ahead.sh` was registered in `~/.claude/settings.json` (Stop) on
 2026-10-13 in log-only mode. Nothing reviews it by itself.
 
-To review: run `scripts/review-buried-go-ahead-log.py`; it does the join below and prints a verdict (20 rows minimum, 70% true matches to block). Review is due when it has 20 rows or on 2026-10-27, whichever is first. By hand: for each row in `~/.local/state/log-buried-go-ahead/*.jsonl`, find the user's next
+The hook triggers the review itself: at 20 logged rows it runs the review script in the background and posts one desktop notification with the true-match rate and verdict, then writes `.review-sent` in its log directory and stays quiet (a "not enough data" verdict retries on a later row). To review early: run `scripts/review-buried-go-ahead-log.py`; it does the join below and prints a verdict (20 rows minimum, 70% true matches to block). By hand: for each row in `~/.local/state/log-buried-go-ahead/*.jsonl`, find the user's next
 typed message in that session's transcript (`~/.claude/projects/*/<session_id>.jsonl`). A bare
 "proceed", "go", "continue" or "yes" after the row is a true match; any other reply means the
 phrase was a false match (a rhetorical question, a quoted phrase).
