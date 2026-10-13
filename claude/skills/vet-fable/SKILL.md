@@ -53,7 +53,11 @@ rides in with it.
 **A plan that exists only in chat** is saved to a file as this session's message, word
 for word. Cut whole paragraphs, never sentences, and only paragraphs that address the
 user (second person, or a decision put to them); keep every paragraph that describes the
-plan. In the brief, say how many paragraphs were cut and put each open decision as a
+plan. A recommendation on a decision ("build it together", "make it a nudge") is a
+decision put to the user: cut it. When the plan sits inside a longer message, cut the
+unrelated sections whole as well. Write nothing of this session's own into the file, not
+a framing paragraph and not the open decisions. In the brief, say how many paragraphs
+and sections were cut, counting the unrelated ones, and put each open decision as a
 neutral question ("warn when a habit is older than the logs: yes or no"). The remaining
 paragraphs were written to persuade; tell the reviewer the text is a message to the user
 so it can discount the tone.
