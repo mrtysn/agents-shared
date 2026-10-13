@@ -21,6 +21,9 @@ has not been communicated.
   follows from picking it. Not "A or B?" but one line of substance per choice.
 - **Put the recommended option first** and mark it `(Recommended)`.
 - **Batch related decisions** into one call rather than asking serially.
+- **At most four options per question.** A long list inside one question (a
+  multi-select of dozens of packages) is the thing that reads as "asked in bulk":
+  group it into categories, one question each, or move it to an HTML decision form.
 
 ## Pick the medium by the decision, not by habit
 
