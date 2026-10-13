@@ -39,6 +39,13 @@ It does **not** hold this session's conclusion, recommendation, "we decided", or
 plan is good. Where the user wants the reviewer to know what already exists, point at the
 files and let it check them itself.
 
+**Read budget.** Name the exact files and line ranges the question turns on, and leave
+out files it does not. A reviewer that reads a whole rules file or script it did not need
+adds that file to every later request. Neutral numbers this session already computed
+(a count, a size) go in with how they were derived, so the reviewer can re-check them.
+Never a summary of what a file says: that is this session's reading, and the stance
+rides in with it.
+
 **A plan that exists only in chat** is saved to a file as this session's message, word
 for word. Cut whole paragraphs, never sentences, and only paragraphs that address the
 user (second person, or a decision put to them); keep every paragraph that describes the
