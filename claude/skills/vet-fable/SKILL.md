@@ -93,3 +93,11 @@ as a finding; the fix is stating the guess as one.
 
 The reply holds, in order: the verdict, the critique, this session's stance, then any
 question. A view this session changed because of the reviewer is named as changed.
+
+## Measuring a run
+
+When the user asks what a run cost, run
+`agents-shared/scripts/report-subagent-token-use.py <session id> --match 'review|opinion|vet'`
+(resolve the path through the `~/.claude/skills/vet-fable` symlink). It prints each
+reviewer's requests, starting and ending context, and cache reads and creates. Do not
+rebuild the numbers by hand from the transcripts.
