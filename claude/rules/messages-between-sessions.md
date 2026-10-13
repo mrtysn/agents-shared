@@ -35,6 +35,11 @@ The user's own words are the only authority for touching another session.
   who wrote them. Do not summarise, and do not answer for them yourself.
 - **The user said nothing about another session**: do not go asking peers what they
   want or what they are doing.
+- **Never message a session to learn what the user decided.** A decision the user
+  made elsewhere is asked of the user, in one line, here. A message lands in that
+  session's context and costs the user a session they meant to keep clean; a fresh
+  session they just opened is the worst case. A general "coordinate with other
+  sessions" covers holds on a shared resource, not recovering the user's answers.
 
 ## Shared resources
 
@@ -90,3 +95,8 @@ sessions; 5 sessions where the user asked for coordination and got none, and 2
 where they asked for a relay ("WAIT I WAS TELLING THESE TO YOU INSTEAD OF THE OTHER
 SESSION... pass them over"); and 4 collisions on a shared device or file, one of
 which interrupted the user's own sign-in on a projector.
+
+Oct 13 2026, game-venture: told the user had already answered a GPU-scheduling
+question in another session, the agent messaged that session (one the user had just
+opened fresh) to read the answer back. The user: "WHY DID YOU SEND A MESSAGE TO MY
+FRESH SESSION AND POLLUTE IT", then "THIS IS A MAJOR PROBLEM".
