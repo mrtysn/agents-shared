@@ -8,7 +8,7 @@ set -euo pipefail
 
 if [[ $# -ne 2 || $1 == -h || $1 == --help ]]; then
     print -u2 "usage: allow-ssh-host-for-session HOST SESSION_ID
-  HOST        the name as typed after ssh, e.g. deck
+  HOST        the name as typed after ssh, e.g. deck; '*' clears every host
   SESSION_ID  the session's UUID (its transcript file name under ~/.claude/projects/<repo>/)
 Tunnels (-D, -L to a remote host) still ask. The clearance ends with the session."
     exit 2

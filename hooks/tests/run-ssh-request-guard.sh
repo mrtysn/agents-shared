@@ -70,6 +70,7 @@ CFG=$(mktemp -d)
 trap 'rm -f "$LOG"; rm -rf "$CFG"' EXIT
 mkdir -p "$CFG/ssh-request-guard/session-allow"
 echo deck > "$CFG/ssh-request-guard/session-allow/sess-a"
+echo '*' > "$CFG/ssh-request-guard/session-allow/sess-all"
 session_case() {
     local want=$1 sid=$2 cmd=$3 out got=pass
     total=$((total + 1))
@@ -83,6 +84,8 @@ session_case pass sess-a "ssh me@deck 'curl -s example.com'"
 session_case ask  sess-b "ssh deck 'uv sync'"
 session_case ask  sess-a "ssh node01 'uv sync'"
 session_case ask  sess-a "ssh -D 1080 deck"
+session_case pass sess-all "ssh node01 'uv sync'"
+session_case ask  sess-all "ssh -D 1080 node01"
 
 echo "$((total - fail))/$total passed, $asks asks logged"
 [ "$fail" = 0 ]

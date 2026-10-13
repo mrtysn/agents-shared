@@ -37,10 +37,10 @@
 # transcript to show whether the ask was approved or denied. Logging never blocks: a failed write is
 # ignored and the ask still fires. Passes are not logged.
 #
-# A host the user has cleared for one session skips the network-word and stdin-script asks (tunnels
+# A host the user has cleared for one session (or `*`, every host) skips the network-word and stdin-script asks (tunnels
 # still ask): its name is a line in $CLAUDE_CONFIG_DIR/ssh-request-guard/session-allow/<session id>,
 # written by scripts/allow-ssh-host-for-session, which the user runs, or by Agent Bar Hopping's
-# Directory menu (cc-statusline repo), which also removes the line to revoke. An agent never writes it.
+# Directory menu (cc-statusline repo), which writes `*` and removes it to revoke. An agent never writes it.
 # Each log line also carries `host` (as typed, user@ dropped) and `clearable` (false for tunnel asks,
 # which a session clearance does not cover), which Agent Bar Hopping reads to offer the clearance.
 #
@@ -85,12 +85,12 @@ ask() {
 
 SESSION_ID=$(printf '%s' "$INPUT" | jq -r '.session_id // empty')
 
-# 0 when the user cleared this host for the current session. The host is matched as typed, with any
-# user@ prefix dropped.
+# 0 when the user cleared this host for the current session, or every host with a `*` line. The host
+# is matched as typed, with any user@ prefix dropped.
 host_allowed_for_session() {
     local file=${CLAUDE_CONFIG_DIR:-$HOME/.claude}/ssh-request-guard/session-allow/$SESSION_ID
     [ -n "$SESSION_ID" ] && [ -n "$1" ] && [ -f "$file" ] || return 1
-    grep -Fxq -- "${1##*@}" "$file"
+    grep -Fxq -- '*' "$file" || grep -Fxq -- "${1##*@}" "$file"
 }
 
 # Appended to the asks the user can clear for a whole session; they run it in their own shell.
