@@ -15,14 +15,13 @@ retrying them is not the same as nudging a dropped stream.
 
 import argparse
 import datetime
-import glob
 import json
 import os
 import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
-from claude_dirs import config_dirs  # noqa: E402
+from transcript_items import items, transcripts  # noqa: E402
 
 DROPPED = re.compile(
     r"response stopped arriving|connection lost|went to sleep mid-response|"
@@ -34,23 +33,35 @@ NUDGE = re.compile(
     r"\b(continue|carry on|go on|keep going|proceed|resume|retry|try again|pick up|finish|where you left)\b|api error",
     re.I,
 )
-HOME_SLUG = os.path.expanduser("~").replace("/", "-") + "-"
 NUDGE_MAX_CHARS = 400
 
 
+def entries(path, project, session):
+    """One dict per transcript entry (line): its first item's fields plus the
+    entry's text blocks joined with a space and whether it carries a tool result."""
+    cur = None
+    for it in items(path, project, session):
+        if cur is None or it["line"] != cur["line"]:
+            if cur:
+                yield cur
+            cur = {**it, "texts": [], "has_result": False}
+        if it["group"] in ("tools", "agents") and it["label"].startswith(("TOOL-RESULT", "RESULT")):
+            cur["has_result"] = True
+        elif it["group"] in ("user", "assistant"):
+            cur["texts"].append(it["text"])
+    if cur:
+        yield cur
+
+
 def text_of(entry):
-    content = entry.get("message", {}).get("content")
-    if isinstance(content, list):
-        content = " ".join(b.get("text", "") for b in content if isinstance(b, dict))
-    return content if isinstance(content, str) else ""
+    return " ".join(entry["texts"])
 
 
 def typed_user_text(entry):
     """What the user typed, or None for tool results, injected and sidechain turns."""
-    if entry.get("type") != "user" or entry.get("isSidechain") or entry.get("isMeta"):
+    if entry["group"] != "user" or entry["label"] in ("RECAP", "USER(queued)") or entry["sidechain"] or entry["meta"]:
         return None
-    content = entry.get("message", {}).get("content")
-    if isinstance(content, list) and any(isinstance(b, dict) and b.get("type") == "tool_result" for b in content):
+    if entry["has_result"]:
         return None
     t = text_of(entry).strip()
     if not t or t.startswith(("<system-reminder", "<command-", "<local-command", "<task-notification")):
@@ -65,38 +76,33 @@ def parse_ts(s):
         return None
 
 
-def scan(path, cutoff):
+def scan(path, project, session, cutoff):
     events, pending = [], None
-    with open(path) as fh:
-        for line in fh:
-            try:
-                e = json.loads(line)
-            except ValueError:
-                continue
-            ts = parse_ts(e.get("timestamp"))
-            if e.get("isApiErrorMessage") and not e.get("isSidechain"):
-                if pending:
-                    events.append(pending)
-                pending = {
-                    "ts": e.get("timestamp"),
-                    "session": e.get("sessionId") or os.path.basename(path)[:-6],
-                    "cwd": e.get("cwd", ""),
-                    "error": text_of(e).strip()[:160],
-                    "dropped": bool(DROPPED.search(text_of(e))),
-                    "next": None,
-                    "gap_s": None,
-                }
-                pending["_t"] = ts
-                continue
+    for e in entries(path, project, session):
+        ts = parse_ts(e["time"])
+        if e["api_error"] and not e["sidechain"]:
             if pending:
-                t = typed_user_text(e)
-                if t is not None:
-                    pending["next"] = t[:300]
-                    if ts and pending["_t"]:
-                        pending["gap_s"] = int((ts - pending["_t"]).total_seconds())
-                    pending["nudge"] = len(t) <= NUDGE_MAX_CHARS and bool(NUDGE.search(t))
-                    events.append(pending)
-                    pending = None
+                events.append(pending)
+            pending = {
+                "ts": e["time"] or None,
+                "session": e["session"],
+                "cwd": e["cwd"],
+                "error": text_of(e).strip()[:160],
+                "dropped": bool(DROPPED.search(text_of(e))),
+                "next": None,
+                "gap_s": None,
+            }
+            pending["_t"] = ts
+            continue
+        if pending:
+            t = typed_user_text(e)
+            if t is not None:
+                pending["next"] = t[:300]
+                if ts and pending["_t"]:
+                    pending["gap_s"] = int((ts - pending["_t"]).total_seconds())
+                pending["nudge"] = len(t) <= NUDGE_MAX_CHARS and bool(NUDGE.search(t))
+                events.append(pending)
+                pending = None
     if pending:
         events.append(pending)
     for ev in events:
@@ -116,12 +122,10 @@ def main():
     if a.days:
         cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=a.days)
     out = []
-    for d in config_dirs():
-        for path in glob.glob(f"{d}/projects/*/*.jsonl"):
-            project = os.path.basename(os.path.dirname(path)).removeprefix(HOME_SLUG)
-            for ev in scan(path, cutoff):
-                ev["project"] = project
-                out.append(ev)
+    for path, project, session in transcripts():
+        for ev in scan(path, project, session, cutoff):
+            ev["project"] = project
+            out.append(ev)
     out.sort(key=lambda ev: ev["ts"] or "")
     if a.json:
         json.dump(out, sys.stdout, indent=1, ensure_ascii=False)
