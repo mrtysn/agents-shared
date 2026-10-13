@@ -39,6 +39,14 @@ It does **not** hold this session's conclusion, recommendation, "we decided", or
 plan is good. Where the user wants the reviewer to know what already exists, point at the
 files and let it check them itself.
 
+**A plan that exists only in chat** is saved to a file as this session's message, word
+for word. Cut whole paragraphs, never sentences, and only paragraphs that address the
+user (second person, or a decision put to them); keep every paragraph that describes the
+plan. In the brief, say how many paragraphs were cut and put each open decision as a
+neutral question ("warn when a habit is older than the logs: yes or no"). The remaining
+paragraphs were written to persuade; tell the reviewer the text is a message to the user
+so it can discount the tone.
+
 ## 3. Confront, once
 
 When the independent answer arrives, send this session's position to the same agent with
@@ -57,7 +65,12 @@ reply:
 - Where it **disagrees** with this session: state the disagreement plainly, say which
   view this session now holds and why. Never "the fable agent agrees" as a summary, and
   never a blended answer that hides the split.
-- Anything that remains a genuine fork goes to the user through `AskUserQuestion`.
+- Anything that remains a genuine fork goes to the user through `AskUserQuestion`, but
+  only after both halves above are written out in prose. The question text quotes both
+  views itself: a question that does not reads as "we agree".
 
 Say uncertainty up front. The second opinion exists because an agent presented a guess
 as a finding; the fix is stating the guess as one.
+
+The reply holds, in order: the verdict, the critique, this session's stance, then any
+question. A view this session changed because of the reviewer is named as changed.
