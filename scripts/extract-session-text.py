@@ -21,6 +21,7 @@ Example:
   extract-session-text.py edb80266-8503-443e-8398-d29d6002e446 --out session.txt
   extract-session-text.py session.jsonl --kinds user,agents --chunk-chars 60000 --out /tmp/s/chunk
   extract-session-text.py session.jsonl --grep 'rebuild' --since 2026-09-20
+  extract-session-text.py <session-id> --kinds user,assistant --around 2026-10-13T06:25 --context 6
 """
 
 import argparse
@@ -133,6 +134,9 @@ def main():
                     help="write numbered chunk files of about N characters (needs --out); entries are never split")
     ap.add_argument("--since", metavar="YYYY-MM-DD[THH:MM]", help="keep entries at or after this UTC timestamp")
     ap.add_argument("--grep", metavar="REGEX", help="keep entries whose text matches (case-insensitive)")
+    ap.add_argument("--around", metavar="YYYY-MM-DDTHH:MM[:SS]",
+                    help="keep only the entries near this UTC timestamp: --context N before and after the first entry at or after it")
+    ap.add_argument("--context", type=int, default=6, metavar="N", help="entries kept each side of --around (default 6)")
     a = ap.parse_args()
 
     want = {k.strip() for k in a.kinds.split(",") if k.strip()}
@@ -143,10 +147,15 @@ def main():
         ap.error("--chunk-chars needs --out")
     rx = re.compile(a.grep, re.I) if a.grep else None
 
+    kept = [e for e in entries(resolve(a.session), want) if e[0] in want and not is_noise(e[1], e[3])]
+    if a.around:
+        at = next((i for i, e in enumerate(kept) if e[2] and e[2] >= a.around), None)
+        if at is None:
+            ap.error(f"no entry at or after {a.around} in this session")
+        kept = kept[max(0, at - a.context):at + a.context + 1]
+
     blocks, n = [], 0
-    for group, label, ts, text in entries(resolve(a.session), want):
-        if group not in want or is_noise(label, text):
-            continue
+    for group, label, ts, text in kept:
         if a.since and ts and ts < a.since:
             continue
         if rx and not rx.search(text):
