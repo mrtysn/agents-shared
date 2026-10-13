@@ -38,7 +38,14 @@ Usage:
                                   at once, the model loads in the background (~4 s).
   system-one stop                 Stop the server and its idle watchdog, by pid file only.
   system-one status               Running or not, pid, port, device, mode, idle
-                                  timeout, shadow log line count.
+                                  timeout, shadow log line count. First line is
+                                  "disabled ..." while the switch below is off.
+  system-one disable              Turn system-one off: set SYSTEM_ONE_ENABLED=0 in the
+                                  config file (edited in place) and stop the server and
+                                  watchdog. While off, `start` refuses, `ask` fails
+                                  open, and every hook exits 0 at once.
+  system-one enable               Set SYSTEM_ONE_ENABLED=1 in the config file and start
+                                  the server.
   system-one ask [options]        POST a {"state","questions"} JSON object and print
                                   the answers JSON. Reads stdin unless --file is given.
       --file <path>               Read the request from a file instead of stdin.
@@ -92,6 +99,9 @@ Answer keys: answers.q1.noul (P(yes)), answers.q2.score (expected level index,
 0..k-1) plus .probabilities, answers.q3.choice plus .probabilities.
 
 Config file: ${CLAUDE_CONFIG_DIR:-~/.claude}/system-one.local.sh
+  SYSTEM_ONE_ENABLED       1 (default) or 0 = disabled; set by `system-one disable` /
+                           `enable`. An exported value overrides the file, and then
+                           `enable` cannot turn it on (it says so).
   SYSTEM_ONE_VENV          required for backend=laya; the uv venv holding laya-serve
   SYSTEM_ONE_PORT          default 7811
   SYSTEM_ONE_IDLE_MINUTES  default 30; the watchdog stops an idle server after this
@@ -158,7 +168,7 @@ config_file="$config_dir/system-one.local.sh"
 
 # ---- configuration ---------------------------------------------------------
 # Environment wins over the file: remember what was set, source, then restore.
-typeset -a cfg_vars=(SYSTEM_ONE_VENV SYSTEM_ONE_PORT SYSTEM_ONE_IDLE_MINUTES
+typeset -a cfg_vars=(SYSTEM_ONE_ENABLED SYSTEM_ONE_VENV SYSTEM_ONE_PORT SYSTEM_ONE_IDLE_MINUTES
     SYSTEM_ONE_MODE SYSTEM_ONE_BASH_ASK SYSTEM_ONE_STATE_DIR
     SYSTEM_ONE_BASH_ASK_FOREIGN_PROCESS SYSTEM_ONE_BASH_ASK_IRREVERSIBLE
     SYSTEM_ONE_BASH_ASK_LEAVES_MACHINE SYSTEM_ONE_BASH_ASK_NETWORK_INSTALL
@@ -179,6 +189,7 @@ for v in "${(k)env_pre[@]}"; do
     typeset -g "$v=${env_pre[$v]}"
 done
 
+SYSTEM_ONE_ENABLED="${SYSTEM_ONE_ENABLED:-1}"
 SYSTEM_ONE_PORT="${SYSTEM_ONE_PORT:-7811}"
 SYSTEM_ONE_IDLE_MINUTES="${SYSTEM_ONE_IDLE_MINUTES:-30}"
 SYSTEM_ONE_MODE="${SYSTEM_ONE_MODE:-shadow}"
@@ -276,6 +287,36 @@ migrate_shadow_layout() {
 }
 
 die() { print -u2 "system-one: $*"; exit 1; }
+
+# The on/off switch: SYSTEM_ONE_ENABLED=0 means off. Anything else, including
+# unset, is on.
+is_disabled() { [[ "$SYSTEM_ONE_ENABLED" == 0 ]]; }
+disabled_hint="disabled (system-one enable to turn it on)"
+
+# Set KEY=VALUE in the config file: the first active assignment is rewritten in
+# place (later duplicates dropped, since the last one would win when sourced),
+# otherwise the line is appended. The file is read once by awk into a temp file
+# beside it and renamed over it, never opened for writing before it is read; a
+# symlinked config is edited at its target so the link survives. Other lines,
+# comments and the file's mode are kept. A missing file is created.
+set_config_value() {
+    local key="$1" val="$2" target="${config_file:A}" tmp mode
+    mkdir -p -- "${target:h}" || die "cannot create ${target:h}"
+    tmp=$(mktemp "$target.XXXXXX") || die "cannot create a temp file beside $target"
+    if [[ -r "$target" ]]; then
+        awk -v k="$key" -v v="$val" '
+            BEGIN { done = 0; re = "^[ \t]*(export[ \t]+)?" k "=" }
+            $0 ~ re { if (!done) { print k "=" v; done = 1 } ; next }
+            { print }
+            END { if (!done) print k "=" v }
+        ' "$target" >"$tmp" || { rm -f -- "$tmp"; die "cannot rewrite $target"; }
+        mode=$(zstat +mode -- "$target" 2>/dev/null) && chmod "$(printf '%o' $(( mode & 8#7777 )))" "$tmp"
+    else
+        print -r -- "$key=$val" >"$tmp" || { rm -f -- "$tmp"; die "cannot write $target"; }
+        chmod 644 "$tmp"
+    fi
+    mv -f -- "$tmp" "$target" || { rm -f -- "$tmp"; die "cannot replace $target"; }
+}
 
 require_venv() {
     [[ "$config_present" = 1 ]] || die "not configured: copy scripts/system-one.local.sh.example to $config_file and fill it in"
@@ -427,6 +468,7 @@ os.execvp(sys.argv[1], sys.argv[1:])
 
 # ---- subcommands -----------------------------------------------------------
 cmd_start() {
+    is_disabled && die "$disabled_hint"
     case "$SYSTEM_ONE_BACKEND" in
         laya) require_venv ;;
         kev)  require_kev ;;
@@ -561,7 +603,28 @@ cmd_stop() {
     (( stopped )) || print "system-one: server was not running"
 }
 
+cmd_disable() {
+    set_config_value SYSTEM_ONE_ENABLED 0
+    SYSTEM_ONE_ENABLED=0
+    print "system-one: disabled in $config_file (SYSTEM_ONE_ENABLED=0)"
+    cmd_stop
+}
+
+cmd_enable() {
+    if [[ "${env_pre[SYSTEM_ONE_ENABLED]:-}" == 0 ]]; then
+        die "SYSTEM_ONE_ENABLED=0 is exported in the environment and overrides the config file; unset it, then run enable again"
+    fi
+    [[ -r "$config_file" ]] || die "not configured: copy scripts/system-one.local.sh.example to $config_file and fill it in"
+    set_config_value SYSTEM_ONE_ENABLED 1
+    SYSTEM_ONE_ENABLED=1
+    print "system-one: enabled in $config_file (SYSTEM_ONE_ENABLED=1)"
+    cmd_start
+}
+
 cmd_status() {
+    if is_disabled; then
+        print "disabled: SYSTEM_ONE_ENABLED=0 (system-one enable to turn it on)"
+    fi
     migrate_shadow_layout
     local h lines=0 model_desc device loaded
     if [[ "$SYSTEM_ONE_BACKEND" == kev ]]; then
@@ -637,6 +700,8 @@ cmd_ask() {
         (( fail_open )) && exit 0
         die "ask: $*"
     }
+    # Switched off: no stdin read, no curl, no shadow row.
+    is_disabled && fail "$disabled_hint"
     local req body
     if [[ -n "$file" ]]; then
         req=$(<"$file") || fail "cannot read $file"
@@ -828,6 +893,8 @@ case "$cmd" in
     _watchdog) cmd_watchdog "$@" ;;
     stop) cmd_stop "$@" ;;
     status) cmd_status "$@" ;;
+    enable) cmd_enable "$@" ;;
+    disable) cmd_disable "$@" ;;
     ask) cmd_ask "$@" ;;
     roster) cmd_roster "$@" ;;
     shadow-report) cmd_shadow_report "$@" ;;

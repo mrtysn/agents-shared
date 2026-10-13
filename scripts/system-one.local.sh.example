@@ -4,6 +4,12 @@
 # both the zsh wrapper and the bash hooks source it. An environment variable of
 # the same name overrides the value here.
 
+# The on/off switch. 1 (default) or 0 = disabled: `start` refuses, `ask` fails
+# open, `status` says "disabled" and every hook exits 0 at once. Prefer
+# `system-one disable` / `system-one enable`, which edit this line in place
+# (and stop / start the server); an exported SYSTEM_ONE_ENABLED=0 overrides it.
+#SYSTEM_ONE_ENABLED=1
+
 # Required for SYSTEM_ONE_BACKEND=laya (the default). The uv venv that holds
 # laya-serve (the design created it at ~/.local/share/system-one/venv; any
 # path works). The kev backend does not need it.
