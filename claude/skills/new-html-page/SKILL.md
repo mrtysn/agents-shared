@@ -72,8 +72,11 @@ When a decision turns on something seen, or on more context than a terminal prom
 1. **Write the spec** as JSON where the form goes (the repo the decision is about, or the
    notebook; never the scratchpad): per question an `id`, a `heading`, `context_html` with the
    facts the choice turns on, `images` (`src` relative to the form, `caption`), and `options`
-   (`id`, `label`, `consequence`, `recommended` on one). `multi`, `allow_other` and `skippable`
-   default to false, true, true. Full format: `project_lifecycle/decision.py`. Screenshots go
+   (`id`, `label`, `consequence`, `recommended` on one). **Set `multi` on every question**; the
+   scaffold refuses a question with options and no `multi`. `true` for options that can be
+   combined (several features to keep, a "both" answer would make sense), `false` only when
+   exactly one must win (a font, one layout). When unsure, ask whether the user could want two:
+   if yes, `true`. `allow_other` and `skippable` default to true. Full format: `project_lifecycle/decision.py`. Screenshots go
    in the same folder.
 2. **Scaffold**:
 
