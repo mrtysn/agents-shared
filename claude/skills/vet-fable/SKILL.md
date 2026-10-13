@@ -30,8 +30,10 @@ own position. It holds:
   to read and let the reviewer read it. A paraphrase is where this session's stance
   leaks back in.
 - **Constraints the user stated**, quoted, not restated.
-- **The task:** find what is wrong or missing first, then what holds. "Looks fine" is
-  acceptable only with what was checked named.
+- **The task:** answer the user's question, finding what is wrong or missing first, then
+  what holds. "Looks fine" is acceptable only with what was checked named. Do not name
+  this session's suspect or hypothesis ("whether X is involved"): it steers the reviewer
+  to the same place. Hypotheses go in the confront round.
 - **Review only:** no edits, no file writes. Ranked findings, about 250 words,
   conclusions not file dumps.
 
@@ -41,7 +43,9 @@ files and let it check them itself.
 
 **Read budget.** Name the exact files and line ranges the question turns on, and leave
 out files it does not. A reviewer that reads a whole rules file or script it did not need
-adds that file to every later request. Neutral numbers this session already computed
+adds that file to every later request. Any command it is told to run gets a line range
+or a size cap (`--since`, `head -n`, a result limit); an uncapped extraction of a large
+transcript is the same cost. Neutral numbers this session already computed
 (a count, a size) go in with how they were derived, so the reviewer can re-check them.
 Never a summary of what a file says: that is this session's reading, and the stance
 rides in with it.
@@ -57,7 +61,9 @@ so it can discount the tone.
 ## 3. Confront, once
 
 When the independent answer arrives, send this session's position to the same agent with
-`SendMessage` and ask for a critique of it. The agent has now given its unanchored read,
+`SendMessage` and ask for a critique of it. Mark each claim in that position as
+**checked** (and how) or **assumed**, so the reviewer spends its reads on the assumed
+ones; a claim stated from memory is assumed. The agent has now given its unanchored read,
 so the second round tests this session's view without contaminating the first. Stop there
 unless the user asks for another round: each round spends Fable quota.
 
@@ -74,7 +80,9 @@ reply:
   never a blended answer that hides the split.
 - Anything that remains a genuine fork goes to the user through `AskUserQuestion`, but
   only after both halves above are written out in prose. The question text quotes both
-  views itself: a question that does not reads as "we agree".
+  views itself: a question that does not reads as "we agree". A closing "shall I make
+  the change?" is also asked with `AskUserQuestion` after the relay, never as a sentence
+  in prose.
 
 Say uncertainty up front. The second opinion exists because an agent presented a guess
 as a finding; the fix is stating the guess as one.
