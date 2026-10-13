@@ -1,5 +1,5 @@
 ---
-description: Find out whether something the user keeps typing, or a failure they keep correcting, deserves a skill or rule. Counts the matching prompts in recent transcripts, reads their context, groups them, explains why the user does it, and gives a verdict. Use when the user says "scour my recent chats for my patterns", "how often do I ask for X", "find the times this happened", "I got tired of asking the same thing", or asks whether a repeated request should become a skill.
+description: Find out whether something the user keeps typing, or a failure they keep correcting, deserves a skill or rule (a repeated request, a repeated failure, or a tone cue such as "more than one ?"). Counts the matching prompts in recent transcripts, reads their context, groups them, explains why the user does it, and gives a verdict. Use when the user says "scour my recent chats for my patterns", "how often do I ask for X", "find the times this happened", "I got tired of asking the same thing", or asks whether a repeated request should become a skill.
 user-invocable: true
 allowed-tools: Bash, Read, Agent
 argument-hint: <the message, habit or failure to look for>
@@ -24,6 +24,10 @@ From the user's example, state in one line what is hunted:
   for the correction, then read the turn before each (`--around`, step 4).
   `scripts/find-listed-unasked-decisions.py` is the worked template for this kind:
   candidates, small-model classification in batches, aggregate.
+- **A tone cue**: a marker the user says signals a mood ("messages with more than
+  one question mark mean I was frustrated"). The marker is the whole search, so
+  the question is what share of the matches carry the mood and what provoked it.
+  Step 3 classifies tone; no keyword is ANDed in.
 
 ## 2. Search
 
@@ -54,11 +58,18 @@ back) in batches, asking each to split real instances from lookups ("find the ch
 where we set this up"), the current session's own prompts, pasted logs and test
 harnesses. Fewer matches: read them yourself. Then search once more with a looser
 pattern for phrasings of the same intent and merge. Report the corrected count with
-its session count, never the raw one.
+its session count, never the raw one: pastes and noise are subtracted before the
+number is stated.
+
+**A tone cue** is classified by the same batches, one label per prompt (for example
+frustrated, calm question, numbered reply to a list, paste). A keyword filter
+(`wtf`, `I said`, `man`) is a quick estimate with false positives and false
+negatives; say "estimate" and never call it a lower or upper bound.
 
 ## 4. Read the context
 
-For about eight instances, read what came before the prompt:
+For about eight instances, read what came before the prompt. Draw them from every
+group, at least two each, not only the group the pattern is suspected in:
 
 ```bash
 python3 "${AGENTS_SHARED}/scripts/extract-session-text.py" <session-id> \
@@ -71,10 +82,19 @@ trigger: a plan just written, an answer the user doubted, finished work, a mista
 ## 5. Group and explain
 
 - Two to four kinds, by moment or purpose, each with a count and one verbatim prompt.
-- The trend: matches per week from step 2, and the busiest days.
-- Why the user does it, in their own words where a prompt says it. Quote it.
-- Whether rules or skills already cover it: `grep` the rule names and descriptions in
-  `claude/rules/` and `claude/skills/` first.
+  Every kind gets a quote, the calm ones too; a share claimed without a quoted
+  example is unsupported.
+- The trend: matches per week from step 2 with the busiest days, and a rate per
+  active day (days with at least one prompt of any kind), since a quiet day says
+  nothing about the habit. Mark a partial week as partial. When the daily counts
+  jump around, say "spiky, no readable trend" rather than "steady" or "rising".
+- Why the user does it, in their own words where a prompt says it. Quote it, and say
+  what the quote explains (the repetition, the punctuation, the failure).
+- Whether rules, skills or memory already cover it: search the names and
+  descriptions in `claude/rules/` and `claude/skills/`, and the memory buckets
+  (`~/.claude/projects/*/memory/`, their `MEMORY.md` indexes and files). Name the file
+  you found, and check that it addresses the instance, not just a shared keyword. A
+  keyword hit in a rule that is about something else is not coverage.
 
 ## 6. Verdict
 
