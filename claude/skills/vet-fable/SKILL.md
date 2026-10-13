@@ -29,7 +29,8 @@ own position. It holds:
 - **The artifact by absolute path** — the plan, the diff, the page, the file. Say what
   to read and let the reviewer read it. A paraphrase is where this session's stance
   leaks back in.
-- **Constraints the user stated**, quoted, not restated.
+- **Constraints the user stated**, quoted, not restated: their exact words, or left out.
+  A one-line summary of several of their rules is this session's reading, not a quote.
 - **The task:** answer the user's question, finding what is wrong or missing first, then
   what holds. "Looks fine" is acceptable only with what was checked named. Do not name
   this session's suspect or hypothesis ("whether X is involved"): it steers the reviewer
