@@ -1,6 +1,6 @@
 ---
 description: Start a new macOS app on the project-lifecycle pipeline — a Swift/AppKit app on the shared MacAppBase package that already builds, self-tests and reports — then create its GitHub repo. Use when the user asks for a new Mac app, menu bar app, or a native window over a local tool.
-argument-hint: [app name] [window|menu-bar] [--login-agent]
+argument-hint: [app name] [window|menu-bar] [--login-agent] [icon]
 allowed-tools: Bash, Read, Write, Edit, AskUserQuestion, Skill
 ---
 
@@ -25,6 +25,11 @@ Ask with AskUserQuestion, in one call, only for what the user will see or type:
 3. **Keep it running from login?** — adds a login agent `install` manages. Recommend yes for a
    menu-bar app that watches something, no for a windowed tool.
 
+4. **Icon** — an SF Symbol name and a colour (`#RRGGBB`) for the app's icon, which `init` draws with
+   `make-icon`. The user sees it in the Dock and Launchpad, so offer two or three pairs that fit
+   what the app does (and differ from the colours of the apps already in `~/Applications`),
+   recommended first.
+
 Do not ask about the repo here; `/new-repo` asks its own questions.
 
 ## Steps
@@ -35,7 +40,7 @@ Do not ask about the repo here; `/new-repo` asks its own questions.
    way: stop and report, never delete.
 2. **Scaffold**:
 
-       project-lifecycle init mac-app --name "<App Name>" --shape <window|menu-bar> [--login-agent] [--tool <slug>]
+       project-lifecycle init mac-app --name "<App Name>" --shape <window|menu-bar> [--login-agent] [--tool <slug>] --icon-symbol <sf-symbol> --icon-color "#RRGGBB"
 
    Relay the files it wrote.
 3. **Prove it**: `project-lifecycle test` must pass (it compiles the app against the shared
@@ -46,7 +51,7 @@ Do not ask about the repo here; `/new-repo` asks its own questions.
    description built from the app name and shape. It handles identity, visibility, license
    and the push.
 5. **Report**: the directory (absolute path), the slug, the three files to edit next
-   (`mac/main.swift` for the app, `project-lifecycle.json` for icon and agent, `CLAUDE.md`),
+   (`mac/main.swift` for the app, `project-lifecycle.json` for the agent, `CLAUDE.md`),
    and the two commands: `project-lifecycle install`, `project-lifecycle status`.
 
 ## What the scaffold already does
@@ -57,6 +62,7 @@ Do not ask about the repo here; `/new-repo` asks its own questions.
   app grows must get a check there (the repo's `CLAUDE.md` says so).
 - `Reporter.start(tool:)` to the receiver; a menu-bar app also heartbeats. Events for failures
   are the app author's job: short stable names, nothing routine, nothing personal.
+- The icon at `assets/AppIcon.icns`, named in the manifest; `test` and `build` warn when an app has none, and a warning is a defect to fix before the repo step, not to report.
 - Local-certificate signing (`Local Dev Signing` from `~/.config/project-lifecycle/config.json`),
   so permission grants survive rebuilds.
 
