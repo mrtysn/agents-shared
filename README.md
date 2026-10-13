@@ -429,13 +429,12 @@ A disabled group costs nothing; an enabled one loads its skill descriptions like
 any other skill. Skills the machine's owner wrote stay flat under
 `claude/skills/<name>/` and keep their bare `/<name>`.
 
-`scripts/skill-tree.py` draws all of this as one page on loopback — every group
-with its skills, the description cost, and the switches: a group per scope for
-the project you pick, a skill inside a group as auto or slash-only (a fenced
-frontmatter edit in this repo, override.patch regenerated), a flat skill through
-the four `skillOverrides` states. It reaches `~/bin` as `skill-tree` through the tools repo's `links.txt`;
-`project-lifecycle -C skill-tree-app install` builds it as *Skill Tree* in `~/Applications`
-for Spotlight.
+Skill Tree draws all of this as one page, and lives in the `dev-repos-skills` repo (its `skills`
+skin): every group with its skills, the description cost, and the switches: a group per scope for
+the project you pick, a skill inside a group as auto or slash-only (a fenced frontmatter edit in
+this repo, override.patch regenerated), a flat skill through the four `skillOverrides` states.
+It finds this checkout from `$AGENTS_SHARED`, else `agents_shared` in its `config.toml`, and calls
+`scripts/usage-survey.py`, `check-skills.zsh` and `vendor-upstream-skill.py` here.
 
 Grouped skills follow the external-skill convention below, one `source.json` per
 skill under `<group>/skills/<name>/`; the sync script finds both layouts, and a
