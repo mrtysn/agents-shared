@@ -20,10 +20,10 @@ From the user's example, state in one line what is hunted:
   Counted in their prompts, steps 2-6 below.
 - **A repeated agent failure**: something an agent did that they then corrected
   ("connection dropped, I had to say continue"). The evidence is in the
-  assistant's text and the user's reaction after it. Search the user's follow-ups
-  for the correction, then read the turn before each (`--around`, step 4).
-  `scripts/find-listed-unasked-decisions.py` is the worked template for this kind:
-  candidates, small-model classification in batches, aggregate.
+  assistant's text and the user's reaction after it. Get the candidates and the
+  batch classification from the `mine-chat-logs` skill (its steps 3 and 4: rows with
+  the user's next message, small read-only agents), then read the turn before each
+  (step 4 below). `scripts/find-listed-unasked-decisions.py` is a worked example.
 - **A tone cue**: a marker the user says signals a mood ("messages with more than
   one question mark mean I was frustrated"). The marker is the whole search, so
   the question is what share of the matches carry the mood and what provoked it.
@@ -47,16 +47,17 @@ mean I was frustrated"), run it as a separate search, not ANDed with the keyword
 `--pattern '\?.*\?'`.
 
 State the window edge in the report: "transcripts begin <date>; nothing earlier is
-visible". Find the date from the oldest `.jsonl` under `~/.claude/projects/`.
+visible". Get the date from
+`python3 "$AGENTS_SHARED/scripts/extract-session-text.py" --all --window`.
 Never claim a habit is older than the logs, and never say it is new.
 
 ## 3. Clean the count
 
 Match lines are too thin to judge. For more than about 30 matches, run `--json` and
-hand the full prompts to `haiku` subagents (effort low, read-only, about 250 words
-back) in batches, asking each to split real instances from lookups ("find the chat
-where we set this up"), the current session's own prompts, pasted logs and test
-harnesses. Fewer matches: read them yourself. Then search once more with a looser
+classify the full prompts in batches as `mine-chat-logs` step 4 describes (haiku, low
+effort, read-only, a verdict file), asking each batch to split real instances from
+lookups ("find the chat where we set this up"), the current session's own prompts,
+pasted logs and test harnesses. Fewer matches: read them yourself. Then search once more with a looser
 pattern for phrasings of the same intent and merge. Report the corrected count with
 its session count, never the raw one: pastes and noise are subtracted before the
 number is stated.
@@ -69,15 +70,10 @@ negatives; say "estimate" and never call it a lower or upper bound.
 ## 4. Read the context
 
 For about eight instances, read what came before the prompt. Draw them from every
-group, at least two each, not only the group the pattern is suspected in:
-
-```bash
-python3 "${AGENTS_SHARED}/scripts/extract-session-text.py" <session-id> \
-  --kinds user,assistant --around <YYYY-MM-DDTHH:MM> --context 6
-```
-
-Use the full session id (`ls ~/.claude/projects/*/<prefix>*.jsonl`). Look for the
-trigger: a plan just written, an answer the user doubted, finished work, a mistake.
+group, at least two each, not only the group the pattern is suspected in, with
+`extract-session-text.py <session-id> --kinds user,assistant --around <time> --context 6`
+(`mine-chat-logs` step 5). Use the full session id (`ls ~/.claude/projects/*/<prefix>*.jsonl`).
+Look for the trigger: a plan just written, an answer the user doubted, finished work, a mistake.
 
 ## 5. Group and explain
 
