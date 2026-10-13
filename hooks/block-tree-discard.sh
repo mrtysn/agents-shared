@@ -5,8 +5,10 @@
 # tracked files:  git checkout -- server/src/Foo.cs
 #
 # Everything wider is blocked: whole-tree and whole-directory discards,
-# pathspec magic, globs, reset --hard, clean -f, stash drop/clear, and
-# branch switches (which can carry or clobber working-tree state).
+# pathspec magic, globs, reset --hard, clean -f, stash (push, save, bare)
+# and stash drop/clear, and branch switches (which can carry or clobber
+# working-tree state). A stash lifts other sessions' uncommitted work out of
+# a shared tree; a failed pop leaves it stranded.
 #
 # To undo an edit, rewrite the file — git is not needed for that.
 # There is deliberately no override: run these yourself in your own shell.
@@ -158,6 +160,9 @@ check_segment() {
             case "$(unquote "${rest[0]-}")" in
                 drop|clear)
                     deny "git stash $(unquote "${rest[0]}") — stashed work is unrecoverable once dropped"
+                    ;;
+                ""|push|save|-*)
+                    deny "git stash — it lifts every uncommitted change out of the tree, other sessions' included. For a clean baseline use a worktree: git worktree add <scratch dir> HEAD"
                     ;;
             esac
             ;;

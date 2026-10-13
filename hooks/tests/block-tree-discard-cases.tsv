@@ -1,0 +1,19 @@
+# Cases for block-tree-discard.sh — one per line: <verdict><TAB><command>
+#
+# verdict is `pass` (hook exits 0) or `block` (hook exits 2).
+#
+block	git stash
+block	git stash push -m baseline
+block	git stash -u
+block	git stash save wip
+block	cd /tmp && git stash
+block	git stash drop
+block	git stash clear
+pass	git stash list
+pass	git stash show -p stash@{0}
+pass	git stash apply
+block	git reset --hard
+block	git checkout .
+block	git clean -fd
+pass	git status
+pass	git diff HEAD
