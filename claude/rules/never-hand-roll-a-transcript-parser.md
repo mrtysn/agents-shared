@@ -30,8 +30,8 @@ It never blocks. The note is a reminder of this rule, not a replacement for it.
 
 ## Provenance
 
-Oct 13 2026, notebook: over 60 days, 303 Bash calls in 66 sessions parsed the
-transcripts by hand, 137 of them in the 12 sessions where the user had asked for log
-mining; 25 calls used a shared script. The user: "I keep asking agents to go over chat
+Oct 13 2026, notebook: over 60 days, 350 Bash calls in 79 sessions parsed the
+transcripts by hand, while 17 calls used a shared script
+(`scripts/count-hand-rolled-transcript-parsers.py` repeats the count). The user: "I keep asking agents to go over chat
 logs. They are all probably writing their own python parses to go over the jsonl. this
 has become WAY TOO inefficient."

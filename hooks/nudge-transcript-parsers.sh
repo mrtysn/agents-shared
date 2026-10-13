@@ -3,9 +3,10 @@
 #
 # The failure this exists to prevent: an agent asked to go over the user's chat logs writes its own jsonl
 # parser — an inline `python3 - <<EOF … json.loads …`, a `jq` over ~/.claude/projects, or a script written
-# to a file and run later. Over 60 days (to 2026-10-13) that was 303 such Bash calls in 66 sessions, plus
-# 39 Write calls, while scripts/extract-session-text.py already reads one session or all of them as text or
-# JSON rows. See claude/rules/never-hand-roll-a-transcript-parser.md and the mine-chat-logs skill.
+# to a file and run later. Over 60 days (to 2026-10-13) that was 350 such Bash calls in 79 sessions, while
+# scripts/extract-session-text.py already reads one session or all of them as text or JSON rows.
+# scripts/count-hand-rolled-transcript-parsers.py repeats the count to see whether this note changed it.
+# See claude/rules/never-hand-roll-a-transcript-parser.md and the mine-chat-logs skill.
 #
 # Never blocks and never asks. It adds one note to the model's context (hookSpecificOutput.additionalContext,
 # the only form a PreToolUse hook's text reaches the model in), and the command or write goes ahead. The note
