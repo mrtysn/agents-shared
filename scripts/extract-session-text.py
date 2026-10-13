@@ -34,6 +34,7 @@ Examples:
   extract-session-text.py session.jsonl --grep 'rebuild' --since 2026-09-20
   extract-session-text.py <session-id> --kinds user,assistant --around 2026-10-13T06:25 --context 6
   extract-session-text.py --all --days 14 --project asset-pipeline --kinds assistant,calls --json --next-user
+  extract-session-text.py --all --window
   extract-session-text.py --all --days 30 --session-mentions '"skill": ?"archify"' --kinds user --grep 'depth'
 """
 
@@ -88,6 +89,24 @@ def session_rows(path, project, session, want, a):
             and not is_noise(r["label"], r["text"])]
 
 
+FIRST_TIME = re.compile(r'"timestamp":\s*"([^"]+)"')
+
+
+def print_window(sources):
+    count, earliest, latest = 0, None, 0.0
+    for path, _, _ in sources:
+        count += 1
+        latest = max(latest, os.path.getmtime(path))
+        with open(path, encoding="utf-8") as fh:
+            for raw in fh:
+                m = FIRST_TIME.search(raw)
+                if m:
+                    earliest = min(earliest or m.group(1), m.group(1))
+                    break
+    last = datetime.datetime.fromtimestamp(latest, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M") if count else "-"
+    print(f"{count} sessions; earliest entry {earliest or '-'}; latest modified {last} (UTC)")
+
+
 def main():
     ap = argparse.ArgumentParser(
         description="Read Claude Code transcripts as ordered plain text or JSON rows.",
@@ -101,6 +120,9 @@ def main():
                     help="with --all: only sessions whose raw transcript contains REGEX anywhere, skill listings included; "
                          "use a pattern that only a real use produces, e.g. '\"skill\": ?\"archify\"'")
     ap.add_argument("--exclude-session", action="append", default=[], metavar="ID", help="with --all: leave out a session (id prefix; repeatable)")
+    ap.add_argument("--window", action="store_true",
+                    help="with --all: print how many sessions match and the earliest and latest time they cover, then stop "
+                         "(the edge to state in any report: nothing earlier is visible)")
     ap.add_argument("--subagents", action="store_true", help="include sub-agent transcripts (their rows have sidechain true)")
     ap.add_argument("--kinds", default="user,assistant,agents",
                     help=f"comma list of {','.join(KINDS)} (default: user,assistant,agents)")
@@ -131,6 +153,8 @@ def main():
         ap.error("--next-user needs --json")
     if bool(a.session) == a.all:
         ap.error("give a session, or --all")
+    if a.window and not a.all:
+        ap.error("--window needs --all")
     if a.around and a.all:
         ap.error("--around reads one session")
     if not a.all and (a.project or a.days or a.session_mentions or a.exclude_session):
@@ -146,6 +170,10 @@ def main():
     else:
         path = resolve(a.session)
         sources = [(path, path.parent.name, path.stem)]
+
+    if a.window:
+        print_window(sources)
+        return
 
     kept = []
     for path, project, session in sources:

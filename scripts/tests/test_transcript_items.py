@@ -170,6 +170,19 @@ class CliTest(unittest.TestCase):
         out = self.run_cli("--kinds", "assistant", "--json", "--subagents").stdout
         self.assertTrue(any(json.loads(line)["sidechain"] for line in out.splitlines()))
 
+    def test_window_reports_count_and_earliest_entry(self):
+        import contextlib
+        import importlib.util
+        import io
+        spec = importlib.util.spec_from_file_location("extract_under_test", EXTRACT)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        second = write_session(self.tmp.name, "-q", "s2", [user("2026-09-20T08:00:00Z", "older")])
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            mod.print_window([(self.path, "p", "s1"), (second, "q", "s2")])
+        self.assertTrue(buf.getvalue().startswith("2 sessions; earliest entry 2026-09-20T08:00:00Z;"))
+
     def test_argument_errors(self):
         self.assertNotEqual(self.run_cli("--next-user").returncode, 0)
         bare = subprocess.run([sys.executable, str(EXTRACT)], capture_output=True, text=True)
