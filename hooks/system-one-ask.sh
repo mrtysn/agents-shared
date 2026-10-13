@@ -40,6 +40,8 @@
 set -u
 
 INPUT=$(cat)
+# SYSTEM_ONE_ENABLED=0 (system-one disable): nothing below runs, no model call.
+. "$(dirname "${BASH_SOURCE[0]}")/system-one-enabled.sh" && { system_one_enabled || exit 0; }
 QUESTIONS_INPUT=$(printf '%s' "$INPUT" | jq -c '.tool_input.questions // empty | select(type == "array")' 2>/dev/null)
 [ -n "$QUESTIONS_INPUT" ] && [ "$QUESTIONS_INPUT" != "[]" ] || exit 0
 SESSION=$(printf '%s' "$INPUT" | jq -r '.session_id // ""' 2>/dev/null)

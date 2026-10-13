@@ -128,6 +128,11 @@ shells_warn_on_exit() {
 }
 trap shells_warn_on_exit EXIT
 
+# SYSTEM_ONE_ENABLED=0 (system-one disable): no classification, no outcome
+# receipt, no model call. Placed after the stale-shell warning above, which is
+# independent of system-one and still rides out through the exit trap.
+. "$(dirname "${BASH_SOURCE[0]}")/system-one-enabled.sh" && { system_one_enabled || exit 0; }
+
 TRANSCRIPT=$(printf '%s' "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)

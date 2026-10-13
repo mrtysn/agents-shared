@@ -28,6 +28,9 @@ say() {
     exit 0
 }
 
+# SYSTEM_ONE_ENABLED=0 (system-one disable): start nothing, say so.
+. "$HERE/system-one-enabled.sh" && { system_one_enabled || say "system-one: disabled"; }
+
 CONFIG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/system-one.local.sh"
 [ -r "$CONFIG" ] || say "system-one: not configured (no system-one.local.sh)"
 [ -x "$WRAPPER" ] || say "system-one: wrapper not found (scripts/system-one)"

@@ -40,6 +40,8 @@
 set -u
 
 INPUT=$(cat)
+# SYSTEM_ONE_ENABLED=0 (system-one disable): no receipt is written.
+. "$(dirname "${BASH_SOURCE[0]}")/system-one-enabled.sh" && { system_one_enabled || exit 0; }
 COMMAND=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
 [ -n "$COMMAND" ] || exit 0
 SESSION=$(printf '%s' "$INPUT" | jq -r '.session_id // ""' 2>/dev/null)
