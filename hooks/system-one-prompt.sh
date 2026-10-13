@@ -113,7 +113,8 @@ if [ -n "$SESSION" ] && [ -x "$SHELLS_LISTER" ]; then
     else
         STALE=$("$SHELLS_LISTER" --session "$SESSION" --older-than 60 2>/dev/null)
         if [ -n "$STALE" ]; then
-            STALE_N=$(printf '%s\n' "$STALE" | wc -l | tr -d ' ')
+            # Top-level lines only: the lister indents a shell's children.
+            STALE_N=$(printf '%s\n' "$STALE" | grep -c '^[^ ]')
             STALE_FIRST=$(printf '%s\n' "$STALE" | head -1 | cut -c1-120)
             SHELLS_WARN="This session has $STALE_N background shell(s) running over 60 minutes (first: $STALE_FIRST). Check whether each is still needed and stop the rest."
         fi

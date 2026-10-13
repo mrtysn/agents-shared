@@ -38,7 +38,7 @@ Compose the final handoff message from the sub-agent's structured summary. Do no
 
 Compose the handoff from this conversation.
 
-First run `list-session-background-shells.sh --session <this session's id>` (in agents-shared `scripts/`, found by resolving the `~/.claude/skills/<this skill>` symlink) (the id is the UUID in the scratchpad path). Each line it prints is a **Running** shell: stop it before handing off, or name it in the handoff (pid, command, why it lives) so the next session does not inherit it unseen. No output, nothing to add.
+First run `list-session-background-shells.sh --session <this session's id>` (in agents-shared `scripts/`, found by resolving the `~/.claude/skills/<this skill>` symlink) (the id is the UUID in the scratchpad path). Each block it prints (a shell, its children indented with their listening ports, or an `orphan`) is a **Running** process tree: stop every pid in the block before handing off, or name it in the handoff (pids, command, port, why it lives) so the next session does not inherit it unseen. No output, nothing to add.
 
 `$ARGUMENTS`, when present, governs **scope and length** — not merely emphasis:
 
