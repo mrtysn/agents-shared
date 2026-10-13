@@ -1,5 +1,5 @@
 #!/bin/zsh
-# DESC: Pick a folder, Claude model and effort from menus and launch Claude Code; model and effort open on your last pick
+# DESC: Pick a folder, Claude model and effort from menus and launch Claude Code, or launch it without menus (clo launch); model and effort open on your last pick
 set -euo pipefail
 
 usage() {
@@ -19,8 +19,18 @@ Usage:
                           Fast mode in the current folder instead of notebook:
                           no menus, Sonnet at medium effort unless a model
                           number is given; --prompt works as in `clo f`.
+  clo launch --dir D --model M [--effort E] [--prompt text] [-- claude args...]
+                          No menus, never fzf: cd to D and run claude --model M
+                          [--effort E], the first message after any extra args.
+                          D must be an existing folder and M non-empty, else exit
+                          2. Effort unset or omitted passes no --effort. Records M
+                          as your last model and E as its effort, as a menu pick
+                          does. (The fast modes above record nothing.)
   clo --list              Print the menu entries and exit
-  clo --init zsh          Print the shell function that leaves your terminal in
+  clo --menu-json         Print the model menu, your last model and each model's
+                          remembered effort as one JSON object and exit:
+                          {"models":[{"value","label"}...],"last":"","effort":{"model":"effort"}}
+  clo --init zsh         Print the shell function that leaves your terminal in
                           the launched folder; add to .zshrc: eval "$(clo --init zsh)"
   clo -h | --help         Show this help
 
@@ -89,6 +99,69 @@ menu() {
     done | sort -t$'\t' -k1,1n -s | cut -f2-
 }
 
+effort_state() { print -r -- "$state_dir/effort/${1//[^A-Za-z0-9._-]/_}"; }
+
+# Remember a pick: the last model, and the effort last used with a model. Both
+# the menus and `clo launch` record through these.
+remember_model() { mkdir -p "$state_dir"; print -r -- "$1" > "$state_dir/last"; }
+# Effort is remembered per model: medium on Opus and xhigh on Fable each stick.
+remember_effort() { mkdir -p "$state_dir/effort"; print -r -- "$2" > "$(effort_state "$1")"; }
+
+# menu_json — the model menu, the last model and each model's remembered effort
+menu_json() {
+    command -v jq >/dev/null || { print -u2 "clo: jq is not on PATH"; return 1; }
+    local last="" m
+    [[ -r "$state_dir/last" ]] && last="$(<"$state_dir/last")"
+    {
+        menu | while IFS=$'\t' read -r m _; do
+            [[ -r "$(effort_state "$m")" ]] && print -r -- "effort"$'\t'"$m"$'\t'"$(<"$(effort_state "$m")")"
+        done || true
+        menu | sed 's/^/model\t/'
+    } | jq -R -s --arg last "$last" '
+        [split("\n")[] | select(length > 0) | split("\t")] as $rows
+        | {models: [$rows[] | select(.[0] == "model") | {value: .[1], label: .[2]}],
+           last: $last,
+           effort: ([$rows[] | select(.[0] == "effort") | {key: .[1], value: .[2]}] | from_entries)}'
+}
+
+# launch_claude <dir> <model> <effort> <first message or ""> [claude args...]
+# cd to <dir> and replace this process with claude. Effort "unset" or empty passes
+# no --effort. The first message goes last, after any extra args.
+launch_claude() {
+    local dir="$1" model="$2" effort="$3" prompt="$4"; shift 4
+    local -a args=(--model "$model")
+    [[ -z "$effort" || "$effort" == unset ]] || args+=(--effort "$effort")
+    command -v claude >/dev/null || { print -u2 "clo: claude is not on PATH"; exit 1; }
+    cd -- "$dir"
+    # Tell the shell function (clo --init zsh) where to leave the terminal.
+    if [[ -n "${CLO_CD_FILE:-}" ]]; then print -r -- "$PWD" > "$CLO_CD_FILE"; fi
+    exec claude "${args[@]}" "$@" ${prompt:+"$prompt"}
+}
+
+# launch_cmd [args after "launch"] — `clo launch`: no menus, state recorded
+launch_cmd() {
+    local dir="" model="" effort="" prompt=""
+    while (( $# )); do
+        case "$1" in
+            --dir|--model|--effort|--prompt)
+                (( $# >= 2 )) || { print -u2 "clo launch: $1 needs a value (clo --help)"; exit 2; }
+                case "$1" in
+                    --dir) dir="$2" ;; --model) model="$2" ;;
+                    --effort) effort="$2" ;; --prompt) prompt="$2" ;;
+                esac
+                shift 2 ;;
+            -h|--help) usage; exit 0 ;;
+            --) shift; break ;;
+            *) print -u2 "clo launch: unknown argument $1 (extra claude args go after --; see clo --help)"; exit 2 ;;
+        esac
+    done
+    [[ -n "$dir" && -d "$dir" ]] || { print -u2 "clo launch: --dir must be an existing folder (got: ${dir:-nothing})"; exit 2; }
+    [[ -n "$model" ]] || { print -u2 "clo launch: --model is required"; exit 2; }
+    remember_model "$model"
+    [[ -z "$effort" ]] || remember_effort "$model" "$effort"
+    launch_claude "$dir" "$model" "$effort" "$prompt" "$@"
+}
+
 # A program cannot change its parent shell's folder, so the shell function
 # printed here runs clo, then cds to the folder the session was launched in.
 init_zsh() {
@@ -115,18 +188,20 @@ case "${1:-}" in
                fast_model=sonnet
                case "$1" in 1) fast_model=haiku ;; 3) fast_model=opus ;; 4) fast_model=fable ;; esac
                shift
-               first_prompt=()
+               fast_prompt=""
                if [[ "${1:-}" == --prompt ]]; then
-                   first_prompt=("${2:?clo: --prompt needs the first message}"); shift 2
+                   fast_prompt="${2:?clo: --prompt needs the first message}"; shift 2
                fi
+               fast_dir="$PWD"
                if (( ! fast_here )); then
                    [[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT/notebook" ]] \
                        || { print -u2 "clo: fast mode needs DEV_ROOT with a notebook folder inside it"; exit 1; }
-                   cd -- "$DEV_ROOT/notebook"
+                   fast_dir="$DEV_ROOT/notebook"
                fi
-               [[ -n "${CLO_CD_FILE:-}" ]] && print -r -- "$PWD" > "$CLO_CD_FILE"
-               exec claude --model "$fast_model" --effort medium "$@" "${first_prompt[@]}" ;;
+               launch_claude "$fast_dir" "$fast_model" medium "$fast_prompt" "$@" ;;
+    launch)    shift; launch_cmd "$@" ;;
     --list)    menu | cut -f2; exit 0 ;;
+    --menu-json) menu_json; exit $? ;;
     --init)    [[ "${2:-}" == zsh ]] || { print -u2 "clo: --init supports zsh only"; exit 1; }
                init_zsh; exit 0 ;;
 esac
@@ -200,8 +275,6 @@ folder_menu() {
 }
 
 effort_rows=($'unset\tunset' $'low\tlow' $'medium\tmedium' $'high\thigh' $'xhigh\txhigh' $'max\tmax')
-effort_state() { print -r -- "$state_dir/effort/${1//[^A-Za-z0-9._-]/_}"; }
-
 # session_rows <dir> — <dir>'s sessions, newest first, as rows whose value is
 # resume:<session id>. They come from the cc-statusline snapshot clo takes at
 # start ($CLO_SNAPSHOT), the same list Agent Bar Hopping shows: its topic, the
@@ -559,11 +632,10 @@ handle_next() {
                 # resume reopens a session; it is not a model to remember, and
                 # the session already has its effort.
                 if [[ "$v" == resume* ]]; then run_set done 1; print -r -- accept; return; fi
-                mkdir -p "$state_dir"; print -r -- "$v" > "$state_dir/last"
+                remember_model "$v"
                 run_set step effort ;;
         effort) run_set effort "$v"
-                # Effort is remembered per model: medium on Opus and xhigh on Fable each stick.
-                mkdir -p "$state_dir/effort"; print -r -- "$v" > "$(effort_state "$(run_get choice)")"
+                remember_effort "$(run_get choice)" "$v"
                 run_set done 1; print -r -- accept; return ;;
     esac
     show_actions
