@@ -14,7 +14,7 @@ confused replies ("what above", "I don't see anything", "show me") are found
 and paired with the assistant message that provoked them.
 
 Read-only. Streams every session transcript under each Claude config dir
-(~/.claude*, plus CLAUDE_CONFIG_DIR — see claude_dirs.config_dirs()).
+(~/.claude*, plus CLAUDE_CONFIG_DIR — see transcript_items.transcripts()).
 
 Usage:
   find-invisible-output-claims.py                  text report to stdout
@@ -27,7 +27,7 @@ Usage:
 
 import argparse
 import collections
-import glob
+import itertools
 import json
 import os
 import re
@@ -35,7 +35,7 @@ import sys
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
-from claude_dirs import config_dirs  # noqa: E402
+from transcript_items import items, transcripts  # noqa: E402
 
 # ---------------------------------------------------------------- defaults
 
@@ -95,33 +95,30 @@ def slug_name(slug):
     return base or slug
 
 
-def text_of(content):
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        return "\n".join(
-            b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text"
-        )
-    return ""
+def entries(path, project):
+    """Yield (role, timestamp, blocks) per user/assistant entry of a transcript.
+
+    transcript_items yields one item per content block; blocks of one entry
+    share a `line`, so regroup on it for the entry-level view."""
+    for _, grp in itertools.groupby(items(path, project), key=lambda b: b["line"]):
+        blocks = [b for b in grp if "entry_type" in b]  # drops recap / queued-prompt lines
+        if blocks:
+            yield blocks[0]["entry_type"], blocks[0]["time"] or None, blocks
 
 
-def tool_result_chars(content):
+def string_content(blocks):
+    """The text of a 'user' entry whose content was a plain string, else None."""
+    if blocks[0]["content_kind"] == "str":
+        return blocks[0]["text"]
+    return None
+
+
+def tool_result_chars(blocks):
     """Total text length of the tool_result blocks in a 'user' entry, or 0."""
-    if not isinstance(content, list):
-        return 0
-    total = 0
-    for b in content:
-        if not isinstance(b, dict) or b.get("type") != "tool_result":
-            continue
-        inner = b.get("content")
-        if isinstance(inner, str):
-            total += len(inner)
-        elif isinstance(inner, list):
-            total += sum(len(x.get("text", "")) for x in inner if isinstance(x, dict))
-    return total
+    return sum(len(b["text"]) for b in blocks if b["group"] in ("tools", "agents"))
 
 
-def classify_invisible_user_entry(content, tool_output_chars=0):
+def classify_invisible_user_entry(blocks, tool_output_chars=0):
     """Return a kind string if this 'user' entry is an injected message the
     user did not type and whose full content they cannot read inline, else
     None.
@@ -135,7 +132,8 @@ def classify_invisible_user_entry(content, tool_output_chars=0):
     also counts: the terminal shows a collapsed line and at most a few lines
     of a command's or a file read's output, so anything past that reaches
     only the model."""
-    if isinstance(content, str):
+    content = string_content(blocks)
+    if content is not None:
         if TASK_NOTIFICATION_RE.search(content):
             if MONITOR_TAG_RE.search(content):
                 return "task-notification (monitor)"
@@ -144,7 +142,7 @@ def classify_invisible_user_entry(content, tool_output_chars=0):
             return "task-notification (background command)"
         if AGENT_MESSAGE_RE.search(content):
             return "agent-message / SubagentHandback"
-    elif tool_output_chars > 0 and tool_result_chars(content) > tool_output_chars:
+    elif tool_output_chars > 0 and tool_result_chars(blocks) > tool_output_chars:
         return "tool output (long)"
     return None
 
@@ -168,35 +166,21 @@ def scan_transcript(path, slug, ref_re, conf_re, within_turns, since_dt, tool_ou
     all_confusion_hits = [0]  # mutable counter, boxed so the caller can read it
 
     try:
-        fh = open(path, "r", encoding="utf-8", errors="replace")
-    except OSError:
-        return ref_hits, conf_pairs, 0
-    with fh:
-        for line in fh:
-            try:
-                e = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            t = e.get("type")
-            if t not in ("user", "assistant"):
-                continue
-            ts = e.get("timestamp")
+        for role, ts, blocks in entries(path, project):
             dt = parse_ts(ts)
             if since_dt and dt and dt < since_dt:
                 continue
 
-            msg = e.get("message") or {}
-            content = msg.get("content")
-
-            if t == "user":
-                kind = classify_invisible_user_entry(content, tool_output_chars)
+            if role == "user":
+                kind = classify_invisible_user_entry(blocks, tool_output_chars)
                 if kind:
                     pending_kind = kind
                     turns_after = 0
                     continue
 
                 # typed user prompt (skip attachments / system reminders)
-                if isinstance(content, str):
+                content = string_content(blocks)
+                if content is not None:
                     stripped = content.strip()
                     if not stripped or stripped.startswith("<system-reminder>") or stripped.startswith("<local-command"):
                         continue
@@ -223,28 +207,24 @@ def scan_transcript(path, slug, ref_re, conf_re, within_turns, since_dt, tool_ou
                 continue
 
             # assistant entry
-            if not isinstance(content, list):
+            if blocks[0]["content_kind"] != "list":
                 continue
-            text_here = ""
-            for b in content:
-                if not isinstance(b, dict):
+            for b in blocks:
+                if b["group"] != "assistant":
                     continue
-                bt = b.get("type")
-                if bt == "text":
-                    txt = b.get("text") or ""
-                    if txt.strip():
-                        text_here = txt
-                        last_assistant_text = txt
-                        if pending_kind and turns_after is not None and turns_after <= within_turns:
-                            for m in ref_re.finditer(txt.lower()):
-                                turns_since_ref_hit = 0
-                                ref_hits.append({
-                                    "project": project, "ts": ts,
-                                    "phrase": m.group(0),
-                                    "assistant_excerpt": clean_excerpt(txt, 200),
-                                    "invisible_kind": pending_kind,
-                                    "turns_after": turns_after,
-                                })
+                txt = b["text"] or ""
+                if txt.strip():
+                    last_assistant_text = txt
+                    if pending_kind and turns_after is not None and turns_after <= within_turns:
+                        for m in ref_re.finditer(txt.lower()):
+                            turns_since_ref_hit = 0
+                            ref_hits.append({
+                                "project": project, "ts": ts,
+                                "phrase": m.group(0),
+                                "assistant_excerpt": clean_excerpt(txt, 200),
+                                "invisible_kind": pending_kind,
+                                "turns_after": turns_after,
+                            })
             if pending_kind is not None:
                 turns_after = (turns_after or 0) + 1
                 if turns_after > within_turns:
@@ -254,6 +234,8 @@ def scan_transcript(path, slug, ref_re, conf_re, within_turns, since_dt, tool_ou
                 turns_since_ref_hit += 1
                 if turns_since_ref_hit > within_turns:
                     turns_since_ref_hit = None
+    except OSError:
+        return ref_hits, conf_pairs, 0
 
     return ref_hits, conf_pairs, all_confusion_hits[0]
 
@@ -345,15 +327,14 @@ def main():
     all_ref_hits = []
     all_conf_pairs = []
     all_confusion_count = 0
-    for cfg in config_dirs():
-        for path in glob.glob(os.path.join(cfg, "projects", "*", "*.jsonl")):
-            slug = os.path.basename(os.path.dirname(path))
-            ref_hits, conf_pairs, confusion_count = scan_transcript(
-                path, slug, ref_re, conf_re, args.within_turns, since_dt,
-                args.tool_output_chars)
-            all_ref_hits.extend(ref_hits)
-            all_conf_pairs.extend(conf_pairs)
-            all_confusion_count += confusion_count
+    for path, _project, _session in transcripts():
+        slug = os.path.basename(os.path.dirname(path))
+        ref_hits, conf_pairs, confusion_count = scan_transcript(
+            path, slug, ref_re, conf_re, args.within_turns, since_dt,
+            args.tool_output_chars)
+        all_ref_hits.extend(ref_hits)
+        all_conf_pairs.extend(conf_pairs)
+        all_confusion_count += confusion_count
 
     all_ref_hits.sort(key=lambda h: h["ts"] or "")
     all_conf_pairs.sort(key=lambda p: p["ts"] or "")
