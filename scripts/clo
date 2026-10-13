@@ -203,6 +203,16 @@ clo() {
     [[ -n "$d" && -d "$d" && "$d" != "$PWD" ]] && cd -- "$d"
     return $rc
 }
+_clo() {
+    local -a names
+    if (( CURRENT == 2 )); then
+        names=(f here launch ${(f)"$(command clo --repo-names 2>/dev/null)"})
+        compadd -- $names 1 2 3 4
+    else
+        compadd -- 1 2 3 4 --prompt
+    fi
+}
+(( $+functions[compdef] )) && compdef _clo clo fclo
 EOF
 }
 
@@ -223,6 +233,14 @@ case "${1:-}" in
                fi
                launch_claude "$fast_dir" "$fast_model" medium "$fast_prompt" "${rest[@]}" ;;
     launch)    shift; launch_cmd "$@" ;;
+    # One name per line for tab completion: each folder's own name and, for nested
+    # ones, its path under $DEV_ROOT.
+    --repo-names) [[ -n "${DEV_ROOT:-}" ]] || exit 0
+               if command -v local-repos-list >/dev/null && command -v jq >/dev/null; then
+                   local-repos-list --root "$DEV_ROOT" --json 2>/dev/null | jq -r '.[].path' \
+                       | while IFS= read -r dir; do rel="${dir#$DEV_ROOT/}"; print -r -- "${rel:t}"; [[ "$rel" == */* ]] && print -r -- "$rel"; done | sort -u
+               fi
+               exit 0 ;;
     --list)    menu | cut -f2; exit 0 ;;
     --menu-json) menu_json; exit $? ;;
     --init)    [[ "${2:-}" == zsh ]] || { print -u2 "clo: --init supports zsh only"; exit 1; }
