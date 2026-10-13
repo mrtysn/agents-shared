@@ -34,7 +34,7 @@ Usage:
                           Launch in the folder called NAME under $DEV_ROOT, at any depth
                           local-repos-list reports (bench/GNM matches GNM or bench/GNM).
                           An exact name wins, else a unique prefix; an ambiguous or unknown
-                          NAME exits 2. With a model number it launches at once (like
+                          NAME opens the folder menu with NAME typed in (exit 2 off a terminal). With a model number it launches at once (like
                           clo here: Sonnet unless 1-4 says otherwise, medium effort); without one it opens the model menu there.
                           Examples: clo adb-reconnect | clo adb-rec 3 | clo GNM 2 --prompt "why 3?"
   clo --list              Print the menu entries and exit
@@ -247,19 +247,26 @@ if [[ -n "${1:-}" && "$1" != -* ]]; then
     matches=($exact)
     (( $#matches )) || matches=($prefix)
     if (( $#matches != 1 )); then
-        if (( $#matches )); then print -u2 "clo: \"$1\" is ambiguous:"; printf '  %s\n' "${matches[@]#$DEV_ROOT/}" >&2
-        else print -u2 "clo: no folder called \"$1\" under $DEV_ROOT (a bare first word is read as a folder name; see clo --help)"; fi
-        exit 2
+        # No single folder: on a terminal the folder menu opens with NAME typed in;
+        # anywhere else it is an error.
+        if [[ -t 0 && -t 1 ]] && command -v fzf >/dev/null; then
+            folder_query="$1"; shift
+        else
+            if (( $#matches )); then print -u2 "clo: \"$1\" is ambiguous:"; printf '  %s\n' "${matches[@]#$DEV_ROOT/}" >&2
+            else print -u2 "clo: no folder called \"$1\" under $DEV_ROOT (a bare first word is read as a folder name; see clo --help)"; fi
+            exit 2
+        fi
+    else
+        name_dir="$matches[1]"; shift
+        if [[ "${1:-}" == [1-4] ]]; then
+            name_model=sonnet
+            case "$1" in 1) name_model=haiku ;; 3) name_model=opus ;; 4) name_model=fable ;; esac
+            shift
+            split_args "$@"
+            launch_claude "$name_dir" "$name_model" medium "$prompt" "${rest[@]}"
+        fi
+        cd -- "$name_dir"
     fi
-    name_dir="$matches[1]"; shift
-    if [[ "${1:-}" == [1-4] ]]; then
-        name_model=sonnet
-        case "$1" in 1) name_model=haiku ;; 3) name_model=opus ;; 4) name_model=fable ;; esac
-        shift
-        split_args "$@"
-        launch_claude "$name_dir" "$name_model" medium "$prompt" "${rest[@]}"
-    fi
-    cd -- "$name_dir"
 fi
 
 zmodload -F zsh/stat b:zstat
@@ -796,6 +803,7 @@ if [[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT" ]]; then
     dev="${DEV_ROOT:A}"
     [[ "${PWD:A}" != "$dev"/* ]] && run_set ask_folder 1
 fi
+[[ -n "${folder_query:-}" ]] && run_set ask_folder 1
 if [[ "$(run_get ask_folder)" == 1 ]]; then
     run_set step folder
 else
@@ -803,7 +811,7 @@ else
 fi
 
 current_rows | fzf --ansi --delimiter=$'\t' --with-nth=2.. --nth=-1 --reverse --cycle --info=hidden \
-    --prompt="$(prompt_text)" --header="$(header_text)" \
+    --prompt="$(prompt_text)" --header="$(header_text)" ${folder_query:+--query="$folder_query"} \
     --bind="load:transform(${(q)self} --pos)" \
     --bind="change:transform(${(q)self} --change {q})" \
     --bind="enter:transform(${(q)self} --next {1})" \
