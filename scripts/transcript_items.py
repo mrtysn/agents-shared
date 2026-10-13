@@ -13,8 +13,15 @@ content block, in transcript order:
   input       the call's input dict, on calls and on sub-agent/question calls
 
 plus entry-level fields every item carries: session, project, time, cwd, line,
-sidechain, meta, origin, api_error. Callers apply their own predicates over those
-fields (what counts as a typed human prompt differs between scripts).
+sidechain, meta, origin, api_error, and for user/assistant entries entry_type
+("user" or "assistant") and content_kind ("str" when the message content is a
+plain string, "list" when it is a block list). Callers apply their own predicates
+over those fields (what counts as a typed human prompt differs between scripts).
+
+A user or assistant entry with no text, tool call or tool result block
+(thinking only, an image only, no content) yields one marker item, group "empty", label "EMPTY",
+text "", so a caller counting turns or delimiting them still sees the entry.
+Pass want without "empty" to leave markers out.
 
 `agents` holds sub-agent spawns, SendMessage, AskUserQuestion and their results;
 `tools` every other tool result; `calls` every other tool call.
@@ -90,6 +97,51 @@ def transcripts(project=None, days=None, mention=None, subagents=False, exclude=
                 yield path, name, session
 
 
+def blocks(d, t, c, tool_names, keep):
+    """The content blocks of one user or assistant entry as (group, label, text, extra).
+
+    text is None for a block that exists but whose group is not wanted, so the caller
+    can tell an entry with no blocks from one whose blocks were filtered out."""
+    if c is None:
+        return
+    if t == "user":
+        if isinstance(c, str):
+            label = "USER"
+            if d.get("isCompactSummary"):
+                label = "COMPACT-SUMMARY"
+            elif "<task-notification>" in c:
+                label = "NOTIFY"
+            elif d.get("isMeta"):
+                label = "META"
+            yield "user", label, c if keep("user") else None, {}
+            return
+        for x in c:
+            if x.get("type") == "text":
+                yield "user", "USER", x["text"] if keep("user") else None, {}
+            elif x.get("type") == "tool_result":
+                name = tool_names.get(x.get("tool_use_id"))
+                group = "agents" if name in AGENT_TOOLS else "tools"
+                label = ("RESULT " if group == "agents" else "TOOL-RESULT ") + (name or "?")
+                yield group, label, result_text(x) if keep(group) else None, {"tool": name, "tool_use_id": x.get("tool_use_id")}
+        return
+    for x in c:
+        if x.get("type") == "text":
+            yield "assistant", "ASSISTANT", x["text"] if keep("assistant") else None, {}
+        elif x.get("type") == "tool_use":
+            tool_names[x["id"]] = x["name"]
+            inp = x.get("input", {})
+            name = x["name"]
+            extra = {"tool": name, "tool_use_id": x["id"], "input": inp}
+            if name == "Agent":
+                yield "agents", "AGENT-SPAWN", f"{inp.get('description')}\n{inp.get('prompt', '')[:4000]}", extra
+            elif name == "SendMessage":
+                yield "agents", "SENDMSG", json.dumps(inp, ensure_ascii=False)[:3000], extra
+            elif name == "AskUserQuestion":
+                yield "agents", "ASK", json.dumps(inp, ensure_ascii=False)[:4000], extra
+            else:
+                yield "calls", "CALL " + name, call_text(inp), extra
+
+
 def items(path, project="", session=None, want=None):
     """Yield one dict per content block of a transcript, in order.
 
@@ -123,51 +175,15 @@ def items(path, project="", session=None, want=None):
             if t not in ("user", "assistant"):
                 continue
             c = (d.get("message") or {}).get("content")
-            if c is None:
-                continue
-            if t == "user":
-                if isinstance(c, str):
-                    label = "USER"
-                    if d.get("isCompactSummary"):
-                        label = "COMPACT-SUMMARY"
-                    elif "<task-notification>" in c:
-                        label = "NOTIFY"
-                    elif d.get("isMeta"):
-                        label = "META"
-                    if keep("user"):
-                        yield item("user", label, c)
-                    continue
-                for x in c:
-                    if x.get("type") == "text":
-                        if keep("user"):
-                            yield item("user", "USER", x["text"])
-                    elif x.get("type") == "tool_result":
-                        name = tool_names.get(x.get("tool_use_id"))
-                        group = "agents" if name in AGENT_TOOLS else "tools"
-                        label = ("RESULT " if group == "agents" else "TOOL-RESULT ") + (name or "?")
-                        if keep(group):
-                            yield item(group, label, result_text(x), tool=name, tool_use_id=x.get("tool_use_id"))
-            else:
-                for x in c:
-                    if x.get("type") == "text":
-                        if keep("assistant"):
-                            yield item("assistant", "ASSISTANT", x["text"])
-                    elif x.get("type") == "tool_use":
-                        tool_names[x["id"]] = x["name"]
-                        inp = x.get("input", {})
-                        name = x["name"]
-                        extra = {"tool": name, "tool_use_id": x["id"], "input": inp}
-                        if name == "Agent":
-                            if keep("agents"):
-                                yield item("agents", "AGENT-SPAWN", f"{inp.get('description')}\n{inp.get('prompt', '')[:4000]}", **extra)
-                        elif name == "SendMessage":
-                            if keep("agents"):
-                                yield item("agents", "SENDMSG", json.dumps(inp, ensure_ascii=False)[:3000], **extra)
-                        elif name == "AskUserQuestion":
-                            if keep("agents"):
-                                yield item("agents", "ASK", json.dumps(inp, ensure_ascii=False)[:4000], **extra)
-                        elif keep("calls"):
-                            yield item("calls", "CALL " + name, call_text(inp), **extra)
+            base["entry_type"] = t
+            base["content_kind"] = "str" if isinstance(c, str) else "list"
+            seen = False
+            for group, label, text, extra in blocks(d, t, c, tool_names, keep):
+                seen = True
+                if text is not None and keep(group):
+                    yield item(group, label, text, **extra)
+            if not seen and keep("empty"):
+                yield item("empty", "EMPTY", "")
 
 
 def is_typed_prompt(it):

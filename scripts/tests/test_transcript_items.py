@@ -101,6 +101,20 @@ class ItemsTest(unittest.TestCase):
         self.assertIsNone(last["next_user"])
         self.assertFalse(ti.is_typed_prompt(next(r for r in rows if r["text"].startswith("<cross-session"))))
 
+    def test_entry_facts_and_empty_markers(self):
+        entries = [
+            user("2026-10-01T10:00:00Z", "plain string"),
+            {"type": "user", "timestamp": "2026-10-01T10:00:01Z", "message": {"content": [{"type": "text", "text": "in a list"}]}},
+            assistant("2026-10-01T10:00:02Z", [{"type": "thinking", "thinking": "hmm"}]),
+            {"type": "user", "timestamp": "2026-10-01T10:00:03Z", "message": {"content": [{"type": "image", "source": {}}]}},
+        ]
+        path = write_session(self.tmp.name, "-p", "s2", entries)
+        rows = list(ti.items(str(path)))
+        self.assertEqual([(r["group"], r["entry_type"], r["content_kind"]) for r in rows], [
+            ("user", "user", "str"), ("user", "user", "list"), ("empty", "assistant", "list"), ("empty", "user", "list")])
+        self.assertEqual([r["group"] for r in ti.items(str(path), want={"user"})], ["user", "user"])
+        self.assertEqual(rows[2]["text"], "")
+
     def test_clip_input_cuts_nested_strings(self):
         out = ti.clip_input({"a": "x" * 10, "b": ["y" * 3, {"c": "z" * 10}]}, 5)
         self.assertEqual(out["a"], "xxxxx...[5 more]")
