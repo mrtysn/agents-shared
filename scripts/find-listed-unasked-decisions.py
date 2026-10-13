@@ -32,7 +32,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from claude_dirs import config_dirs  # noqa: E402
+from transcript_items import items, transcripts as transcript_files  # noqa: E402
 
 DECISION_RE = re.compile(
     r"(open (question|decision)|decision|needs? (you|your)|your call|up to you|want me to|"
@@ -48,33 +48,56 @@ ASK_RE = re.compile(
 CASE_RE = re.compile(r"======== CASE (\d+) \| (\S+) \| (\S+) \| session (\S+) \| outstanding=(\w+)")
 
 
-def text_of(content):
-    if isinstance(content, str):
-        return content
-    return "\n".join(b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text")
+RESULT_LABELS = ("RESULT ", "TOOL-RESULT ")
+QUEUE_LABELS = ("RECAP", "USER(queued)")
+OTHER_ASSISTANT_LABELS = ("AGENT-SPAWN", "SENDMSG")
+
+
+def entries(path, project):
+    """One record per user/assistant entry of a transcript, built from its items:
+    kind, time, session, sidechain, meta, origin, text (user text blocks joined
+    by newline), has_result (a tool_result block), final (last assistant text),
+    asked (an AskUserQuestion call)."""
+    cur = None
+    for it in items(path, project, want={"user", "assistant", "agents", "tools"}):
+        label = it["label"]
+        if label in QUEUE_LABELS:
+            continue
+        if cur is None or cur["line"] != it["line"]:
+            if cur:
+                yield cur
+            cur = {k: it[k] for k in ("line", "time", "session", "sidechain", "meta", "origin")}
+            cur.update(kind="assistant", texts=[], has_result=False, final=None, asked=False)
+        if label == "ASSISTANT":
+            cur["final"] = it["text"]
+        elif label == "ASK":
+            cur["asked"] = True
+        elif label in OTHER_ASSISTANT_LABELS:
+            pass
+        else:
+            cur["kind"] = "user"
+            if label.startswith(RESULT_LABELS):
+                cur["has_result"] = True
+            else:
+                cur["texts"].append(it["text"])
+    if cur:
+        yield cur
 
 
 def is_human(e):
-    if e.get("type") != "user" or e.get("isSidechain") or e.get("isMeta"):
+    if e["kind"] != "user" or e["sidechain"] or e["meta"] or e["origin"] != "human" or e["has_result"]:
         return False
-    if (e.get("origin") or {}).get("kind") != "human":
-        return False
-    content = e["message"]["content"]
-    if isinstance(content, list) and any(isinstance(b, dict) and b.get("type") == "tool_result" for b in content):
-        return False
-    return not text_of(content).startswith(("<task-notification", "<local-command", "[Request interrupted"))
+    return not "\n".join(e["texts"]).startswith(("<task-notification", "<local-command", "[Request interrupted"))
 
 
 def transcripts():
-    for cfg in config_dirs():
-        for path in sorted(glob.glob(f"{cfg}/projects/*/*.jsonl")):
-            project = os.path.basename(os.path.dirname(path))
-            project = re.sub(r"^-Users-[^-]+-dev-?", "", project) or "dev"
-            try:
-                with open(path) as f:
-                    yield project, [json.loads(line) for line in f]
-            except (OSError, json.JSONDecodeError):
-                continue
+    for path, _, _ in transcript_files():
+        project = os.path.basename(os.path.dirname(path))
+        project = re.sub(r"^-Users-[^-]+-dev-?", "", project) or "dev"
+        try:
+            yield project, list(entries(path, project))
+        except OSError:
+            continue
 
 
 def turns(entries):
@@ -84,14 +107,12 @@ def turns(entries):
         end = humans[k + 1] if k + 1 < len(humans) else len(entries)
         final, asked = None, False
         for e in entries[i + 1:end]:
-            if e.get("type") != "assistant" or e.get("isSidechain"):
+            if e["kind"] != "assistant" or e["sidechain"]:
                 continue
-            for b in e["message"].get("content", []):
-                if b.get("type") == "text":
-                    final = b["text"]
-                elif b.get("type") == "tool_use" and b["name"] == "AskUserQuestion":
-                    asked = True
-        nxt = text_of(entries[end]["message"]["content"]) if end < len(entries) else "(session ended)"
+            if e["final"] is not None:
+                final = e["final"]
+            asked = asked or e["asked"]
+        nxt = "\n".join(entries[end]["texts"]) if end < len(entries) else "(session ended)"
         yield entries[i], final, asked, nxt
 
 
@@ -101,11 +122,11 @@ def cmd_candidates(args):
         for prompt_e, final, asked, nxt in turns(entries):
             if not final or asked:
                 continue
-            prompt = text_of(prompt_e["message"]["content"])
+            prompt = "\n".join(prompt_e["texts"])
             outstanding = "<command-name>/outstanding" in prompt
             if not outstanding and not (len(final) >= args.min_chars and DECISION_RE.search(final)):
                 continue
-            cases.append((prompt_e["timestamp"], project, prompt_e["sessionId"], outstanding, prompt, final, nxt))
+            cases.append((prompt_e["time"], project, prompt_e["session"], outstanding, prompt, final, nxt))
     cases.sort()
     os.makedirs(args.out_dir, exist_ok=True)
     per = -(-len(cases) // args.batches) if cases else 0
@@ -129,11 +150,11 @@ def cmd_asks(args):
         for e in entries:
             if not is_human(e):
                 continue
-            t = text_of(e["message"]["content"])
+            t = "\n".join(e["texts"])
             if t.startswith("<") or not ASK_RE.search(t):
                 continue
             flat = re.sub(r"\s+", " ", t)
-            print(f"{e['timestamp'][:10]}  {project[:24]:24}  {flat[:160]}")
+            print(f"{e['time'][:10]}  {project[:24]:24}  {flat[:160]}")
 
 
 def cmd_aggregate(args):
