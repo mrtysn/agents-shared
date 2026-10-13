@@ -55,6 +55,9 @@ now_ms() { perl -MTime::HiRes=time -e 'printf "%d\n", time * 1000'; }
 
 STARTED=0
 STATUS=$("$WRAPPER" status)
+if [ "$(printf '%s\n' "$STATUS" | head -n 1 | cut -c1-8)" = disabled ]; then
+    echo "skipped: system-one is disabled (system-one enable, then rerun)"; exit 0
+fi
 if ! printf '%s\n' "$STATUS" | grep -q '^server: *running'; then
     "$WRAPPER" start
     STARTED=1

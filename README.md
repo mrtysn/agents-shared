@@ -151,8 +151,8 @@ probabilities, for the bounded checks the exact guards cannot enumerate. Design,
 measurements and the evaluation plan: `notebook/2026-09-24-system-one-decision-model-integration.md`.
 
 `scripts/system-one` is the wrapper (`start`, `stop`, `status`, `ask`,
-`shadow-report`, `install`; `roster` is a stub, unrelated to the two hooks
-below). It reaches `~/bin` through the tools repo's `links.txt`. Copy
+`enable`, `disable`, `shadow-report`, `install`; `roster` is a stub, unrelated
+to the two hooks below). It reaches `~/bin` through the tools repo's `links.txt`. Copy
 `scripts/system-one.local.sh.example` to `${CLAUDE_CONFIG_DIR:-~/.claude}/system-one.local.sh`
 and set `SYSTEM_ONE_VENV`; the port (7811), idle exit (30 min) and mode have
 defaults there, and the Bash hook's thresholds live in the questions file with
@@ -189,6 +189,23 @@ before launching anything (a checkpoint directory must hold
 a Hub id must be `owner/name[@rev]`) and sets `HF_HUB_OFFLINE=1` on every
 shape, so a start never downloads a model. Switching backends is `stop` then
 `start`: `start` leaves a running server of another shape alone and says so.
+
+**Switching it off.** `SYSTEM_ONE_ENABLED` (default `1`; `0` = disabled) is the
+on/off switch. `system-one disable` sets `SYSTEM_ONE_ENABLED=0` in the config
+file in place (the line is rewritten or appended; the other lines, the file's
+mode and a symlink are kept) and stops the server and watchdog; `system-one
+enable` sets it to `1` and starts the server. While it is `0`, `start` refuses
+with `system-one: disabled (system-one enable to turn it on)`, `ask` fails open
+(prints nothing and exits 0 with `--fail-open`, a one-line error otherwise),
+`status` prints a first line beginning `disabled`, and every hook exits 0 at
+once with no model call and no shadow-log or receipt write; the SessionStart
+hook reports `system-one: disabled` instead of starting. An exported
+`SYSTEM_ONE_ENABLED` overrides the file like every other key, so
+`enable` refuses while `SYSTEM_ONE_ENABLED=0` is exported. The prompt hook's
+stale-background-shell warning does not depend on system-one and still runs.
+The hooks read the switch through `hooks/system-one-enabled.sh`, which they
+source. `hooks/tests/run-system-one-disabled.sh` covers it with no server; the
+runners that need a live model skip themselves while it is off.
 
 - `system-one-start.sh` runs `system-one start` at SessionStart (it returns at
   once; the server takes about 4 s to load and is warm by the first Bash call).
