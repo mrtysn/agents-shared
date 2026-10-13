@@ -64,7 +64,7 @@ accurate it is.
    moving forward, so the final question asks what to build next. It is asked every run,
    including when no decision is open.
    - **Items** are the outstanding work in this session: tasks listed as not started or
-     unfinished, and next steps already agreed. Take them in the order the session's own
+     unfinished, and next steps already agreed, and Blocked or Yours items. A Yours item's option is "Walk me through it" (the steps written out) or, where an agent path exists, "Do it yourself". Take them in the order the session's own
      list shows; that order is the execution order, so there is no ranking question.
    - `multiSelect: true`. One option per item: the label names the item in full, the
      description says the concrete action that will be taken. Items you recommend doing
@@ -86,7 +86,7 @@ accurate it is.
 
 ## When there is nothing to ask
 
-With no open decision and no outstanding item, say so in one line:
+With no open decision and no outstanding item of any owner, say so in one line:
 `No open decisions in this session.` Do not invent questions to have something to ask.
 
 With no open decision but outstanding items, there is still the proceed question. Do not

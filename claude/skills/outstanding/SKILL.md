@@ -100,9 +100,9 @@ Layout, exactly:
 
 Rules for the items:
 - **Item** — name it as the user named it. No embellishment.
-- **State** — exactly one of: Blocked, Uncommitted, Partial, Running, Not started. Never Deferred: deferred items belong to Set aside.
-- **Next step** — one concrete, actionable move, anchored to where the work lives: a `file.cs:line`, a branch name, or the exact command. Not "finish it" — the actual edit or invocation. For a Blocked item, name the exact decision or answer you need.
-- Order by what the user should see first: Blocked (needs them), then Uncommitted (cheapest to close), Partial, Running, Not started.
+- **State** — exactly one of: Blocked, Yours, Uncommitted, Partial, Running, Not started. `Yours` is a step only the user can perform (a physical button, a login, a click in an app). Never Deferred: deferred items belong to Set aside.
+- **Next step** — one concrete, actionable move, anchored to where the work lives: a `file.cs:line`, a branch name, or the exact command. Not "finish it" — the actual edit or invocation. For a Blocked item, name the exact decision or answer you need. For a `Yours` item, the next step is the numbered steps the user performs: the app, the screen, the control, what they should see, and how to undo it. First check that an agent cannot do the step itself (a self-test, a CLI, ssh); if it can, the item is Not started, not Yours.
+- Order by what the user should see first: Blocked (needs them), then Yours, then Uncommitted (cheapest to close), Partial, Running, Not started.
 - **Self-contained** — no session-local shorthand: no "option B", "the fix", bare codes, or truncated links. Full repo-relative paths, full URLs, and enough words that each row reads cold, weeks later, without this conversation open.
 - **Ownership** — if the user asks who does what ("which of these are you taking on yourself?"), split the report: **Mine** (items you will execute, and then execute them) vs **Yours** (decisions, commits, external steps). Never answer that question with an unowned task list.
 - **No deferral framing** — never soften an item with "latent", "can wait", "if it goes live", "nice to have". Every item is either outstanding or it isn't; if it is in the Outstanding list, it is real work to be finished.
