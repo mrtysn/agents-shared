@@ -162,7 +162,11 @@ https://raw.githubusercontent.com/Panniantong/agent-reach/main/docs/install.md
 - **No cookies, ever.** The X/Reddit/Instagram/Facebook cookie channels stay dormant — no real
   accounts, no burners. Do not run `agent-reach configure *-cookies` or `--from-browser`.
   X content is read through the user's own browser sessions (claude-in-chrome), Instagram via
-  its data export.
+  its data export. That names the route, not a permission: a read in the user's logged-in
+  browser needs their go-ahead for that batch first (per no-unprompted-account-traffic), and
+  stating a page count while starting the read is not asking. Post text and media of a public
+  X post come keyless from `api.fxtwitter.com/<handle>/status/<id>` and yt-dlp; replies do not,
+  and come from a link-keeper capture the user makes or fetch-anything's `x-replies` record.
 - Keyless channels (YouTube, RSS, GitHub, web via Jina, Bilibili search) are the whole intended
   surface. Anonymous Jina is blocked from the usual VPN egress (AS9009); don't retry it in a loop.
 - Skip the "tell the user to update" nudge in the rules above.
