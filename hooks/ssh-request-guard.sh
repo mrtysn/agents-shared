@@ -88,6 +88,12 @@ host_allowed_for_session() {
     grep -Fxq -- "${1##*@}" "$file"
 }
 
+# Appended to the asks the user can clear for a whole session; they run it in their own shell.
+clear_hint() {
+    [ -n "$SESSION_ID" ] && [ -n "$1" ] || return 0
+    printf ' To stop these asks for this host in this session, the user runs: allow-ssh-host-for-session %s %s' "${1##*@}" "$SESSION_ID"
+}
+
 NET_REASON="Whatever it fetches leaves from that host's IP, outside this machine's agent-request-limiter and uncounted, and a rate limit or ban lands on that server. To test code that makes requests: fetch once locally, save the response, and test against the saved copy. Run network code on a server only when the user asked for exactly that."
 
 # The first network-capable word in a text, or nothing.
@@ -356,7 +362,7 @@ check_segment() {
     if [ -n "$hit" ] && [ $stdin_file = 0 ] && [ "$sep" != "|" ] && safe_remote "$heredoc" "$rtext"; then
         hit=""                                     # inspection inside a container, read in full
     fi
-    [ -n "$hit" ] && ask "This runs '$hit' on ${host:-a remote host} over ssh. $NET_REASON"
+    [ -n "$hit" ] && ask "This runs '$hit' on ${host:-a remote host} over ssh. $NET_REASON$(clear_hint "$host")"
 
     # a remote shell with no -c reads its script from stdin. ssh joins its arguments with spaces and the
     # remote shell splits them again, so 'bash -s' as one argument is still bash with -s.
@@ -373,7 +379,7 @@ check_segment() {
     if [ $bare = 1 ]; then
         if [ $heredoc = 1 ] && [ -n "$BODY" ]; then
             hit=$(net_hit "$BODY")
-            [ -n "$hit" ] && ask "This feeds ${host:-a remote host} a script over ssh that runs '$hit'. $NET_REASON"
+            [ -n "$hit" ] && ask "This feeds ${host:-a remote host} a script over ssh that runs '$hit'. $NET_REASON$(clear_hint "$host")"
         elif [ $stdin_file = 1 ] || [ "$sep" = "|" ]; then
             ask "This feeds a shell on ${host:-a remote host} a script through stdin, which this hook cannot read. If that script makes requests, they leave from that host's IP, outside this machine's agent-request-limiter. Check what it runs before approving."
         fi
