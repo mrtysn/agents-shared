@@ -39,7 +39,10 @@
 #
 # A host the user has cleared for one session skips the network-word and stdin-script asks (tunnels
 # still ask): its name is a line in $CLAUDE_CONFIG_DIR/ssh-request-guard/session-allow/<session id>,
-# written by scripts/allow-ssh-host-for-session, which the user runs. An agent never writes it.
+# written by scripts/allow-ssh-host-for-session, which the user runs, or by Agent Bar Hopping's
+# Directory menu (cc-statusline repo), which also removes the line to revoke. An agent never writes it.
+# Each log line also carries `host` (as typed, user@ dropped) and `clearable` (false for tunnel asks,
+# which a session clearance does not cover), which Agent Bar Hopping reads to offer the clearance.
 #
 # Known false positive, kept deliberately: a network word inside an argument asks too — e.g. `https`
 # in a grep pattern. Not covered: a remote script file (`ssh host ./fetch.sh`), which the hook cannot
@@ -67,13 +70,15 @@ log_ask() {
     {
         mkdir -p "$(dirname "$file")" &&
         printf '%s' "$INPUT" | jq -c --arg r "$1" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg h "${ASK_HOST:-}" --arg c "${2:-clearable}" \
             '{at: $at, session: (.session_id // ""), cwd: (.cwd // ""), transcript: (.transcript_path // ""),
-              tool_use_id: (.tool_use_id // ""), command: (.tool_input.command // ""), reason: $r}' >> "$file"
+              tool_use_id: (.tool_use_id // ""), command: (.tool_input.command // ""), reason: $r,
+              host: $h, clearable: ($c == "clearable")}' >> "$file"
     } 2>/dev/null || true
 }
 
 ask() {
-    log_ask "$1"
+    log_ask "$1" "${2:-clearable}"
     jq -n --arg r "$1" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: $r}}'
     exit 0
 }
@@ -344,14 +349,15 @@ check_segment() {
         i=$((i + 1))
     done
 
+    ASK_HOST=${host##*@}
     if [ $dyn = 1 ]; then
-        ask "This opens a SOCKS tunnel through ${host:-the remote host} (ssh -D / DynamicForward). Anything sent through it leaves from that host's IP, outside this machine's agent-request-limiter. Ask the user before tunnelling through a server."
+        ask "This opens a SOCKS tunnel through ${host:-the remote host} (ssh -D / DynamicForward). Anything sent through it leaves from that host's IP, outside this machine's agent-request-limiter. Ask the user before tunnelling through a server." tunnel
     fi
     local f fh
     for f in "${fwd[@]}"; do
         fh=$(printf '%s' "$f" | awk -F: '{ if (NF >= 3) print $(NF-1) }' | tr -d '[]')
         case "$fh" in ""|localhost|127.0.0.1|::1) ;; *)
-            ask "This forwards a local port to $fh through ${host:-the remote host} (ssh -L). Those connections leave from that host's IP, outside this machine's agent-request-limiter. Ask the user before tunnelling through a server." ;;
+            ask "This forwards a local port to $fh through ${host:-the remote host} (ssh -L). Those connections leave from that host's IP, outside this machine's agent-request-limiter. Ask the user before tunnelling through a server." tunnel ;;
         esac
     done
 
