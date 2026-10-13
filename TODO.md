@@ -68,3 +68,20 @@ single shared value, so it cannot differ where the repo differs — the problem 
 was meant to solve. In `.zshrc.base` with a `.zshrc.c02` override it would
 travel correctly, but hook resolution would then depend on the CLI having been
 launched from a login shell, which is not true for desktop-app launches.
+
+## Review the log-only go-ahead hook, then decide whether it blocks
+
+`hooks/log-buried-go-ahead.sh` was registered in `~/.claude/settings.json` (Stop) on
+2026-10-13 in log-only mode. Nothing reviews it by itself.
+
+To review: for each row in `~/.local/state/log-buried-go-ahead/*.jsonl`, find the user's next
+typed message in that session's transcript (`~/.claude/projects/*/<session_id>.jsonl`). A bare
+"proceed", "go", "continue" or "yes" after the row is a true match; any other reply means the
+phrase was a false match (a rhetorical question, a quoted phrase).
+
+Decide from the rates: if most rows are true matches, change the hook to return
+`{"decision": "block", "reason": "..."}` telling the agent to ask with AskUserQuestion
+(`stop_hook_active` guards against a loop). If many are false matches, tighten the pattern
+first. Origin: 14 of 144 continue-style nudges (2026-09-14 to 2026-10-13) followed
+"say the word and I'll build it"; see
+`/Users/mrtysn/dev/notebook/2026-10-13-claude-code-friction-proposal-v2.html`.
