@@ -9,7 +9,9 @@ clo — pick a folder, Claude model and effort level, then launch Claude Code.
 Usage:
   clo [--prompt text] [claude args...]
                           Open the picker; extra flags go to `claude` (e.g. clo --chrome);
-                          --prompt, if given first, is sent as the first message.
+                          --prompt, anywhere among them, is sent as the first message.
+                          A first message is only ever given with --prompt; a bare word
+                          among the arguments exits 2.
   clo f [--prompt text]   Fast mode: no menus, launch in $DEV_ROOT/notebook with
                           Sonnet at medium effort; --prompt, if given, is sent
                           as the first message. `fclo` is the same thing.
@@ -132,6 +134,21 @@ menu_json() {
            effort: ([$rows[] | select(.[0] == "effort") | {key: .[1], value: .[2]}] | from_entries)}'
 }
 
+# split_args [args...] — sets $prompt to the value of --prompt (anywhere among the
+# arguments) and $rest to the other arguments. The first message is only ever sent
+# through --prompt, so a bare word among the rest is a mistake (a mistyped mode or
+# folder name) and exits 2.
+split_args() {
+    prompt="" rest=()
+    while (( $# )); do
+        case "$1" in
+            --prompt) prompt="${2:?clo: --prompt needs the first message}"; shift 2 ;;
+            -*)       rest+=("$1"); shift ;;
+            *)        print -u2 "clo: \"$1\" is not a flag; send a first message with --prompt \"text\" (clo --help)"; exit 2 ;;
+        esac
+    done
+}
+
 # launch_claude <dir> <model> <effort> <first message or ""> [claude args...]
 # cd to <dir> and replace this process with claude. Effort "unset" or empty passes
 # no --effort. The first message goes last, after any extra args.
@@ -196,17 +213,14 @@ case "${1:-}" in
                fast_model=sonnet
                case "$1" in 1) fast_model=haiku ;; 3) fast_model=opus ;; 4) fast_model=fable ;; esac
                shift
-               fast_prompt=""
-               if [[ "${1:-}" == --prompt ]]; then
-                   fast_prompt="${2:?clo: --prompt needs the first message}"; shift 2
-               fi
+               split_args "$@"; fast_prompt="$prompt"
                fast_dir="$PWD"
                if (( ! fast_here )); then
                    [[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT/notebook" ]] \
                        || { print -u2 "clo: fast mode needs DEV_ROOT with a notebook folder inside it"; exit 1; }
                    fast_dir="$DEV_ROOT/notebook"
                fi
-               launch_claude "$fast_dir" "$fast_model" medium "$fast_prompt" "$@" ;;
+               launch_claude "$fast_dir" "$fast_model" medium "$fast_prompt" "${rest[@]}" ;;
     launch)    shift; launch_cmd "$@" ;;
     --list)    menu | cut -f2; exit 0 ;;
     --menu-json) menu_json; exit $? ;;
@@ -241,11 +255,8 @@ if [[ -n "${1:-}" && "$1" != -* ]]; then
         name_model=sonnet
         case "$1" in 1) name_model=haiku ;; 3) name_model=opus ;; 4) name_model=fable ;; esac
         shift
-        name_prompt=""
-        if [[ "${1:-}" == --prompt ]]; then
-            name_prompt="${2:?clo: --prompt needs the first message}"; shift 2
-        fi
-        launch_claude "$name_dir" "$name_model" medium "$name_prompt" "$@"
+        split_args "$@"
+        launch_claude "$name_dir" "$name_model" medium "$prompt" "${rest[@]}"
     fi
     cd -- "$name_dir"
 fi
@@ -760,12 +771,8 @@ esac
 command -v fzf >/dev/null || { print -u2 "clo: fzf is not on PATH"; exit 1; }
 command -v claude >/dev/null || { print -u2 "clo: claude is not on PATH"; exit 1; }
 
-# The first message to send is --prompt text, first among the arguments; the rest go to claude.
-picker_prompt=""
-if [[ "${1:-}" == --prompt ]]; then
-    picker_prompt="${2:?clo: --prompt needs the first message}"; shift 2
-fi
-
+# The first message is --prompt text; every other argument goes to claude.
+split_args "$@"
 CLO_RUN="$(mktemp -d "${TMPDIR:-/tmp}/clo.XXXXXX")"
 export CLO_RUN CLO_SNAPSHOT="$CLO_RUN/snapshot"
 trap 'rm -rf -- "$CLO_RUN"' EXIT
@@ -814,11 +821,11 @@ case "$choice" in
     # first when it looks live in another tab.
     resume:*) [[ -n "${CLO_CD_FILE:-}" ]] && print -r -- "$PWD" > "$CLO_CD_FILE"
               rm -rf -- "$CLO_RUN"
-              exec "${self:h}/recent-sessions.py" --resume-id "${choice#resume:}" -- "$@" ;;
+              exec "${self:h}/recent-sessions.py" --resume-id "${choice#resume:}" -- "${rest[@]}" ;;
     *)        launch=(--model "$choice")
               [[ "$effort" != unset ]] && launch+=(--effort "$effort") ;;
 esac
 # Tell the shell function (clo --init zsh) where to leave the terminal.
 [[ -n "${CLO_CD_FILE:-}" ]] && print -r -- "$PWD" > "$CLO_CD_FILE"
 rm -rf -- "$CLO_RUN"   # exec skips the EXIT trap
-exec claude "${launch[@]}" "$@" ${picker_prompt:+"$picker_prompt"}
+exec claude "${launch[@]}" "${rest[@]}" ${prompt:+"$prompt"}
