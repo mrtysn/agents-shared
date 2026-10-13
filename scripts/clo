@@ -36,6 +36,7 @@ Usage:
                           An exact name wins, else a unique prefix; an ambiguous or unknown
                           NAME exits 2. With a model number it launches at once (like
                           clo here: Sonnet unless 1-4 says otherwise, medium effort); without one it opens the model menu there.
+                          Examples: clo adb-reconnect | clo adb-rec 3 | clo GNM 2 --prompt "why 3?"
   clo --list              Print the menu entries and exit
   clo --menu-json         Print the model menu, your last model and each model's
                           remembered effort as one JSON object and exit:
