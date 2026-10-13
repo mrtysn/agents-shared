@@ -76,6 +76,8 @@ accurate it is.
      a decision's answer changes what the items are, or the slots are full, ask it as its
      own round straight after, with no prose in between.
    - Parked or deferred items the user already set aside are not offered again.
+   - A "Walk me through it" option the user has passed over once is not offered again in
+     the same session; the user knows how to do their own step and asks when they want it.
 
 6. **Close with a record** of what was decided: a short table, one row per decision,
    `Decision | Chosen | What happens next`, plus a row for the items picked to proceed.
