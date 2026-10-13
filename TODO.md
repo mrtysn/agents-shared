@@ -84,4 +84,4 @@ Decide from the rates: if most rows are true matches, change the hook to return
 (`stop_hook_active` guards against a loop). If many are false matches, tighten the pattern
 first. Origin: 14 of 144 continue-style nudges (2026-09-14 to 2026-10-13) followed
 "say the word and I'll build it"; see
-`/Users/mrtysn/dev/notebook/2026-10-13-claude-code-friction-proposal-v2.html`.
+`2026-10-13-claude-code-friction-proposal-v2.html` in the notebook repo.
