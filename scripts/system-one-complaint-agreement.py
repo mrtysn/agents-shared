@@ -14,6 +14,12 @@ how often it fired where they did not.
         (AskUserQuestion answered with a rejection). Verdict rows are matched
         to the tool call by session and time (within MATCH_SECONDS).
 
+Read the numbers for what the labels are, not as a grade of the hooks: the stop
+hook scores padding and needless tables (not jargon the reader cannot follow),
+and the ask hook scores whether a question was already answered or is a routine
+default (not whether it lacked explanation). A low score means the hook's
+question is a different one from the complaint, not that it is miscalibrated.
+
 It reads the verdict's own `fired` list, so it never re-runs the model or
 re-derives a threshold. With --days N only rows from the last N days count.
 
