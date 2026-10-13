@@ -1,0 +1,31 @@
+# Cases for nudge-transcript-parsers.sh — one per line: <verdict><TAB><tool><TAB><command or file content>
+#
+# verdict is `pass` (no output) or `nudge` (additionalContext, never a permission decision). tool is Bash or
+# Write; for Write the last column is the file's content. Use \n for a newline; the runner decodes it with printf %b.
+# Each case runs in a session of its own, so the once-per-session rule is checked separately by the runner.
+
+# Bash: a hand-written parser over the transcripts
+nudge	Bash	python3 - <<'EOF'\nimport json, glob\nfor f in glob.glob("/home/u/.claude/projects/*/*.jsonl"):\n    json.loads(open(f).readline())\nEOF
+nudge	Bash	cd ~/.claude/projects && python3 -c 'import json; print(1)'
+nudge	Bash	jq -c 'select(.type=="user")' ~/.claude/projects/-home-u-dev-x/abc.jsonl
+nudge	Bash	cat ~/.claude*/projects/*/*.jsonl | python3 -c 'import sys; print(sys.stdin.read())'
+nudge	Bash	node -e 'require("fs").readdirSync(process.env.HOME + "/.claude/projects")'
+nudge	Bash	cd "$CLAUDE_CONFIG_DIR/projects" && perl -ne 'print' */*.jsonl
+
+# Bash: plain listing and grep, or a shared reader, or no transcript folder
+pass	Bash	ls ~/.claude/projects | head
+pass	Bash	grep -c foo ~/.claude/projects/-home-u-dev-x/abc.jsonl
+pass	Bash	python3 "$AGENTS_SHARED/scripts/extract-session-text.py" ~/.claude/projects/-x/a.jsonl --json | jq .
+pass	Bash	python3 scripts/find-repeated-user-prompts.py --days 30 --pattern 'x'
+pass	Bash	python3 build.py
+pass	Bash	jq . package.json
+pass	Bash	cat ~/.claude/settings.json | jq .hooks
+
+# Write: a parser written to a file
+nudge	Write	import json\nimport os\nroot = os.path.expanduser("~/.claude/projects")\nfor f in os.listdir(root):\n    pass
+nudge	Write	const fs = require('fs');\nconst root = process.env.HOME + '/.claude/projects';\nJSON.parse('{}');
+pass	Write	See ~/.claude/projects for the raw logs; use the shared reader to read them.
+pass	Write	import json\nprint(json.dumps({"a": 1}))
+
+# Other tools never fire
+pass	Edit	import json\nroot = "~/.claude/projects"
