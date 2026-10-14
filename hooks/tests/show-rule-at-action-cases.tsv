@@ -66,3 +66,7 @@ pass	Write	{"file_path":"/p/agents-shared/scripts/new-script.py","content":"x"}
 each-agent	Write	{"file_path":"/p/agents-shared/claude/rules/another-rule.md","content":"x"}
 note	Bash	{"command":"project-lifecycle page-new --mode report --title X --out x.html"}
 pass	Bash	{"command":"project-lifecycle test"}
+# --- rescue-unreachable-window: probing windows by hand through System Events
+note	Bash	{"command":"/usr/bin/osascript -e 'tell application \"System Events\" to tell process \"Firefox\" to get position of every window'"}
+pass	Bash	{"command":"rescue-window firefox"}
+pass	Bash	{"command":"grep \"System Events\" notes.md"}
