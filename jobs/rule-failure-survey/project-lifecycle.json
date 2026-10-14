@@ -1,0 +1,25 @@
+{
+  "kind": "launchd-job",
+  "name": "Rule Failure Survey",
+  "tool": "rule-failure-survey",
+  "test": [
+    {
+      "name": "parses",
+      "run": [
+        "zsh",
+        "-n",
+        "scripts/rule-failure-survey.zsh"
+      ]
+    }
+  ],
+  "launchd_job": {
+    "command": [
+      "/bin/zsh",
+      "{repo}/scripts/rule-failure-survey.zsh"
+    ],
+    "calendar": {
+      "Hour": 9,
+      "Minute": 30
+    }
+  }
+}

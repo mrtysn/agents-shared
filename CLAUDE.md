@@ -13,7 +13,10 @@ One line per directory — contents are not enumerated here, because the files
 are self-describing and a hand-kept list drifts. Use `ls`.
 
 - `claude/commands/` — slash commands, one `.md` per command, description in frontmatter
-- `claude/rules/` — behavioural rules, loaded at launch in **every** session
+- `claude/rules/` — behavioural rules, loaded at launch in **every** session. A rule
+  that applies only at a particular tool call keeps a short core here and its full
+  text in `docs/on-demand/<id>.md`; a row in `hooks/rule-triggers.tsv` brings the text
+  up the first time a session makes that call, with no settings edit
 - `claude/skills/` — one directory per skill; `SKILL.md` frontmatter is the
   authoritative description. External skills additionally carry `source.json`,
   `.upstream/`, and (if locally adapted) `override.patch` — see *External
@@ -22,7 +25,10 @@ are self-describing and a hand-kept list drifts. Use `ls`.
   session utilities); each script states its purpose in a header comment
 - `hooks/` — shell scripts wired by hand into `settings.json`, documented in README
 - `docs/` — maintainer documentation, deliberately outside `claude/rules/` so it
-  is never loaded as an instruction
+  is never loaded as an instruction; `docs/on-demand/` holds rule text that hooks
+  show at the action
+- `jobs/<name>/` — scheduled jobs kept by launchd through `project-lifecycle`, one
+  manifest each (`jobs/rule-failure-survey/` counts rule failures daily)
 
 ## Command File Format
 
