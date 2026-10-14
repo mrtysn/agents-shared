@@ -1,3 +1,12 @@
+---
+paths:
+  - "**/*.html"
+  - "**/*.css"
+  - "**/*.swift"
+  - "**/*.tsx"
+  - "**/*.vue"
+---
+
 # Check a visual change against the user's own words
 
 **A change to a window, page or layout the user will look at is not done until you
