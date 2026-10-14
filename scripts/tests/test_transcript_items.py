@@ -88,6 +88,27 @@ class ItemsTest(unittest.TestCase):
         got = {i["group"] for i in ti.items(str(self.path), want={"assistant"})}
         self.assertEqual(got, {"assistant"})
 
+    def test_attachments_are_opt_in_and_carry_loaded_rules_and_hook_context(self):
+        entries = [
+            {"type": "attachment", "timestamp": "2026-10-14T10:00:00Z", "attachment": {
+                "type": "nested_memory", "path": "/r/rules/shell-scripts.md",
+                "content": {"content": "Use zsh.", "globs": ["**/*.sh"], "path": "/r/rules/shell-scripts.md"}}},
+            {"type": "attachment", "timestamp": "2026-10-14T10:00:01Z", "attachment": {
+                "type": "hook_additional_context", "hookName": "PreToolUse:Bash", "hookEvent": "PreToolUse",
+                "toolUseID": "t9", "content": ["A standing rule applies.", "Second line."]}},
+            {"type": "attachment", "timestamp": "2026-10-14T10:00:02Z", "attachment": {"type": "hook_success"}},
+            user("2026-10-14T10:00:03Z", "hello"),
+        ]
+        path = write_session(self.tmp.name, "-p", "s2", entries)
+        self.assertEqual({i["group"] for i in ti.items(str(path))}, {"user"})
+        rows = list(ti.items(str(path), want={"attachments"}))
+        self.assertEqual([(r["label"], r["text"]) for r in rows], [
+            ("RULE-LOADED shell-scripts.md", "Use zsh."),
+            ("HOOK-CONTEXT PreToolUse:Bash", "A standing rule applies.\nSecond line.")])
+        self.assertEqual((rows[0]["path"], rows[0]["globs"]), ("/r/rules/shell-scripts.md", ["**/*.sh"]))
+        self.assertEqual((rows[1]["hook"], rows[1]["hook_event"], rows[1]["tool_use_id"]),
+                         ("PreToolUse:Bash", "PreToolUse", "t9"))
+
     def test_flags_survive_for_callers_own_predicates(self):
         rows = list(ti.items(str(self.path)))
         self.assertTrue(any(r["sidechain"] for r in rows))

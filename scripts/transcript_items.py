@@ -5,7 +5,7 @@ transcript format is parsed in one place. `transcripts()` finds the files across
 every config dir; `items()` turns one file into a flat stream of dicts, one per
 content block, in transcript order:
 
-  group       user | assistant | agents | tools | calls
+  group       user | assistant | agents | tools | calls | attachments
   label       USER, ASSISTANT, AGENT-SPAWN, CALL Bash, TOOL-RESULT Read, ...
   text        the block's text (a tool call's text is its command or path)
   tool        tool name, on calls and results
@@ -24,7 +24,10 @@ text "", so a caller counting turns or delimiting them still sees the entry.
 Pass want without "empty" to leave markers out.
 
 `agents` holds sub-agent spawns, SendMessage, AskUserQuestion and their results;
-`tools` every other tool result; `calls` every other tool call.
+`tools` every other tool result; `calls` every other tool call; `attachments` the rule
+text a path match loaded (label RULE-LOADED <file>, with path and globs) and the context
+a hook added (label HOOK-CONTEXT <hook>, with hook, hook_event and tool_use_id). A caller
+gets attachments only by naming the group in want; want=None leaves them out.
 """
 
 import glob
@@ -142,6 +145,23 @@ def blocks(d, t, c, tool_names, keep):
                 yield "calls", "CALL " + name, call_text(inp), extra
 
 
+def attachments(a, item):
+    """The items of one attachment entry that carry instruction text Claude Code put into the
+    session: a rule loaded because a matching file was touched (nested_memory) and the context
+    a hook added (hook_additional_context). Every other attachment type yields nothing."""
+    kind = a.get("type")
+    if kind == "nested_memory":
+        c = a.get("content")
+        text = c.get("content") if isinstance(c, dict) else c
+        yield item("attachments", "RULE-LOADED " + os.path.basename(a.get("path") or "?"), str(text or ""),
+                   path=a.get("path"), globs=(c or {}).get("globs") if isinstance(c, dict) else None)
+    elif kind == "hook_additional_context":
+        c = a.get("content")
+        text = "\n".join(str(x) for x in c) if isinstance(c, list) else str(c or "")
+        yield item("attachments", "HOOK-CONTEXT " + (a.get("hookName") or "?"), text,
+                   hook=a.get("hookName"), hook_event=a.get("hookEvent"), tool_use_id=a.get("toolUseID"))
+
+
 def items(path, project="", session=None, want=None):
     """Yield one dict per content block of a transcript, in order.
 
@@ -172,6 +192,8 @@ def items(path, project="", session=None, want=None):
                 yield item("user", "RECAP", d.get("content", ""))
             if t == "queue-operation" and d.get("operation") == "enqueue" and keep("user"):
                 yield item("user", "USER(queued)", d.get("content", ""))
+            if t == "attachment" and want is not None and "attachments" in want:
+                yield from attachments(d.get("attachment") or {}, item)
             if t not in ("user", "assistant"):
                 continue
             c = (d.get("message") or {}).get("content")

@@ -11,6 +11,7 @@ tokens to write, it is thrown away, and the next session writes it again.
 |---|---|
 | One session, as text | `$AGENTS_SHARED/scripts/extract-session-text.py <session-id> --kinds user,assistant,calls,tools [--grep REGEX] [--around YYYY-MM-DDTHH:MM]` |
 | Many sessions, as rows | `extract-session-text.py --all --days N [--project TEXT] [--session-mentions REGEX] --kinds ... --json [--next-user]`, then `jq` over the rows |
+| Whether a rule or hook note reached a session, and where | `extract-session-text.py <session-id> --kinds user,calls,attachments`: RULE-LOADED rows (a path-scoped rule) and HOOK-CONTEXT rows (a hook's added text) sit in order with the calls |
 | A session found by keyword | `$AGENTS_SHARED/scripts/search-history.py` |
 | A task like "scour my chat logs", "find the times when…" | the [mine-chat-logs skill](../skills/mine-chat-logs/SKILL.md) |
 

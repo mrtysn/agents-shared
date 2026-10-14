@@ -18,6 +18,9 @@ other config dir claude_dirs.py knows). Many sessions: --all, narrowed by
              the user, and the hand-back results that answer them
   calls      every other tool call: its command, path or pattern (input in JSON)
   tools      every other tool result (off by default; can be huge)
+  attachments  the rule text a path match loaded (RULE-LOADED <file>) and the context a
+             hook added (HOOK-CONTEXT <hook>); off by default. Use it to see whether a
+             rule or hook note reached a session, and where, instead of grepping the file.
 
 Sidechain (sub-agent internal) entries are left out unless --subagents.
 
@@ -50,7 +53,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from claude_dirs import find_transcript  # noqa: E402
 from transcript_items import add_next_user, clip_input, items, transcripts  # noqa: E402
 
-KINDS = ("user", "assistant", "agents", "calls", "tools")
+KINDS = ("user", "assistant", "agents", "calls", "tools", "attachments")
 UUID_ONLY = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 JSON_MAX_CHARS = 2000
 
