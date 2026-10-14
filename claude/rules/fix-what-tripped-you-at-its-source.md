@@ -20,6 +20,10 @@ In this order, taking the first that fits:
 4. **A memory entry**, last, and only for a fact with no repo home. See
    memory hygiene, which the first memory write in a session brings up.
 
+The mechanism of a fix (rule, trigger row, hook, skill, script, mod) is chosen from
+`docs/on-demand/choose-the-fix-for-a-pattern.md` in agents-shared, which shows itself
+the first time a session writes one.
+
 ## How far to go
 
 - **Fix it in the repo that owns the tool**, under that repo's `CLAUDE.md` and
