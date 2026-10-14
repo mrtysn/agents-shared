@@ -34,8 +34,8 @@ user's budget, and these hold for any third-party service:
   host within an hour is already too many for testing.
 - **Public code and docs hosts are ordinary reads.** Raw files and pages on GitHub, GitLab
   and official docs sites need no count stated up front, up to about 15 distinct URLs per
-  task, each fetched once and saved. Past that, state the count first. The first 429 or 403
-  still ends it. This does not cover search-engine pages, undocumented endpoints, anything
+  task, each fetched once and saved. Past that, state the count first. A refusal still ends it,
+  as below. This does not cover search-engine pages, undocumented endpoints, anything
   behind a login, or any run on a server.
 - **Never test network code on a server.** Running a script over ssh — `docker exec` into a
   production container included — sends its requests from that server's IP, where nothing counts
@@ -46,10 +46,13 @@ user's budget, and these hold for any third-party service:
   calls (Google's `batchexecute`, a mobile app's private API, a scraped JSON
   route) gets the user's approval before the first request, with the plan for
   how often production will call it.
-- **The first refusal ends it.** A 429, a 403, a captcha, a consent wall or a
-  "sorry" page means stop and report. No retry, no header variations, no second
-  host to try from — each of those is another request against a service that
-  already said no.
+- **A refusal ends it, except a 429 that says when to come back.** A captcha, a
+  consent wall, a "sorry" page or a 403 block page means stop and report. A 429
+  that carries a `Retry-After` of under 10 minutes is waited out once: wait that
+  long, send one more request, and stop and report if it is refused again. A 429
+  with no `Retry-After`, or a longer one, means stop and report. No header
+  variations, no second host to try from — each of those is another request
+  against a service that already said no.
 - **A refusal is never written down as a verdict on the site.** "Ends it" covers
   requests from this session, nothing more. Do not record the host as excluded,
   blocked, banned or "failed" in a skill, rule, memory, script or doc; a one-off
@@ -61,7 +64,7 @@ user's budget, and these hold for any third-party service:
   too many calls at once, slow down and continue: send the remaining queries one or
   two at a time, never more than about five in parallel. Abandoning the research over
   your own burst is the wrong lesson. This does not cover a target site's 429, which
-  still ends requests to that site.
+  follows the 429 rule above.
 - **Production code backs off by itself.** Anything shipped that calls a
   third-party service caches what it fetched, and after a refusal stops calling
   for a cool-down period instead of trying again on the next run.
@@ -90,3 +93,8 @@ Oct 9 2026: fifteen parallel Exa searches hit its ten-per-second limit and the
 session dropped the five failed lookups under "the first refusal ends it". The
 user: "you can pace your queries, dont stop searching for info cos of a mistake
 you made". The burst-limit clause above is the result.
+
+Oct 14 2026: asked whether requests should stop at a site's first refusal, the user
+chose one retry after a `Retry-After` for requests that do not go through
+fetch-anything, and had written that requests should "learn and adapt its pacing"
+instead of ending early. The 429 exception above is the result.
