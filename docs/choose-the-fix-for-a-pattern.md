@@ -1,8 +1,9 @@
 # Choose the fix for a repeated pattern
 
-Read by `pattern-discovery-for-new-skill` when it writes its verdict, and by
-`vet-fable` when the subject under review is which fix to build. It lives in `docs/`,
-not `claude/rules/`, so no session pays for it unless one of those two runs.
+The one table of where an instruction or a fix goes. Read by `docs/MAINTAINING-RULES.md`
+when a new rule arrives, by `pattern-discovery-for-new-skill` when it writes its verdict,
+and by `vet-fable` when the subject under review is which fix to build. It lives in
+`docs/`, not `claude/rules/`, so no session pays for it unless one of those runs.
 
 ## First: does a fix already exist, and why did it not fire?
 
@@ -22,9 +23,12 @@ second thing. Find out why the first did not work:
 | Situation | Fix | Cost |
 |---|---|---|
 | A fact with no repo home | memory entry | loads by index line; one per fact |
-| Guidance every session needs whatever it is doing | rule in `claude/rules/` | **every session pays for it at launch**; keep a short core and put the full text on demand |
+| Guidance every session needs whatever it is doing | rule in `claude/rules/` | loaded at launch, everywhere, so **every session pays for it**; keep a short core and put the full text on demand |
+| Relevant to one project only | that repo's `CLAUDE.md` | loaded when working in that repo |
+| Relevant only when working with certain files | that repo's `.claude/rules/` with `paths:` frontmatter | loads on a file match, which saves context |
+| Machine-specific, private, or a path | a gitignored local file | `agents-shared` is **public** |
 | A rule that matters only at a tool call | trigger row in `hooks/rule-triggers.tsv` plus a doc at `docs/on-demand/<id>.md` | `deny-once` fires before the action, `note-once` alongside it; **tool calls only** (PreToolUse), matched on `command`, `file_path`, `content` or `url` |
-| The moment is not a tool call, or the check needs its own logic | hook, wired by hand into `settings.json` and listed in the README | `system-one-prompt.sh` sees a typed prompt, `system-one-stop.sh` sees the final message, `nudge-transcript-parsers.sh` is a worked example of a check with state |
+| Something that must run at a fixed moment unconditionally (rules are context, not enforcement), the moment is not a tool call, or the check needs its own logic | hook, wired by hand into `settings.json` and listed in the README | `system-one-prompt.sh` sees a typed prompt, `system-one-stop.sh` sees the final message, `nudge-transcript-parsers.sh` is a worked example of a check with state |
 | Steps worth fixing that someone invokes: a brief to write, a model to pick, a way to read a result | skill | does nothing unless invoked, so its description has to carry the phrases that call it; **every skill's description loads into every session's prompt** |
 | A repeatable computation or search | script in `scripts/`, per [persist useful tooling](../claude/rules/persist-useful-tooling.md) | an agent has to know it exists, so give it a trigger row or a rule line |
 | The fix needs state across events, rewriting content, or drawing | mod (**untested here**) | see below |
