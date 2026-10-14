@@ -1,0 +1,42 @@
+#!/bin/zsh
+# DESC: Run fetch-anything get/record/status with the agents' own token, which leaves from the home address
+#
+# Agents fetch third-party pages, feeds and API responses through the owner's fetch-anything
+# gateway so its per-site budget, cool-down and archive apply. This wrapper passes the `agents`
+# consumer's token (a mode-600 file, never committed) as FA_TOKEN for one command, so the token
+# the Mac's app and runner use in the gateway's config.local.sh is left alone. The `agents`
+# consumer is pinned to the home egress and its wildcard never covers a site a committed rule names.
+set -euo pipefail
+
+usage() {
+    cat <<'EOF'
+usage: fetch-anything-agent get URL [--max-age SECONDS] [--wait SECONDS] [--egress home] [--output FILE]
+       fetch-anything-agent record KIND KEY
+       fetch-anything-agent status
+
+Runs the fetch-anything command of the same name with the agents' token. Any other command is refused.
+The token file is $FA_AGENT_TOKEN_FILE, else ${XDG_CONFIG_HOME:-~/.config}/fetch-anything/agent-token,
+and must be readable by its owner only. A fetch is served by the Mac's runner, so one that is not
+running leaves the answer queued (202).
+EOF
+}
+
+case "${1:-}" in
+    -h|--help|"") usage; [[ -n "${1:-}" ]] && exit 0; exit 2 ;;
+    get|record|status) ;;
+    *) print -u2 "fetch-anything-agent: '${1}' is not allowed; use get, record or status"; usage >&2; exit 2 ;;
+esac
+
+if [[ -z "${DEV_ROOT:-}" && -r "$HOME/.config/agents-shared/env.zsh" ]]; then
+    source "$HOME/.config/agents-shared/env.zsh"
+fi
+[[ -n "${DEV_ROOT:-}" ]] || { print -u2 "fetch-anything-agent: DEV_ROOT is not set; run agents-shared/scripts/init-global.sh"; exit 1; }
+cli="$DEV_ROOT/fetch-anything/fetch-anything"
+[[ -x "$cli" ]] || { print -u2 "fetch-anything-agent: no fetch-anything at $cli"; exit 1; }
+
+token_file="${FA_AGENT_TOKEN_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/fetch-anything/agent-token}"
+[[ -r "$token_file" ]] || { print -u2 "fetch-anything-agent: no token at $token_file; ask the owner to create the 'agents' consumer"; exit 1; }
+mode="$(/usr/bin/stat -f '%Lp' "$token_file")"
+[[ "$mode" == 600 ]] || { print -u2 "fetch-anything-agent: $token_file has mode $mode; it must be 600"; exit 1; }
+
+FA_TOKEN="$(<"$token_file")" exec "$cli" "$@"
