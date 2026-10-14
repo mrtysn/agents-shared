@@ -1,5 +1,5 @@
 ---
-description: Find out whether something the user keeps typing, or a failure they keep correcting, deserves a skill or rule (a repeated request, a repeated failure, or a tone cue such as "more than one ?"). Counts the matching prompts in recent transcripts, reads their context, groups them, explains why the user does it, and gives a verdict. Use when the user says "scour my recent chats for my patterns", "how often do I ask for X", "find the times this happened", "I got tired of asking the same thing", or asks whether a repeated request should become a skill.
+description: Find out whether something the user keeps typing, or a failure they keep correcting, deserves a fix, and which one: a skill, rule, trigger row, hook, mod or script (a repeated request, a repeated failure, a tone cue such as "more than one ?", or a tool they are weighing). Counts the matching prompts in recent transcripts, reads their context, groups them, explains why the user does it, and gives a verdict. Use when the user says "scour my recent chats for my patterns", "how often do I ask for X", "find the times this happened", "I got tired of asking the same thing", "would this tool help me", or asks whether a repeated request should become a skill.
 user-invocable: true
 allowed-tools: Bash, Read, Agent
 argument-hint: <the message, habit or failure to look for>
@@ -8,9 +8,9 @@ argument-hint: <the message, habit or failure to look for>
 # pattern-discovery-for-new-skill
 
 The user repeats a request or keeps correcting the same failure. This skill measures
-it, explains it, and says whether it earns a skill or rule. **It builds nothing**: the
-report is the deliverable, and the verdict ends the job. A skill or rule is built
-only when the user says so afterwards.
+it, explains it, and says which fix it earns. **It builds nothing**: the report is the
+deliverable, and the verdict ends the job. The fix is built only when the user says so
+afterwards.
 
 ## 1. Say which kind of pattern
 
@@ -28,6 +28,11 @@ From the user's example, state in one line what is hunted:
   one question mark mean I was frustrated"). The marker is the whole search, so
   the question is what share of the matches carry the mood and what provoked it.
   Step 3 classifies tone; no keyword is ANDed in.
+- **A tool or feature the user is weighing** ("see if such a feature would be
+  helpful for me"): not a pattern yet. Hunt the moments it would have helped, such as an
+  agent asking the user to click something and the user then asking where, and count
+  those as a repeated failure. The verdict is adopt or not, and for adoption which fix
+  makes agents reach for it.
 
 ## 2. Search
 
@@ -92,13 +97,23 @@ Look for the trigger: a plan just written, an answer the user doubted, finished 
   you found, and check that it addresses the instance, not just a shared keyword. A
   keyword hit in a rule that is about something else is not coverage.
 
-## 6. Verdict
+## 6. If something already covers it, say why it did not fire
 
-Say whether it earns a skill or rule. It does when it repeats weekly or more, the
-instances share a purpose, and the right response has steps worth fixing (a brief to
-write, a model to pick, a way to read the result). It does not when each instance
-needs different judgment. Name what the skill would hold, and give the command lines
-used so the count can be repeated.
+Only when step 5 found a rule, skill, hook or script that addresses the instances. Read
+the turn before a few instances and decide which it is: the agent never knew it
+existed, it loads too late, it was ignored, or it is wrong. A pattern that repeats
+under existing coverage is rarely fixed by adding a second thing; the table in
+[choose the fix for a pattern](../../../docs/choose-the-fix-for-a-pattern.md) names the
+fix for each cause.
+
+## 7. Verdict
+
+Name one fix from that table: skill, rule, trigger row, hook, mod or script, or none.
+A skill earns its place when the pattern repeats weekly or more, the instances share a
+purpose, and the right response has steps worth fixing (a brief to write, a model to
+pick, a way to read the result). It does not when each instance needs different
+judgment. Name what the fix would hold, and for a trigger row or hook, the check that
+detects the moment. Give the command lines used so the count can be repeated.
 
 Do not offer to build it.
 
