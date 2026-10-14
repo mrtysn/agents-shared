@@ -1,0 +1,103 @@
+#!/bin/bash
+# DESC: PreToolUse hook — shows a rule's full text the first time its trigger fires in a session
+#
+# A rule that applies only when a particular tool call is made does not have to sit in
+# every session's context. Its full text lives in docs/on-demand/<id>.md, and a row in
+# hooks/rule-triggers.tsv says which tool call brings it up. This hook is registered once
+# in settings.json; moving another rule out of claude/rules/ is a new row and a new doc,
+# never another settings edit.
+#
+# Row columns, tab-separated (blank lines and # lines are skipped):
+#   id       the doc is docs/on-demand/<id>.md, and the id names the once-per-session marker
+#   tools    ERE matched against the whole tool name: Bash, Write|Edit, SendMessage ...
+#   field    what the pattern is matched against: command, file_path, content, url, or
+#            none (every call of the tool matches; pattern is ignored)
+#   pattern  ERE (grep -E) on that field
+#   exclude  ERE on the same field that cancels a match, or `-` for none
+#   mode     deny-once  the call is refused (exit 2) with the text, and the same action
+#                       goes through when re-issued; for a rule that has to fire before
+#                       the action
+#            note-once  the call goes ahead and the text is added to the model's context
+#                       (hookSpecificOutput.additionalContext)
+#
+# Fires at most once per rule per session. The marker is a file named for the session id
+# under $CLAUDE_CONFIG_DIR/rule-injection/, pruned after 14 days; when it cannot be
+# written the call is not refused and no text is added. A missing doc file does nothing.
+#
+# Bash, not zsh, to match the hooks beside it. Written for bash 3.2 (macOS /bin/bash).
+
+set -e
+
+INPUT=$(cat)
+TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty')
+SESSION=$(printf '%s' "$INPUT" | jq -r '.session_id // empty')
+[ -n "$TOOL" ] || exit 0
+
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+TRIGGERS=${RULE_TRIGGERS:-$HERE/rule-triggers.tsv}
+DOCS="$HERE/../docs/on-demand"
+STATE=${CLAUDE_CONFIG_DIR:-$HOME/.claude}/rule-injection
+[ -r "$TRIGGERS" ] || exit 0
+
+field_value() {
+    case "$1" in
+        command)   printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' ;;
+        file_path) printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' ;;
+        content)   printf '%s' "$INPUT" | jq -r '.tool_input.content // .tool_input.new_string // empty' ;;
+        url)       printf '%s' "$INPUT" | jq -r '.tool_input.url // empty' ;;
+        *)         printf '' ;;
+    esac
+}
+
+DENY_TEXT=
+NOTE_TEXT=
+
+while IFS=$'\t' read -r id tools field pattern exclude mode; do
+    case "${id-}" in ''|'#'*) continue ;; esac
+    printf '%s' "$TOOL" | grep -Eq "^($tools)\$" || continue
+
+    if [ "$field" != none ]; then
+        value=$(field_value "$field")
+        [ -n "$value" ] || continue
+        printf '%s' "$value" | grep -Eq -e "$pattern" || continue
+        if [ "$exclude" != "-" ] && printf '%s' "$value" | grep -Eq -e "$exclude"; then
+            continue
+        fi
+    fi
+
+    doc="$DOCS/$id.md"
+    [ -r "$doc" ] || continue
+
+    mark="$STATE/${SESSION:-no-session}-$id"
+    [ -e "$mark" ] && continue
+    {
+        mkdir -p "$STATE" &&
+        find "$STATE" -type f -mtime +14 -delete &&
+        : > "$mark"
+    } 2>/dev/null || continue
+
+    text=$(cat "$doc")
+    case "$mode" in
+        deny-once) DENY_TEXT="$DENY_TEXT
+$text
+" ;;
+        *)         NOTE_TEXT="$NOTE_TEXT
+$text
+" ;;
+    esac
+done < "$TRIGGERS"
+
+if [ -n "$DENY_TEXT" ]; then
+    {
+        echo "BLOCKED once: this is the first action in this session that a standing rule covers. Its full text:"
+        printf '%s\n' "$DENY_TEXT$NOTE_TEXT"
+        echo "Re-issue the call if it still fits the rule."
+    } >&2
+    exit 2
+fi
+
+if [ -n "$NOTE_TEXT" ]; then
+    jq -n --arg n "A standing rule applies to what you are doing:$NOTE_TEXT" \
+        '{hookSpecificOutput: {hookEventName: "PreToolUse", additionalContext: $n}}'
+fi
+exit 0

@@ -1,0 +1,34 @@
+# Cases for show-rule-at-action.sh: <verdict><TAB><tool name><TAB><tool_input JSON>
+#
+# pass   the call is untouched, now and on the repeat
+# block  the first call exits 2 with the rule text; the same call again exits 0 with no output
+# note   the first call exits 0 with additionalContext; the repeat adds nothing
+# --- window-focus
+block	Bash	{"command":"open -g /Applications/Foo.app"}
+block	Bash	{"command":"quiet-open ~/Applications/Foo.app"}
+block	Bash	{"command":"godot --path game"}
+pass	Bash	{"command":"godot --headless --path game"}
+pass	Bash	{"command":"ls open-source"}
+# --- no-unprompted-account-traffic
+block	Bash	{"command":"curl -s https://example.com/x"}
+block	Bash	{"command":"cd /x && ssh host ls"}
+pass	Bash	{"command":"curl -s http://localhost:8797/api"}
+pass	Bash	{"command":"git status"}
+note	WebFetch	{"url":"https://example.com","prompt":"x"}
+note	WebSearch	{"query":"x"}
+# --- messages-between-sessions and asking-for-decisions
+block	SendMessage	{"to":"x","message":"y"}
+block	AskUserQuestion	{"questions":[]}
+# --- absolute-paths-for-deletion
+note	Bash	{"command":"rm /tmp/x"}
+pass	Bash	{"command":"echo rmdirs"}
+# --- decide-file-location-and-format-by-reader and persist-useful-tooling
+block	Write	{"file_path":"/private/tmp/claude-1/s/scratchpad/notes.txt","content":"x"}
+block	Write	{"file_path":"/tmp/probe.py","content":"x"}
+pass	Write	{"file_path":"/Users/someone/dev/repo/src/main.py","content":"x"}
+# --- memory-hygiene
+note	Write	{"file_path":"/Users/someone/.claude/projects/-x/memory/note.md","content":"x"}
+note	Edit	{"file_path":"/Users/someone/.claude/projects/-x/memory/MEMORY.md","old_string":"a","new_string":"b"}
+# --- tools no row covers
+pass	Read	{"file_path":"/tmp/x"}
+pass	Edit	{"file_path":"/Users/someone/dev/repo/a.txt","old_string":"a","new_string":"b"}
