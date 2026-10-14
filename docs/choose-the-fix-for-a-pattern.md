@@ -13,6 +13,7 @@ second thing. Find out why the first did not work:
 |---|---|
 | Agents never knew the tool, rule or script existed | a trigger row or hook at the moment it applies |
 | It exists but loads too late, or only at launch and gets ignored | move it to the moment of action (trigger row) |
+| It fires and agents follow it, but it is too vague to act on | make it specific; specificity, not volume, is what changes behaviour |
 | It exists and fires, and agents follow it, but it is wrong | edit it |
 | Nothing covers it | choose from the table below |
 
@@ -24,7 +25,7 @@ second thing. Find out why the first did not work:
 | Guidance every session needs whatever it is doing | rule in `claude/rules/` | **every session pays for it at launch**; keep a short core and put the full text on demand |
 | A rule that matters only at a tool call | trigger row in `hooks/rule-triggers.tsv` plus a doc at `docs/on-demand/<id>.md` | `deny-once` fires before the action, `note-once` alongside it; **tool calls only** (PreToolUse), matched on `command`, `file_path`, `content` or `url` |
 | The moment is not a tool call, or the check needs its own logic | hook, wired by hand into `settings.json` and listed in the README | `system-one-prompt.sh` sees a typed prompt, `system-one-stop.sh` sees the final message, `nudge-transcript-parsers.sh` is a worked example of a check with state |
-| Steps worth fixing that someone invokes: a brief to write, a model to pick, a way to read a result | skill | does nothing unless invoked, so its description has to carry the phrases that call it |
+| Steps worth fixing that someone invokes: a brief to write, a model to pick, a way to read a result | skill | does nothing unless invoked, so its description has to carry the phrases that call it; **every skill's description loads into every session's prompt** |
 | A repeatable computation or search | script in `scripts/`, per [persist useful tooling](../claude/rules/persist-useful-tooling.md) | an agent has to know it exists, so give it a trigger row or a rule line |
 | The fix needs state across events, rewriting content, or drawing | mod (**untested here**) | see below |
 
@@ -38,10 +39,11 @@ when that is not.
 
 - Installed with `claude --plugin-dir <folder>`, `CLAUDE_CODE_PLUGIN_DIRS`, or a
   marketplace, **not** by `scripts/init-global.sh`, so a mod carries setup that a
-  hook does not.
-- Runs with the same access as Claude Code, unsandboxed.
-- Two weeks old when this table was written, and not yet tried here. Check the
-  `plugin-authoring` skill's types before promising what one can do.
+  hook does not. A mod a session writes for itself is hot-reloaded from that session's
+  mods folder once the user enables it.
+- Written against the `plugin-authoring` skill of Claude Code 2.1.299, and not yet
+  tried here. Check that skill's types for the running version before promising what
+  one can do.
 
 ## By kind of pattern
 
