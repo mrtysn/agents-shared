@@ -17,7 +17,9 @@ git, Time Machine or Claude's file history.
 - **Prefer the Edit tool** for any change to an existing file. It reads, matches
   and writes in one checked step.
 - **In a script:** read into a variable, check it is not empty, transform, write
-  to a temp file, then replace: `text = p.read_text(); assert text; tmp.write_text(new); tmp.replace(p)`.
+  to a temp file, copy the original's mode onto it, then replace:
+  `text = p.read_text(); assert text; tmp.write_text(new); shutil.copymode(p, tmp); tmp.replace(p)`.
+  Without `copymode` the new file has the default mode, and an executable script loses its `x` bit.
 - **Shared docs** (a file other sessions or agents also edit, such as a project's
   pipeline doc): Edit tool only. Stage your own lines from a HEAD blob
   (`git update-index --cacheinfo`) so others' uncommitted lines stay theirs.
