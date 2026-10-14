@@ -103,8 +103,7 @@ Only when step 5 found a rule, skill, hook or script that addresses the instance
 the turn before a few instances and decide which it is: the agent never knew it
 existed, it loads too late, it was ignored, or it is wrong. A pattern that repeats
 under existing coverage is rarely fixed by adding a second thing; the table in
-[choose the fix for a pattern](../../../docs/choose-the-fix-for-a-pattern.md) names the
-fix for each cause.
+`$AGENTS_SHARED/docs/choose-the-fix-for-a-pattern.md` names the fix for each cause.
 
 ## 7. Verdict
 
