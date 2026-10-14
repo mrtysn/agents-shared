@@ -96,6 +96,8 @@ USER_INTERRUPT_RE = re.compile(
     r"user rejected|User rejected|\[Request interrupted)"
 )
 COMMAND_NAME_RE = re.compile(r"<command-name>/?([\w:-]+)</command-name>")
+# a typed command ends at whitespace or the end of the prompt: "/Volumes/Elements/pictures is full" is a path
+TYPED_SLASH_RE = re.compile(r"^/(\w[\w:.-]*)(?:\s|$)")
 LENGTH_BUCKETS = [(5, "<=5w"), (15, "6-15w"), (40, "16-40w"), (100, "41-100w"), (10 ** 9, ">100w")]
 
 
@@ -321,9 +323,10 @@ def scan_transcript(path, slug, sidechain=False):
                     if m:
                         s["slash"][m.group(1)] += 1
                         note_last(s["slash_last"], m.group(1), ts)
-                    elif text.startswith("/"):
-                        s["slash"][text.split()[0].lstrip("/")] += 1
-                        note_last(s["slash_last"], text.split()[0].lstrip("/"), ts)
+                    elif TYPED_SLASH_RE.match(text):
+                        name = TYPED_SLASH_RE.match(text).group(1)
+                        s["slash"][name] += 1
+                        note_last(s["slash_last"], name, ts)
                     if cls not in ("slash", "url", "error-paste") and ws:
                         s["openers"][" ".join(ws[:3])] += 1
                     # stall: previous prompt had no tool use after it
@@ -461,8 +464,8 @@ def scan_history(cfg, since):
                 out["sessions"].add(e["sessionId"])
             cls = classify_prompt(text)
             out["classes"][cls] += 1
-            if text.startswith("/"):
-                out["slash"][text.split()[0].lstrip("/")] += 1
+            if TYPED_SLASH_RE.match(text):
+                out["slash"][TYPED_SLASH_RE.match(text).group(1)] += 1
             elif cls not in ("url", "error-paste"):
                 ws = words(text.splitlines()[0])
                 if ws:
