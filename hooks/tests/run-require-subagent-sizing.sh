@@ -34,7 +34,11 @@ while IFS=$'\t' read -r verdict input; do
         payload=$(jq -cn --argjson i "$input" --arg s "once-$total" '{tool_name: "Agent", session_id: $s, tool_input: $i}')
         first=0; printf '%s' "$payload" | "$HOOK" >/dev/null 2>&1 || first=$?
         second=0; printf '%s' "$payload" | "$HOOK" >/dev/null 2>&1 || second=$?
-        if [ "$first" = 2 ] && [ "$second" = 0 ]; then
+        # A sub-agent shares the session_id: its own first call is refused once too.
+        sub_payload=$(printf '%s' "$payload" | jq -c '. + {agent_id: "sub-1"}')
+        sub_first=0; printf '%s' "$sub_payload" | "$HOOK" >/dev/null 2>&1 || sub_first=$?
+        sub_second=0; printf '%s' "$sub_payload" | "$HOOK" >/dev/null 2>&1 || sub_second=$?
+        if [ "$first" = 2 ] && [ "$second" = 0 ] && [ "$sub_first" = 2 ] && [ "$sub_second" = 0 ]; then
             [ "$VERBOSE" = "1" ] && printf 'ok    %-13s %s\n' "$verdict" "$input"
         else
             failed=$((failed + 1))

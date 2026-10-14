@@ -64,10 +64,14 @@ deny() {
 # model is chosen. A call with no session_id, or a marker that cannot be written, passes.
 FIRST=0
 SESSION=$(printf '%s' "$INPUT" | jq -r '.session_id // empty')
+AGENT=$(printf '%s' "$INPUT" | jq -r '.agent_id // empty')
 if [ -n "$SESSION" ]; then
+    # A sub-agent carries its parent's session_id, so the marker names the agent as well.
     SEEN_DIR="${TMPDIR:-/tmp}/agents-shared-subagent-sizing"
-    if mkdir -p "$SEEN_DIR" 2>/dev/null && [ ! -e "$SEEN_DIR/$SESSION" ] && : > "$SEEN_DIR/$SESSION" 2>/dev/null; then
+    MARK="$SEEN_DIR/$SESSION${AGENT:+-$AGENT}"
+    if mkdir -p "$SEEN_DIR" 2>/dev/null && [ ! -e "$MARK" ] && : > "$MARK" 2>/dev/null; then
         FIRST=1
+        find "$SEEN_DIR" -type f -mtime +14 -delete 2>/dev/null || true
     fi
 fi
 
