@@ -52,6 +52,21 @@ class SummariseTest(unittest.TestCase):
         self.assertEqual(r["description"], "Review of plan")
         self.assertEqual(r["model"], "fable")
 
+    def test_per_request_series_is_added_only_on_request(self):
+        m = load()
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "agent-abc123.jsonl"
+            rows = [assistant("m1", "2026-10-13T10:00:00.000Z", 0, 60000),
+                    assistant("m2", "2026-10-13T10:00:30.000Z", 60000, 5000)]
+            p.write_text("\n".join(json.dumps(r) for r in rows))
+            plain = m.summarise(str(p))
+            full = m.summarise(str(p), per_request=True)
+        self.assertNotIn("per_request", plain)
+        self.assertEqual(full["fresh_input"], 20)
+        self.assertEqual(full["per_request"], [
+            {"context": 60010, "cache_read": 0, "cache_created": 60000, "fresh_input": 10},
+            {"context": 65010, "cache_read": 60000, "cache_created": 5000, "fresh_input": 10}])
+
     def test_agent_with_no_requests_is_skipped(self):
         m = load()
         with tempfile.TemporaryDirectory() as d:

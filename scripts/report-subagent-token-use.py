@@ -18,6 +18,7 @@ Examples:
   report-subagent-token-use.py 9e49818b-f213-4c0f-bbb7-bc2cdedf445d
   report-subagent-token-use.py 9e49818b --match 'opinion|review'
   report-subagent-token-use.py /path/to/session.jsonl --json
+  report-subagent-token-use.py 9e49818b --json --per-request   # adds each request's context series
 """
 
 import argparse
@@ -54,9 +55,11 @@ def parse_ts(s):
     return datetime.fromisoformat(s.replace("Z", "+00:00"))
 
 
-def summarise(path):
-    """One subagent's numbers from its transcript, or None when it made no model request."""
-    requests = {}  # message id -> (context, cache_read, cache_created); the last row of an id wins
+def summarise(path, per_request=False):
+    """One subagent's numbers from its transcript, or None when it made no model request.
+
+    With per_request, the row also carries the whole series, one entry per request in order."""
+    requests = {}  # message id -> (context, cache_read, cache_created, fresh_input); the last row of an id wins
     tool_calls = 0
     first = last = None
     with open(path) as f:
@@ -75,7 +78,8 @@ def summarise(path):
             u = msg["usage"]
             read = u.get("cache_read_input_tokens", 0)
             made = u.get("cache_creation_input_tokens", 0)
-            requests[msg.get("id") or row.get("uuid")] = (u.get("input_tokens", 0) + read + made, read, made)
+            fresh = u.get("input_tokens", 0)
+            requests[msg.get("id") or row.get("uuid")] = (fresh + read + made, read, made, fresh)
             content = msg.get("content")
             if isinstance(content, list):
                 tool_calls += sum(1 for x in content if x.get("type") == "tool_use")
@@ -87,7 +91,7 @@ def summarise(path):
     if os.path.isfile(meta_path):
         with open(meta_path) as f:
             meta = json.load(f)
-    return {
+    row = {
         "agent": os.path.basename(path)[len("agent-"):-len(".jsonl")],
         "description": meta.get("description", ""),
         "model": meta.get("model", ""),
@@ -98,8 +102,13 @@ def summarise(path):
         "context_growth": ctx[-1] - ctx[0],
         "cache_read": sum(r[1] for r in requests.values()),
         "cache_created": sum(r[2] for r in requests.values()),
+        "fresh_input": sum(r[3] for r in requests.values()),
         "seconds": int((parse_ts(last) - parse_ts(first)).total_seconds()) if first and last else 0,
     }
+    if per_request:
+        row["per_request"] = [{"context": c, "cache_read": rd, "cache_created": mk, "fresh_input": fr}
+                              for c, rd, mk, fr in requests.values()]
+    return row
 
 
 def kilo(n):
@@ -112,12 +121,14 @@ def main():
     ap.add_argument("session", help="session id (or unique prefix), or a path to the session .jsonl")
     ap.add_argument("--match", metavar="REGEX", help="keep subagents whose description matches (case-insensitive)")
     ap.add_argument("--json", action="store_true", help="print the rows as JSON")
+    ap.add_argument("--per-request", action="store_true",
+                    help="with --json: add each subagent's per-request series (context, cache read, cache created, fresh input)")
     a = ap.parse_args()
 
     sub_dir = resolve_subagent_dir(a.session)
     if not os.path.isdir(sub_dir):
         sys.exit(f"report-subagent-token-use: no subagents/ directory at {sub_dir}")
-    rows = [r for r in (summarise(p) for p in sorted(glob.glob(os.path.join(sub_dir, "agent-*.jsonl")))) if r]
+    rows = [r for r in (summarise(p, a.per_request and a.json) for p in sorted(glob.glob(os.path.join(sub_dir, "agent-*.jsonl")))) if r]
     if a.match:
         pat = re.compile(a.match, re.I)
         rows = [r for r in rows if pat.search(r["description"])]
