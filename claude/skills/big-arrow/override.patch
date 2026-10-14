@@ -13,7 +13,7 @@
  ```bash
  open "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
 -bigarrow start --element "Ghostty" --app "System Settings" --text "Franz, switch this on: Ghostty may record your screen" --say
-+bigarrow start --element "Ghostty" --app "System Settings" --text "Mert, switch this on: Ghostty may record your screen" --say
++bigarrow start --element "Ghostty" --app "System Settings" --text "Switch this on: Ghostty may record your screen" --say
  # watch for the result (page changed, job continued, file appeared), then:
  bigarrow stop
  ```
@@ -23,16 +23,16 @@
    walk them through menus. The human clicks; you point.
 -- The sign is one full sentence naming the action ("Franz, click Save", never "here"). When the
 -  click approves, grants, pays, signs, sends or deletes, add what happens: "Franz, click Pay:
-+- The sign is one full sentence naming the action ("Mert, click Save", never "here"). When the
-+  click approves, grants, pays, signs, sends or deletes, add what happens: "Mert, click Pay:
++- The sign is one full sentence naming the action ("Click Save", never "here"). When the
++  click approves, grants, pays, signs, sends or deletes, add what happens: "Click Pay:
    49 EUR to Hetzner". The human decides; the facts go on the sign, not only in the terminal.
  - `--say` when the human may not be looking. Time-critical (code expires, page times out, job
 -  waits): `--color red --say` and say by when: "Franz, enter the 2FA code now, it expires in 60 s".
-+  waits): `--color red --say` and say by when: "Mert, enter the 2FA code now, it expires in 60 s".
++  waits): `--color red --say` and say by when: "Enter the 2FA code now, it expires in 60 s".
  - Something to paste (a command you may not run, a URL, a code): put it on the sign as
    `{{value}}`. The human sees the value on a copy button (no braces); one click copies all of it
 -  and the arrow stays. Point at where it goes: "Franz, copy {{sudo xcodebuild -license accept}}
-+  and the arrow stays. Point at where it goes: "Mert, copy {{sudo xcodebuild -license accept}}
++  and the arrow stays. Point at where it goes: "Copy {{sudo xcodebuild -license accept}}
    and paste it here", then check that it was pasted.
  - One arrow per step; `bigarrow stop` the moment the step is done. Arrows also end alone: after
    300 s, when your session exits, when the human answers (hook below).
@@ -45,7 +45,7 @@
 +becoming the active app unattended, and a hotkey terminal hides the instant another app activates.
 +`--app` and `--window` raise the app, so: never use the `App:title` form (it raises the window and
 +selects a tab); use `--app X` only for an app already visible on screen; never raise an app that
-+is not. Address the sign to the user as "Mert". Do not add the settings.json hook yourself: hooks
++is not. Never put the user's name on a sign; write the action only ("Click Save"). Do not add the settings.json hook yourself: hooks
 +are wired by hand from `hooks/`.
 +<!-- LOCAL END -->
 +
