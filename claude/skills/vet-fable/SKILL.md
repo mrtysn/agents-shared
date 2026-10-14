@@ -51,6 +51,11 @@ transcript is the same cost. Neutral numbers this session already computed
 Never a summary of what a file says: that is this session's reading, and the stance
 rides in with it.
 
+**A question about which fix to build** (a rule, skill, trigger row, hook, mod or
+script): add `$AGENTS_SHARED/docs/choose-the-fix-for-a-pattern.md` to the files to read,
+resolved to its absolute path. It is a reference table, not this session's view, so it
+does not breach the blind brief.
+
 **A plan that exists only in chat** is saved to a file as this session's message, word
 for word. Cut whole paragraphs, never sentences, and only paragraphs that address the
 user (second person, or a decision put to them); keep every paragraph that describes the
