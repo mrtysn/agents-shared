@@ -30,7 +30,7 @@ second thing. Find out why the first did not work:
 | A rule that matters only at a tool call | trigger row in `hooks/rule-triggers.tsv` plus a doc at `docs/on-demand/<id>.md` | `deny-once` fires before the action, `note-once` alongside it; **tool calls only** (PreToolUse), matched on `command`, `file_path`, `content` or `url` |
 | Something that must run at a fixed moment unconditionally (rules are context, not enforcement), the moment is not a tool call, or the check needs its own logic | hook, wired by hand into `settings.json` and listed in the README | `system-one-prompt.sh` sees a typed prompt, `system-one-stop.sh` sees the final message, `nudge-transcript-parsers.sh` is a worked example of a check with state |
 | Steps worth fixing that someone invokes: a brief to write, a model to pick, a way to read a result | skill | does nothing unless invoked, so its description has to carry the phrases that call it; **every skill's description loads into every session's prompt** |
-| A repeatable computation or search | script in `scripts/`, per [persist useful tooling](../claude/rules/persist-useful-tooling.md) | an agent has to know it exists, so give it a trigger row or a rule line |
+| A repeatable computation or search | script in `scripts/`, per [persist useful tooling](on-demand/persist-useful-tooling.md) | an agent has to know it exists, so give it a trigger row or a rule line |
 | The fix needs state across events, rewriting content, or drawing | mod (**untested here**) | see below |
 
 ## Mods
