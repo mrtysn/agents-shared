@@ -7,6 +7,11 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 HOOK="$HERE/../require-subagent-sizing.sh"
 CASES="$HERE/require-subagent-sizing-cases.tsv"
 
+# The hook keeps its once-per-session markers under $TMPDIR; give the run its own.
+SEEN_ROOT=$(mktemp -d)
+export TMPDIR=$SEEN_ROOT
+trap '[ -n "${SEEN_ROOT:-}" ] && rm -rf "$SEEN_ROOT"' EXIT
+
 VERBOSE=0
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -23,6 +28,20 @@ while IFS=$'\t' read -r verdict input; do
     case "${verdict-}" in
         ''|'#'*) continue ;;
     esac
+    if [ "$verdict" = once ]; then
+        # A session's first call is refused, the same call a second time passes.
+        total=$((total + 1))
+        payload=$(jq -cn --argjson i "$input" --arg s "once-$total" '{tool_name: "Agent", session_id: $s, tool_input: $i}')
+        first=0; printf '%s' "$payload" | "$HOOK" >/dev/null 2>&1 || first=$?
+        second=0; printf '%s' "$payload" | "$HOOK" >/dev/null 2>&1 || second=$?
+        if [ "$first" = 2 ] && [ "$second" = 0 ]; then
+            [ "$VERBOSE" = "1" ] && printf 'ok    %-13s %s\n' "$verdict" "$input"
+        else
+            failed=$((failed + 1))
+            printf 'FAIL  once: want first 2 then 0, got %s then %s: %s\n' "$first" "$second" "$input"
+        fi
+        continue
+    fi
     want_effort=
     case "$verdict" in
         pass) want=0 ;;

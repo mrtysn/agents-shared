@@ -1,5 +1,10 @@
 # Size sub-agents to the task
 
+> **This file is in `docs/`, not `claude/rules/`, on purpose.** It is no longer loaded
+> into every session. `hooks/require-subagent-sizing.sh` reads the table under
+> "## Pick by the work" and prints it on a session's first `Agent` call, and again on
+> any call that sets no `model`. Keep that table's shape: the hook parses it.
+
 **Every `Agent` call sets `model`, and `effort` for every row below except the last.**
 Omitting them runs the sub-agent at the parent's size, which spends tokens the task
 does not need. Token efficiency is a hard constraint, not a preference. The hook
@@ -42,7 +47,7 @@ costs a brief, a report and a context of its own.
 - **A word cap on the report** (about 250 words) and a request for conclusions, not
   file dumps. A report is read once and then discarded.
 - **Where any file it produces goes**, per
-  [decide file location and format by reader](decide-file-location-and-format-by-reader.md).
+  [decide file location and format by reader](../claude/rules/decide-file-location-and-format-by-reader.md).
 
 ## Provenance
 

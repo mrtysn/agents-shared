@@ -1,7 +1,8 @@
 # Cases for require-subagent-sizing.sh — one per line: <verdict><TAB><tool_input JSON>
 #
 # verdict is `pass` (hook exits 0, no rewrite), `block` (hook exits 2), or
-# `effort=<level>` (hook exits 0 and its updatedInput carries that effort).
+# `effort=<level>` (hook exits 0 and its updatedInput carries that effort), or `once`
+# (sent with a session_id: the first call exits 2, the same call again exits 0).
 
 # --- no model is the failure the hook exists for
 block	{"description":"x","prompt":"x"}
@@ -27,3 +28,6 @@ pass	{"description":"x","prompt":"x","model":"opus","effort":"high"}
 pass	{"description":"x","prompt":"x","subagent_type":"fork"}
 # --- an unknown model string is not this hook's business
 pass	{"description":"x","prompt":"x","model":"claude-opus-5-5"}
+# --- with a session_id the first call is refused once, even with a model set; the repeat passes
+once	{"description":"x","prompt":"x","model":"haiku","effort":"low"}
+once	{"description":"x","prompt":"x","model":"opus"}

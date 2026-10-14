@@ -17,8 +17,8 @@ output or question under discussion.
 
 A `fork` inherits this conversation and therefore its bias. Use the `Agent` tool with a
 non-fork `subagent_type` and set `model`: `fable` by default. A model the user names
-(opus, sonnet) wins. Omit `effort` for `fable` and `opus`, per
-[size sub-agents to the task](../../rules/size-subagents-to-the-task.md).
+(opus, sonnet) wins. Omit `effort` for `fable` and `opus`, per the sizing table the
+Agent hook prints on a session's first spawn.
 
 ## 2. Write a blind brief
 

@@ -25,7 +25,7 @@ not said or the repo does not show.
 ## Sub-agents
 
 Each sub-agent gets a brief that stands alone and names the repo path of anything it hands back.
-Size each by the house table (`size-subagents-to-the-task`):
+Size each by the house table the Agent hook prints on a session's first spawn:
 
 | Sub-agent | Does | `model` | `effort` |
 |---|---|---|---|

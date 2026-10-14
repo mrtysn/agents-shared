@@ -70,8 +70,8 @@ brief holds the question in the user's words, what counts as a real instance and
 is noise (a lookup of an old chat, pasted logs, a test harness, this session's own
 prompts, injected agent messages), the batch file's absolute path, and the output: a
 JSONL file of `{id, verdict: REAL|NOISE|UNSURE, why, quote}` at an absolute path under
-the scratchpad, with a report of about 250 words. Add the sizing table from
-`size-subagents-to-the-task.md` so their own spawns are sized. Then read about eight of
+the scratchpad, with a report of about 250 words. Add the sizing table the Agent hook
+printed on this session's first spawn, so their own spawns are sized. Then read about eight of
 the verdicts yourself, at least two of each kind.
 
 ## 5. Read the context
