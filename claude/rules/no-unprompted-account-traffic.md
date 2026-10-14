@@ -8,7 +8,9 @@ Requests with no login still spend the user's IP budget: fetch once and iterate 
 the saved copy, state the count before a loop of more than a handful of requests,
 never test network code over ssh on a server, and treat a 429, 403, captcha or
 consent wall from a site as the end of requests to that site. Never record a
-refusal as a verdict on a site. Where agent-request-limiter answers 429, stop and
-tell the user.
+refusal as a verdict on a site. A burst limit the agent itself caused (too many
+parallel calls to a search tool) is pacing, not a refusal: slow down and continue,
+never more than about five in parallel. Where agent-request-limiter answers 429,
+stop and tell the user.
 
 The full rule appears the first time a session runs a network command.

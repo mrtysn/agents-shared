@@ -9,6 +9,8 @@ each option inside the option, puts the recommended option first marked
 something seen, or on more context than a few sentences, goes to an HTML decision
 form instead (`/new-html-page`, decision-form mode). Routine judgment calls are
 decided and stated, not asked. Outward-facing or hard-to-reverse actions are
-confirmed with the tool before they run.
+confirmed with the tool before they run. Ask only for names the user will type or
+see; pick the rest without asking, and every name, picked or offered, says what
+the thing does (verb-object, never a metaphor noun).
 
 The full rule appears the first time a session asks.
