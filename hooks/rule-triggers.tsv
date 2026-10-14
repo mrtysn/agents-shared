@@ -6,7 +6,7 @@ no-unprompted-account-traffic	Bash	command	(^|[;&|(`[:space:]])(curl|wget|ssh|sc
 no-unprompted-account-traffic	WebFetch|WebSearch|mcp__exa__.*	none	.	-	note-once
 messages-between-sessions	SendMessage	none	.	-	deny-once
 asking-for-decisions	AskUserQuestion	none	.	-	deny-once
-absolute-paths-for-deletion	Bash	command	(^|[;&|(`[:space:]])(rm|rmdir|unlink|trash)[[:space:]]	-	note-once
+absolute-paths-for-deletion	Bash	command	(^|[;&|(`[:space:]])(rm|rmdir|unlink|trash)[[:space:]]	git[[:space:]]+rm	note-once
 decide-file-location-and-format-by-reader	Write	file_path	^(/private)?/tmp/|/scratchpad/|^/var/folders/|^/private/var/folders/	-	deny-once
 persist-useful-tooling	Write	file_path	(/tmp/|/scratchpad/|/var/folders/).*\.(sh|zsh|py|js|rb)$	-	note-once
 memory-hygiene	Write|Edit	file_path	/memory/	-	note-once

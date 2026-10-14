@@ -32,3 +32,4 @@ note	Edit	{"file_path":"/Users/someone/.claude/projects/-x/memory/MEMORY.md","ol
 # --- tools no row covers
 pass	Read	{"file_path":"/tmp/x"}
 pass	Edit	{"file_path":"/Users/someone/dev/repo/a.txt","old_string":"a","new_string":"b"}
+pass	Bash	{"command":"git rm -q old.md"}
