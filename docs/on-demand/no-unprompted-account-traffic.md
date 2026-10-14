@@ -37,6 +37,17 @@ user's budget, and these hold for any third-party service:
   task, each fetched once and saved. Past that, state the count first. A refusal still ends it,
   as below. This does not cover search-engine pages, undocumented endpoints, anything
   behind a login, or any run on a server.
+- **Plain HTTP requests go through the gateway.** A request for a page, feed or API
+  response that curl or a script would make goes through `fetch-anything-agent get URL`
+  (also `record KIND KEY` and `status`). The gateway counts it against the site's budget,
+  answers repeats from its archive, and cools the site after a refusal, with a 429's
+  `Retry-After` setting the wait. The `agents` token is pinned to the home address, so
+  the Mac's runner serves every fetch: with it stopped the answer stays queued (HTTP 202)
+  and nothing arrives. A site the owner's tools depend on (Steam, TEFAS and the other
+  committed rules in fetch-anything's `sites/`) answers 403 `scope`; that is the gateway's
+  scope check, not a refusal by the site, so use the owner's tool for it or ask. yt-dlp,
+  SDKs, browsers and anything else that does its own HTTP stay direct under the refusal
+  rules in this file.
 - **Never test network code on a server.** Running a script over ssh — `docker exec` into a
   production container included — sends its requests from that server's IP, where nothing counts
   them and a ban hits production. Test locally against a saved response; run network code on a
