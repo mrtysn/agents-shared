@@ -17,3 +17,4 @@ persist-useful-tooling	Write	file_path	(/tmp/|/scratchpad/|/var/folders/).*\.(sh
 memory-hygiene	Write|Edit	file_path	/memory/	-	note-once
 choose-the-fix-for-a-pattern	Write	file_path	(claude/rules/|/skills/[^/]+/SKILL\.md$|docs/on-demand/|/hooks/[^/]+\.(sh|py)$|/CLAUDE\.md$)	-	note-once
 choose-the-fix-for-a-pattern	Edit	file_path	(hooks/rule-triggers\.tsv$|/CLAUDE\.md$|claude/rules/)	-	note-once
+verify-visual-ui-against-the-request	Bash	command	project-lifecycle[[:space:]].*page-new	-	note-once

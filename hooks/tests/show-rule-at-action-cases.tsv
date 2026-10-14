@@ -64,3 +64,5 @@ pass	Edit	{"file_path":"/p/app/src/main.py","old_string":"a","new_string":"b"}
 pass	Write	{"file_path":"/p/app/Sources/App.swift","content":"x"}
 pass	Write	{"file_path":"/p/agents-shared/scripts/new-script.py","content":"x"}
 each-agent	Write	{"file_path":"/p/agents-shared/claude/rules/another-rule.md","content":"x"}
+note	Bash	{"command":"project-lifecycle page-new --mode report --title X --out x.html"}
+pass	Bash	{"command":"project-lifecycle test"}
