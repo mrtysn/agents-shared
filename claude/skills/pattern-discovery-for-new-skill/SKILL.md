@@ -103,12 +103,14 @@ Only when step 5 found a rule, skill, hook or script that addresses the instance
 the turn before a few instances and decide which it is: the agent never knew it
 existed, it loads too late, it was ignored, or it is wrong. A pattern that repeats
 under existing coverage is rarely fixed by adding a second thing; the table in
-`$AGENTS_SHARED/docs/choose-the-fix-for-a-pattern.md` names the fix for each cause.
+`$AGENTS_SHARED/docs/on-demand/choose-the-fix-for-a-pattern.md` names the fix for each
+cause.
 
 ## 7. Verdict
 
-Name one fix from that table: skill, rule, trigger row, hook, mod or script, or none.
-A skill earns its place when the pattern repeats weekly or more, the instances share a
+Read `$AGENTS_SHARED/docs/on-demand/choose-the-fix-for-a-pattern.md` now, whether or not
+step 6 applied, and name one fix from its table: skill, rule, trigger row, hook, mod or
+script, or none. A skill earns its place when the pattern repeats weekly or more, the instances share a
 purpose, and the right response has steps worth fixing (a brief to write, a model to
 pick, a way to read the result). It does not when each instance needs different
 judgment. Name what the fix would hold, and for a trigger row or hook, the check that

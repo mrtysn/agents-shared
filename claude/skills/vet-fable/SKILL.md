@@ -52,7 +52,7 @@ Never a summary of what a file says: that is this session's reading, and the sta
 rides in with it.
 
 **A question about which fix to build** (a rule, skill, trigger row, hook, mod or
-script): add `$AGENTS_SHARED/docs/choose-the-fix-for-a-pattern.md` to the files to read,
+script): add `$AGENTS_SHARED/docs/on-demand/choose-the-fix-for-a-pattern.md` to the files to read,
 resolved to its absolute path. It is a reference table, not this session's view, so it
 does not breach the blind brief.
 

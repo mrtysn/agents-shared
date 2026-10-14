@@ -66,7 +66,7 @@ There is no push-based sync. A machine gets changes when you pull on it.
 ## When a new rule arrives
 
 Decide which layer it belongs to before writing anything, using the table in
-[choose-the-fix-for-a-pattern.md](choose-the-fix-for-a-pattern.md). It is the one place
+[choose-the-fix-for-a-pattern.md](on-demand/choose-the-fix-for-a-pattern.md). It is the one place
 that says where an instruction goes (rule, project `CLAUDE.md`, `paths:` rules, trigger
 row, hook, skill, script, mod, memory, local file), with what each costs.
 

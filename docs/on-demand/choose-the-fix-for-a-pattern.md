@@ -1,9 +1,11 @@
 # Choose the fix for a repeated pattern
 
-The one table of where an instruction or a fix goes. Read by `docs/MAINTAINING-RULES.md`
-when a new rule arrives, by `pattern-discovery-for-new-skill` when it writes its verdict,
-and by `vet-fable` when the subject under review is which fix to build. It lives in
-`docs/`, not `claude/rules/`, so no session pays for it unless one of those runs.
+The one table of where an instruction or a fix goes. It is shown once per session, by
+`hooks/show-rule-at-action.sh`, the first time a session writes a rule, a skill, a hook
+script, a trigger row, an on-demand doc or a `CLAUDE.md`. It is also read by
+`docs/MAINTAINING-RULES.md` when a new rule arrives, by `pattern-discovery-for-new-skill`
+when it writes its verdict, and by `vet-fable` when the subject under review is which fix
+to build. It lives here, not in `claude/rules/`, so no session pays for it at launch.
 
 ## First: does a fix already exist, and why did it not fire?
 
@@ -30,7 +32,7 @@ second thing. Find out why the first did not work:
 | A rule that matters only at a tool call | trigger row in `hooks/rule-triggers.tsv` plus a doc at `docs/on-demand/<id>.md` | `deny-once` fires before the action, `note-once` alongside it; **tool calls only** (PreToolUse), matched on `command`, `file_path`, `content` or `url` |
 | Something that must run at a fixed moment unconditionally (rules are context, not enforcement), the moment is not a tool call, or the check needs its own logic | hook, wired by hand into `settings.json` and listed in the README | `system-one-prompt.sh` sees a typed prompt, `system-one-stop.sh` sees the final message, `nudge-transcript-parsers.sh` is a worked example of a check with state |
 | Steps worth fixing that someone invokes: a brief to write, a model to pick, a way to read a result | skill | does nothing unless invoked, so its description has to carry the phrases that call it; **every skill's description loads into every session's prompt** |
-| A repeatable computation or search | script in `scripts/`, per [persist useful tooling](on-demand/persist-useful-tooling.md) | an agent has to know it exists, so give it a trigger row or a rule line |
+| A repeatable computation or search | script in `scripts/`, per [persist useful tooling](persist-useful-tooling.md) | an agent has to know it exists, so give it a trigger row or a rule line |
 | The fix needs state across events, rewriting content, or drawing | mod (**untested here**) | see below |
 
 ## Mods
@@ -52,7 +54,7 @@ when that is not.
 ## By kind of pattern
 
 - **A repeated agent failure** is a trip that recurred. Start from
-  [fix what tripped you](../claude/rules/fix-what-tripped-you-at-its-source.md) for
+  [fix what tripped you](../../claude/rules/fix-what-tripped-you-at-its-source.md) for
   where the fix goes (a guard, then an error message, then a doc line, then memory),
   and use this table only for the mechanism.
 - **A repeated request** earns a skill when the steps are worth fixing, a script when
