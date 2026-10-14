@@ -2,7 +2,7 @@
 
 > 面向使用者的图文指南（各区域与功能、截图）见 [GUIDE.md](GUIDE.md)；本文是技术说明。
 
-剪映式的成片后期台：多轨时间线 + 素材库（成片单元 / 216 个镜头卡 demo / 音效库 / 背景）+
+剪映式的成片后期台：多轨时间线 + 素材库（成片单元 / 150 个镜头卡 demo / 音效库 / 背景）+
 schema 属性面板 + Remotion 实时预览 + 一键导出。skill 交付成片后由
 `scripts/open.mjs` 自动打开，用户不用回到代码里改 tsx 就能挪镜头、改文案、换音效、变速、导出。
 移植自 [video-talkcraft/workbench](https://github.com/Vincentwei1021/video-talkcraft)，
@@ -20,7 +20,7 @@ cd workbench && npm install && npm run dev      # http://localhost:5198
 
 ## 能做什么
 
-- **素材库四 tab**：素材（成片单元 + 工程 public/ 里的图片视频）· 动效库（demos/ 216 个 demo 按画廊
+- **素材库四 tab**：素材（成片单元 + 工程 public/ 里的图片视频）· 动效库（demos/ 150 个 demo 按画廊
   10 类折叠，有本地样片的循环预览，没样片的卡显示定妆帧、悬停才播放）· 音效（本片音频 + `assets/audio/sfx` 149 个音效按 16 类 +
   5 首 BGM）· 背景（纸底 / 纯白 / 墨黑 / 纸底提亮）。**点击=中屏预览，拖拽到时间轨=添加**
 - **时间轨**：多轨道（上层覆盖下层，拖轨道头排序）、拖动、两端裁剪、跨轨、吸附、分割（S）、
@@ -30,6 +30,8 @@ cd workbench && npm install && npm run dev      # http://localhost:5198
 - **成片拆解导入**：按工程 `src/workbench.ts` 清单一键拆成 镜头 / 转场 / 字幕 / 叠加层 / 音乐 /
   音效 的多轨工程，落点与原 `<Sequence>` 逐帧一致（`npm run parity` 可证）
 - **保存**：自动存 localStorage（800ms 防抖），导出/导入工程 JSON，撤销/重做
+- **旧工程兼容**：2026-10 下架的 66 个镜头以冻结实现保留在 `demos/_legacy/`；旧存档 / JSON 仍按原
+  `cardId`、时序、变速和属性预览与导出。兼容卡不重新出现在素材库或 Studio 独立合成列表里。
 - **界面语言**：默认英文，顶栏右侧下拉框切换 English / 中文 / Русский（选择记在
   localStorage `shotcraft-workbench-locale`）。语言只影响展示，不改写工程 JSON 与轨道名。界面 chrome 走 `src/i18n.ts`
   的字符串表；卡片名 / schema 字段名 / 分类 / 轨道名 / 清单里的镜头标签照原文写，展示时按同文件的 zh→en / zh→ru

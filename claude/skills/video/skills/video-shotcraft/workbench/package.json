@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test:themes": "node scripts/test-themes.mjs",
+    "test:legacy": "node scripts/gen-index.mjs && node scripts/test-legacy.mjs",
     "gen": "node scripts/gen-index.mjs",
     "prepare": "node scripts/gen-index.mjs",
     "predev": "node scripts/gen-index.mjs",

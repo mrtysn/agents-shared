@@ -43,6 +43,9 @@ def find_demos():
     """返回 [(路径, 时长导出名, 组件名)], 按路径排序。"""
     out = []
     for f in sorted((ROOT / 'demos').rglob('*.tsx')):
+        # 下架镜头只为工作台旧工程保留，不重新成为当前镜头库的样片。
+        if '_legacy' in f.relative_to(ROOT / 'demos').parts:
+            continue
         src = f.read_text(encoding='utf-8')
         m = DUR_PAT.search(src)
         if not m:
