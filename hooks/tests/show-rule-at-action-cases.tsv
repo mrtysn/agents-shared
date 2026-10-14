@@ -49,3 +49,18 @@ note	Edit	{"file_path":"/Users/someone/.claude/projects/-x/memory/MEMORY.md","ol
 # --- tools no row covers
 pass	Read	{"file_path":"/tmp/x"}
 pass	Edit	{"file_path":"/Users/someone/dev/repo/a.txt","old_string":"a","new_string":"b"}
+# --- choose-the-fix-for-a-pattern: a session writing a place where an instruction or fix can go
+note	Write	{"file_path":"/p/agents-shared/claude/rules/new-rule.md","content":"x"}
+note	Write	{"file_path":"/p/agents-shared/claude/skills/new-skill/SKILL.md","content":"x"}
+note	Write	{"file_path":"/p/agents-shared/claude/skills/group/skills/new-skill/SKILL.md","content":"x"}
+note	Write	{"file_path":"/p/agents-shared/docs/on-demand/new-id.md","content":"x"}
+note	Write	{"file_path":"/p/agents-shared/hooks/new-hook.sh","content":"x"}
+note	Write	{"file_path":"/p/other-repo/CLAUDE.md","content":"x"}
+note	Edit	{"file_path":"/p/agents-shared/hooks/rule-triggers.tsv","old_string":"a","new_string":"b"}
+note	Edit	{"file_path":"/p/other-repo/CLAUDE.md","old_string":"a","new_string":"b"}
+note	Edit	{"file_path":"/p/agents-shared/claude/rules/existing-rule.md","old_string":"a","new_string":"b"}
+pass	Edit	{"file_path":"/p/agents-shared/claude/skills/existing/SKILL.md","old_string":"a","new_string":"b"}
+pass	Edit	{"file_path":"/p/app/src/main.py","old_string":"a","new_string":"b"}
+pass	Write	{"file_path":"/p/app/Sources/App.swift","content":"x"}
+pass	Write	{"file_path":"/p/agents-shared/scripts/new-script.py","content":"x"}
+each-agent	Write	{"file_path":"/p/agents-shared/claude/rules/another-rule.md","content":"x"}
