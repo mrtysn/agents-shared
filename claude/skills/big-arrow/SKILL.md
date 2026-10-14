@@ -63,6 +63,9 @@ becoming the active app unattended, and a hotkey terminal hides the instant anot
 selects a tab); use `--app X` only for an app already visible on screen; never raise an app that
 is not. Never put the user's name on a sign; write the action only ("Click Save"). Do not add the settings.json hook yourself: hooks
 are wired by hand from `hooks/`.
+For a picture instead of a live arrow (a report, a verification screenshot, a guide), do not draw
+on screen: `capture-mac-window --owner NAME --point X,Y --text "Click Save" OUT.png` captures the
+window and pastes the arrow on, with X,Y in the window's own pixels.
 <!-- LOCAL END -->
 
 ## Errors
