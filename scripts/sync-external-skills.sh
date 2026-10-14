@@ -312,7 +312,15 @@ for source_file in "$SKILLS_DIR"/*/source.json "$SKILLS_DIR"/*/skills/*/source.j
     for f in "${files[@]}"; do
         new_sha=$(git -C "$rd" rev-parse -q --verify "$new_commit:$(up "$f")" 2>/dev/null)
         if [[ -z "$new_sha" ]]; then
-            failed+=("$skill_name — file not found upstream: $f @ ${new_commit:0:7}")
+            # A repo-root skill skips the listing-drift check above, so adopt drops
+            # a listed file that upstream no longer has here instead.
+            if [[ $ADOPT -eq 1 && "$MODE" == "sync" ]]; then
+                rm -f "$skill_dir/$f" "$base_dir/$f"
+                jq --arg f "$f" '.files -= [$f]' "$source_file" > "$source_file.tmp" && mv "$source_file.tmp" "$source_file"
+                echo "  listing adopted: dropped $f (gone upstream)"
+                continue
+            fi
+            failed+=("$skill_name — file not found upstream: $f @ ${new_commit:0:7}; if upstream removed it, rerun with --adopt-listing $skill_name")
             ok=0; break
         fi
         if [[ ! -f "$base_dir/$f" ]] || [[ "$(git hash-object --no-filters "$base_dir/$f")" != "$new_sha" ]]; then
