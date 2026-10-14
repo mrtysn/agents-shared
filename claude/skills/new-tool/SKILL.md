@@ -23,13 +23,13 @@ Propose both from the script, recommended option first.
 
 ### 1. Locate or create the script
 
-If the user names an existing path, use it. For a fresh script, pick its home with the placement rule in `persist-useful-tooling` — a hand-invoked machine tool belongs in `$DEV_ROOT/tools/bin/`. Never put it in `dev-env`: that repo is dotfiles, and a program you invoke is not configuration. Never write the source directly into `~/bin` — keep source and symlink separate so the script is editable in its natural project location and travels with its repo.
+If the user names an existing path, use it. For a fresh script, pick its home with the placement rule in `$AGENTS_SHARED/docs/on-demand/persist-useful-tooling.md` — a hand-invoked machine tool belongs in `$DEV_ROOT/tools/bin/`. Never put it in `dev-env`: that repo is dotfiles, and a program you invoke is not configuration. Never write the source directly into `~/bin` — keep source and symlink separate so the script is editable in its natural project location and travels with its repo.
 
 Confirm the tool is missing from `~/bin` before proceeding — registering one twice produces a second entry that shadows the first. `tools/install.sh` links everything in `tools/bin/` in bulk, so a script already placed there and installed needs nothing further.
 
 ### 2. Hold it to the repo bar, and verify the DESC line
 
-A script becomes repo code, so it meets the bar in `persist-useful-tooling` before it is linked.
+A script becomes repo code, so it meets the bar in `$AGENTS_SHARED/docs/on-demand/persist-useful-tooling.md` before it is linked.
 Read the file and fix what fails:
 - Line 1 is a `#!` shebang; `#!/bin/zsh` unless it must be portable (a different one needs a stated reason).
 - Somewhere in the first 20 lines there is a `# DESC: <text>` line.

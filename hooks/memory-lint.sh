@@ -5,8 +5,9 @@
 # MEMORY.md loads into every session in its project; the memory files load only
 # on recall. So a fact in an index line is paid for in every session whether or
 # not the topic comes up, and the index is where private detail leaks. The
-# companion rule (claude/rules/memory-hygiene.md) says what to write; this
-# enforces the two halves that a script can check.
+# companion text (docs/on-demand/memory-hygiene.md, shown at a session's first
+# memory write) says what to write; this enforces the two halves that a script
+# can check.
 #
 # On a write under <config>/projects/*/memory/:
 #   - MEMORY.md: every index line that is new or changed relative to the file on

@@ -47,7 +47,7 @@ costs a brief, a report and a context of its own.
 - **A word cap on the report** (about 250 words) and a request for conclusions, not
   file dumps. A report is read once and then discarded.
 - **Where any file it produces goes**, per
-  [decide file location and format by reader](../claude/rules/decide-file-location-and-format-by-reader.md).
+  [decide file location and format by reader](on-demand/decide-file-location-and-format-by-reader.md).
 
 ## Provenance
 

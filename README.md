@@ -91,7 +91,7 @@ is where private detail leaks. On any `Edit` or `Write` under
 
 Only lines being introduced are judged, so rewriting an index that already
 carries old offenders is not blocked for them. The rule that says what to
-write is `claude/rules/memory-hygiene.md`; this refuses what it can detect.
+write is `docs/on-demand/memory-hygiene.md`; this refuses what it can detect.
 
 **Fails closed**, like the other PreToolUse guards. Cases in
 `hooks/tests/memory-lint-cases.tsv`, run with `hooks/tests/run-memory-lint.sh`.

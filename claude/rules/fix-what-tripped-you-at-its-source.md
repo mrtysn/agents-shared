@@ -18,7 +18,7 @@ In this order, taking the first that fits:
 3. **A doc line or Lessons-table row**, where the repo keeps one. Several repos
    have a Lessons table or a `REFUSALS.md`; use it.
 4. **A memory entry**, last, and only for a fact with no repo home. See
-   [memory hygiene](memory-hygiene.md).
+   memory hygiene, which the first memory write in a session brings up.
 
 ## How far to go
 
