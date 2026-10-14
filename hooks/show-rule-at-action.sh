@@ -10,8 +10,9 @@
 # Row columns, tab-separated (blank lines and # lines are skipped):
 #   id       the doc is docs/on-demand/<id>.md, and the id names the once-per-session marker
 #   tools    ERE matched against the whole tool name: Bash, Write|Edit, SendMessage ...
-#   field    what the pattern is matched against: command, file_path, content, url, or
-#            none (every call of the tool matches; pattern is ignored)
+#   field    what the pattern is matched against: command, file_path, content, url, to
+#            (a SendMessage recipient), or none (every call of the tool matches; pattern
+#            is ignored)
 #   pattern  ERE (grep -E) on that field
 #   exclude  ERE on the same field that cancels a match, or `-` for none
 #   mode     deny-once  the call is refused (exit 2) with the text, and the same action
@@ -19,10 +20,15 @@
 #                       the action
 #            note-once  the call goes ahead and the text is added to the model's context
 #                       (hookSpecificOutput.additionalContext)
+#   scope    optional. `main` fires the row only in the main conversation, not inside a
+#            sub-agent (a sub-agent's hook input carries `agent_id`); anything else, or
+#            nothing, fires it everywhere.
 #
-# Fires at most once per rule per session. The marker is a file named for the session id
-# under $CLAUDE_CONFIG_DIR/rule-injection/, pruned after 14 days; when it cannot be
-# written the call is not refused and no text is added. A missing doc file does nothing.
+# Fires at most once per rule per session and per agent: a sub-agent carries its parent's
+# session_id, so the marker is named for the session id plus the agent id (empty in the
+# main conversation), and a sub-agent's first trip does not use up the parent's. Markers
+# are files under $CLAUDE_CONFIG_DIR/rule-injection/, pruned after 14 days; when one cannot
+# be written the call is not refused and no text is added. A missing doc file does nothing.
 #
 # Bash, not zsh, to match the hooks beside it. Written for bash 3.2 (macOS /bin/bash).
 
@@ -31,6 +37,7 @@ set -e
 INPUT=$(cat)
 TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty')
 SESSION=$(printf '%s' "$INPUT" | jq -r '.session_id // empty')
+AGENT=$(printf '%s' "$INPUT" | jq -r '.agent_id // empty')
 [ -n "$TOOL" ] || exit 0
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -45,6 +52,7 @@ field_value() {
         file_path) printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' ;;
         content)   printf '%s' "$INPUT" | jq -r '.tool_input.content // .tool_input.new_string // empty' ;;
         url)       printf '%s' "$INPUT" | jq -r '.tool_input.url // empty' ;;
+        to)        printf '%s' "$INPUT" | jq -r '.tool_input.to // empty' ;;
         *)         printf '' ;;
     esac
 }
@@ -52,9 +60,10 @@ field_value() {
 DENY_TEXT=
 NOTE_TEXT=
 
-while IFS=$'\t' read -r id tools field pattern exclude mode; do
+while IFS=$'\t' read -r id tools field pattern exclude mode scope; do
     case "${id-}" in ''|'#'*) continue ;; esac
     printf '%s' "$TOOL" | grep -Eq "^($tools)\$" || continue
+    [ "${scope-}" = main ] && [ -n "$AGENT" ] && continue
 
     if [ "$field" != none ]; then
         value=$(field_value "$field")
@@ -68,7 +77,7 @@ while IFS=$'\t' read -r id tools field pattern exclude mode; do
     doc="$DOCS/$id.md"
     [ -r "$doc" ] || continue
 
-    mark="$STATE/${SESSION:-no-session}-$id"
+    mark="$STATE/${SESSION:-no-session}${AGENT:+-$AGENT}-$id"
     [ -e "$mark" ] && continue
     {
         mkdir -p "$STATE" &&

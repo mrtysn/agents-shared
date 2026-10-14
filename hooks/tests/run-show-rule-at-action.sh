@@ -30,13 +30,31 @@ run_hook() {
     OUT=$(printf '%s' "$1" | "$HOOK" 2>/dev/null) || CODE=$?
 }
 
-while IFS=$'\t' read -r verdict tool input; do
+while IFS=$'\t' read -r verdict tool input agent; do
     case "${verdict-}" in
         ''|'#'*) continue ;;
     esac
     total=$((total + 1))
-    payload=$(jq -cn --arg t "$tool" --arg s "case-$total" --argjson i "$input" \
-        '{tool_name: $t, session_id: $s, tool_input: $i}')
+    payload=$(jq -cn --arg t "$tool" --arg s "case-$total" --arg a "${agent-}" --argjson i "$input" \
+        '{tool_name: $t, session_id: $s, tool_input: $i} + (if $a == "" then {} else {agent_id: $a} end)')
+
+    if [ "$verdict" = each-agent ]; then
+        # A note-once row: the main conversation and a sub-agent of the same session each get
+        # the text once, and a repeat from either is quiet.
+        sub=$(printf '%s' "$payload" | jq -c '. + {agent_id: "sub-1"}')
+        run_hook "$payload"; main_first=$OUT
+        run_hook "$sub"; sub_first=$OUT
+        run_hook "$sub"; sub_again=$OUT
+        run_hook "$payload"; main_again=$OUT
+        if [ -n "$main_first" ] && [ -n "$sub_first" ] && [ -z "$sub_again" ] && [ -z "$main_again" ]; then
+            [ "$VERBOSE" = 1 ] && printf 'ok    %-6s %-16s %s\n' "$verdict" "$tool" "$input"
+        else
+            failed=$((failed + 1))
+            printf 'FAIL  each-agent: main first=%s sub first=%s sub again=%s main again=%s: %s %s\n' \
+                "${main_first:+text}" "${sub_first:+text}" "${sub_again:+text}" "${main_again:+text}" "$tool" "$input"
+        fi
+        continue
+    fi
 
     run_hook "$payload"
     first_code=$CODE
