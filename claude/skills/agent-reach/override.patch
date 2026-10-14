@@ -29,7 +29,7 @@
  metadata:
    homepage: https://github.com/Panniantong/Agent-Reach
  ---
-@@ -166,3 +152,27 @@
+@@ -163,3 +149,27 @@
  https://raw.githubusercontent.com/Panniantong/agent-reach/main/docs/install.md
  
  用户只需提供 cookies，其他配置由 agent 完成。
