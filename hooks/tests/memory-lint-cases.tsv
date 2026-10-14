@@ -32,3 +32,6 @@ block	Write	rule-dup:No-Hardcoded-Paths	body
 pass	Write	rule-dup:no-hardcoded-defaults	body
 # --- editing an existing memory file is not a duplicate
 pass	Write	finances.md	rewritten body with 3,316,271 TL in it
+block	Write	rule-dup:window-focus	body
+block	Write	rule-dup:feedback_memory_hygiene	body
+pass	Write	rule-dup:window-title	body

@@ -94,7 +94,9 @@ fi
 # --- new memory file: rule collision ----------------------------------------
 
 [ -e "$path" ] && exit 0            # editing an existing memory is not a new duplicate
-[ -d "$rules_dir" ] || exit 0
+
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+on_demand_dir="$HERE/../docs/on-demand"
 
 normalize() {
     printf '%s' "$1" | sed -E 's/^(feedback|reference|project|user)[_-]//; s/_/-/g' | tr '[:upper:]' '[:lower:]'
@@ -106,6 +108,14 @@ for rule in "$rules_dir"/*.md; do
     rname=$(basename "$rule" .md)
     if [ "$(normalize "$rname")" = "$slug" ]; then
         fail "$base duplicates the rule $rules_dir/$rname.md, which already loads in every session. Write no memory for it; edit the rule if it is wrong."
+    fi
+done
+# A rule whose full text a hook shows at the action is still a rule.
+for rule in "$on_demand_dir"/*.md; do
+    [ -e "$rule" ] || continue
+    rname=$(basename "$rule" .md)
+    if [ "$(normalize "$rname")" = "$slug" ]; then
+        fail "$base duplicates the rule text in docs/on-demand/$rname.md, which a hook shows at the action. Write no memory for it; edit the rule if it is wrong."
     fi
 done
 exit 0
