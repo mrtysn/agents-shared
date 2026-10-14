@@ -5,6 +5,9 @@ paths:
   - "**/*.swift"
   - "**/*.tsx"
   - "**/*.vue"
+  - "**/*.scss"
+  - "**/*.tscn"
+  - "**/*.xib"
 ---
 
 # Check a visual change against the user's own words
