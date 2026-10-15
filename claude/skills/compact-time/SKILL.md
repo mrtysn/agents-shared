@@ -1,8 +1,8 @@
 ---
-description: Decide whether now is a good time to run /compact — nothing mid-edit, nothing that only this conversation holds and a summary would lose — and end with a ready /compact message naming what the summary must keep. Read-only by default. Use when the user asks "is this a good time to run compact", "should I compact", "can I compact now", "what should the compact message say", or is about to run /compact.
+description: Decide whether now is a good time to run /compact — nothing mid-edit, nothing that only this conversation holds and a summary would lose — and end with a ready /compact message naming what the summary must keep. Read-only: it writes no file and makes no commit. Use when the user asks "is this a good time to run compact", "should I compact", "can I compact now", "what should the compact message say", or is about to run /compact.
 argument-hint: [optional scope, e.g. "just the message"]
 user-invocable: true
-allowed-tools: Bash, Read, Grep, Glob, Edit, Write, ListAgents, AskUserQuestion
+allowed-tools: Bash, Read, Grep, Glob, ListAgents
 ---
 
 The user is considering `/compact`. A compact is not a close: the session stays, and only
@@ -13,8 +13,9 @@ reports whether anything would be lost or broken, and ends with the message to c
 
 If that line is empty, run every check.
 
-**Read-only by default.** Steps 1 to 4 change nothing. The one exception is the ask in
-step 5, and only a yes there writes a file or commits.
+**Read-only.** Every step changes nothing: no file is written, nothing is committed, and
+no handoff note is made. What only the conversation holds goes into the `/compact`
+message, not into a file.
 
 ## What a compact keeps and loses
 
@@ -68,33 +69,23 @@ documented.
    Auto-compaction ignores `Wait`; near the threshold, the message matters more than the
    verdict.
 
-5. **The ask.** Only when step 2 or 3 found a gap, ask once with `AskUserQuestion`:
-   - own work left uncommitted on purpose, or an item that lives only in the conversation
-     and a fresh session would also need (write it into the doc where it belongs, or a
-     handoff in the repo it belongs to, per `/handoff`);
-   - not finished own work that is simply uncommitted: the commit rule already covers it,
-     and the verdict names it.
-
-   On a yes: write the doc with the Edit tool (never open a file for writing before
-   reading it), commit and push per the commit rule, and name the absolute paths. On a no,
-   or when there is no gap, change nothing.
-
 ## Output
 
 Lead with the verdict, one line. Then only what the user needs:
 
 - `Good time.` or `Wait:` and the reason.
 - Live work that survives, one line each; anything with survival not documented, marked.
-- Gaps written into files after a yes, as absolute paths.
+- Finished own work that is uncommitted, named with its repo (the commit rule covers it;
+  this skill does not commit it).
 
 The last thing in the reply is the message, in a code block:
 
     /compact <one or two lines naming what the summary must keep>
 
 - Names only what step 3 found: ids, paths, the next step, waiting decisions, corrections.
-- Stays one or two lines, because a long line wraps and breaks when copied. Anything
-  longer is a gap: it goes into a doc after the ask in step 5, and the message says
-  `read <absolute path>`.
+- Stays one or two lines, because a long line wraps and breaks when copied. If it will not
+  fit, keep the ids, the next step and the waiting decisions, and drop the rest; a summary
+  does not need every detail.
 - Never written to the clipboard, and never offered.
 - Nothing to keep that git, rules or memory do not hold: say "nothing is lost" and give
   a bare `/compact`.
