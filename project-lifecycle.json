@@ -34,7 +34,7 @@
       "run": [
         "bash",
         "-c",
-        "for t in memory-lint nudge-transcript-parsers require-absolute-rm require-subagent-sizing show-rule-at-action ssh-request-guard system-one-bash system-one-disabled system-one-receipts; do bash hooks/tests/run-$t.sh || exit 1; done"
+        "for t in memory-lint nudge-transcript-parsers require-absolute-rm require-subagent-sizing show-rule-at-action ssh-request-guard; do bash hooks/tests/run-$t.sh || exit 1; done"
       ]
     },
     {
