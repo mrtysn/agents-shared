@@ -135,15 +135,16 @@ upstream (never fetched otherwise) and listed files deleted upstream (which stop
 is a per-skill decision.
 A full run (no name) also lists `SKILL.md` files in the upstream repos that no `source.json`
 vendors (new upstream skills such as a repo's new sibling skills), one path per line
-(`--new-skills-summary` prints per-repo counts instead). Decide them with
-the **Upstream skills** button in Skill Tree (`scripts/skill_tree_skin.py`). Its *Not copied* tab shows each
-skill with its own description and a Copy it / Ignore / Decide later choice; its *Installed* tab lists every
-skill here with source, local-change count (override.patch), uncommitted-change flag and sync/change dates,
-and lets an external skill be marked Remove (folder deleted, skill ignored, nothing committed). Choices
-queue in the browser; the *Review* tab shows and edits every queued pick before the Apply dialog. Choices are queued in the browser; Apply shows
-what will change, then appends ignore lines to `scripts/external-skills-ignore.txt` (`<owner/repo> <glob>`)
-and copies skills with `scripts/vendor-upstream-skill.py`. Both drop out of the report. The list is
-cached at `$XDG_CACHE_HOME/agents-shared/unvendored-skills.json` and rebuilt by the view's Refresh button
+(`--new-skills-summary` prints per-repo counts instead). Decide them in the **Upstream** view of the Skill Tree
+app (the `dev-repos-skills` repo, `apps/skill-tree`; the third switch in its main window, or ⌘U). It is drawn
+like the Graph: each repository is a node that opens to its skills, and the right-hand panel shows the picked
+skill's description with a Copy / Undecided / Ignore choice. Where an installed skill came from (repo, pinned
+commit, sync date, local-change count from override.patch, uncommitted flag) and a Keep / Remove choice
+(folder deleted, skill ignored, nothing committed) are in the Graph tab's skill panel. Choices queue in the
+app; the footer button opens the plan, which says what will change before Apply appends ignore lines to
+`scripts/external-skills-ignore.txt` (`<owner/repo> <glob>`) and copies skills with
+`scripts/vendor-upstream-skill.py`. Both drop out of the report. The list is cached at
+`$XDG_CACHE_HOME/agents-shared/unvendored-skills.json` and rebuilt by the view's Refresh button
 (`scripts/catalog-unvendored-skills.py --json`, paced GitHub fetches). `--out <absolute html path>` builds
 a standalone page instead.
 `bash scripts/sync-external-skills.sh --check-links [<name>]` needs no network: it reports relative
