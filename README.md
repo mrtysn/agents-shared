@@ -67,6 +67,7 @@ config dir (`$CLAUDE_CONFIG_DIR`, else `~/.claude`).
 | `hooks/dump-hook-stdin.sh` | any | Probe: writes the JSON a hook event receives to a file, then allows the call |
 | `hooks/ssh-request-guard.sh` | PreToolUse (`Bash`) | Asks before an ssh command that could send requests from a remote host: network programs, code in a container, tunnels, scripts fed over stdin; read-only inspection in a container passes. A host the user clears for one session with `allow-ssh-host-for-session HOST SESSION_ID` (user-run, never agent-run) skips those asks in that session only. Every ask is appended to `<config>/ssh-request-guard/asks.jsonl`; `scripts/review-ssh-guard-asks.py` joins the log with the transcripts to show which asks were approved or denied |
 | `hooks/nudge-transcript-parsers.sh` | PreToolUse (`Bash\|Write`) | Never blocks. Once per session, when a command or a written file reads `~/.claude/projects` with python, jq, node or similar and names no shared reader, adds one `additionalContext` note pointing at `scripts/extract-session-text.py` and the mine-chat-logs skill. State file per session in `<config>/nudge-transcript-parsers/`; cases in `hooks/tests/nudge-transcript-parsers-cases.tsv`, run with `hooks/tests/run-nudge-transcript-parsers.sh`. Covers `claude/rules/never-hand-roll-a-transcript-parser.md` |
+| `hooks/nudge-named-skills-and-stale-shells.sh` | UserPromptSubmit | Never blocks, no model. Adds one line to the context when a typed prompt names a skill or command from the roster (invoke it with the Skill tool), and one when this session has background shells running over 60 minutes |
 | `hooks/log-buried-go-ahead.sh` | Stop | Log-only: when the final reply ends asking for a go-ahead in prose ("say the word", "want me to"), appends the phrase and the reply's tail to `~/.local/state/log-buried-go-ahead/<session>.jsonl`; no model call, never blocks. Covers `claude/rules/asking-for-decisions.md`; review steps are in `TODO.md` |
 
 ### memory-lint.sh
@@ -141,7 +142,10 @@ do about both.
 
 ### system-one
 
-The local decision model (Laya server), its hooks (`system-one-start`, `-bash`, `-bash-post`, `-prompt`, `-stop`, `-ask`), training and evaluation scripts, and skill live in the private `system-one` repo (`SYSTEM_ONE_DIR` in `paths.local.sh` is its checkout). Its README is the documentation.
+The local decision model server and the `system-one ask` call agents use for a bounded judgment live in
+the private `system-one` repo (`SYSTEM_ONE_DIR` in `paths.local.sh` is its checkout); its README is the
+documentation. It has no hooks beyond the session-start one. The skill-name nudge and the stale-shells
+warning that used to ride on its prompt hook are `hooks/nudge-named-skills-and-stale-shells.sh` here.
 
 ## Updating
 

@@ -1,0 +1,19 @@
+# Cases for nudge-named-skills-and-stale-shells.sh -- one per line: <expected><TAB><prompt>
+#
+# expected is `none` (no skill line) or `skill:a,b` (the context line names every listed skill, as /a and /b).
+# The runner builds a roster of: stg-msg-cmt, search-history, new-repo, archify, humanizer, outstanding.
+# Prompts are written on one line; the hook flattens newlines itself.
+none	hello there how are you doing today
+none	/outstanding
+none	use archify
+none	i want to search history for that chat from yesterday
+none	outstanding items please list them for me
+none	search-history --resume was in my terminal output just now
+none	<agent-message from="x"> please use search-history to find it </agent-message>
+none	[Subagent hand-back] the report says to run stg-msg-cmt now
+skill:search-history	please use search-history to find that chat
+skill:stg-msg-cmt	run /stg-msg-cmt for me now please
+skill:outstanding	please run /outstanding at the end now
+skill:archify	can you archify this flow for me
+skill:humanizer	rewrite this paragraph with humanizer please
+skill:new-repo,search-history	use new-repo then search-history on it
