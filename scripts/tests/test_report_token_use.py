@@ -44,6 +44,27 @@ class ReadMessagesTest(unittest.TestCase):
         self.assertEqual(got, {})
 
 
+class SubagentSplitTest(unittest.TestCase):
+    def test_subagent_transcripts_are_counted_in_total_and_in_sub(self):
+        mod = load()
+        with tempfile.TemporaryDirectory() as tmp:
+            proj = Path(tmp) / "projects" / "-p"
+            (proj / "sess" / "subagents").mkdir(parents=True)
+            (proj / "sess.jsonl").write_text(json.dumps(entry("a", "2026-10-14T10:00:00Z", 1)) + "\n")
+            (proj / "sess" / "subagents" / "agent-1.jsonl").write_text(
+                json.dumps(entry("b", "2026-10-14T10:01:00Z", 1)) + "\n")
+            mod.transcripts = lambda **kw: mod_transcripts(tmp, **kw)
+            rows, projects = mod.summarise(None, None)
+        self.assertEqual(rows[0]["total"]["requests"], 2)
+        self.assertEqual(rows[0]["sub"]["requests"], 1)
+        self.assertEqual(projects[0]["sub"]["requests"], 1)
+
+
+def mod_transcripts(tmp, **kw):
+    from transcript_items import transcripts
+    return transcripts(config_dir_list=[tmp], **kw)
+
+
 class WeightTest(unittest.TestCase):
     def test_weighted_uses_the_price_ratios(self):
         t = {"input": 10, "cache_write": 8, "cache_read": 100, "output": 2}

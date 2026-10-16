@@ -13,6 +13,9 @@ reply streamed, so they undercount the real output: treat them as a lower bound.
 A message belongs to the window when its timestamp is inside --since/--until. Totals are
 kept per model, because the models are not priced alike.
 
+Each session and project also carries "sub": the part of its total that came from sub-agent
+transcripts, so the cost of delegated agents reads apart from the parent session's own.
+
 Prints one JSON object: {"window", "sessions": [...], "projects": [...]} sorted by
 fresh-equivalent tokens (input + 1.25 x cache write + 0.1 x cache read + 5 x output), the
 ratios of the standard price list. That sort key is a ranking aid, not the quota's formula.
@@ -90,13 +93,16 @@ def summarise(since, until, project=None, days=None):
     for path, name, session in transcripts(project=project, days=days, subagents=True):
         key = (name, session)
         s = sessions.setdefault(key, {"project": name, "session": session, "first": None, "last": None,
-                                      "total": empty(), "models": {}})
+                                      "total": empty(), "sub": empty(), "models": {}})
+        is_sub = "/subagents/" in path
         for ts, model, vals in read_messages(path).values():
             when = parse_time(ts)
             if when is None or (since and when < since) or (until and when >= until):
                 continue
             row = {**vals, "requests": 1}
             add(s["total"], row)
+            if is_sub:
+                add(s["sub"], row)
             add(s["models"].setdefault(model, empty()), row)
             s["first"] = min(filter(None, [s["first"], ts]))
             s["last"] = max(filter(None, [s["last"], ts]))
@@ -106,9 +112,10 @@ def summarise(since, until, project=None, days=None):
     rows.sort(key=lambda s: -s["weighted"])
     folders = {}
     for s in rows:
-        p = folders.setdefault(s["project"], {"project": s["project"], "sessions": 0, "total": empty(), "models": {}})
+        p = folders.setdefault(s["project"], {"project": s["project"], "sessions": 0, "total": empty(), "sub": empty(), "models": {}})
         p["sessions"] += 1
         add(p["total"], s["total"])
+        add(p["sub"], s["sub"])
         for model, t in s["models"].items():
             add(p["models"].setdefault(model, empty()), t)
     projects = list(folders.values())
