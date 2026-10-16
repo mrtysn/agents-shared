@@ -19,3 +19,4 @@ choose-the-fix-for-a-pattern	Write	file_path	(claude/rules/|/skills/[^/]+/SKILL\
 choose-the-fix-for-a-pattern	Edit	file_path	(hooks/rule-triggers\.tsv$|/CLAUDE\.md$|claude/rules/)	-	note-once
 verify-visual-ui-against-the-request	Bash	command	project-lifecycle[[:space:]].*page-new	-	note-once
 rescue-unreachable-window	Bash	command	System Events.*window	rescue-window	note-once
+leave-the-clipboard-alone	Bash	command	(^|[;&|(`])[[:space:]]*(pbcopy|xclip|xsel|wl-copy)([[:space:]]|$)|set the clipboard	-	deny-once
