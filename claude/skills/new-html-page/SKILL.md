@@ -29,9 +29,13 @@ Pages are local files (see the artifacts rule): never publish to Anthropic.
    | `link-collection` | links worth keeping, grouped |
    | `status-grid` | where things are and how many copies or owners each has |
    | `tool` | a calculator: inputs, live results |
+   | `deck` | a talk to present: one slide per section, speaker notes, keyboard and touch |
 
-   Each mode has default sections; give `--section` to name your own (`schedule` and
-   `link-collection` always need them: the days, the groups).
+   Each mode has default sections; give `--section` to name your own (`schedule`,
+   `link-collection` and `deck` always need them: the days, the groups, the slides).
+   A deck is the one mode with no contents column. The title becomes the first slide, each
+   `--section` is a slide holding one point, and the `.ws-notes` div on a slide is what the
+   presenter says (`N` shows it; printing leaves it out). Pass no `--layout`.
 2. **Pick the sections.** The headings are the contents column: two to eight, each a noun
    phrase. No question to the user unless the content itself is undecided.
 3. **Scaffold** into the repo or folder the page belongs in (notebook pages are
