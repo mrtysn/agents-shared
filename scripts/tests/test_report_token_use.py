@@ -65,6 +65,25 @@ def mod_transcripts(tmp, **kw):
     return transcripts(config_dir_list=[tmp], **kw)
 
 
+class IntervalsTest(unittest.TestCase):
+    def test_cuts_sum_the_weighted_tokens_between_each_pair(self):
+        mod = load()
+        with tempfile.TemporaryDirectory() as tmp:
+            proj = Path(tmp) / "projects" / "-p"
+            proj.mkdir(parents=True)
+            (proj / "s.jsonl").write_text("".join(json.dumps(e) + "\n" for e in [
+                entry("a", "2026-10-14T10:00:00Z", 0, read=0),
+                entry("b", "2026-10-14T11:00:00Z", 0, read=0),
+                entry("c", "2026-10-14T12:30:00Z", 0, read=0)]))
+            mod.transcripts = lambda **kw: mod_transcripts(tmp, **kw)
+            cuts = [mod.parse_time("2026-10-14T09:00:00Z"), mod.parse_time("2026-10-14T11:00:00Z"),
+                    mod.parse_time("2026-10-14T13:00:00Z")]
+            buckets = []
+            mod.summarise(None, None, cuts=cuts, buckets=buckets)
+        one = 5 + 1.25 * 20  # input + cache write, no cache read, no output
+        self.assertEqual(buckets, [one, 2 * one])
+
+
 class WeightTest(unittest.TestCase):
     def test_weighted_uses_the_price_ratios(self):
         t = {"input": 10, "cache_write": 8, "cache_read": 100, "output": 2}

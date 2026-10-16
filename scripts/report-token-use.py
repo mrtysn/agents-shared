@@ -16,6 +16,9 @@ kept per model, because the models are not priced alike.
 Each session and project also carries "sub": the part of its total that came from sub-agent
 transcripts, so the cost of delegated agents reads apart from the parent session's own.
 
+--cuts t1,t2,... adds "intervals": the weighted tokens between each consecutive pair of times, across
+all sessions, for calibrating a quota percentage against the tokens spent between two readings.
+
 Prints one JSON object: {"window", "sessions": [...], "projects": [...]} sorted by
 fresh-equivalent tokens (input + 1.25 x cache write + 0.1 x cache read + 5 x output), the
 ratios of the standard price list. That sort key is a ranking aid, not the quota's formula.
@@ -27,6 +30,7 @@ Examples:
 """
 
 import argparse
+import bisect
 import json
 import sys
 from datetime import datetime, timezone
@@ -88,8 +92,11 @@ def read_messages(path):
     return seen
 
 
-def summarise(since, until, project=None, days=None):
+def summarise(since, until, project=None, days=None, cuts=None, buckets=None):
+    """cuts: sorted datetimes; buckets: a list filled with the weighted tokens between each pair."""
     sessions = {}
+    if buckets is not None:
+        buckets[:] = [0.0] * max(len(cuts or []) - 1, 0)
     for path, name, session in transcripts(project=project, days=days, subagents=True):
         key = (name, session)
         s = sessions.setdefault(key, {"project": name, "session": session, "first": None, "last": None,
@@ -100,6 +107,10 @@ def summarise(since, until, project=None, days=None):
             if when is None or (since and when < since) or (until and when >= until):
                 continue
             row = {**vals, "requests": 1}
+            if buckets is not None:
+                slot = bisect.bisect_right(cuts, when) - 1
+                if 0 <= slot < len(buckets):
+                    buckets[slot] += weighted(vals)
             add(s["total"], row)
             if is_sub:
                 add(s["sub"], row)
@@ -132,10 +143,13 @@ def main():
     ap.add_argument("--project", help="only project folders whose name contains this")
     ap.add_argument("--days", type=int, help="skip transcripts not modified in the last N days")
     ap.add_argument("--top", type=int, help="keep the N biggest sessions and projects")
+    ap.add_argument("--cuts", help="comma list of ISO times: also print the weighted tokens between each consecutive pair, as \"intervals\"")
     ap.add_argument("--text", action="store_true", help="print a table instead of JSON")
     a = ap.parse_args()
     since, until = parse_time(a.since), parse_time(a.until)
-    sessions, projects = summarise(since, until, a.project, a.days)
+    cuts = sorted(parse_time(c) for c in a.cuts.split(",")) if a.cuts else None
+    buckets = []
+    sessions, projects = summarise(since, until, a.project, a.days, cuts, buckets if cuts else None)
     if a.top:
         sessions, projects = sessions[: a.top], projects[: a.top]
     if a.text:
@@ -145,7 +159,11 @@ def main():
             print(f"{s['project'][:40]:40} {s['session'][:8]:9} {t['requests']:8} {t['input']:10} "
                   f"{t['cache_write']:11} {t['cache_read']:13} {t['output']:9}")
         return
-    print(json.dumps({"window": {"since": a.since, "until": a.until}, "sessions": sessions, "projects": projects}))
+    out = {"window": {"since": a.since, "until": a.until}, "sessions": sessions, "projects": projects}
+    if cuts:
+        out["intervals"] = [{"from": cuts[i].isoformat(), "to": cuts[i + 1].isoformat(), "weighted": buckets[i]}
+                            for i in range(len(buckets))]
+    print(json.dumps(out))
 
 
 if __name__ == "__main__":
