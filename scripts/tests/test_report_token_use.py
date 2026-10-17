@@ -19,7 +19,7 @@ def load():
     return m
 
 
-def entry(msg_id, ts, out, model="claude-x", read=100):
+def entry(msg_id, ts, out, model="claude-sonnet-5-5", read=100):
     return {"type": "assistant", "timestamp": ts,
             "message": {"id": msg_id, "model": model,
                         "usage": {"input_tokens": 5, "cache_creation_input_tokens": 20,
@@ -80,14 +80,42 @@ class IntervalsTest(unittest.TestCase):
                     mod.parse_time("2026-10-14T13:00:00Z")]
             buckets = []
             mod.summarise(None, None, cuts=cuts, buckets=buckets)
-        one = 5 + 1.25 * 20  # input + cache write, no cache read, no output
-        self.assertEqual(buckets, [one, 2 * one])
+        # per message: 5 input at $2 plus 20 cache-write tokens, all 1-hour at $4, per million
+        one = (5 * 2 + 20 * 4) / 1e6
+        self.assertAlmostEqual(buckets[0], one)
+        self.assertAlmostEqual(buckets[1], 2 * one)
 
 
-class WeightTest(unittest.TestCase):
-    def test_weighted_uses_the_price_ratios(self):
-        t = {"input": 10, "cache_write": 8, "cache_read": 100, "output": 2}
-        self.assertEqual(load().weighted(t), 10 + 10 + 10 + 10)
+class CostTest(unittest.TestCase):
+    def usage(self, **kw):
+        base = {"input": 0, "cache_write": 0, "cache_read": 0, "output": 0, "write_1h": 0}
+        return {**base, **kw}
+
+    def test_sonnet_55_prices_each_line_from_its_row(self):
+        mod = load()
+        # 1M of each: input 2, 5m write 2.5, read 0.10, output 10 x scale 2
+        v = self.usage(input=1_000_000, cache_write=1_000_000, cache_read=1_000_000, output=1_000_000)
+        self.assertAlmostEqual(mod.message_cost("claude-sonnet-5-5", v), 2 + 2.5 + 0.10 + 20)
+
+    def test_the_one_hour_part_of_a_write_costs_the_one_hour_price(self):
+        mod = load()
+        v = self.usage(cache_write=1_000_000, write_1h=1_000_000)
+        self.assertAlmostEqual(mod.message_cost("claude-opus-5-5", v), 8.0)
+
+    def test_fable_51_reads_at_a_40th_of_input(self):
+        mod = load()
+        v = self.usage(cache_read=1_000_000)
+        self.assertAlmostEqual(mod.message_cost("claude-fable-5-1", v), 0.25)
+
+    def test_haiku_55_changes_row_above_100k_prompt_tokens(self):
+        mod = load()
+        small = mod.message_cost("claude-haiku-5-5", self.usage(input=50_000))
+        big = mod.message_cost("claude-haiku-5-5", self.usage(input=200_000))
+        self.assertAlmostEqual(small, 50_000 * 0.10 / 1e6)
+        self.assertAlmostEqual(big, 200_000 * 0.50 / 1e6)
+
+    def test_a_model_with_no_row_has_no_cost(self):
+        self.assertIsNone(load().message_cost("claude-unknown-9", self.usage(input=1)))
 
 
 if __name__ == "__main__":
