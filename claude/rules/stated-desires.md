@@ -33,9 +33,4 @@ Read-only investigation to inform the proposal is welcome — say that is what i
 is. Groundwork that silently turns into edits is the failure this rule exists to
 prevent.
 
-## Provenance
-
-A request for two global hotkeys — a Firefox tab and one Telegram chat. The
-desire was stated as two bullets; the reply surveyed the machine, picked
-Karabiner, chose a file layout, and was writing scripts when it was
-interrupted. Nothing about the approach had been discussed.
+Provenance: [docs/provenance/stated-desires.md](../../docs/provenance/stated-desires.md).

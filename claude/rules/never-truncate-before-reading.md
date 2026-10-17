@@ -25,9 +25,4 @@ git, Time Machine or Claude's file history.
   (`git update-index --cacheinfo`) so others' uncommitted lines stay theirs.
 - **Briefing a sub-agent** that will edit such a file: say this in the brief.
 
-## Provenance
-
-Oct 9 2026, asset-pipeline: four sub-agents in one session emptied
-docs/PUPPET_PIPELINE.md this way. Three rebuilt it from memory; the fourth
-emptying was found later and restored from HEAD. Another session's uncommitted
-plush-clothing lines were lost.
+Provenance: [docs/provenance/never-truncate-before-reading.md](../../docs/provenance/never-truncate-before-reading.md).

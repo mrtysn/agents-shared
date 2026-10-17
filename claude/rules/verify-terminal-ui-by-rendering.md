@@ -19,9 +19,4 @@ A program's raw output is cursor moves and redraws. Finding the expected words
 in it proves the data is there, not that anyone can read it: every layout bug
 passes that check. Only the rendered screen shows layout.
 
-## Provenance
-
-Sep 2026: clo's search and recent-sessions views were reported done after tests
-that grepped a pseudo-terminal's output for session names. On screen, a 60%
-side pane cut every topic to twelve characters and the header ran off the
-edge; the user found it from a screenshot.
+Provenance: [docs/provenance/verify-terminal-ui-by-rendering.md](../../docs/provenance/verify-terminal-ui-by-rendering.md).

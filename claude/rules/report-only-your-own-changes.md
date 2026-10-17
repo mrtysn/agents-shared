@@ -14,8 +14,4 @@ Labelling it "pre-existing, not mine" is still listing it.
   row, no state, no next step.
 - Keep excluding them from staging, silently.
 
-## Provenance
-
-Corrected twice in Aug 2026: a pre-existing untracked script listed as an
-outstanding item after a commit, and an unrelated personal file included in a
-cleanup summary with a "not mine" label.
+Provenance: [docs/provenance/report-only-your-own-changes.md](../../docs/provenance/report-only-your-own-changes.md).

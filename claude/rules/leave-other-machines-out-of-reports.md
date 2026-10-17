@@ -23,10 +23,4 @@ Where a repo separates local from synced content (the notebook's root vs
 `synced/`), put new files where its instructions say and name the path. Moving
 them across is the user's decision; do not offer it.
 
-## Provenance
-
-Sep 2026: 46 messages in 30 sessions told the user to act on "other machines", most
-seeded by maintenance docs' "On other machines: pull, then run the script" and
-the notebook's "worth having on every machine → `synced/`". The user: "there is no
-other machine", and "this is NEVER in the scope of what we are doing but has been
-reported to me MANY times".
+Provenance: [docs/provenance/leave-other-machines-out-of-reports.md](../../docs/provenance/leave-other-machines-out-of-reports.md).

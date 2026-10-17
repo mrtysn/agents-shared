@@ -33,8 +33,4 @@ path carrying its own context cannot be resolved against the wrong directory.
 Distinct from [no hardcoded paths](no-hardcoded-paths.md), which governs what goes
 in a *file* — this governs what goes in a *message*.
 
-## Provenance
-
-Asked for by hand at least five times across Aug 10–31: "full path of that file
-please", "I need full path not this relative path", "either give me full path or
-launch it yourself".
+Provenance: [docs/provenance/absolute-paths-for-handoff.md](../../docs/provenance/absolute-paths-for-handoff.md).

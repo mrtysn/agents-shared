@@ -37,10 +37,4 @@ Mac apps and web pages.
    corners, or moving a column nobody mentioned is a change the user did not ask for;
    leave it, or name it and ask.
 
-## Provenance
-
-Oct 13 2026, notebook: a survey of 138 pushback messages ("that is not what I asked",
-"why are you…") put 34 in the group where the agent misread or reshaped the request,
-most of them visual layout work. cc-statusline on Sep 19 gave five corrections in a
-row about one window ("it doesnt even fit", "NOO you added scroll bars", "I asked you
-to FIT IT", "no dude NOW LEFT label", "I said stack them side by side, you HID THEM").
+Provenance: [docs/provenance/verify-visual-ui-against-the-request.md](../../docs/provenance/verify-visual-ui-against-the-request.md).
