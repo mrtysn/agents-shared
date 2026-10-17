@@ -17,7 +17,7 @@ Ours: the processes `list-session-background-shells.sh` prints for this session'
 
 ## Procedure
 
-1. **Processes.** Run `list-session-background-shells.sh --session <this session's id>` (agents-shared `scripts/`; the id is the UUID in the scratchpad path). Each block is one process tree this session started: the shell on the first line, its children indented with any `LISTEN addr:port`, and `orphan` blocks for children whose shell is already gone. Printed nothing: go to step 2. For each block, in order:
+1. **Processes.** Run `"$AGENTS_SHARED/scripts/list-session-background-shells.sh" --session <this session's id>` ( the id is the UUID in the scratchpad path). Each block is one process tree this session started: the shell on the first line, its children indented with any `LISTEN addr:port`, and `orphan` blocks for children whose shell is already gone. Printed nothing: go to step 2. For each block, in order:
    1. Say what it is doing in plain words.
    2. Check what stopping it loses. A server holding input the user typed (a decision form, an editor): look for its saved copy beside the file it serves (`FORM.answers.json`, a draft file; `--help` of the command says where) and read it. A job writing results: check the output file is complete. If stopping loses something that rerunning the command cannot bring back, do not stop it; it is a blocker.
    3. Otherwise stop it: `kill <pid> <pid> …` with every pid of the block typed as a literal number, the children included. No `pkill`, no pattern, no `$(…)`, no pid the script did not print. Wait two seconds; if a pid is still alive, `kill -KILL <pid>` once.

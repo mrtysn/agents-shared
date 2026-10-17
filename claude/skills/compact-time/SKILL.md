@@ -40,7 +40,7 @@ documented.
 
 ## Procedure
 
-1. **Live work.** Run `list-session-background-shells.sh --session <this session's id>`
+1. **Live work.** Run `"$AGENTS_SHARED/scripts/list-session-background-shells.sh" --session <this session's id>`
    (agents-shared `scripts/`; the id is the UUID in the scratchpad path) and `ListAgents`.
    Name each running shell and agent of this session, with its pid or id and what its
    result will do: a shell or agent keeps running through a compact. Name every `/loop`,
