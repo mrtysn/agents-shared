@@ -70,3 +70,16 @@ pass	Bash	{"command":"project-lifecycle test"}
 note	Bash	{"command":"/usr/bin/osascript -e 'tell application \"System Events\" to tell process \"Firefox\" to get position of every window'"}
 pass	Bash	{"command":"rescue-window firefox"}
 pass	Bash	{"command":"grep \"System Events\" notes.md"}
+# --- shell-scripts: writing a shell script, or running one through bash or sh
+note	Write	{"file_path":"/x/tools/run.zsh","content":"#!/bin/zsh\n"}
+note	Bash	{"command":"bash scripts/init-global.sh"}
+pass	Bash	{"command":"./scripts/init-global.sh"}
+pass	Bash	{"command":"bash -c 'echo hi'"}
+# --- no-hardcoded-paths: a write that carries a home-directory path
+note	Write	{"file_path":"/x/config.py","content":"ROOT = '/Users/someone/dev/x'\n"}
+note	Edit	{"file_path":"/x/a.sh","old_string":"a","new_string":"cd /home/someone/src"}
+pass	Write	{"file_path":"/x/config.py","content":"ROOT = Path.home() / 'dev'\n"}
+# --- never-truncate-before-reading: a write-mode open in a command or a written script
+note	Bash	{"command":"python3 -c \"open(p, 'w').write(open(p).read().upper())\""}
+note	Write	{"file_path":"/x/fix.py","content":"open(path, \"w\").write(text)\n"}
+pass	Bash	{"command":"python3 -c \"print(open(p).read())\""}

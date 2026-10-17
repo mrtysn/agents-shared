@@ -20,3 +20,8 @@ choose-the-fix-for-a-pattern	Edit	file_path	(hooks/rule-triggers\.tsv$|/CLAUDE\.
 verify-visual-ui-against-the-request	Bash	command	project-lifecycle[[:space:]].*page-new	-	note-once
 rescue-unreachable-window	Bash	command	System Events.*window	rescue-window	note-once
 leave-the-clipboard-alone	Bash	command	(^|[;&|(`])[[:space:]]*(pbcopy|xclip|xsel|wl-copy)([[:space:]]|$)|set the clipboard	-	deny-once
+shell-scripts	Write	file_path	\.(sh|zsh)$	-	note-once
+shell-scripts	Bash	command	(^|[;&|(`])[[:space:]]*(bash|sh)[[:space:]]+[^-[:space:]][^[:space:]]*\.(sh|zsh)([[:space:]]|$)	-	note-once
+no-hardcoded-paths	Write|Edit	content	/(Users|home)/[a-z][a-zA-Z0-9_.-]*/	-	note-once
+never-truncate-before-reading	Bash	command	open\([^)]*,[[:space:]]*['"]w['"]	-	note-once
+never-truncate-before-reading	Write	content	open\([^)]*,[[:space:]]*['"]w['"]	-	note-once
