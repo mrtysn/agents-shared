@@ -86,6 +86,22 @@ class IntervalsTest(unittest.TestCase):
         self.assertAlmostEqual(buckets[1], 2 * one)
 
 
+class TitleTest(unittest.TestCase):
+    def test_the_last_ai_title_of_the_session_file_is_reported(self):
+        mod = load()
+        with tempfile.TemporaryDirectory() as tmp:
+            proj = Path(tmp) / "projects" / "-p"
+            proj.mkdir(parents=True)
+            (proj / "s.jsonl").write_text("".join(json.dumps(e) + "\n" for e in [
+                {"type": "ai-title", "aiTitle": "First name", "sessionId": "s"},
+                entry("a", "2026-10-14T10:00:00Z", 1),
+                {"type": "ai-title", "aiTitle": "Better name", "sessionId": "s"}]))
+            mod.transcripts = lambda **kw: mod_transcripts(tmp, **kw)
+            rows, projects = mod.summarise(None, None)
+        self.assertEqual(rows[0]["title"], "Better name")
+        self.assertEqual(projects[0]["first"], "2026-10-14T10:00:00Z")
+
+
 class CostTest(unittest.TestCase):
     def usage(self, **kw):
         base = {"input": 0, "cache_write": 0, "cache_read": 0, "output": 0, "write_1h": 0}

@@ -26,7 +26,9 @@ times OUTPUT_SCALE for the undercount. A model with no row costs nothing and is 
 "unpriced". The plan quota's own formula is unpublished: cost is a ranking and calibration
 aid, not what the plan charges.
 
-Each session and project also carries "sub": the part of its total that came from sub-agent
+Each session carries "title", the last ai-title its transcript records (null when it has none), and
+sessions and projects carry "first" and "last", the times of their earliest and latest message in the
+window. Each also carries "sub": the part of its total that came from sub-agent
 transcripts, so the cost of delegated agents reads apart from the parent session's own.
 
 --cuts t1,t2,... adds "intervals": the cost between each consecutive pair of times, across
@@ -111,11 +113,20 @@ def add(into, other):
         into[k] += other[k]
 
 
-def read_messages(path):
-    """message id -> (timestamp, model, usage), one entry per id at the largest value per field."""
+def read_messages(path, titles=None):
+    """message id -> (timestamp, model, usage), one entry per id at the largest value per field.
+
+    titles: a list that gets each ai-title the file records (Claude Code's own name for the session)."""
     seen = {}
     with open(path, encoding="utf-8", errors="replace") as fh:
         for raw in fh:
+            if titles is not None and '"ai-title"' in raw:
+                try:
+                    title = json.loads(raw).get("aiTitle")
+                except json.JSONDecodeError:
+                    title = None
+                if title:
+                    titles.append(title)
             if '"usage"' not in raw:
                 continue
             try:
@@ -152,10 +163,11 @@ def summarise(since, until, project=None, days=None, cuts=None, buckets=None, un
         buckets[:] = [0.0] * max(len(cuts or []) - 1, 0)
     for path, name, session in transcripts(project=project, days=days, subagents=True):
         key = (name, session)
-        s = sessions.setdefault(key, {"project": name, "session": session, "first": None, "last": None,
-                                      "total": empty(), "sub": empty(), "models": {}})
+        s = sessions.setdefault(key, {"project": name, "session": session, "title": None, "first": None,
+                                      "last": None, "total": empty(), "sub": empty(), "models": {}})
         is_sub = "/subagents/" in path
-        for ts, model, vals in read_messages(path).values():
+        titles = None if is_sub else []
+        for ts, model, vals in read_messages(path, titles).values():
             when = parse_time(ts)
             if when is None or (since and when < since) or (until and when >= until):
                 continue
@@ -176,12 +188,17 @@ def summarise(since, until, project=None, days=None, cuts=None, buckets=None, un
             add(s["models"].setdefault(model, empty()), row)
             s["first"] = min(filter(None, [s["first"], ts]))
             s["last"] = max(filter(None, [s["last"], ts]))
+        if titles:
+            s["title"] = titles[-1]
     rows = [s for s in sessions.values() if s["total"]["requests"]]
     rows.sort(key=lambda s: -s["total"]["cost"])
     folders = {}
     for s in rows:
-        p = folders.setdefault(s["project"], {"project": s["project"], "sessions": 0, "total": empty(), "sub": empty(), "models": {}})
+        p = folders.setdefault(s["project"], {"project": s["project"], "sessions": 0, "first": None, "last": None,
+                                              "total": empty(), "sub": empty(), "models": {}})
         p["sessions"] += 1
+        p["first"] = min(filter(None, [p["first"], s["first"]]))
+        p["last"] = max(filter(None, [p["last"], s["last"]]))
         add(p["total"], s["total"])
         add(p["sub"], s["sub"])
         for model, t in s["models"].items():
