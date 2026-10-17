@@ -102,6 +102,34 @@ class TitleTest(unittest.TestCase):
         self.assertEqual(projects[0]["first"], "2026-10-14T10:00:00Z")
 
 
+def sized(msg_id, ts, read, write):
+    return {"type": "assistant", "timestamp": ts,
+            "message": {"id": msg_id, "model": "claude-sonnet-5-5",
+                        "usage": {"input_tokens": 0, "cache_creation_input_tokens": write,
+                                  "cache_read_input_tokens": read, "output_tokens": 0}}}
+
+
+class RewriteTest(unittest.TestCase):
+    def test_a_full_rewrite_after_idle_counts_and_a_compaction_does_not(self):
+        mod = load()
+        with tempfile.TemporaryDirectory() as tmp:
+            proj = Path(tmp) / "projects" / "-p"
+            proj.mkdir(parents=True)
+            (proj / "s.jsonl").write_text("".join(json.dumps(e) + "\n" for e in [
+                sized("a", "2026-10-14T10:00:00Z", 0, 100_000),
+                sized("b", "2026-10-14T10:00:30Z", 100_000, 5_000),
+                sized("c", "2026-10-14T12:00:00Z", 0, 105_000),       # cache gone after 2 hours
+                sized("d", "2026-10-14T12:00:20Z", 105_000, 3_000),
+                sized("e", "2026-10-14T12:00:40Z", 0, 30_000)]))      # compacted: smaller prompt
+            mod.transcripts = lambda **kw: mod_transcripts(tmp, **kw)
+            rows, _ = mod.summarise(None, None)
+        t = rows[0]["total"]
+        self.assertEqual(t["rewrites"], 1)
+        self.assertEqual(t["rewrites_after_idle"], 1)
+        self.assertEqual(t["rewrite_tokens"], 105_000)
+        self.assertAlmostEqual(t["rewrite_cost"], 105_000 * 4 / 1e6)
+
+
 class CostTest(unittest.TestCase):
     def usage(self, **kw):
         base = {"input": 0, "cache_write": 0, "cache_read": 0, "output": 0, "write_1h": 0}

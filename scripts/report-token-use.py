@@ -31,6 +31,14 @@ sessions and projects carry "first" and "last", the times of their earliest and 
 window. Each also carries "sub": the part of its total that came from sub-agent
 transcripts, so the cost of delegated agents reads apart from the parent session's own.
 
+Totals also count cache rewrites: a request whose cache read falls below half of the previous
+request's prompt in the same transcript while its own prompt stays at least 80% as large (so not
+a compaction), with at least 20,000 tokens written. The cache had expired or been dropped, and
+the whole context was written again at the write price. "rewrites" counts them,
+"rewrite_tokens" and "rewrite_cost" are what they wrote, and "rewrites_after_idle" counts those
+that followed a gap of 5 minutes or more since the previous request: an agent left waiting on a
+long job pays its full context again on its next request.
+
 --cuts t1,t2,... adds "intervals": the cost between each consecutive pair of times, across
 all sessions, for calibrating a quota percentage against the spend between two readings.
 
@@ -104,8 +112,20 @@ def message_cost(model, v, output_scale=OUTPUT_SCALE):
             + v["cache_read"] * p_read + v["output"] * output_scale * p_out) / 1e6
 
 
+REWRITE_READ_SHARE = 0.5   # cache read below this share of the previous prompt
+REWRITE_KEEP_SHARE = 0.8   # while the prompt keeps at least this share (not a compaction)
+REWRITE_MIN_WRITE = 20_000
+IDLE_SECONDS = 300
+
+
+def is_rewrite(vals, prompt, prev_prompt):
+    return bool(prev_prompt and vals["cache_read"] < REWRITE_READ_SHARE * prev_prompt
+                and prompt >= REWRITE_KEEP_SHARE * prev_prompt and vals["cache_write"] >= REWRITE_MIN_WRITE)
+
+
 def empty():
-    return {"input": 0, "cache_write": 0, "cache_read": 0, "output": 0, "requests": 0, "cost": 0.0}
+    return {"input": 0, "cache_write": 0, "cache_read": 0, "output": 0, "requests": 0, "cost": 0.0,
+            "rewrites": 0, "rewrites_after_idle": 0, "rewrite_tokens": 0, "rewrite_cost": 0.0}
 
 
 def add(into, other):
@@ -167,8 +187,13 @@ def summarise(since, until, project=None, days=None, cuts=None, buckets=None, un
                                       "last": None, "total": empty(), "sub": empty(), "models": {}})
         is_sub = "/subagents/" in path
         titles = None if is_sub else []
-        for ts, model, vals in read_messages(path, titles).values():
+        prev_prompt = prev_when = None
+        for ts, model, vals in sorted(read_messages(path, titles).values(), key=lambda m: m[0] or ""):
             when = parse_time(ts)
+            prompt = vals["input"] + vals["cache_read"] + vals["cache_write"]
+            rewrite = is_rewrite(vals, prompt, prev_prompt)
+            idle = bool(rewrite and when and prev_when and (when - prev_when).total_seconds() >= IDLE_SECONDS)
+            prev_prompt, prev_when = prompt, when
             if when is None or (since and when < since) or (until and when >= until):
                 continue
             cost = message_cost(model, vals, output_scale)
@@ -177,7 +202,13 @@ def summarise(since, until, project=None, days=None, cuts=None, buckets=None, un
                 if unpriced is not None:
                     unpriced[model] = unpriced.get(model, 0) + 1
             row = {k: vals[k] for k in ("input", "cache_write", "cache_read", "output")}
-            row.update(requests=1, cost=cost)
+            rewrite_cost = 0.0
+            if rewrite:
+                written = {"input": 0, "cache_read": 0, "output": 0, "cache_write": vals["cache_write"],
+                           "write_1h": vals["write_1h"]}
+                rewrite_cost = message_cost(model, written, output_scale) or 0.0
+            row.update(requests=1, cost=cost, rewrites=int(rewrite), rewrites_after_idle=int(idle),
+                       rewrite_tokens=vals["cache_write"] if rewrite else 0, rewrite_cost=rewrite_cost)
             if buckets is not None:
                 slot = bisect.bisect_right(cuts, when) - 1
                 if 0 <= slot < len(buckets):
@@ -228,11 +259,13 @@ def main():
     if a.top:
         sessions, projects = sessions[: a.top], projects[: a.top]
     if a.text:
-        print(f"{'project':40} {'session':9} {'requests':>8} {'cost $':>9} {'cache_w':>11} {'cache_r':>13} {'output':>9}")
+        print(f"{'project':40} {'session':9} {'requests':>8} {'cost $':>9} {'cache_w':>11} {'cache_r':>13} "
+              f"{'output':>9} {'rewrites':>8} {'idle':>5} {'rewrite $':>9}")
         for s in sessions:
             t = s["total"]
             print(f"{s['project'][:40]:40} {s['session'][:8]:9} {t['requests']:8} {t['cost']:9.2f} "
-                  f"{t['cache_write']:11} {t['cache_read']:13} {t['output']:9}")
+                  f"{t['cache_write']:11} {t['cache_read']:13} {t['output']:9} {t['rewrites']:8} "
+                  f"{t['rewrites_after_idle']:5} {t['rewrite_cost']:9.2f}")
         if unpriced:
             print(f"unpriced (counted as $0): {unpriced}")
         return
