@@ -20,9 +20,13 @@ explicit `model` on the call overrides it.
 
 | The sub-agent does | `model` | `effort` |
 |---|---|---|
-| Read-only work: a search or survey of more than about five tool calls, cataloguing, a report from files already named | `haiku` | low |
+| Read-only work: a search or survey of more than about five tool calls, cataloguing, a report from files already named; a search or survey goes as `subagent_type: Explore`, which starts at ~19k context instead of ~52–60k | `haiku` | low |
 | Ordinary implementation, mechanical edits, formatting, a page from a finished spec, a review of a diff under about 200 changed lines | `sonnet` | medium; high for a bug fix or where edge cases matter |
 | Design, review of a larger change, judgment across a codebase or between options | `opus` (`fable` only for the hardest cross-codebase judgment) | omit |
+
+Explore skips CLAUDE.md and the global rules (it keeps the skill list), so a brief for it
+carries anything those would have said. It reads excerpts rather than whole files, so a
+review or a report on named files stays a general-purpose agent.
 
 `low` is Anthropic's level for work a human checks step by step; a sub-agent's edits
 are not checked mid-run, so edits never go in the haiku row. `medium` is the model
@@ -76,6 +80,10 @@ the gap before their 176 rewrites had a median of 10.1 minutes. One Opus agent r
 reached 877k context and rewrote it 78 times. Of 447 sub-agents, the 17% that passed 200k made
 73% of sub-agent cache reads and the 6% past 300k made 47%; small agents that ran 40 minutes
 under ~110k were cheap, so the limits are on size, not duration.
+
+2026-10-17, `report-subagent-token-use.py`: Explore sub-agents started at 18.6–19.4k context
+in asset-pipeline and notebook sessions, against 52–69k for general-purpose ones; a probe
+Explore agent reported seeing the skill list but no rules and no CLAUDE.md.
 
 The same constraint typed by hand onto prompts, Sep–Oct 2026:
 
