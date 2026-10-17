@@ -52,7 +52,7 @@ fail=0 n=0
 check() { # name ok
     n=$((n + 1))
     if [ "$2" = 1 ]; then
-        [ "$VERBOSE" = 1 ] && echo "ok    $1"
+        if [ "$VERBOSE" = 1 ]; then echo "ok    $1"; fi
     else
         echo "FAIL  $1"; fail=$((fail + 1))
     fi
