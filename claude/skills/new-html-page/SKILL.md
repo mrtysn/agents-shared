@@ -37,7 +37,9 @@ Pages are local files (see the artifacts rule): never publish to Anthropic.
    `--section` is a slide holding one point, and the `.ws-notes` div on a slide is what the
    presenter says (`N` shows it; printing leaves it out). Pass no `--layout`. Give a slide its
    composition with `--section "Heading::layout"`: `stat` (one big number), `split` (two columns),
-   `figure`, `quote`, or `list` (default); vary them, a deck of lists reads flat.
+   `art` (text beside a picture), `figure`, `quote`, or `list` (default); vary them, a deck of lists
+   reads flat. `+accent` or `+soft` after the layout sets the slide's ground, and the `ws-kicker`
+   line above each title takes a two-word label.
 2. **Pick the sections.** The headings are the contents column: two to eight, each a noun
    phrase. No question to the user unless the content itself is undecided.
 3. **Scaffold** into the repo or folder the page belongs in (notebook pages are
