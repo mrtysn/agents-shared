@@ -49,6 +49,13 @@ guide_table() {
         | sed -e 's/^| */  /' -e 's/ *| */   model /' -e 's/ *| */   effort /' -e 's/ *|$//'
 }
 
+guide_limits() {
+    # The bullets under "## Keep it small while it runs", bold markers dropped.
+    [ -r "$GUIDE" ] || return
+    awk '/^## Keep it small while it runs/{on=1; next} on && /^## /{exit} on && /^- /' "$GUIDE" \
+        | sed -e 's/^- /  /' -e 's/\*\*//g'
+}
+
 deny() {
     echo "BLOCKED: $1" >&2
     {
@@ -59,9 +66,13 @@ deny() {
         echo
         echo "Edits never go in the haiku row: nothing checks a sub-agent's edits mid-run. Where a"
         echo "task could sit in two rows and its difficulty is unknown, start in the lower row."
-        echo "A lookup of up to ~5 tool calls is done in this session instead. Put this table"
-        echo "and a ~250-word report cap in the sub-agent's brief, and name where any file it"
-        echo "produces goes. Re-issue the call."
+        echo "A lookup of up to ~5 tool calls is done in this session instead."
+        echo
+        echo "Keep it small while it runs:"
+        guide_limits
+        echo
+        echo "Put this table, these limits and a ~250-word report cap in the sub-agent's brief,"
+        echo "and name where any file it produces goes. Re-issue the call."
     } >&2
     exit 2
 }

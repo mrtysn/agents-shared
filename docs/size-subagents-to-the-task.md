@@ -39,6 +39,14 @@ report falls short. A task you can already tell is hard goes straight to the hig
 row. `fork` ignores `model` and `effort`: use it only when the task needs this
 session's full context.
 
+## Keep it small while it runs
+
+- **Size, not time, is the cost.** A sub-agent pays its whole context on every request, and again in full at the cache-write price when it wakes after more than 5 minutes idle: sub-agents cache for 5 minutes.
+- **Long-running is fine while small.** A watcher or poller under ~100k context may wait as long as the job takes.
+- **Above ~100k, do not idle.** Poll a running job at most every 4 minutes, or hand back with the job id and let a fresh agent pick up the result.
+- **Hand back past ~200k.** Finish the current step and return a report a fresh agent can continue from.
+- **Past ~300k, only with a reason.** Continue only when close to the end of a diagnosis a report would lose, and say so in the report.
+
 ## Do not spawn at all
 
 A lookup or edit of up to about five tool calls is done in this session. A sub-agent
@@ -46,8 +54,8 @@ costs a brief, a report and a context of its own.
 
 ## What goes in the brief
 
-- **This sizing table and the report cap below**, copied in, so the sub-agent's own
-  spawns are sized too.
+- **This sizing table, the size limits above and the report cap below**, copied in, so
+  the sub-agent keeps itself small and its own spawns are sized too.
 - **A word cap on the report** (about 250 words) and a request for conclusions, not
   file dumps. A report is read once and then discarded.
 - **Where any file it produces goes**, per
@@ -61,6 +69,13 @@ session, 1,772 sub-agent requests ran on `opus` at about 290k context for tasks 
 Steam Deck": 127M of the session's 144M weighted tokens, 16% of the week's total. The
 spawns named `opus` explicitly, so the settings default did not apply and the hook, which
 allowed `opus`, did not object.
+
+Same window, measured with `report-token-use.py`'s rewrite count (2026-10-17): idle cache
+rewrites were $408 of the week's $1,856 at list price. Sub-agents wrote no 1-hour cache, and
+the gap before their 176 rewrites had a median of 10.1 minutes. One Opus agent ran 16.8 hours,
+reached 877k context and rewrote it 78 times. Of 447 sub-agents, the 17% that passed 200k made
+73% of sub-agent cache reads and the 6% past 300k made 47%; small agents that ran 40 minutes
+under ~110k were cheap, so the limits are on size, not duration.
 
 The same constraint typed by hand onto prompts, Sep–Oct 2026:
 
