@@ -22,6 +22,9 @@ parsers=$(python3 "$scripts/count-hand-rolled-transcript-parsers.py" --days 7 --
 commits=$(python3 "$scripts/count-manual-commit-requests.py" --days 7 --samples 0 | sed -n 's/^commit requests: \([0-9][0-9]*\) in.*/\1/p')
 invisible=$(python3 "$scripts/find-invisible-output-claims.py" --since "$since" --examples 0 --json | jq '.reference_hits | length')
 
+# The skill-group usage cache that hooks/note-skill-groups-used-here.sh reads at session start.
+python3 "$scripts/report-skill-group-use.py" --write-cache --quiet
+
 for value in "$parsers" "$commits" "$invisible"; do
     [[ "$value" =~ '^[0-9]+$' ]] || { print -u2 "rule-failure-survey: a counter printed no number (parsers='$parsers' commits='$commits' invisible='$invisible')"; exit 1 }
 done
