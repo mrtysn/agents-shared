@@ -173,6 +173,8 @@ def main():
     else:
         path = resolve(a.session)
         sources = [(path, path.parent.name, path.stem)]
+        if path.parent.name == "subagents":
+            a.subagents = True  # every row of a sub-agent transcript is a sidechain row
 
     if a.window:
         print_window(sources)
