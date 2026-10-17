@@ -39,7 +39,12 @@ Pages are local files (see the artifacts rule): never publish to Anthropic.
    composition with `--section "Heading::layout"`: `stat` (one big number), `split` (two columns),
    `art` (text beside a picture), `figure`, `quote`, or `list` (default); vary them, a deck of lists
    reads flat. `+accent` or `+soft` after the layout sets the slide's ground, and the `ws-kicker`
-   line above each title takes a two-word label.
+   line above each title takes a two-word label. **Turning an existing report into a deck:** read the
+   whole report first, including its later sections, because a follow-up section ("Result", "Decisions")
+   can overturn the first half; order slides so evidence comes before the claim that depends on it; give each
+   split column one point; a one-sentence finding is a line on a slide, not a stat slide; the dropped tables
+   stay in the report, which the deck accompanies. Have a fresh agent audit the deck against the report
+   before handing it over.
 2. **Pick the sections.** The headings are the contents column: two to eight, each a noun
    phrase. No question to the user unless the content itself is undecided.
 3. **Scaffold** into the repo or folder the page belongs in (notebook pages are
