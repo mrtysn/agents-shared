@@ -1,5 +1,5 @@
 ---
-description: Start a new HTML page — a report, document, diagram wrapper or write-up — on the house style, with a sticky contents column on the left built from its section headings. Use whenever the agent writes anything for the user to read (a report, survey, comparison, plan or write-up), whenever the user asks for an HTML page or visual output, and to turn a skill's Markdown report into a page (--from-markdown). Also the decision form — questions put to the user on a page, with screenshots and long context, answered back to the agent — for decisions AskUserQuestion would show badly.
+description: Start a new HTML page — a report, document, diagram wrapper or write-up — on the house style, with a sticky contents column on the left built from its section headings. Use whenever the agent writes anything for the user to read (a report, survey, comparison, plan or write-up), whenever the user asks for an HTML page or visual output, for slides, a deck or a presentation (deck mode), and to turn a skill's Markdown report into a page (--from-markdown). Also the decision form — questions put to the user on a page, with screenshots and long context, answered back to the agent — for decisions AskUserQuestion would show badly.
 argument-hint: [title] [section headings…]
 allowed-tools: Bash, Read, Write, Edit, Skill
 ---
