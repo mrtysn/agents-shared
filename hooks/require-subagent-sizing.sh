@@ -52,8 +52,14 @@ guide_table() {
 guide_limits() {
     # The bullets under "## Keep it small while it runs", bold markers dropped.
     [ -r "$GUIDE" ] || return
-    awk '/^## Keep it small while it runs/{on=1; next} on && /^## /{exit} on && /^- /' "$GUIDE" \
-        | sed -e 's/^- /  /' -e 's/\*\*//g'
+    local limits
+    limits=$(awk '/^## Keep it small while it runs/{on=1; next} on && /^## /{exit} on && /^- /' "$GUIDE" \
+        | sed -e 's/^- /  /' -e 's/\*\*//g')
+    if [ -n "$limits" ]; then
+        printf '%s\n' "$limits"
+    else
+        echo "  (size limits not found: no bullets under '## Keep it small while it runs' in $GUIDE)"
+    fi
 }
 
 deny() {

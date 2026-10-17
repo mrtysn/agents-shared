@@ -90,5 +90,15 @@ while IFS=$'\t' read -r verdict input; do
     fi
 done < "$CASES"
 
+# The refusal text carries the guide's size limits; a renamed heading would drop them silently.
+total=$((total + 1))
+refusal=$(printf '%s' '{"tool_name":"Agent","tool_input":{"description":"x","prompt":"x"}}' | "$HOOK" 2>&1 >/dev/null || true)
+if printf '%s' "$refusal" | grep -q 'Hand back past' && ! printf '%s' "$refusal" | grep -q 'size limits not found'; then
+    [ "$VERBOSE" = "1" ] && echo "ok    refusal prints the size limits"
+else
+    failed=$((failed + 1))
+    echo "FAIL  refusal does not print the size limits from the guide"
+fi
+
 printf '\n%s cases, %s failed\n' "$total" "$failed"
 [ "$failed" = "0" ]
