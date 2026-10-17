@@ -64,7 +64,7 @@ If a `.git/` exists, inspect `git remote -v` before proceeding. If `origin` alre
 
 Only create what is missing; never overwrite existing files without asking.
 
-- **`.gitignore`** — pick sensible defaults for the detected stack (look at file extensions, package manifests, lockfiles). Keep it minimal. If unsure, ask.
+- **`.gitignore`** — pick sensible defaults for the detected stack (look at file extensions, package manifests, lockfiles). Keep it minimal. If unsure, ask. Always include `.claude/settings.local.json` (step 4c writes it).
 - **`README.md`** — one short paragraph describing what the project is. Draw from existing project files; do not invent features.
 - **`LICENSE`** — default to AGPL-3.0 (see "License" section below for rationale and command). Always confirm with the user before adding; the choice is a deliberate decision per project, not a reflex.
 
@@ -105,6 +105,25 @@ reports/**/*.html
 Those patterns are a default, not a reading of the repo's real layout. On a no,
 write nothing. Nothing is ever added inside the repo itself; the file lives only
 on this machine.
+
+### 4c. Decide which skill groups this repo loads
+
+Optional skill groups (`~/.claude/skills/<group>`, loaded as the plugin `<group>@skills-dir`)
+are off globally so their descriptions stay out of every session; a repo turns on the ones
+its work needs. Run `report-skill-group-use.py` (agents-shared `scripts/`, about 20 seconds)
+for each group's skill count and 30-day uses across all folders.
+
+Suggest groups from what the repo is: a web UI → motion, react; a three.js game → threejs;
+a Godot game → gamedev; pixel art or rendering → art; video → video. `interface` is already
+on everywhere; leave it out. Ask with AskUserQuestion, multi-select, at most four options:
+the suggested groups first, each showing its uses; one option for the remaining groups,
+which then get their own question; and **None**.
+
+Write every group under `enabledPlugins` in `.claude/settings.local.json`, `true` for the
+chosen ones and `false` for the rest. The `false` entries record that the choice was made,
+which keeps `hooks/note-skill-groups-used-here.sh` quiet in this repo. The file is
+machine-local: a fresh clone starts without the choice, because the groups exist only in
+this machine's `~/.claude/skills`.
 
 ### 5. Confirm visibility, then create remote and push
 
