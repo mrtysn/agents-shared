@@ -9,8 +9,11 @@
 Omitting them runs the sub-agent at the parent's size, which spends tokens the task
 does not need. Token efficiency is a hard constraint, not a preference. The hook
 `hooks/require-subagent-sizing.sh` refuses a call with no `model` and fills in the
-row's `effort` when it is missing; `CLAUDE_CODE_SUBAGENT_MODEL=sonnet` in settings
-catches a spawn that reaches the tool another way.
+row's `effort` when it is missing, and refuses once an `opus` or `fable` spawn whose
+description opens with a build verb (Build, Fix, Implement, Offload, ...) because that is
+the sonnet row: re-issuing the call unchanged passes. `CLAUDE_CODE_SUBAGENT_MODEL=sonnet`
+in settings catches a spawn that reaches the tool another way, but is only a default: an
+explicit `model` on the call overrides it.
 
 ## Pick by the work
 
@@ -50,6 +53,13 @@ costs a brief, a report and a context of its own.
   [decide file location and format by reader](on-demand/decide-file-location-and-format-by-reader.md).
 
 ## Provenance
+
+Week of 2026-10-12, measured with `scripts/report-token-use.py`: in asset-pipeline's heaviest
+session, 1,772 sub-agent requests ran on `opus` at about 290k context for tasks described
+"Build GNM hand-puppet body", "Fix brow motion and sheet framing", "Offload fit work to
+Steam Deck": 127M of the session's 144M weighted tokens, 16% of the week's total. The
+spawns named `opus` explicitly, so the settings default did not apply and the hook, which
+allowed `opus`, did not object.
 
 The same constraint typed by hand onto prompts, Sep–Oct 2026:
 

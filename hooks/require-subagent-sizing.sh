@@ -11,6 +11,11 @@
 #   - a session's first Agent call, once per session_id, so the table below reaches
 #     the session before it picks a model. The marker is a file under $TMPDIR; when
 #     it cannot be written the call is not refused.
+#   - `opus` or `fable` for a task whose description opens with a build verb ("Build",
+#     "Fix", "Implement", ...): the table puts ordinary implementation on sonnet. Once
+#     per session and description, so a call that really is judgment work passes when
+#     it is issued again unchanged. A heuristic on the first word: it cannot judge the
+#     task, only that the description reads like the sonnet row.
 # Rewritten (allowed, with `effort` added through updatedInput):
 #   - `model` haiku with no `effort`  -> effort low
 #   - `model` sonnet with no `effort` -> effort medium
@@ -77,6 +82,24 @@ fi
 
 [ -z "$MODEL" ] && deny "this Agent call sets no model."
 [ "$FIRST" = 1 ] && deny "this is the session's first Agent call; the sizing table is shown once, before you choose."
+
+# opus and fable are allowed without effort, but not for work the table gives to sonnet.
+# Week of 2026-10-12: asset-pipeline's heaviest session ran 1,772 sub-agent requests on
+# opus at ~290k context for tasks described "Build ...", "Fix ...", "Offload ...": 127M
+# weighted tokens, 16% of the whole week.
+if [ -n "$SESSION" ] && { [ "$MODEL" = opus ] || [ "$MODEL" = fable ]; }; then
+    DESC=$(printf '%s' "$INPUT" | jq -r '.tool_input.description // empty')
+    WORD=$(printf '%s' "$DESC" | tr '[:upper:]' '[:lower:]' | awk '{print $1}')
+    case "$WORD" in
+        build|fix|implement|add|write|refactor|wire|offload|auto-route|create|migrate|port|rename|patch|install|convert|extract|apply|make|update|move)
+            SUM=$(printf '%s' "$DESC" | cksum | cut -d' ' -f1)
+            IMPL_MARK="$SEEN_DIR/impl-$SESSION${AGENT:+-$AGENT}-$SUM"
+            if [ ! -e "$IMPL_MARK" ] && : > "$IMPL_MARK" 2>/dev/null; then
+                deny "this spawn runs $MODEL for \"$DESC\", which reads as implementation. The table below puts ordinary implementation on sonnet (effort medium, high for a bug fix); $MODEL is for design and judgment, at twice sonnet's price. If this task really needs design or cross-codebase judgment, issue the same call again unchanged and it will pass."
+            fi
+            ;;
+    esac
+fi
 
 if [ -z "$EFFORT" ]; then
     case "$MODEL" in

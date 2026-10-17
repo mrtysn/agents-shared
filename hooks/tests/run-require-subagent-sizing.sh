@@ -46,6 +46,24 @@ while IFS=$'\t' read -r verdict input; do
         fi
         continue
     fi
+    if [ "$verdict" = once-after-first ] || [ "$verdict" = pass-after-first ]; then
+        # Use up the session's first-call refusal with a harmless call, then judge the call itself.
+        total=$((total + 1))
+        sid="after-first-$total"
+        warm=$(jq -cn --arg s "$sid" '{tool_name: "Agent", session_id: $s, tool_input: {description: "x", prompt: "x", model: "haiku", effort: "low"}}')
+        printf '%s' "$warm" | "$HOOK" >/dev/null 2>&1 || true
+        payload=$(jq -cn --argjson i "$input" --arg s "$sid" '{tool_name: "Agent", session_id: $s, tool_input: $i}')
+        first=0; printf '%s' "$payload" | "$HOOK" >/dev/null 2>&1 || first=$?
+        second=0; printf '%s' "$payload" | "$HOOK" >/dev/null 2>&1 || second=$?
+        want_first=2; [ "$verdict" = pass-after-first ] && want_first=0
+        if [ "$first" = "$want_first" ] && [ "$second" = 0 ]; then
+            [ "$VERBOSE" = "1" ] && printf 'ok    %-16s %s\n' "$verdict" "$input"
+        else
+            failed=$((failed + 1))
+            printf 'FAIL  %s: want first %s then 0, got %s then %s: %s\n' "$verdict" "$want_first" "$first" "$second" "$input"
+        fi
+        continue
+    fi
     want_effort=
     case "$verdict" in
         pass) want=0 ;;
