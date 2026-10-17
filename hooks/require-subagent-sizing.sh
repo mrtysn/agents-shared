@@ -11,11 +11,12 @@
 #   - a session's first Agent call, once per session_id, so the table below reaches
 #     the session before it picks a model. The marker is a file under $TMPDIR; when
 #     it cannot be written the call is not refused.
-#   - `opus` or `fable` for a task whose description opens with a build verb ("Build",
-#     "Fix", "Implement", ...): the table puts ordinary implementation on sonnet. Once
-#     per session and description, so a call that really is judgment work passes when
-#     it is issued again unchanged. A heuristic on the first word: it cannot judge the
-#     task, only that the description reads like the sonnet row.
+#   - `opus` or `fable` (or a full id containing either) for a task whose description opens
+#     with a build verb ("Build", "Fix", "Implement", ...): the table puts ordinary
+#     implementation on sonnet. Once per session and description, so a call that really
+#     is judgment work passes when it is issued again unchanged; on the session's first
+#     call both reasons arrive in one refusal. A heuristic on the first word: it cannot
+#     judge the task, only that the description reads like the sonnet row.
 # Rewritten (allowed, with `effort` added through updatedInput):
 #   - `model` haiku with no `effort`  -> effort low
 #   - `model` sonnet with no `effort` -> effort medium
@@ -81,25 +82,39 @@ if [ -n "$SESSION" ]; then
 fi
 
 [ -z "$MODEL" ] && deny "this Agent call sets no model."
-[ "$FIRST" = 1 ] && deny "this is the session's first Agent call; the sizing table is shown once, before you choose."
 
-# opus and fable are allowed without effort, but not for work the table gives to sonnet.
-# Week of 2026-10-12: asset-pipeline's heaviest session ran 1,772 sub-agent requests on
-# opus at ~290k context for tasks described "Build ...", "Fix ...", "Offload ...": 127M
-# weighted tokens, 16% of the whole week.
-if [ -n "$SESSION" ] && { [ "$MODEL" = opus ] || [ "$MODEL" = fable ]; }; then
-    DESC=$(printf '%s' "$INPUT" | jq -r '.tool_input.description // empty')
-    WORD=$(printf '%s' "$DESC" | tr '[:upper:]' '[:lower:]' | awk '{print $1}')
-    case "$WORD" in
-        build|fix|implement|add|write|refactor|wire|offload|auto-route|create|migrate|port|rename|patch|install|convert|extract|apply|make|update|move)
-            SUM=$(printf '%s' "$DESC" | cksum | cut -d' ' -f1)
-            IMPL_MARK="$SEEN_DIR/impl-$SESSION${AGENT:+-$AGENT}-$SUM"
-            if [ ! -e "$IMPL_MARK" ] && : > "$IMPL_MARK" 2>/dev/null; then
-                deny "this spawn runs $MODEL for \"$DESC\", which reads as implementation. The table below puts ordinary implementation on sonnet (effort medium, high for a bug fix); $MODEL is for design and judgment, at twice sonnet's price. If this task really needs design or cross-codebase judgment, issue the same call again unchanged and it will pass."
-            fi
+# opus and fable (also as a full model id) are allowed without effort, but not for work the
+# table gives to sonnet. Week of 2026-10-12: asset-pipeline's heaviest session ran 1,772
+# sub-agent requests on opus at ~290k context for tasks described "Build ...", "Fix ...",
+# "Offload ...": 127M weighted tokens, 16% of the whole week. The description's first word
+# (letters only, so "Fix:" and "- Build" count) is matched against build verbs, and the
+# refusal is once per session and description. When the session's first-call refusal is
+# due as well, one message carries both reasons and the repeat passes.
+IMPL=0
+IMPL_SENTENCE=
+if [ -n "$SESSION" ]; then
+    case "$MODEL" in
+        opus|fable|*opus*|*fable*)
+            DESC=$(printf '%s' "$INPUT" | jq -r '.tool_input.description // empty')
+            WORD=$(printf '%s' "$DESC" | head -n1 | tr '[:upper:]' '[:lower:]' | sed -E 's/^[^a-z]*([a-z]+).*/\1/')
+            case "$WORD" in
+                build|builds|building|built|fix|fixes|fixing|fixed|implement|implements|implementing|implemented|add|adds|adding|added|write|writes|writing|wrote|refactor|refactors|refactoring|wire|wires|wiring|offload|offloads|offloading|auto|create|creates|creating|created|migrate|migrates|migrating|port|ports|porting|rename|renames|renaming|patch|patches|patching|install|installs|installing|convert|converts|converting|extract|extracts|extracting|apply|applies|applying|make|makes|making|made|update|updates|updating|move|moves|moving|edit|edits|editing|change|changes|changing|remove|removes|removing|delete|deletes|deleting|generate|generates|generating)
+                    SUM=$(printf '%s' "$DESC" | cksum | cut -d' ' -f1)
+                    IMPL_MARK="$SEEN_DIR/impl-$SESSION${AGENT:+-$AGENT}-$SUM"
+                    if [ ! -e "$IMPL_MARK" ] && : > "$IMPL_MARK" 2>/dev/null; then
+                        IMPL=1
+                        IMPL_SENTENCE="this spawn runs $MODEL for \"$DESC\", which reads as implementation. The table below puts ordinary implementation on sonnet (effort medium, high for a bug fix); $MODEL costs more per token and is for design and judgment. If this task really needs design or cross-codebase judgment, issue the same call again unchanged and it will pass."
+                    fi
+                    ;;
+            esac
             ;;
     esac
 fi
+
+if [ "$FIRST" = 1 ]; then
+    deny "this is the session's first Agent call; the sizing table is shown once, before you choose.${IMPL_SENTENCE:+ Also, $IMPL_SENTENCE}"
+fi
+[ "$IMPL" = 1 ] && deny "$IMPL_SENTENCE"
 
 if [ -z "$EFFORT" ]; then
     case "$MODEL" in

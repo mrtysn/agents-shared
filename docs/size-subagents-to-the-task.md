@@ -9,9 +9,10 @@
 Omitting them runs the sub-agent at the parent's size, which spends tokens the task
 does not need. Token efficiency is a hard constraint, not a preference. The hook
 `hooks/require-subagent-sizing.sh` refuses a call with no `model` and fills in the
-row's `effort` when it is missing, and refuses once an `opus` or `fable` spawn whose
-description opens with a build verb (Build, Fix, Implement, Offload, ...) because that is
-the sonnet row: re-issuing the call unchanged passes. `CLAUDE_CODE_SUBAGENT_MODEL=sonnet`
+row's `effort` when it is missing, and refuses once an `opus` or `fable` spawn (a full
+model id containing either counts) whose description opens with a build verb (Build, Fix,
+Implement, Offload, ...) because that is the sonnet row: re-issuing the call unchanged
+passes, and on a session's first call the one refusal carries both reasons. `CLAUDE_CODE_SUBAGENT_MODEL=sonnet`
 in settings catches a spawn that reaches the tool another way, but is only a default: an
 explicit `model` on the call overrides it.
 

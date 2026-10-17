@@ -39,4 +39,14 @@ once-after-first	{"description":"Offload fit work to Steam Deck","prompt":"x","m
 # a design or review description, or sonnet, or an unknown model string, is not refused
 pass-after-first	{"description":"Review the hook's sizing design","prompt":"x","model":"opus"}
 pass-after-first	{"description":"Build GNM hand-puppet body","prompt":"x","model":"sonnet","effort":"medium"}
-pass-after-first	{"description":"Build GNM hand-puppet body","prompt":"x","model":"claude-opus-5-5"}
+once-after-first	{"description":"Build GNM hand-puppet body","prompt":"x","model":"claude-opus-5-5"}
+# punctuation, endings and irregular pasts still read as the build verb; an empty or non-verb description does not
+once-after-first	{"description":"Fix: brow motion","prompt":"x","model":"opus"}
+once-after-first	{"description":"- Implementing the queue","prompt":"x","model":"opus"}
+once-after-first	{"description":"Built the rig","prompt":"x","model":"fable"}
+once-after-first	{"description":"Delete the stale jobs","prompt":"x","model":"opus"}
+pass-after-first	{"description":"","prompt":"x","model":"opus"}
+pass-after-first	{"description":"Address review and portfolio notes","prompt":"x","model":"opus"}
+pass-after-first	{"description":"Say \"build\" in quotes","prompt":"x","model":"opus"}
+# --- a build-verb spawn that is also the session's first call is refused once, not twice
+once	{"description":"Build GNM hand-puppet body","prompt":"x","model":"opus"}
