@@ -88,3 +88,10 @@ Sep 2026: 143 naming questions in 30 days; in 73 the user took none of the optio
 The answers repeated: "optimize for agent use", "agents will use it, pick whatever
 is best", "none of these are descriptive enough", "descriptive beats ambigious",
 and "what data folder??? no way" for a name asked before the thing was agreed.
+
+Oct 2026: a question asked to create 15 logins "in the table above". The table had been written
+only in the agent's thinking, so none had been sent. The user typed "list me them in a table" as
+the answer; the agent asked again with the same pointer and blamed the question box for hiding
+the table. A typed answer that asks for output is answered with that output in a plain reply
+before any new question. `hooks/require-question-facts-in-question.sh` refuses a question that
+points at text when no visible text was sent since the user last spoke.
