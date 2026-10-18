@@ -149,6 +149,9 @@ if (( ${#tasks_dirs} )); then
     (( ${ancestor[$p]:-0} )) && continue
     [[ -n ${par[$p]:-} ]] || continue
     has_claude_ancestor $p && continue
+    # The age limit holds here too: a subagent's shell is reparented to pid 1
+    # while it runs, so without it a minute-old test run reads as stale.
+    (( $(secs_of ${et[$p]}) / 60 >= older )) || continue
     seen[$p]=1
     for c in $(descendants $p); do seen[$c]=1; done
     print_block $p orphan
