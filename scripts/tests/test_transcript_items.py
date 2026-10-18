@@ -218,6 +218,31 @@ class CliTest(unittest.TestCase):
             mod.print_window([(self.path, "p", "s1"), (second, "q", "s2")])
         self.assertTrue(buf.getvalue().startswith("2 sessions; earliest entry 2026-09-20T08:00:00Z;"))
 
+    def test_since_last_user_is_the_turn_since_a_typed_prompt_or_a_question_answer(self):
+        turn = [
+            user("2026-10-02T10:00:00Z", "go"),
+            assistant("2026-10-02T10:00:01Z", [text("table here"), call("q1", "AskUserQuestion", questions=[{"question": "which?"}])]),
+            {"type": "user", "timestamp": "2026-10-02T10:00:02Z", "message": {"content": [result("q1", "list me them in a table")]}},
+            assistant("2026-10-02T10:00:03Z", [{"type": "thinking", "thinking": "table"}, call("q2", "AskUserQuestion", questions=[{"question": "ok, see above?"}])]),
+        ]
+        path = write_session(self.tmp.name, "-q", "s3", turn)
+        out = subprocess.run([sys.executable, str(EXTRACT), str(path), "--kinds", "assistant", "--since-last-user", "--json"],
+                             capture_output=True, text=True).stdout
+        self.assertEqual(out, "")  # the text came before the answer, so this turn has none
+        out = subprocess.run([sys.executable, str(EXTRACT), str(path), "--kinds", "assistant,agents", "--since-last-user", "--json"],
+                             capture_output=True, text=True).stdout
+        self.assertEqual([json.loads(r)["label"] for r in out.splitlines()], ["ASK"])
+        out = subprocess.run([sys.executable, str(EXTRACT), str(self.path), "--kinds", "assistant", "--since-last-user", "--json"],
+                             capture_output=True, text=True).stdout
+        self.assertEqual(out, "")  # a queued prompt is the last user message there, nothing follows it
+
+    def test_questions_and_answers_are_agents_rows_not_calls_or_tools(self):
+        out = self.run_cli("--kinds", "agents", "--json").stdout
+        rows = [json.loads(line) for line in out.splitlines()]
+        self.assertEqual([r["label"] for r in rows], ["ASK", "RESULT AskUserQuestion"])
+        self.assertIn("which?", rows[0]["text"])
+        self.assertEqual(rows[1]["text"], "A")
+
     def test_argument_errors(self):
         self.assertNotEqual(self.run_cli("--next-user").returncode, 0)
         bare = subprocess.run([sys.executable, str(EXTRACT)], capture_output=True, text=True)

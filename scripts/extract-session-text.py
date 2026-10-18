@@ -15,7 +15,10 @@ other config dir claude_dirs.py knows). Many sessions: --all, narrowed by
   user       typed messages, queued messages, compaction summaries, recaps
   assistant  the assistant's text blocks
   agents     sub-agent spawn prompts, SendMessage calls, questions asked of
-             the user, and the hand-back results that answer them
+             the user (AskUserQuestion: an ASK row with the questions and options as JSON,
+             then a RESULT AskUserQuestion row with the user's choice, typed answer or
+             rejection) and the hand-back results that answer them. These rows are in
+             agents, not calls or tools: --kinds calls,tools,user never shows a question
   calls      every other tool call: its command, path or pattern (input in JSON)
   tools      every other tool result (off by default; can be huge)
   attachments  the rule text a path match loaded (RULE-LOADED <file>) and the context a
@@ -35,6 +38,7 @@ Examples:
   extract-session-text.py edb80266-8503-443e-8398-d29d6002e446 --out session.txt
   extract-session-text.py session.jsonl --kinds user,agents --chunk-chars 60000 --out /tmp/s/chunk
   extract-session-text.py session.jsonl --grep 'rebuild' --since 2026-09-20
+  extract-session-text.py session.jsonl --kinds assistant,agents --since-last-user --json
   extract-session-text.py <session-id> --kinds user,assistant --around 2026-10-13T06:25 --context 6
   extract-session-text.py --all --days 14 --project asset-pipeline --kinds assistant,calls --json --next-user
   extract-session-text.py --all --window
@@ -51,7 +55,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from claude_dirs import find_transcript  # noqa: E402
-from transcript_items import add_next_user, clip_input, items, transcripts  # noqa: E402
+from transcript_items import add_next_user, clip_input, items, since_last_user, transcripts  # noqa: E402
 
 KINDS = ("user", "assistant", "agents", "calls", "tools", "attachments")
 UUID_ONLY = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
@@ -85,9 +89,13 @@ def is_noise(label, text):
 def session_rows(path, project, session, want, a):
     """One session's kept rows, in order."""
     build = None if a.next_user else want | {"user"}
+    if a.since_last_user and build is not None:
+        build = build | {"agents"}  # the boundary is a typed prompt or an AskUserQuestion answer
     rows = list(items(str(path), project, session, build))
     if a.next_user:
         add_next_user(rows)
+    if a.since_last_user:
+        rows = since_last_user(rows)
     return [r for r in rows if r["group"] in want and (a.subagents or not r["sidechain"])
             and not is_noise(r["label"], r["text"])]
 
@@ -136,6 +144,10 @@ def main():
     ap.add_argument("--out", help="output file; stdout if omitted. With --chunk-chars, a prefix for <out>-001.txt, ...")
     ap.add_argument("--chunk-chars", type=int, metavar="N",
                     help="write numbered chunk files of about N characters (needs --out); entries are never split")
+    ap.add_argument("--since-last-user", action="store_true",
+                    help="keep only the rows after the last user reply: a typed prompt, or the answer to an "
+                         "AskUserQuestion call. What the assistant has done since the user last spoke; a hook "
+                         "given a transcript path uses it to check the current turn")
     ap.add_argument("--since", metavar="YYYY-MM-DD[THH:MM]", help="keep entries at or after this UTC timestamp")
     ap.add_argument("--until", metavar="YYYY-MM-DD[THH:MM]", help="keep entries before this UTC timestamp")
     ap.add_argument("--grep", metavar="REGEX", help="keep entries whose text matches (case-insensitive)")
@@ -160,6 +172,8 @@ def main():
         ap.error("--window needs --all")
     if a.around and a.all:
         ap.error("--around reads one session")
+    if a.since_last_user and a.all:
+        ap.error("--since-last-user reads one session")
     if not a.all and (a.project or a.days or a.session_mentions or a.exclude_session):
         ap.error("--project, --days, --session-mentions and --exclude-session need --all")
     rx = re.compile(a.grep, re.I) if a.grep else None

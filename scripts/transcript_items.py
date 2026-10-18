@@ -226,6 +226,23 @@ def add_next_user(rows):
     return rows
 
 
+def is_reply_boundary(it):
+    """True for an item that ends the assistant's turn from the user's side: a typed prompt, or the
+    answer to an AskUserQuestion call (the user's choice, typed text, or rejection)."""
+    return is_typed_prompt(it) or (it["label"] == "RESULT AskUserQuestion" and not it["sidechain"])
+
+
+def since_last_user(rows):
+    """The rows after the last user reply in one session's items, in order.
+
+    A reply is a typed prompt or an AskUserQuestion answer (see is_reply_boundary), so the
+    result is what the assistant has done since the user last spoke. rows must have been
+    built with the user and agents groups, or the boundary is not visible. With no reply at
+    all, every row is returned."""
+    last = max((n for n, it in enumerate(rows) if is_reply_boundary(it)), default=-1)
+    return rows[last + 1:]
+
+
 def clip_input(value, limit):
     """Copy of a tool input with every string value cut to limit characters."""
     if isinstance(value, str):
