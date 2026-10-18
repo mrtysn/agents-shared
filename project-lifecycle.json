@@ -34,7 +34,7 @@
       "run": [
         "bash",
         "-c",
-        "for t in memory-lint nudge-named-skills-and-stale-shells nudge-transcript-parsers require-absolute-rm require-subagent-sizing show-rule-at-action ssh-request-guard; do bash hooks/tests/run-$t.sh || exit 1; done"
+        "for t in memory-lint nudge-named-skills-and-stale-shells nudge-transcript-parsers require-absolute-rm require-question-facts-in-question require-subagent-sizing show-rule-at-action ssh-request-guard; do bash hooks/tests/run-$t.sh || exit 1; done"
       ]
     },
     {
