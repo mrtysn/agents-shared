@@ -74,7 +74,10 @@ Pages are local files (see the artifacts rule): never publish to Anthropic.
 5. **Look at it** before saying it is done: render at about 1300 and 600 px wide
    (`"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new
    --screenshot=OUT.png --window-size=1300,900 file://FILE`, OUT in the scratchpad) and read
-   the PNGs. The column sits left on wide, stacks on top when narrow.
+   the PNGs. The column sits left on wide, stacks on top when narrow. Headless Chrome clamps
+   `--window-size` to 500 px wide, so a "320 px" screenshot is a 500 px layout cropped: text
+   cut at the right edge there is the crop, not an overflow. A real 320 px check needs a
+   browser window resized to 320 (claude-in-chrome's `resize_window` on a local server).
 6. **Hand over** the absolute path on its own line. Mention once that `notes-publish` can
    serve it, never run it unprompted.
 
