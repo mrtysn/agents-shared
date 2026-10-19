@@ -11,6 +11,10 @@ Prints the live background shells of the Claude Code session ID, one block each:
       PID  ELAPSED  CHILD COMMAND  [LISTEN addr:port ...]      (one per descendant)
 and after them any orphan: a process whose output still goes to this session's
 task files but whose shell is gone (its parent is launchd), marked `orphan`.
+A Monitor (one armed by a subagent too) is a block marked `monitor`: its shell
+writes to a pipe, so it is found as a piped shell-snapshot child of the `claude`
+process this script runs under. Stop it with TaskStop when its task id is known,
+else kill its pids.
 Prints nothing and exits 0 when there is nothing alive.
 
 Stopping a shell does not stop its children: a server started by the shell
@@ -126,8 +130,25 @@ if (( ${#candidates} )); then
   pids=${(j:,:)candidates}
   owned=$(lsof -a -p "$pids" -d 1 -Fpn 2>/dev/null | awk -v s="/$session/tasks/" '
     /^p/ { p=substr($0,2) } /^n/ && index($0, s) { print p }')
+  # A Monitor's shell writes to a pipe, not a task file: it carries no session id,
+  # so it is attributed through the claude process this script runs under.
+  piped=$(lsof -a -p "$pids" -d 1 -Fpft 2>/dev/null | awk '
+    /^p/ { p=substr($0,2) } /^t(PIPE|unix)$/ { print p }')
+  mypid=$$
+  myclaude=0
+  while (( mypid > 1 )); do
+    (( ${isclaude[$mypid]:-0} )) && { myclaude=$mypid; break; }
+    mypid=${par[$mypid]:-0}
+  done
   for p in ${(on)candidates}; do
-    (( ${${(f)owned}[(Ie)$p]} )) || continue
+    label=""
+    if (( ${${(f)owned}[(Ie)$p]} )); then
+      :
+    elif (( myclaude && ${par[$p]} == myclaude )) && (( ${${(f)piped}[(Ie)$p]} )); then
+      label=monitor
+    else
+      continue
+    fi
     s=$(secs_of ${et[$p]})
     (( s >= 5 )) || continue                     # a parallel foreground tool call
     (( s / 60 >= older )) || continue
@@ -137,7 +158,7 @@ if (( ${#candidates} )); then
     cmd=${cmd#*eval }; cmd=${cmd%% < /dev/null*}
     cmd=${cmd#\'}; cmd=${cmd%\'}
     cmdof[$p]=$cmd
-    print_block $p ""
+    print_block $p $label
   done
 fi
 

@@ -62,6 +62,9 @@ costs a brief, a report and a context of its own.
   the sub-agent keeps itself small and its own spawns are sized too.
 - **A word cap on the report** (about 250 words) and a request for conclusions, not
   file dumps. A report is read once and then discarded.
+- **An instruction to stop what it started**: a `Monitor` it arms is stopped with `TaskStop`
+  before it hands back. A monitor outlives the sub-agent and keeps the session from closing
+  cleanly until its timeout (up to 30 minutes).
 - **Where any file it produces goes**, per
   [decide file location and format by reader](on-demand/decide-file-location-and-format-by-reader.md).
 
