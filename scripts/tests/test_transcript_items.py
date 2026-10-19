@@ -236,6 +236,20 @@ class CliTest(unittest.TestCase):
                              capture_output=True, text=True).stdout
         self.assertEqual(out, "")  # a queued prompt is the last user message there, nothing follows it
 
+    def test_a_hook_refused_question_is_not_a_reply_boundary(self):
+        turn = [
+            user("2026-10-02T10:00:00Z", "go"),
+            assistant("2026-10-02T10:00:01Z", [text("the path is /tmp/report.html")]),
+            assistant("2026-10-02T10:00:02Z", [call("q1", "AskUserQuestion", questions=[{"question": "open /tmp/report.html?"}])]),
+            {"type": "user", "timestamp": "2026-10-02T10:00:03Z",
+             "message": {"content": [result("q1", "PreToolUse:AskUserQuestion hook error: BLOCKED: never sent")]}},
+            assistant("2026-10-02T10:00:04Z", [call("q2", "AskUserQuestion", questions=[{"question": "open /tmp/report.html?"}])]),
+        ]
+        path = write_session(self.tmp.name, "-r", "s4", turn)
+        out = subprocess.run([sys.executable, str(EXTRACT), str(path), "--kinds", "assistant", "--since-last-user", "--json"],
+                             capture_output=True, text=True).stdout
+        self.assertEqual([json.loads(r)["text"] for r in out.splitlines()], ["the path is /tmp/report.html"])
+
     def test_questions_and_answers_are_agents_rows_not_calls_or_tools(self):
         out = self.run_cli("--kinds", "agents", "--json").stdout
         rows = [json.loads(line) for line in out.splitlines()]

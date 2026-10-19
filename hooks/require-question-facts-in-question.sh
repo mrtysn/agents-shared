@@ -63,7 +63,7 @@ if [ -n "$PATHS" ]; then
         cat >&2 <<MSG
 BLOCKED: the file this question rests on was never sent as an absolute path in visible text: $WHY. Text in thinking never reaches the user.
 
-Send the report with its absolute path on its own line in a plain reply, end the turn, and ask in a later turn (docs/on-demand/asking-for-decisions.md, absolute-paths-for-handoff). Use the absolute path in the question as well.
+Write the absolute path on its own line in a text block, then ask in a LATER response of this same turn (text in the same response as the question is not yet in the transcript when this hook runs; a tool call in between flushes it). Use the absolute path in the question as well (docs/on-demand/asking-for-decisions.md, absolute-paths-for-handoff).
 MSG
         exit 2
     done <<PATHLIST

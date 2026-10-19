@@ -228,8 +228,10 @@ def add_next_user(rows):
 
 def is_reply_boundary(it):
     """True for an item that ends the assistant's turn from the user's side: a typed prompt, or the
-    answer to an AskUserQuestion call (the user's choice, typed text, or rejection)."""
-    return is_typed_prompt(it) or (it["label"] == "RESULT AskUserQuestion" and not it["sidechain"])
+    answer to an AskUserQuestion call (the user's choice, typed text, or rejection). A question a
+    PreToolUse hook refused never reached the user, so its result is not a reply."""
+    return is_typed_prompt(it) or (it["label"] == "RESULT AskUserQuestion" and not it["sidechain"]
+                                   and not it["text"].lstrip().startswith("PreToolUse:"))
 
 
 def since_last_user(rows):
