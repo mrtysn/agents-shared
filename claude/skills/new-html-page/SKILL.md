@@ -90,11 +90,16 @@ render), give them a page that moves instead of answering "what's the progress" 
 1. **Scaffold** in a folder of its own (the repo the work belongs to, or a dated notebook
    folder; never the scratchpad): `page-new --mode progress --title "<what moves>" --out <DIR>/<NAME>.html`.
    Write the Notes section: what moves, from where to where, what happens after.
-2. **Report** with `project-lifecycle progress-write <DIR>/<NAME>.progress.json --item ID --label …`
-   and `--done N --total N`, or `--watch PATH --total N` for a copy whose destination file grows
-   (the server reads its size, so the copy itself reports nothing). No total known yet: leave it
-   out. `--state failed` on a failure, `--note` for one line under the bar. Remote rsync: parse
-   `rsync --info=progress2` in the loop and pass its bytes as `--done`.
+2. **Report** with `project-lifecycle progress-write <DIR>/<NAME>.progress.json --item ID --label …`:
+   - `--done N --total N` from a loop, in any `--unit` (bytes, seconds, files, steps).
+   - `--watch PATH --total N` for a local cp or ditto whose destination grows; the server reads
+     its size. Not rsync without `--inplace`, not adb (the file grows on the device).
+   - `--from rsync|ffmpeg|lines` with the worker piped in: `rsync --info=progress2` (3.1+, so
+     Homebrew's or the server's, not macOS's openrsync), `ffmpeg -progress pipe:1` with
+     `--total` as the input's seconds, or plain `done [total]` lines. A job on another machine
+     pipes through its ssh session: `ssh host rsync --info=progress2 … | progress-write --from rsync …`.
+   No total known yet: leave it out. `--state failed` on a failure, `--note` for one line under
+   the bar. A step that is silent for minutes by design gets `--stall-after`/`--stale-after`.
 3. **Serve** with `project-lifecycle progress-serve <DIR>/<NAME>.html --until-finished` as a
    background command. It opens the page without taking focus and exits 0 when every item is
    done, 1 when one failed, 2 on `--timeout`. Give the user the page's absolute path.
