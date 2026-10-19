@@ -106,7 +106,7 @@ descendants() {  # prints every descendant pid of $1, depth first
 }
 
 print_block() {  # $1 pid, $2 label ("" or "orphan")
-  local pid=$1 label=$2 c cmd
+  local pid=$1 label=${2:-} c cmd
   cmd=${cmdof[$pid]//$'\n'/ }
   local tag=""; [[ -n $label ]] && tag="$label "
   print -r -- "${tag}${pid}  ${et[$pid]}  ${cmd[1,100]}${listen[$pid]:+  LISTEN ${listen[$pid]% }}"
@@ -158,7 +158,7 @@ if (( ${#candidates} )); then
     cmd=${cmd#*eval }; cmd=${cmd%% < /dev/null*}
     cmd=${cmd#\'}; cmd=${cmd%\'}
     cmdof[$p]=$cmd
-    print_block $p $label
+    print_block $p "$label"
   done
 fi
 
