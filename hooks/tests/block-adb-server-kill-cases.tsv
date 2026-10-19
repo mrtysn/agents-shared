@@ -1,0 +1,24 @@
+# Cases for block-adb-server-kill.sh — one per line: <verdict><TAB><command>
+#
+# verdict is `pass` (hook exits 0) or `block` (hook exits 2).
+#
+block	adb kill-server
+block	adb kill-server && adb start-server
+block	~/Library/Android/sdk/platform-tools/adb kill-server
+block	$ANDROID_HOME/platform-tools/adb -P 5037 kill-server
+block	emulator -avd Pixel -no-window & sleep 5; adb kill-server
+block	cd /tmp && adb kill-server
+block	killall adb
+block	pkill -9 adb
+block	pkill -f 'adb'
+block	launchctl kickstart -k gui/501/local.adb-reconnect.server
+block	launchctl bootout gui/501/local.adb-reconnect.server
+pass	adb devices
+pass	adb start-server
+pass	adb -s emulator-5584 wait-for-device
+pass	grep -rn "adb kill-server" docs
+pass	echo 'never run adb kill-server'
+pass	pkill -f qemu-system-aarch64
+pass	pkill -f adb-reconnect-helper
+pass	launchctl print gui/501/local.adb-reconnect.server
+pass	killall Finder
