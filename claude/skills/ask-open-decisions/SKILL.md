@@ -34,6 +34,9 @@ accurate it is.
    choice, an approval, a value, a credential, or an answer only the user can give.
    Sources: your recent replies (tables, "your call", "want me to…", "say the word",
    "open questions", "needs you"), proposals the user has not answered, and Blocked items.
+   A decision is open only if it traces to something the user said or a fork the user
+   approved; a choice you raised in your own recap is a proposal, not a user decision.
+   Name the thing in the user's own word for it, not an internal code name.
    Do **not** filter out decisions you could have settled yourself. Ask them too, with
    your recommendation first: the user sees what you would do and still decides.
 
