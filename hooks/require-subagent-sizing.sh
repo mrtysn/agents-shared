@@ -8,15 +8,17 @@
 #
 # Refused (exit 2):
 #   - no `model`
-#   - a session's first Agent call, once per session_id, so the table below reaches
-#     the session before it picks a model. The marker is a file under $TMPDIR; when
-#     it cannot be written the call is not refused.
 #   - `opus` or `fable` (or a full id containing either) for a task whose description opens
 #     with a build verb ("Build", "Fix", "Implement", ...): the table puts ordinary
 #     implementation on sonnet. Once per session and description, so a call that really
 #     is judgment work passes when it is issued again unchanged; on the session's first
 #     call both reasons arrive in one refusal. A heuristic on the first word: it cannot
 #     judge the task, only that the description reads like the sonnet row.
+# Allowed with the table attached (`additionalContext`):
+#   - a session's first Agent call, once per session_id, that names a model: the table
+#     and size limits reach the session with the call, so every later spawn is sized
+#     by them. The marker is a file under ${XDG_CACHE_HOME:-$HOME/.cache}, which
+#     survives a resumed session; when it cannot be written the note is sent each time.
 # Rewritten (allowed, with `effort` added through updatedInput):
 #   - `model` haiku with no `effort`  -> effort low
 #   - `model` sonnet with no `effort` -> effort medium
@@ -83,14 +85,14 @@ deny() {
     exit 2
 }
 
-# The first Agent call of a session is refused once, so the table arrives before the
-# model is chosen. A call with no session_id, or a marker that cannot be written, passes.
+# The first Agent call of a session carries the table as added context. A call with no
+# session_id, or a marker that cannot be written, passes without it.
 FIRST=0
 SESSION=$(printf '%s' "$INPUT" | jq -r '.session_id // empty')
 AGENT=$(printf '%s' "$INPUT" | jq -r '.agent_id // empty')
 if [ -n "$SESSION" ]; then
     # A sub-agent carries its parent's session_id, so the marker names the agent as well.
-    SEEN_DIR="${TMPDIR:-/tmp}/agents-shared-subagent-sizing"
+    SEEN_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/agents-shared/subagent-sizing"
     MARK="$SEEN_DIR/$SESSION${AGENT:+-$AGENT}"
     if mkdir -p "$SEEN_DIR" 2>/dev/null && [ ! -e "$MARK" ] && : > "$MARK" 2>/dev/null; then
         FIRST=1
@@ -128,23 +130,37 @@ if [ -n "$SESSION" ]; then
     esac
 fi
 
+# A first call that is also a build-verb opus spawn is refused once with both reasons; a
+# first call that only names a model goes through with the table attached.
+CONTEXT=
 if [ "$FIRST" = 1 ]; then
-    deny "this is the session's first Agent call; the sizing table is shown once, before you choose.${IMPL_SENTENCE:+ Also, $IMPL_SENTENCE}"
+    [ "$IMPL" = 1 ] && deny "this is the session's first Agent call, and the table below is shown once. Also, $IMPL_SENTENCE"
+    CONTEXT="Sub-agent sizing (docs/size-subagents-to-the-task.md in agents-shared), shown once for this session. Pick each sub-agent's model by the work:
+$(guide_table)
+
+Edits never go in the haiku row: nothing checks a sub-agent's edits mid-run. Where a task could sit in two rows and its difficulty is unknown, start in the lower row. A lookup of up to ~5 tool calls is done in this session instead.
+
+Keep it small while it runs:
+$(guide_limits)
+
+Put this table, these limits and a ~250-word report cap in the sub-agent's brief, and name where any file it produces goes."
 fi
 [ "$IMPL" = 1 ] && deny "$IMPL_SENTENCE"
 
+DEFAULT=
 if [ -z "$EFFORT" ]; then
     case "$MODEL" in
         haiku)  DEFAULT=low ;;
         sonnet) DEFAULT=medium ;;
-        *)      DEFAULT= ;;
     esac
-    if [ -n "$DEFAULT" ]; then
-        echo "require-subagent-sizing: model $MODEL named no effort; set effort $DEFAULT (docs/size-subagents-to-the-task.md)" >&2
-        printf '%s' "$INPUT" | jq -c --arg e "$DEFAULT" \
-            '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: (.tool_input + {effort: $e})}}'
-        exit 0
-    fi
+fi
+if [ -n "$DEFAULT" ] || [ -n "$CONTEXT" ]; then
+    [ -n "$DEFAULT" ] && echo "require-subagent-sizing: model $MODEL named no effort; set effort $DEFAULT (docs/size-subagents-to-the-task.md)" >&2
+    # permissionDecision allow rides with updatedInput only; context alone leaves the permission flow as it was.
+    printf '%s' "$INPUT" | jq -c --arg e "$DEFAULT" --arg c "$CONTEXT" \
+        '{hookSpecificOutput: ({hookEventName: "PreToolUse"}
+            + (if $e != "" then {permissionDecision: "allow", updatedInput: (.tool_input + {effort: $e})} else {} end)
+            + (if $c != "" then {additionalContext: $c} else {} end))}'
 fi
 
 exit 0
