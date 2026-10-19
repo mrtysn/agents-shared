@@ -1,6 +1,6 @@
 {
   "name": "interface",
-  "description": "Interface design review and craft: accessibility, layout, writing, typography, colors, UI polish, plus frontend direction and a web-interface checklist.",
+  "description": "Interface design review and craft: accessibility, layout, writing, typography, colors, UI polish, frontend direction, a web-interface checklist, and design-taste packs (premium, minimalist, brutalist, image-to-code, redesigns).",
   "version": "1.0.0",
   "author": {
     "name": "Mert Yaşin"
