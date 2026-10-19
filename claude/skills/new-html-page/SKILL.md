@@ -149,6 +149,9 @@ user pastes JSON from a form opened from disk, write it to `<FORM>.answers.json`
   never a style rule.
 - **No `<aside>` in the main column**: classless.css floats it into the margin as a sidenote.
   Use `<div class="ws-callout">`.
+- **A table whose cells hold sentences needs `<table class="ws-table--wrap">`.** A plain
+  `<table>` is styled as data: every cell `nowrap` and right-aligned, so prose cells run off
+  the column and scroll. Use the plain one only for short values and numbers.
 - **The column lists `<h2>` sections only**; a page whose headings are `<h3>` has no column.
 - **Links are set up by the head**: every link except an in-page `#anchor` opens in a new tab
   with `rel="noopener noreferrer"`. Write plain `<a href>`; never add `target` yourself.
