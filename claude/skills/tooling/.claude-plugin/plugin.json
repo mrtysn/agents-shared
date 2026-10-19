@@ -1,6 +1,6 @@
 {
   "name": "tooling",
-  "description": "Claude Code working aids: visual explanations, HTML playgrounds, skill authoring with evals, and session cost reports.",
+  "description": "Claude Code working aids: visual explanations, HTML playgrounds, skill authoring with evals, session cost reports, complete-output enforcement and Codex host/sandbox operators.",
   "version": "1.0.0",
   "author": {
     "name": "Mert Yaşin"
