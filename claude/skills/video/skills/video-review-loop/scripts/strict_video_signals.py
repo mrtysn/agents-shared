@@ -20,12 +20,21 @@ from typing import Any
 
 FRAME_RE = re.compile(r"frame:\s*(?P<frame>\d+).*?pts_time:(?P<time>[-+0-9.]+)")
 META_RE = re.compile(r"lavfi\.signalstats\.(?P<key>[A-Z0-9]+)=(?P<value>[-+0-9.eE]+)")
-GPU_POLICY_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "motion-director"
-    / "scripts"
-    / "gpu_policy.py"
-)
+# <!-- LOCAL: agents-shared splits the pack into skill groups, so motion-director sits in
+# the motion group (../../../motion/skills/motion-director), not beside this skill. -->
+def _motion_director_dir() -> Path:
+    here = Path(__file__).resolve()
+    for candidate in (
+        here.parents[2] / "motion-director",
+        here.parents[4] / "motion" / "skills" / "motion-director",
+    ):
+        if candidate.is_dir():
+            return candidate
+    return here.parents[2] / "motion-director"
+# <!-- LOCAL END -->
+
+
+GPU_POLICY_PATH = _motion_director_dir() / "scripts" / "gpu_policy.py"
 
 
 def load_gpu_policy():

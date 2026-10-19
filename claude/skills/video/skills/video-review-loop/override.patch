@@ -1,0 +1,69 @@
+--- a/scripts/review_video.py
++++ b/scripts/review_video.py
+@@ -18,18 +18,22 @@
+ 
+ 
+ NUMBER = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)"
+-GPU_POLICY_PATH = (
+-    Path(__file__).resolve().parents[2]
+-    / "motion-director"
+-    / "scripts"
+-    / "gpu_policy.py"
+-)
+-REFERENCE_FIDELITY_PATH = (
+-    Path(__file__).resolve().parents[2]
+-    / "motion-director"
+-    / "scripts"
+-    / "reference_fidelity.py"
+-)
++# <!-- LOCAL: agents-shared splits the pack into skill groups, so motion-director sits in
++# the motion group (../../../motion/skills/motion-director), not beside this skill. -->
++def _motion_director_dir() -> Path:
++    here = Path(__file__).resolve()
++    for candidate in (
++        here.parents[2] / "motion-director",
++        here.parents[4] / "motion" / "skills" / "motion-director",
++    ):
++        if candidate.is_dir():
++            return candidate
++    return here.parents[2] / "motion-director"
++# <!-- LOCAL END -->
++
++
++GPU_POLICY_PATH = _motion_director_dir() / "scripts" / "gpu_policy.py"
++REFERENCE_FIDELITY_PATH = _motion_director_dir() / "scripts" / "reference_fidelity.py"
+ 
+ 
+ class ReviewError(RuntimeError):
+--- a/scripts/strict_video_signals.py
++++ b/scripts/strict_video_signals.py
+@@ -20,14 +20,23 @@
+ 
+ FRAME_RE = re.compile(r"frame:\s*(?P<frame>\d+).*?pts_time:(?P<time>[-+0-9.]+)")
+ META_RE = re.compile(r"lavfi\.signalstats\.(?P<key>[A-Z0-9]+)=(?P<value>[-+0-9.eE]+)")
+-GPU_POLICY_PATH = (
+-    Path(__file__).resolve().parents[2]
+-    / "motion-director"
+-    / "scripts"
+-    / "gpu_policy.py"
+-)
++# <!-- LOCAL: agents-shared splits the pack into skill groups, so motion-director sits in
++# the motion group (../../../motion/skills/motion-director), not beside this skill. -->
++def _motion_director_dir() -> Path:
++    here = Path(__file__).resolve()
++    for candidate in (
++        here.parents[2] / "motion-director",
++        here.parents[4] / "motion" / "skills" / "motion-director",
++    ):
++        if candidate.is_dir():
++            return candidate
++    return here.parents[2] / "motion-director"
++# <!-- LOCAL END -->
+ 
+ 
++GPU_POLICY_PATH = _motion_director_dir() / "scripts" / "gpu_policy.py"
++
++
+ def load_gpu_policy():
+     spec = importlib.util.spec_from_file_location("motion_gpu_policy", GPU_POLICY_PATH)
+     if spec is None or spec.loader is None:

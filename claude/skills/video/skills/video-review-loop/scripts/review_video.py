@@ -18,18 +18,22 @@ from typing import Any
 
 
 NUMBER = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)"
-GPU_POLICY_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "motion-director"
-    / "scripts"
-    / "gpu_policy.py"
-)
-REFERENCE_FIDELITY_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "motion-director"
-    / "scripts"
-    / "reference_fidelity.py"
-)
+# <!-- LOCAL: agents-shared splits the pack into skill groups, so motion-director sits in
+# the motion group (../../../motion/skills/motion-director), not beside this skill. -->
+def _motion_director_dir() -> Path:
+    here = Path(__file__).resolve()
+    for candidate in (
+        here.parents[2] / "motion-director",
+        here.parents[4] / "motion" / "skills" / "motion-director",
+    ):
+        if candidate.is_dir():
+            return candidate
+    return here.parents[2] / "motion-director"
+# <!-- LOCAL END -->
+
+
+GPU_POLICY_PATH = _motion_director_dir() / "scripts" / "gpu_policy.py"
+REFERENCE_FIDELITY_PATH = _motion_director_dir() / "scripts" / "reference_fidelity.py"
 
 
 class ReviewError(RuntimeError):
