@@ -30,6 +30,7 @@ Pages are local files (see the artifacts rule): never publish to Anthropic.
    | `status-grid` | where things are and how many copies or owners each has |
    | `tool` | a calculator: inputs, live results |
    | `deck` | a talk to present: one slide per section, speaker notes, keyboard and touch |
+   | `progress` | long work to watch live: a transfer, a copy, a render; see "Progress page" below |
 
    Each mode has default sections; give `--section` to name your own (`schedule`,
    `link-collection` and `deck` always need them: the days, the groups, the slides).
@@ -80,6 +81,23 @@ Pages are local files (see the artifacts rule): never publish to Anthropic.
    browser window resized to 320 (claude-in-chrome's `resize_window` on a local server).
 6. **Hand over** the absolute path on its own line. Mention once that `notes-publish` can
    serve it, never run it unprompted.
+
+## Progress page: long work shown live
+
+When the user will wait on long work (a copy to a drive, an adb push, an rsync to a server, a
+render), give them a page that moves instead of answering "what's the progress" by hand.
+
+1. **Scaffold** in a folder of its own (the repo the work belongs to, or a dated notebook
+   folder; never the scratchpad): `page-new --mode progress --title "<what moves>" --out <DIR>/<NAME>.html`.
+   Write the Notes section: what moves, from where to where, what happens after.
+2. **Report** with `project-lifecycle progress-write <DIR>/<NAME>.progress.json --item ID --label …`
+   and `--done N --total N`, or `--watch PATH --total N` for a copy whose destination file grows
+   (the server reads its size, so the copy itself reports nothing). No total known yet: leave it
+   out. `--state failed` on a failure, `--note` for one line under the bar. Remote rsync: parse
+   `rsync --info=progress2` in the loop and pass its bytes as `--done`.
+3. **Serve** with `project-lifecycle progress-serve <DIR>/<NAME>.html --until-finished` as a
+   background command. It opens the page without taking focus and exits 0 when every item is
+   done, 1 when one failed, 2 on `--timeout`. Give the user the page's absolute path.
 
 ## Decision form: asking the user on a page
 
