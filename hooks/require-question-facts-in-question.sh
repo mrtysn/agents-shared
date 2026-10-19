@@ -23,9 +23,31 @@
 # spoke. A relative path is refused even when prose had it: the question must stand alone, so
 # it names the absolute path too. Same reader call, same fail-open behaviour.
 #
+# A third trigger needs no transcript: a label coined in the session. Refused (exit 2) when the
+# questions or their options name a letter label (capitals A to H) as "option B", "pair A",
+# "direction C" (after option, direction, pair, plan, variant, version, choice, route, design,
+# palette, approach or layout), "B or C", "A vs B" or "A/B", and that letter is not defined in
+# the same call's text as "B: …", "B = …", "B — …" or "B (…)". The letters were named on a form
+# or in earlier prose; the user deciding from the prompt alone does not know what they stand for.
+#
 # Bash, not zsh, to match the hooks beside it.
 
 INPUT=$(cat)
+
+ALLTEXT=$(printf '%s' "$INPUT" | jq -r '[.tool_input.questions[]? | .question, (.options[]? | .label, .description)] | map(select(type == "string")) | join("\n")' 2>/dev/null) || ALLTEXT=""
+NOUNS='option|direction|pair|plan|variant|version|choice|route|design|palette|approach|layout'
+LETTERREF="\\b(($NOUNS)s? [A-H]|[A-H] (or|and|vs\\.?) [A-H]|[A-H]/[A-H])\\b"
+REFS=$(printf '%s' "$ALLTEXT" | grep -Eo "$LETTERREF" | grep -Eo '\b[A-H]\b' | sort -u)
+for L in $REFS; do
+    printf '%s' "$ALLTEXT" | grep -Eq "\\b$L( ?[:=—–]| \\()" && continue
+    REF=$(printf '%s' "$ALLTEXT" | grep -Eo "$LETTERREF" | grep -E "\\b$L\\b" | head -n1)
+    cat >&2 <<MSG
+BLOCKED: this question names "$REF", but the letter $L is never defined in the question or its options. A label coined on a form or in earlier prose means nothing to a user deciding from the prompt alone.
+
+Each question stands alone (docs/on-demand/asking-for-decisions.md): put the facts inside the question. Name the thing itself ("the bear and bunny pair", not "B"), or define the letter where it is used ("B (bear and bunny)"), then re-issue the call.
+MSG
+    exit 2
+done
 
 TRANSCRIPT=$(printf '%s' "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null) || exit 0
 [ -n "$TRANSCRIPT" ] && [ -r "$TRANSCRIPT" ] || exit 0

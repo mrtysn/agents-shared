@@ -19,6 +19,10 @@ has not been communicated.
 
 - **Explain each option inside the option**, briefly — what it means and what
   follows from picking it. Not "A or B?" but one line of substance per choice.
+- **Name things, never their session labels.** A letter given on a form or in
+  earlier prose ("pair A", "B or C", "option B") means nothing in the prompt. Say
+  "the bear and bunny pair", or define the label where it is used ("B (bear and
+  bunny)"). `hooks/require-question-facts-in-question.sh` refuses an undefined letter.
 - **Put the recommended option first** and mark it `(Recommended)`.
 - **Batch related decisions** into one call rather than asking serially.
 - **At most four options per question.** A long list inside one question (a

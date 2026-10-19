@@ -42,7 +42,7 @@ check() {
     total=$((total + 1))
     if [ "$got" = "$want" ]; then
         [ "$VERBOSE" = 1 ] && printf 'ok    %s\n' "$name"
-        if [ "$want" = 2 ] && ! printf '%s' "$err" | grep -Eq 'put the facts inside the question|absolute path on its own line'; then
+        if [ "$want" = 2 ] && ! printf '%s' "$err" | grep -Eq 'put the facts inside the question|Use the absolute path in the question'; then
             failed=$((failed + 1)); printf 'FAIL  %s: refusal gives no remedy\n' "$name"
         fi
     else
@@ -96,6 +96,31 @@ check 'URL is not a file path' 0 'Is https://x.com/a.html the right source?' "$f
 check 'a name without a slash is not a path' 0 'Is report.html the right name?' "$f"
 f=$(mk path-text-prose "$(u 'go')" "$(say "Saved to $ABS.")")
 check 'absolute path followed by a period in prose allows' 0 "Which of $ABS reads better?" "$f"
+
+# Third trigger: letter labels coined in the session, checked across the question and its options.
+# checkopts NAME WANT QUESTION OPTION-LABEL OPTION-DESCRIPTION
+checkopts() {
+    local name=$1 want=$2 payload got=0 err
+    payload=$(jq -cn --arg q "$3" --arg l "$4" --arg d "$5" --arg f "$TMP/none.jsonl" \
+        '{tool_name:"AskUserQuestion", transcript_path:$f, tool_input:{questions:[{question:$q, header:"h", options:[{label:$l, description:$d}]}]}}')
+    err=$(printf '%s' "$payload" | "$HOOK" 2>&1 >/dev/null) || got=$?
+    total=$((total + 1))
+    if [ "$got" = "$want" ]; then
+        [ "$VERBOSE" = 1 ] && printf 'ok    %s\n' "$name"
+        if [ "$want" = 2 ] && ! printf '%s' "$err" | grep -q 'put the facts inside the question'; then
+            failed=$((failed + 1)); printf 'FAIL  %s: refusal gives no remedy\n' "$name"
+        fi
+    else
+        failed=$((failed + 1)); printf 'FAIL  %s: want exit %s, got %s\n' "$name" "$want" "$got"
+    fi
+}
+# The real failure (2026-10-19, social-content): letters from a decision form reused in a question.
+checkopts 'undefined "pair A" and "B or C" refuses' 2 'The reel uses chibi pair A. Render now?' 'Switch to B or C first' 'Rebuild with the bear and bunny or the mochi pair'
+checkopts 'undefined "option B" in a description refuses' 2 'Which layout?' 'Grid' 'Same as option B but wider'
+checkopts 'letters defined with a colon allow' 0 'A: two people, B: bear and bunny. Which pair?' 'A or B' 'pick one'
+checkopts 'letters defined with parentheses allow' 0 'Keep pair A (two people) or switch?' 'Keep pair A' 'as built'
+checkopts 'no letter labels allow' 0 'Render the reel now?' 'Render now' 'make the upload file'
+checkopts 'a lone capital in prose allows' 0 'Should I add a CTA at the end?' 'Add a CTA' 'one line, A1 size'
 
 # Fail open.
 check 'transcript missing allows' 0 "$ABOVE" "$TMP/nonexistent.jsonl"
