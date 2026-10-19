@@ -90,8 +90,10 @@ PATHLIST
 read_visible
 # The text sent in the same message as this question can reach the transcript file a moment
 # after the hook runs (a refusal came back though the path sat in a text block written three
-# seconds earlier). Read again before refusing, so a lagging write is not read as a silent turn.
-for _ in 1 2 3; do
+# seconds earlier; another, in a 59MB transcript, was still missing after 3s though the entry
+# was timestamped 4s before the question). Read again before refusing, so a lagging write is
+# not read as a silent turn. Waits only while evidence is missing, so a true refusal costs 12s.
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
     visible_evidence_missing || break
     sleep 1
     read_visible
