@@ -1,6 +1,6 @@
 {
   "name": "motion",
-  "description": "Motion design: build, review and audit animation, with Apple-style physical interaction rules and a vocabulary of effects.",
+  "description": "Motion design: build, review and audit animation, Apple-style physical interaction rules, a vocabulary of effects, a motion-graphics direction pack (brief, brand intake, charts, reveals, Lottie, paper-cut), the GSAP reference set and sound (Tone.js, SFX).",
   "version": "1.0.0",
   "author": {
     "name": "Mert Yaşin"

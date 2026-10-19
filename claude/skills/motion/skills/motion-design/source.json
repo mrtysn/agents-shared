@@ -1,0 +1,25 @@
+{
+  "repo": "imMamdouhaboammar/motion-graphics-skills",
+  "path": "skills/motion-design/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "director/choreography.md",
+    "director/context-adaptation.md",
+    "director/core-philosophy.md",
+    "director/decision-framework.md",
+    "director/disney-principles.md",
+    "director/emotion-mapping.md",
+    "director/motion-personality.md",
+    "director/narrative-structure.md",
+    "patterns/ambient-continuous.md",
+    "patterns/entrance-exit.md",
+    "patterns/multi-element.md",
+    "patterns/state-feedback.md",
+    "reference/property-selection.md",
+    "reference/quality-checklist.md",
+    "reference/timing-easing-tables.md",
+    "reference/troubleshooting.md"
+  ],
+  "commit": "29919c1ff91d0e0a242ffc0d085b838fa9575584",
+  "updated": "2026-10-19"
+}

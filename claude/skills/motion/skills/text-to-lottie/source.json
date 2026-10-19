@@ -1,0 +1,31 @@
+{
+  "repo": "imMamdouhaboammar/motion-graphics-skills",
+  "path": "skills/text-to-lottie/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "evals/output-rubric.md",
+    "evals/reference-loading-prompts.json",
+    "evals/routing-prompts.json",
+    "evals/trigger-prompts.json",
+    "references/chapterization-transition-grammar.md",
+    "references/design-taste.md",
+    "references/lottie-spec-map.md",
+    "references/motion-taste.md",
+    "references/player-contract.md",
+    "references/recipe-camera-scene-motion.md",
+    "references/recipe-data-stats.md",
+    "references/recipe-diagram-technical.md",
+    "references/recipe-loaders-icons.md",
+    "references/recipe-logo.md",
+    "references/recipe-lower-thirds.md",
+    "references/recipe-product-promo.md",
+    "references/recipe-starter-projects.md",
+    "references/recipe-svg-animation.md",
+    "references/recipe-typography.md",
+    "references/recipe-ui-microinteractions.md",
+    "references/recipe-visual-effects.md",
+    "references/svg-compatibility.md"
+  ],
+  "commit": "29919c1ff91d0e0a242ffc0d085b838fa9575584",
+  "updated": "2026-10-19"
+}
