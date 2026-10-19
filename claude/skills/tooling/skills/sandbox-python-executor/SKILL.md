@@ -1,11 +1,13 @@
 ---
 name: sandbox-python-executor
-description: Use when a ChatGPT/Codex Plugin workflow needs deterministic computation, file processing, repository checks, package inspection, or other work that should be actually executed with host-native Python instead of answered from unverified reasoning.
+description: Use when a motion or media workflow needs deterministic computation, file processing, repository checks, package inspection, or other work that should be actually executed with Python instead of answered from unverified reasoning.
 ---
 
 # Sandbox Python Executor
 
 Use the host's own Python execution capability to produce evidence, not just code suggestions.
+
+<!-- LOCAL --> In Claude Code the **python tool** below is Bash running `python3` (with `-I` on files that came from outside the repo); the generated file reference is its absolute path. Everything that follows about ChatGPT and Codex applies with that substitution.
 
 OpenAI calls Code Interpreter the **python tool**. In ChatGPT, when that tool is available for the current conversation, use it for the execution steps in this Skill. In Codex, use the host execution environment available to the session and run Python there when Python is the appropriate runtime.
 

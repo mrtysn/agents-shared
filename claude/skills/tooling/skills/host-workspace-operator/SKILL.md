@@ -1,11 +1,13 @@
 ---
 name: host-workspace-operator
-description: Use when a ChatGPT/Codex Plugin workflow needs to inspect, search, modify, or verify files in the host workspace using the safest native tools available.
+description: Use when a motion or media workflow needs to inspect, search, modify, or verify files in the workspace using the narrowest native tool for each step.
 ---
 
 # Host Workspace Operator
 
 Use workspace tools supplied by the current ChatGPT/Codex host instead of pretending the Plugin owns a filesystem API.
+
+<!-- LOCAL --> In Claude Code the capabilities below map to: read → Read; list → Glob or `ls` in Bash; search and grep → Grep; patch → Edit; write → Write; shell → Bash; python → Bash running `python3`.
 
 Tool names differ by surface. Route by capability, not by a hard-coded tool name. Typical capabilities include read, list, search, grep, write, patch, shell, and python.
 

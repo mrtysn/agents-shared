@@ -1,0 +1,16 @@
+--- a/SKILL.md
++++ b/SKILL.md
+@@ -1,10 +1,12 @@
+ ---
+ name: motion-studio
+-description: Use when starting a motion graphics project in ChatGPT or Codex, choosing a specialist from this pack, or determining whether the host can plan, build, review or render the requested film. Do not use for unrelated software or static design tasks.
++description: Use when starting a motion graphics project in Claude Code, choosing a specialist from this pack (motion-director, motion-brief-writer, brand-intake, vox-explainer, animated-chart, video-review-loop, reel-export…), or determining whether the session can plan, build, review or render the requested film. Do not use for unrelated software or static design tasks.
+ ---
+ 
+ # Motion Studio
+ 
++<!-- LOCAL --> In Claude Code the host capabilities below are: files via Read, Glob, Grep, Edit and Write; execution via Bash (python3, node, ffmpeg); `host-workspace-operator` and `sandbox-python-executor` (tooling group) map those names. Skills in this pack load as `motion:<name>` and `video:<name>`.
++
+ Start with the user's requested deliverable and the capabilities actually available in the current host. Use this pack for motion direction and craft. Skills provide instructions and supporting files, not a hosted rendering service or permission to access accounts.
+ 
+ ## Choose the next skill
