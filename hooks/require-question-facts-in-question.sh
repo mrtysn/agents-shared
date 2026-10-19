@@ -67,10 +67,35 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 READER="$HERE/../scripts/extract-session-text.py"
 [ -r "$READER" ] || exit 0
 
-ROWS=$(python3 "$READER" "$TRANSCRIPT" --kinds assistant --since-last-user --json 2>/dev/null) || exit 0
-# jq failing on the reader's output is not proof the turn was silent.
-printf '%s' "$ROWS" | jq -e -s 'type == "array"' >/dev/null 2>&1 || exit 0
-VISIBLE=$(printf '%s' "$ROWS" | jq -r -s '.[] | .text // empty' 2>/dev/null) || exit 0
+read_visible() {
+    ROWS=$(python3 "$READER" "$TRANSCRIPT" --kinds assistant --since-last-user --json 2>/dev/null) || exit 0
+    # jq failing on the reader's output is not proof the turn was silent.
+    printf '%s' "$ROWS" | jq -e -s 'type == "array"' >/dev/null 2>&1 || exit 0
+    VISIBLE=$(printf '%s' "$ROWS" | jq -r -s '.[] | .text // empty' 2>/dev/null) || exit 0
+}
+
+# True while the evidence a refusal would rest on is missing: an absolute path not yet in
+# visible text, or a pointer with no visible text at all.
+visible_evidence_missing() {
+    local P
+    while IFS= read -r P; do
+        case "$P" in /*) printf '%s' "$VISIBLE" | grep -Fq -- "$P" || return 0 ;; esac
+    done <<PATHLIST
+$PATHS
+PATHLIST
+    [ "$HAS_POINTER" = 1 ] && ! printf '%s' "$VISIBLE" | grep -q '[^[:space:]]' && return 0
+    return 1
+}
+
+read_visible
+# The text sent in the same message as this question can reach the transcript file a moment
+# after the hook runs (a refusal came back though the path sat in a text block written three
+# seconds earlier). Read again before refusing, so a lagging write is not read as a silent turn.
+for _ in 1 2 3; do
+    visible_evidence_missing || break
+    sleep 1
+    read_visible
+done
 
 if [ -n "$PATHS" ]; then
     while IFS= read -r P; do

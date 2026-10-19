@@ -122,6 +122,13 @@ checkopts 'letters defined with parentheses allow' 0 'Keep pair A (two people) o
 checkopts 'no letter labels allow' 0 'Render the reel now?' 'Render now' 'make the upload file'
 checkopts 'a lone capital in prose allows' 0 'Should I add a CTA at the end?' 'Add a CTA' 'one line, A1 size'
 
+# A text block that reaches the transcript file just after the hook starts is still seen.
+ABS_LAG=/work/p/lag/HANDOFF.md
+f=$(mk lag "$(u 'go')" "$(think)")
+( sleep 0.5; say "The handoff file is $ABS_LAG." >> "$f" ) &
+check 'path text written a moment after the hook starts allows' 0 "Which of $ABS_LAG reads better?" "$f"
+wait
+
 # Fail open.
 check 'transcript missing allows' 0 "$ABOVE" "$TMP/nonexistent.jsonl"
 payload=$(jq -cn --arg q "$ABOVE" '{tool_name:"AskUserQuestion", tool_input:{questions:[{question:$q}]}}')
