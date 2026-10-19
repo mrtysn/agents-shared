@@ -102,7 +102,8 @@ render), give them a page that moves instead of answering "what's the progress" 
    the bar. A step that is silent for minutes by design gets `--stall-after`/`--stale-after`.
 3. **Serve** with `project-lifecycle progress-serve <DIR>/<NAME>.html --until-finished` as a
    background command. It opens the page without taking focus and exits 0 when every item is
-   done, 1 when one failed, 2 on `--timeout`. Give the user the page's absolute path.
+   done, 1 when one failed, 2 on `--timeout`. Give the user the `http://127.0.0.1:<port>/` address its first
+   line prints, not the HTML file's path: the page moves only while it is served, and from disk it stays still.
 
 ## Decision form: asking the user on a page
 
