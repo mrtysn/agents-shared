@@ -95,3 +95,12 @@ the answer; the agent asked again with the same pointer and blamed the question 
 the table. A typed answer that asks for output is answered with that output in a plain reply
 before any new question. `hooks/require-question-facts-in-question.sh` refuses a question that
 points at text when no visible text was sent since the user last spoke.
+
+2026-10-19: a question asked about a comparison page named by a relative path. The report holding
+its absolute path existed only in the agent's thinking. The agent then claimed, three times, that
+the question box had hidden the path, and once claimed it had written an answer "above" that was
+again only in thinking. When the user did not see something, the first check is
+`scripts/extract-session-text.py --since-last-user`; the question box has never hidden text sent
+before it (the text stays visible after the box is dismissed). The path check in
+`hooks/require-question-facts-in-question.sh` is the guard: a question naming a file is refused
+unless its absolute path was sent in visible text.
