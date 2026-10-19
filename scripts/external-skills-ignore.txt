@@ -5,3 +5,5 @@ imMamdouhaboammar/motion-graphics-skills .agents/*
 imMamdouhaboammar/motion-graphics-skills projects/*
 # lemo-opuscar keeps a copy of its skill under tools/directory
 lemomo-ai/lemo-opuscar tools/*
+# the previous version of design-taste-frontend, kept upstream only for backward compatibility
+imMamdouhaboammar/motion-graphics-skills skills/design-taste-frontend-v1/SKILL.md
