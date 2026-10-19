@@ -9,6 +9,10 @@ a browser file picker, dragging it into an app, importing a zip as a temporary
 Firefox extension, revealing it in Finder — anywhere the path gets typed or pasted
 into a dialog that has no cwd.
 
+The text of an AskUserQuestion question is a message under this rule: a file it
+names is written absolute there too, and the report holding it has been sent in
+visible text first.
+
 ## Why a relative path is useless here
 
 There are 20+ tabs open. Which directory a given session sits in is not visible at
