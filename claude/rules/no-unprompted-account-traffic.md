@@ -19,4 +19,8 @@ parallel calls to a search tool) is pacing, not a refusal: slow down and continu
 never more than about five in parallel. Where agent-request-limiter answers 429,
 stop and tell the user.
 
+A tool an agent builds that loads pages in the user's browser is held to the same: it
+paces from each site's robots.txt (a slow floor when unreadable), stops a site at its
+first refusal, and is never updated mid-run.
+
 The full rule appears the first time a session runs a network command.

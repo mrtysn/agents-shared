@@ -82,6 +82,30 @@ user's budget, and these hold for any third-party service:
 
 Fetching a single public page the user pointed at is ordinary work.
 
+## Tools that send requests from the user's browser
+
+A browser extension, userscript or app an agent builds that loads pages in the user's own browser
+sends its traffic from their address and with their logins, so the sites see the user, not a bot.
+Everything above binds what the tool does, not only what the session does, and these hold before it
+ships:
+
+- **Pace from the site's own word.** Read each site's robots.txt once before its first page and never go
+  faster than its `Crawl-delay`; a robots.txt that cannot be read (a timeout, a server error) means a
+  slow floor of about 30 s, not none. Waits not given by the site start at about 10 s between pages of one
+  site, never a figure picked to make a run finish sooner. A setting that speeds the tool up never goes
+  below the site's floor.
+- **Recognise a refusal and stop at the first one.** A login page the site redirected to, a captcha, a
+  block or rate-limit page ("not able to serve your requests this quickly", "unusual traffic") ends that
+  site for the run. A refusal the tool cannot recognise it cannot obey, so its tests include the pages
+  of the sites it will actually reach.
+- **Check the pace against the site, not against the tool.** A monitor that compares the tool's timing
+  with the tool's own table only proves the table was followed. Report the real gap per site and
+  every refusal.
+- **Never update the tool while it runs.** Installing a new version of an extension mid-run restarts it
+  and drops the run; release between runs.
+- **Keeping why a link failed, when the user asks for it,** is data they retry from, not a verdict on the
+  site, and the clause above about not recording refusals does not forbid it.
+
 ## agent-request-limiter
 
 Where it is installed, agents' requests go through a per-site budget proxy (via the proxy settings
@@ -104,6 +128,13 @@ Oct 9 2026: fifteen parallel Exa searches hit its ten-per-second limit and the
 session dropped the five failed lookups under "the first refusal ends it". The
 user: "you can pace your queries, dont stop searching for info cos of a mistake
 you made". The burst-limit clause above is the result.
+
+Oct 20 2026, link-keeper: a capture queue an agent built loaded the user's saved links in their own
+Firefox at 2 s per site, a figure no site gave. Hacker News, whose robots.txt asks for 30 s, got 32 pages
+in minutes and rate-limited the user, whose message was "WTF FIX THE TOOL WHY IS IT GETTING ME BANNED FROM
+HACKER NEWS". Its refusal page was not recognised, so the run could not stop; the session's monitor
+reported "spacing fine" because it checked the tool against its own table; and eight releases in under
+three hours, several mid-run, reset the user's run four times. The browser-tools section is the result.
 
 Oct 14 2026: asked whether requests should stop at a site's first refusal, the user
 chose one retry after a `Retry-After` for requests that do not go through
