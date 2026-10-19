@@ -15,6 +15,13 @@
 # Allowed otherwise, and always when the transcript cannot be read (fails open: a missing
 # path, a missing reader or a reader error never blocks a question).
 #
+# A second, independent trigger covers a file the question rests on. Refused (exit 2) when a
+# question's text contains a file path (a token with a "/" ending in html, htm, png, jpg, jpeg,
+# gif, svg, mp4, mov, webm, pdf, md, csv, json, txt or zip; URLs with "://" are not file paths)
+# unless that path is ABSOLUTE and appears in a visible assistant text block since the user last
+# spoke. A relative path is refused even when prose had it: the question must stand alone, so
+# it names the absolute path too. Same reader call, same fail-open behaviour.
+#
 # Bash, not zsh, to match the hooks beside it.
 
 INPUT=$(cat)
@@ -26,19 +33,46 @@ QUESTIONS=$(printf '%s' "$INPUT" | jq -r '[.tool_input.questions[]?.question // 
 [ -n "$QUESTIONS" ] || exit 0
 
 POINTER='\b(above|the table|as listed|listed above|shown above|see above)\b'
-printf '%s' "$QUESTIONS" | grep -Eqi "$POINTER" || exit 0
+PATHRE='[^[:space:]"'"'"'`()<>,;]*/[^[:space:]"'"'"'`()<>,;]*\.(html|htm|png|jpg|jpeg|gif|svg|mp4|mov|webm|pdf|md|csv|json|txt|zip)\b'
+
+HAS_POINTER=0
+printf '%s' "$QUESTIONS" | grep -Eqi "$POINTER" && HAS_POINTER=1
+PATHS=$(printf '%s' "$QUESTIONS" | grep -Eoi "$PATHRE" | grep -v '://')
+[ "$HAS_POINTER" = 1 ] || [ -n "$PATHS" ] || exit 0
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 READER="$HERE/../scripts/extract-session-text.py"
 [ -r "$READER" ] || exit 0
 
 ROWS=$(python3 "$READER" "$TRANSCRIPT" --kinds assistant --since-last-user --json 2>/dev/null) || exit 0
-# Any visible text block this turn means the pointer can lead somewhere.
-if printf '%s' "$ROWS" | jq -e -s 'any(.[]; (.text // "") | test("\\S"))' >/dev/null 2>&1; then
-    exit 0
-fi
 # jq failing on the reader's output is not proof the turn was silent.
 printf '%s' "$ROWS" | jq -e -s 'type == "array"' >/dev/null 2>&1 || exit 0
+VISIBLE=$(printf '%s' "$ROWS" | jq -r -s '.[] | .text // empty' 2>/dev/null) || exit 0
+
+if [ -n "$PATHS" ]; then
+    while IFS= read -r P; do
+        [ -n "$P" ] || continue
+        case "$P" in
+            /*)
+                printf '%s' "$VISIBLE" | grep -Fq -- "$P" && continue
+                WHY="the absolute path $P never appeared in visible text since the user last spoke" ;;
+            *)
+                WHY="the question names a relative path ($P); name the absolute path in the question text too, since a question stands alone" ;;
+        esac
+        cat >&2 <<MSG
+BLOCKED: the file this question rests on was never sent as an absolute path in visible text: $WHY. Text in thinking never reaches the user.
+
+Send the report with its absolute path on its own line in a plain reply, end the turn, and ask in a later turn (docs/on-demand/asking-for-decisions.md, absolute-paths-for-handoff). Use the absolute path in the question as well.
+MSG
+        exit 2
+    done <<PATHLIST
+$PATHS
+PATHLIST
+fi
+
+[ "$HAS_POINTER" = 1 ] || exit 0
+# Any visible text block this turn means the pointer can lead somewhere.
+printf '%s' "$VISIBLE" | grep -q '[^[:space:]]' && exit 0
 
 WORD=$(printf '%s' "$QUESTIONS" | grep -Eoi "$POINTER" | head -n1)
 cat >&2 <<MSG

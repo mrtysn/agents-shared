@@ -42,7 +42,7 @@ check() {
     total=$((total + 1))
     if [ "$got" = "$want" ]; then
         [ "$VERBOSE" = 1 ] && printf 'ok    %s\n' "$name"
-        if [ "$want" = 2 ] && ! printf '%s' "$err" | grep -q 'put the facts inside the question'; then
+        if [ "$want" = 2 ] && ! printf '%s' "$err" | grep -Eq 'put the facts inside the question|absolute path on its own line'; then
             failed=$((failed + 1)); printf 'FAIL  %s: refusal gives no remedy\n' "$name"
         fi
     else
@@ -78,6 +78,24 @@ check 'text sent after the answer allows' 0 "$ABOVE" "$f"
 
 f=$(mk earlier-turn "$(u 'first')" "$(say 'old text')" "$(u 'second')" "$(think)")
 check 'text from an earlier turn does not count' 2 "$ABOVE" "$f"
+
+# Second trigger: a file path in the question needs its absolute form in visible text.
+ABS=/Users/x/repo/games/a/b.html
+f=$(mk path-silent "$(u 'go')" "$(think)")
+check 'path in question, no text refuses' 2 "Which of $ABS reads better?" "$f"
+f=$(mk path-rel "$(u 'go')" "$(say "Report: $ABS")")
+check 'relative path in question, absolute in prose refuses' 2 'Which of games/a/b.html reads better?' "$f"
+check 'absolute path in question and in prose allows' 0 "Which of $ABS reads better?" "$f"
+f=$(mk path-notes "$(u 'go')" "$(say 'Working on it, one moment.')")
+check 'absolute path in question, prose without it refuses' 2 "Which of $ABS reads better?" "$f"
+f=$(mk path-earlier "$(u 'first')" "$(say "Report: $ABS")" "$(u 'second')" "$(say 'noted')")
+check 'absolute path sent in an earlier turn refuses' 2 "Which of $ABS reads better?" "$f"
+f=$(mk path-none "$(u 'go')" "$(think)")
+check 'no path, no pointer allows' 0 'Which design reads better?' "$f"
+check 'URL is not a file path' 0 'Is https://x.com/a.html the right source?' "$f"
+check 'a name without a slash is not a path' 0 'Is report.html the right name?' "$f"
+f=$(mk path-text-prose "$(u 'go')" "$(say "Saved to $ABS.")")
+check 'absolute path followed by a period in prose allows' 0 "Which of $ABS reads better?" "$f"
 
 # Fail open.
 check 'transcript missing allows' 0 "$ABOVE" "$TMP/nonexistent.jsonl"
