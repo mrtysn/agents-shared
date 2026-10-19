@@ -17,14 +17,18 @@ Usage:
     scripts/vendor-upstream-skill.py <owner/repo> <path/to/SKILL.md> (--group NAME | --flat) [--dry-run]
     scripts/vendor-upstream-skill.py --plan plan.json [--dry-run]
 
-plan.json is [{"repo": "...", "path": ".../SKILL.md", "dest": "<group>" | "flat"}, ...].
+plan.json is [{"repo": "...", "path": ".../SKILL.md", "dest": "<group>" | "flat", "ignore": [...]}, ...].
+`ignore` (optional, also --ignore GLOB on the command line, repeatable) lists skill-dir-relative
+globs of upstream files deliberately not vendored, matched like sync-external-skills.sh matches
+source.json's "ignore" (a `*` crosses `/`); they are left out of the copy and recorded in source.json.
 Prints one JSON object per skill on stdout. Refuses a skill whose SKILL.md sits at the repo root
-(its directory is the whole repo), more than 500 files or 20 MB, and an existing destination.
+(its directory is the whole repo), more than 500 files or 20 MB after ignores, and an existing destination.
 
 Environment: VENDOR_GIT_BASE overrides https://github.com (used by the tests, which clone local repos).
 """
 import argparse
 import datetime
+import fnmatch
 import json
 import os
 import re
@@ -56,7 +60,7 @@ def destination(root, dest, name):
 
 
 def vendor_repo(root, repo, entries, base):
-    """entries: list of (path, dest). Returns one result dict per entry."""
+    """entries: list of (path, dest, ignore). Returns one result dict per entry."""
     results = []
     work = tempfile.mkdtemp(prefix="vendor-")
     d = os.path.join(work, "repo")
@@ -64,17 +68,17 @@ def vendor_repo(root, repo, entries, base):
          "%s/%s.git" % (base, repo), d])
     sha = run(["git", "rev-parse", "HEAD"], cwd=d).strip()
     dirs = []
-    for path, dest in entries:
+    for path, dest, ignore in entries:
         sdir = os.path.dirname(path)
         if sdir in ("", "."):
             results.append({"repo": repo, "path": path, "ok": False,
                             "error": "SKILL.md at the repo root: its directory is the whole repo"})
             continue
-        dirs.append((path, dest, sdir))
+        dirs.append((path, dest, sdir, ignore))
     if dirs:
         run(["git", "sparse-checkout", "set", "--cone"] + sorted({x[2] for x in dirs}), cwd=d)
         run(["git", "checkout", "-q"], cwd=d)
-    for path, dest, sdir in dirs:
+    for path, dest, sdir, ignore in dirs:
         res = {"repo": repo, "path": path, "dest": dest}
         try:
             name = os.path.basename(sdir)
@@ -82,18 +86,24 @@ def vendor_repo(root, repo, entries, base):
             if os.path.exists(target):
                 raise ValueError("already exists: %s" % os.path.relpath(target, root))
             listing = run(["git", "ls-tree", "-r", "HEAD", "--", sdir], cwd=d).strip().split("\n")
-            files, total = [], 0
+            files, total, dropped = [], 0, 0
             for line in listing:
                 meta, rel = line.split("\t", 1)
                 mode = meta.split()[0]
-                files.append((rel[len(sdir) + 1:], mode))
+                skill_rel = rel[len(sdir) + 1:]
+                if any(fnmatch.fnmatchcase(skill_rel, pat) for pat in ignore):
+                    dropped += 1
+                    continue
+                files.append((skill_rel, mode))
                 total += os.path.getsize(os.path.join(d, rel))
             if not files or not any(f == "SKILL.md" for f, _ in files):
                 raise ValueError("no SKILL.md under %s" % sdir)
             if len(files) > MAX_FILES or total > MAX_BYTES:
-                raise ValueError("too large (%d files, %.1f MB); vendor by hand" % (len(files), total / 1048576))
-            res.update({"name": name, "target": os.path.relpath(target, root), "files": len(files), "ok": True})
-            res["_plan"] = (target, sdir, files)
+                raise ValueError("too large (%d files, %.1f MB); add ignore globs or vendor by hand"
+                                 % (len(files), total / 1048576))
+            res.update({"name": name, "target": os.path.relpath(target, root), "files": len(files),
+                        "ignored": dropped, "ok": True})
+            res["_plan"] = (target, sdir, files, ignore)
         except (ValueError, OSError, RuntimeError) as e:
             res.update({"ok": False, "error": str(e)})
         results.append(res)
@@ -102,7 +112,7 @@ def vendor_repo(root, repo, entries, base):
 
 
 def write_skill(d, repo, path, sha, plan):
-    target, sdir, files = plan
+    target, sdir, files, ignore = plan
     os.makedirs(target)
     for rel, mode in files:
         src = os.path.join(d, sdir, rel)
@@ -113,6 +123,8 @@ def write_skill(d, repo, path, sha, plan):
                 os.chmod(out, 0o755)
     source = {"repo": repo, "path": path, "files": sorted(r for r, _ in files), "commit": sha,
               "updated": datetime.date.today().isoformat()}
+    if ignore:
+        source["ignore"] = list(ignore)
     with open(os.path.join(target, "source.json"), "w", encoding="utf-8") as f:
         json.dump(source, f, indent=2, ensure_ascii=False)
         f.write("\n")
@@ -125,7 +137,9 @@ def main():
     g = ap.add_mutually_exclusive_group()
     g.add_argument("--group")
     g.add_argument("--flat", action="store_true")
-    ap.add_argument("--plan", help="JSON file: [{repo, path, dest}]")
+    ap.add_argument("--ignore", action="append", default=[], metavar="GLOB",
+                    help="skill-dir-relative glob of upstream files not to vendor (repeatable)")
+    ap.add_argument("--plan", help="JSON file: [{repo, path, dest, ignore?}]")
     ap.add_argument("--dry-run", action="store_true", help="clone and check, write nothing")
     ap.add_argument("--delay", type=float, default=2.0)
     ap.add_argument("--root", default=DEFAULT_ROOT, help="agents-shared checkout (default: this one)")
@@ -134,7 +148,8 @@ def main():
     if args.plan:
         plan = json.load(open(args.plan, encoding="utf-8"))
     elif args.repo and args.path and (args.group or args.flat):
-        plan = [{"repo": args.repo, "path": args.path, "dest": "flat" if args.flat else args.group}]
+        plan = [{"repo": args.repo, "path": args.path, "dest": "flat" if args.flat else args.group,
+                 "ignore": args.ignore}]
     else:
         ap.error("give <repo> <path> with --group/--flat, or --plan")
 
@@ -149,12 +164,12 @@ def main():
             out.append({"repo": e["repo"], "path": e["path"], "ok": False, "error": "listed twice in the plan"})
             continue
         seen.add((e["repo"], e["path"]))
-        by_repo.setdefault(e["repo"], []).append((e["path"], e["dest"]))
+        by_repo.setdefault(e["repo"], []).append((e["path"], e["dest"], list(e.get("ignore") or [])))
 
     failed_git = False
     for n, (repo, entries) in enumerate(by_repo.items()):
         if failed_git:
-            out += [{"repo": repo, "path": p, "ok": False, "error": "skipped after an earlier git failure"} for p, _ in entries]
+            out += [{"repo": repo, "path": p, "ok": False, "error": "skipped after an earlier git failure"} for p, _, _ in entries]
             continue
         if n:
             time.sleep(args.delay)
@@ -162,7 +177,7 @@ def main():
             sha, d, results, work = vendor_repo(args.root, repo, entries, base)
         except RuntimeError as e:
             failed_git = True
-            out += [{"repo": repo, "path": p, "ok": False, "error": "git failed, no further requests: %s" % e} for p, _ in entries]
+            out += [{"repo": repo, "path": p, "ok": False, "error": "git failed, no further requests: %s" % e} for p, _, _ in entries]
             continue
         for r in results.values():
             planned = r.pop("_plan", None)
