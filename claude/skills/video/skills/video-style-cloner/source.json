@@ -1,0 +1,40 @@
+{
+  "repo": "imMamdouhaboammar/motion-graphics-skills",
+  "path": "skills/video-style-cloner/SKILL.md",
+  "files": [
+    "README.md",
+    "SKILL.md",
+    "engine/Cargo.lock",
+    "engine/Cargo.toml",
+    "engine/README.md",
+    "engine/examples/smoke-project/render_segment.py",
+    "engine/examples/smoke-project/review_final.py",
+    "engine/examples/smoke-project/review_segment.py",
+    "engine/proto/reelmimic.proto",
+    "engine/src/agents/mod.rs",
+    "engine/src/cli/mod.rs",
+    "engine/src/config/mod.rs",
+    "engine/src/executor/mod.rs",
+    "engine/src/lib.rs",
+    "engine/src/main.rs",
+    "engine/src/models/mod.rs",
+    "engine/src/pipeline/mod.rs",
+    "engine/src/project_paths.rs",
+    "engine/src/router/mod.rs",
+    "engine/tests/regressions.rs",
+    "evals/evals.json",
+    "references/audio.md",
+    "references/engines.md",
+    "references/licensing.md",
+    "references/qa-checklist.md",
+    "references/runtime.md",
+    "references/shot-analysis.md",
+    "styles/_TEMPLATE.md",
+    "styles/painted-animation.md"
+  ],
+  "commit": "29919c1ff91d0e0a242ffc0d085b838fa9575584",
+  "updated": "2026-10-19",
+  "ignore": [
+    "skills/*"
+  ]
+}

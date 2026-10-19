@@ -1,0 +1,12 @@
+{
+  "repo": "imMamdouhaboammar/motion-graphics-skills",
+  "path": "skills/video-spotlight/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "references/color-integrity.md",
+    "scripts/spotlight_plan.py",
+    "scripts/test_spotlight_plan.py"
+  ],
+  "commit": "29919c1ff91d0e0a242ffc0d085b838fa9575584",
+  "updated": "2026-10-19"
+}

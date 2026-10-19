@@ -1,0 +1,12 @@
+{
+  "repo": "imMamdouhaboammar/motion-graphics-skills",
+  "path": "skills/jump-cut-pacing/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "references/pacing-rules.md",
+    "scripts/cut_plan.py",
+    "scripts/test_cut_plan.py"
+  ],
+  "commit": "29919c1ff91d0e0a242ffc0d085b838fa9575584",
+  "updated": "2026-10-19"
+}

@@ -1,0 +1,16 @@
+{
+  "repo": "imMamdouhaboammar/motion-graphics-skills",
+  "path": "skills/video-review-loop/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "references/review-gates.md",
+    "scripts/review_round.py",
+    "scripts/review_video.py",
+    "scripts/strict_video_signals.py",
+    "scripts/test_review_round.py",
+    "scripts/test_review_video.py",
+    "scripts/test_strict_video_signals.py"
+  ],
+  "commit": "29919c1ff91d0e0a242ffc0d085b838fa9575584",
+  "updated": "2026-10-19"
+}

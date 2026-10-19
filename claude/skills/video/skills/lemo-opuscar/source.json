@@ -1,0 +1,10 @@
+{
+  "repo": "lemomo-ai/lemo-opuscar",
+  "path": "plugin/skills/lemo-opuscar/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "scripts/setup.sh"
+  ],
+  "commit": "b5e8ef93930b6d828f352055a689320f138237b1",
+  "updated": "2026-10-19"
+}

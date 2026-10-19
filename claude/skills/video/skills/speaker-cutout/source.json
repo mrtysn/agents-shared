@@ -1,0 +1,12 @@
+{
+  "repo": "imMamdouhaboammar/motion-graphics-skills",
+  "path": "skills/speaker-cutout/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "references/depth-stacking.md",
+    "scripts/speaker_layer.py",
+    "scripts/test_speaker_layer.py"
+  ],
+  "commit": "29919c1ff91d0e0a242ffc0d085b838fa9575584",
+  "updated": "2026-10-19"
+}
