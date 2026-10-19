@@ -17,7 +17,8 @@
 #
 # A second, independent trigger covers a file the question rests on. Refused (exit 2) when a
 # question's text contains a file path (a token with a "/" ending in html, htm, png, jpg, jpeg,
-# gif, svg, mp4, mov, webm, pdf, md, csv, json, txt or zip; URLs with "://" are not file paths)
+# gif, svg, mp4, mov, webm, pdf, md, csv, json, txt or zip; URLs with "://" and glob patterns
+# with "*" or "?" are not file paths)
 # unless that path is ABSOLUTE and appears in a visible assistant text block since the user last
 # spoke. A relative path is refused even when prose had it: the question must stand alone, so
 # it names the absolute path too. Same reader call, same fail-open behaviour.
@@ -37,7 +38,7 @@ PATHRE='[^[:space:]"'"'"'`()<>,;]*/[^[:space:]"'"'"'`()<>,;]*\.(html|htm|png|jpg
 
 HAS_POINTER=0
 printf '%s' "$QUESTIONS" | grep -Eqi "$POINTER" && HAS_POINTER=1
-PATHS=$(printf '%s' "$QUESTIONS" | grep -Eoi "$PATHRE" | grep -v '://')
+PATHS=$(printf '%s' "$QUESTIONS" | grep -Eoi "$PATHRE" | grep -v -e '://' -e '[*?]')
 [ "$HAS_POINTER" = 1 ] || [ -n "$PATHS" ] || exit 0
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
