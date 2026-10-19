@@ -1,2 +1,7 @@
 # Upstream SKILL.md files deliberately not vendored. One per line: "<owner/repo> <glob>",
 # the glob matched against the SKILL.md path inside that repo. Reported otherwise as new upstream skills.
+# motion-graphics-skills ships the same skills again under .agents/ and inside its demo projects
+imMamdouhaboammar/motion-graphics-skills .agents/*
+imMamdouhaboammar/motion-graphics-skills projects/*
+# lemo-opuscar keeps a copy of its skill under tools/directory
+lemomo-ai/lemo-opuscar tools/*
