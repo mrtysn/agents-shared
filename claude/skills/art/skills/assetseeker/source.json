@@ -1,0 +1,12 @@
+{
+  "repo": "imMamdouhaboammar/motion-graphics-skills",
+  "path": "skills/assetseeker/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "references/asset_catalog.md",
+    "references/google_fonts_index.json",
+    "scripts/seek_assets.py"
+  ],
+  "commit": "29919c1ff91d0e0a242ffc0d085b838fa9575584",
+  "updated": "2026-10-19"
+}
