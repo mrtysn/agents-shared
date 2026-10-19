@@ -114,8 +114,8 @@ its work needs. Run `report-skill-group-use.py` (agents-shared `scripts/`, about
 for each group's skill count and 30-day uses across all folders.
 
 Suggest groups from what the repo is: a web UI → motion, react; a three.js game → threejs;
-a Godot game → gamedev; pixel art or rendering → art; video → video. `interface` is already
-on everywhere; leave it out. Ask with AskUserQuestion, multi-select, at most four options:
+a Godot game → gamedev; pixel art or rendering → art; video → video; anything with a UI the
+user looks at, or image generation → interface. Ask with AskUserQuestion, multi-select, at most four options:
 the suggested groups first, each showing its uses; one option for the remaining groups,
 which then get their own question; and **None**.
 
