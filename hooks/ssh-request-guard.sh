@@ -41,6 +41,8 @@
 # still ask): its name is a line in $CLAUDE_CONFIG_DIR/ssh-request-guard/session-allow/<session id>,
 # written by scripts/allow-ssh-host-for-session, which the user runs, or by Agent Bar Hopping's
 # Directory menu (cc-statusline repo), which writes `*` and removes it to revoke. An agent never writes it.
+# The file $CLAUDE_CONFIG_DIR/ssh-request-guard/bypass-all-sessions clears every host in every session
+# the same way, until it is removed; CC Sessions' Guards menu makes and removes it.
 # Each log line also carries `host` (as typed, user@ dropped) and `clearable` (false for tunnel asks,
 # which a session clearance does not cover), which Agent Bar Hopping reads to offer the clearance.
 #
@@ -88,7 +90,9 @@ SESSION_ID=$(printf '%s' "$INPUT" | jq -r '.session_id // empty')
 # 0 when the user cleared this host for the current session, or every host with a `*` line. The host
 # is matched as typed, with any user@ prefix dropped.
 host_allowed_for_session() {
-    local file=${CLAUDE_CONFIG_DIR:-$HOME/.claude}/ssh-request-guard/session-allow/$SESSION_ID
+    local dir=${CLAUDE_CONFIG_DIR:-$HOME/.claude}/ssh-request-guard
+    [ -n "$1" ] && [ -e "$dir/bypass-all-sessions" ] && return 0
+    local file=$dir/session-allow/$SESSION_ID
     [ -n "$SESSION_ID" ] && [ -n "$1" ] && [ -f "$file" ] || return 1
     grep -Fxq -- '*' "$file" || grep -Fxq -- "${1##*@}" "$file"
 }

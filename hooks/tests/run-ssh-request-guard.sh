@@ -86,6 +86,12 @@ session_case ask  sess-a "ssh node01 'uv sync'"
 session_case ask  sess-a "ssh -D 1080 deck"
 session_case pass sess-all "ssh node01 'uv sync'"
 session_case ask  sess-all "ssh -D 1080 node01"
+# every host in every session, while the global file exists; tunnels still ask
+touch "$CFG/ssh-request-guard/bypass-all-sessions"
+session_case pass sess-b "ssh node01 'uv sync'"
+session_case ask  sess-b "ssh -D 1080 node01"
+rm -f "$CFG/ssh-request-guard/bypass-all-sessions"
+session_case ask  sess-b "ssh node01 'uv sync'"
 
 echo "$((total - fail))/$total passed, $asks asks logged"
 [ "$fail" = 0 ]
