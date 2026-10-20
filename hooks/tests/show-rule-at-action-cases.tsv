@@ -3,6 +3,7 @@
 # pass        the call is untouched, now and on the repeat
 # block       the first call exits 2 with the rule text; the same call again exits 0 with no output
 # note        the first call exits 0 with additionalContext; the repeat adds nothing
+# each-message a deny-each row: a new message in the same session is refused once more, a repeat passes
 # each-agent  a note-once row: the main conversation and a sub-agent of one session each get the text once
 # --- window-focus: launches only
 block	Bash	{"command":"open -g /Applications/Foo.app"}
@@ -32,6 +33,9 @@ each-agent	WebFetch	{"url":"https://example.com","prompt":"x"}
 block	SendMessage	{"to":"x","message":"y"}
 pass	SendMessage	{"to":"main","message":"y"}
 pass	SendMessage	{"to":"x","message":"y"}	sub-1
+# --- send-message-gate: every distinct message is refused once; a repeat passes
+each-message	SendMessage	{"to":"x","message":"y"}
+pass	SendMessage	{"to":"main","message":"z"}
 # --- asking-for-decisions
 note	AskUserQuestion	{"questions":[]}
 # --- absolute-paths-for-deletion

@@ -18,6 +18,9 @@
 #   mode     deny-once  the call is refused (exit 2) with the text, and the same action
 #                       goes through when re-issued; for a rule that has to fire before
 #                       the action
+#            deny-each  like deny-once, but each distinct call (same tool input) is refused
+#                       once, so every new message is stopped and a re-issue of the same
+#                       one goes through; for a rule that has to be weighed at every use
 #            note-once  the call goes ahead and the text is added to the model's context
 #                       (hookSpecificOutput.additionalContext)
 #   scope    optional. `main` fires the row only in the main conversation, not inside a
@@ -78,6 +81,9 @@ while IFS=$'\t' read -r id tools field pattern exclude mode scope; do
     [ -r "$doc" ] || continue
 
     mark="$STATE/${SESSION:-no-session}${AGENT:+-$AGENT}-$id"
+    if [ "$mode" = deny-each ]; then
+        mark="$mark-$(printf '%s' "$INPUT" | jq -cS '.tool_input' | shasum | cut -c1-16)"
+    fi
     [ -e "$mark" ] && continue
     {
         mkdir -p "$STATE" &&
@@ -87,7 +93,7 @@ while IFS=$'\t' read -r id tools field pattern exclude mode scope; do
 
     text=$(cat "$doc")
     case "$mode" in
-        deny-once) DENY_TEXT="$DENY_TEXT
+        deny-once|deny-each) DENY_TEXT="$DENY_TEXT
 $text
 " ;;
         *)         NOTE_TEXT="$NOTE_TEXT
@@ -98,7 +104,7 @@ done < "$TRIGGERS"
 
 if [ -n "$DENY_TEXT" ]; then
     {
-        echo "BLOCKED once: this is the first action in this session that a standing rule covers. Its full text:"
+        echo "BLOCKED once: this call meets a standing rule. Its text:"
         printf '%s\n' "$DENY_TEXT$NOTE_TEXT"
         echo "Re-issue the call if it still fits the rule."
     } >&2
