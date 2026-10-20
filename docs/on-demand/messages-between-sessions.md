@@ -122,3 +122,10 @@ with failing CI to `ai-job-search`, the agent listed ten peers and sent to
 the user it had not confirmed that was the session that made the commits. This doc
 was shown before the send and said nothing about choosing a recipient; the agent
 fixed the message format and kept the guess.
+
+Oct 20 2026, job-search: told "isn't session notebook-b5 working on that, why are you
+asking me that?", an agent sent notebook-b5 four findings it assumed that session
+lacked, nothing asked of it. The full text had been shown at its first send 15 hours
+earlier; deny-once never fired again. Fix: a deny-each row (`send-message-gate`) refuses
+every new message once with a two-question check, and the launch rule says a remark about
+a session is not an order to message it.
