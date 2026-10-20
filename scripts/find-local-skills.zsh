@@ -9,15 +9,17 @@
 # A flat skill follows `skillOverrides` the same way. A skill moved to a group's off/ folder is off
 # everywhere.
 #
-# usage: find-local-skills.zsh QUERY [FOLDER]    FOLDER defaults to the current directory
+# usage: find-local-skills.zsh QUERY|--all [FOLDER]    FOLDER defaults to the current directory
+#   --all lists every installed skill, whatever the text, for an overview
 # output: one line per match, "<state>\t<group/skill or skill>", states:
 #   active | not-enabled-here (group off) | off-in-group | off (override) | slash-only | name-only
 
 query=${1:-}
 if [[ -z $query ]]; then
-  print -u2 "usage: ${0:t} QUERY [FOLDER]"
+  print -u2 "usage: ${0:t} QUERY|--all [FOLDER]"
   exit 2
 fi
+[[ $query == --all ]] && query=
 folder=${2:-$PWD}
 config=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
 skills=$config/skills
@@ -37,7 +39,7 @@ setting() {
 }
 
 typeset -U hits
-hits=(${(f)"$(grep -rilF --include=SKILL.md -- $query $skills/*/ 2>/dev/null)"})
+hits=(${(f)"$(grep -rilF --include=SKILL.md -- "$query" $skills/*/ 2>/dev/null)"})
 
 for hit in $hits; do
   rel=${hit#$skills/}
