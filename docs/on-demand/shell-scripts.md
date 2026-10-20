@@ -22,6 +22,12 @@ Say which one applies rather than defaulting to bash out of habit.
 
 - `set -euo pipefail` at the top of anything non-trivial
 - Quote expansions; `"$var"`, not `$var`
+- A list of background pids is an array: `pids=(); … & pids+=($!); kill $pids`, or `kill $(jobs -p)`.
+  zsh does not word-split an unquoted string, so `pids="$pids $!"` then `kill $pids` passes the
+  whole string as one bad argument and kills nothing. On 2026-10-20 a load test left 12 busy loops
+  on every core for three hours that way: `kill $pids 2>/dev/null; echo killed` hid the failure and
+  reported success. A cleanup step never sends its errors to /dev/null, and says "stopped" only after
+  checking the pids are gone.
 
 ## Long commands go in a file, not the chat
 
