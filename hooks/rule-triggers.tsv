@@ -25,3 +25,4 @@ shell-scripts	Bash	command	(^|[;&|(`])[[:space:]]*(bash|sh)[[:space:]]+[^-[:spac
 no-hardcoded-paths	Write|Edit	content	/(Users|home)/[a-z][a-zA-Z0-9_.-]*/	-	note-once
 never-truncate-before-reading	Bash	command	open\([^)]*,[[:space:]]*['"]w['"]	-	note-once
 never-truncate-before-reading	Write	content	open\([^)]*,[[:space:]]*['"]w['"]	-	note-once
+commit-only-your-paths	Bash	command	(^|[;&|(`])[[:space:]]*git[[:space:]]+(-C[[:space:]]+[^[:space:]]+[[:space:]]+)?commit([[:space:]]|$)	[[:space:]]--[[:space:]]+[^[:space:]-]	deny-once
