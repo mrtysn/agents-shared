@@ -19,6 +19,7 @@ answering the user, and it does not mean wait for them.
   user are listed in the report, not waited for. Never poll for something only the
   user can cause.
 - **Answer every message that arrives mid-run**, even a short one, before carrying on.
+- **Before ending a turn during an /away stretch, arm a waiter on the next thing you owe** (a wakeup, or a background until-loop on the filed job's end) and read its result when it fires; a filed job is not done until its outcome is seen. A Stop hook refuses the end of turn otherwise.
 - **One waiter per background task.** Wait on its completion notice, or with Monitor.
   A foreground wait that times out and moves to the background is not reissued: its
   task is already running, and each reissue adds a second waiter on the same thing.
