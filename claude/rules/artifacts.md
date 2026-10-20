@@ -4,6 +4,15 @@
 
 - A file for the user to read is a **local HTML page** on disk, whether or not they asked for HTML (the first scratch write in a session shows the rule on where a file lives and what it is); give its file path.
 - Make it self-contained: inline all CSS/JS, no CDNs, works offline.
+- A page the user opens from disk (`file://`) must not depend on a third-party tile, API or
+  font host at runtime: such hosts block or watermark a request with no Referer (OpenStreetMap
+  answers 403, CARTO's free URL stamps "API KEY REQUIRED"). Use data bundled in the page, or
+  state the dependency and check the host's usage policy before choosing it.
+- Verify it from the origin the user will use: open the page as `file://`, not from
+  `http://127.0.0.1`, which sends a Referer and hides the failure. Where the tool cannot open
+  `file://`, say the check is missing; do not report the page as fixed.
+- A fetched image (a tile, a screenshot, a chart) is checked by viewing it with Read, never by
+  HTTP status or file type alone.
 - Do not offer to publish or share through Anthropic.
 
 ## Every page starts from `page-new`

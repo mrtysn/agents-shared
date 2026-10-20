@@ -155,5 +155,7 @@ user pastes JSON from a form opened from disk, write it to `<FORM>.answers.json`
 - **The column lists `<h2>` sections only**; a page whose headings are `<h3>` has no column.
 - **Links are set up by the head**: every link except an in-page `#anchor` opens in a new tab
   with `rel="noopener noreferrer"`. Write plain `<a href>`; never add `target` yourself.
+- **No runtime third-party hosts (map tiles, APIs), and test from `file://`, with every fetched image
+  viewed**: see the artifacts rule.
 - A diagram (`/archify`) or a long data table is a section's content, not a reason to skip
   the scaffold.
