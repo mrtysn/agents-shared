@@ -57,6 +57,12 @@ message, and a hold must be able to end.
 
 ## Sending one
 
+**Every send to a peer carries the user's words.** Put a quotation of what the user typed, or
+answered in AskUserQuestion, in the call's `summary` (the recipient never sees it):
+`User said "<their words>"`. A hook refuses a call without one, and one instruction covers one
+message. A send to `main` and a send to a sub-agent you spawned are exempt; a sub-agent
+messages no one but `main`.
+
 Send only when the other session must act, or must stop waiting. No status
 updates, no courtesy copies.
 
@@ -126,6 +132,7 @@ fixed the message format and kept the guess.
 Oct 20 2026, job-search: told "isn't session notebook-b5 working on that, why are you
 asking me that?", an agent sent notebook-b5 four findings it assumed that session
 lacked, nothing asked of it. The full text had been shown at its first send 15 hours
-earlier; deny-once never fired again. Fix: a deny-each row (`send-message-gate`) refuses
-every new message once with a two-question check, and the launch rule says a remark about
-a session is not an order to message it.
+earlier; deny-once never fired again. Fix: `hooks/require-user-quote-before-session-message.py`
+refuses a send to a peer unless the call's `summary` (never shown to the recipient) quotes
+words the user typed, or answered in an AskUserQuestion, since the previous send; the launch
+rule says a remark about a session is not an order to message it.

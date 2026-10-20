@@ -1,6 +1,7 @@
-# Before this message goes out
+# Before a message goes to another session
 
-Answer both, in your head, before re-issuing the same call:
+`hooks/require-user-quote-before-session-message.py` refuses the call when its `summary` does
+not quote the user. Two questions decide whether the quote exists:
 
 1. **Did the user tell you, in words, to send this or pass it on?** A question or a
    remark about another session ("isn't session X working on that?") is not an
@@ -13,5 +14,6 @@ If neither is yes, do not send. Findings you think a peer lacks, a status update
 courtesy copy and "staying out of your files" are not reasons: the peer has its own
 user and its own context.
 
-If one is yes, check the recipient by evidence, not by its name, as the full rule
-says, then re-issue the call unchanged.
+If the user told you to: quote their words in `summary` as `User said "..."`, check the
+recipient by evidence (not by its name), and send. If only your own work is stuck, ask the
+user with AskUserQuestion; their answer is then the quotation.
