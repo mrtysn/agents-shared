@@ -1,0 +1,11 @@
+--- a/SKILL.md
++++ b/SKILL.md
+@@ -403,6 +403,8 @@
+ A contact sheet finds candidates. It does not prove geometry. Confirm a suspected clip or overflow on a full-resolution still or by measurement before changing code.
+ 
+ For an HTML composition with window.seek, run scripts/clip-audit.js over the whole timeline. It measures every visible text run against the frame and every clipping container and reports persistent cuts, and with --safe it warns about text near the frame edge. Declare designed crops with data-crop="intentional". The audit does not see clip-path polygons or occlusion by a sibling layer, so check light cones, shaped masks, and objects passing over words by eye.
++
++Text over a moving particle layer (stars, sparks, dust, rain) gets protection when it is built, not when it is reviewed: an ink halo on the text (`text-shadow` in the background colour) or the particles kept out of the text's box. A light particle drifting through the gap under a glyph reads as a mark on it, and no audit sees that. At review, check every frame that holds a headline number or name at full resolution, cropped to the text, at three times across its hold.
+ 
+ Hard-fail and fix:
+ 
