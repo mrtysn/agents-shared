@@ -1,7 +1,7 @@
 ---
 description: Search public Claude Code skill directories for an existing skill matching a need. Use when user asks "is there a skill for X", wants to find/discover skills, or before writing a new skill from scratch.
 context: fork
-allowed-tools: WebSearch, WebFetch, Read, Glob, Grep, Bash(gh search:*), Bash(gh api:*), Bash(ls:*)
+allowed-tools: WebSearch, WebFetch, Read, Glob, Grep, Bash(gh search:*), Bash(gh api:*), Bash(ls:*), Bash(*/find-local-skills.zsh:*)
 argument-hint: <what the skill should do>
 ---
 
@@ -13,15 +13,29 @@ If no arguments were given, return immediately asking for a description of what 
 
 ## Check what is already installed first
 
-Before touching the network:
+Before touching the network, run:
 
 ```
-ls -d ~/.claude/skills/*/ ./.claude/skills/*/ 2>/dev/null
-grep -ril "<query>" ~/.claude/skills ~/.claude/plugins ./.claude/skills 2>/dev/null | head
+$AGENTS_SHARED/scripts/find-local-skills.zsh "<query>" "$PWD"
 ```
 
-Grep the descriptions, not just directory names — a skill that does the asked thing is
-often named something else. If one already installed covers it, say so and stop.
+It prints one `state<TAB>name` line per installed skill whose text matches, and the text itself
+is never printed. That matters: a skill in a group switched off for this folder in Skill Tree
+(`not-enabled-here`) must not reach context just because it was searched for. **Never Read, cat
+or grep the body of a skill whose state is not `active`.** Name it in the report and say it is
+installed but off here.
+
+- `active` — installed and live in this folder. If it covers the need, say so and stop.
+- `not-enabled-here (group off)` — installed, but its group is off for this folder. Report it as
+  the answer: the fix is to switch the group on for this folder in Skill Tree, not to look
+  elsewhere. Stop.
+- `off-in-group`, `off (override)` — installed and switched off everywhere (or by a skill
+  override). Same: report it and stop.
+- `slash-only`, `name-only` — installed; Claude does not auto-invoke it, the user can type it.
+
+Matching is on the whole text of each skill, so try a second, narrower word if the list is long
+(more than ~15 lines) before deciding what covers the need. Only when nothing installed covers
+it, continue to the public sources.
 
 ## Sources
 
