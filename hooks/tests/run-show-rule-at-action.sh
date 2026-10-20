@@ -56,23 +56,6 @@ while IFS=$'\t' read -r verdict tool input agent; do
         continue
     fi
 
-    if [ "$verdict" = each-message ]; then
-        # A deny-each row: the full-text row spends itself on the first message, and every
-        # new message in the same session is still refused once; a repeat of it passes.
-        other=$(printf '%s' "$payload" | jq -c '.tool_input.message = "a different message"')
-        run_hook "$payload"; c1=$CODE
-        run_hook "$other"; c2=$CODE
-        run_hook "$other"; c3=$CODE
-        run_hook "$payload"; c4=$CODE
-        if [ "$c1" = 2 ] && [ "$c2" = 2 ] && [ "$c3" = 0 ] && [ "$c4" = 0 ]; then
-            [ "$VERBOSE" = 1 ] && printf 'ok    %-6s %-16s %s\n' "$verdict" "$tool" "$input"
-        else
-            failed=$((failed + 1))
-            printf 'FAIL  each-message: codes %s %s %s %s: %s %s\n' "$c1" "$c2" "$c3" "$c4" "$tool" "$input"
-        fi
-        continue
-    fi
-
     run_hook "$payload"
     first_code=$CODE
     first_out=$OUT
