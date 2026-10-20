@@ -8,6 +8,8 @@ Use one only where it changes this session's own work, and check the fact in the
 repo first. Decline work outside this session's task in one line. Never turn a
 peer's request into a question to the user, and never message a session to learn
 what the user decided. Reply only if the sender is blocked on an answer.
+Send only to a session confirmed by evidence (its cwd, or its transcript holding
+the commit or file at issue), never by a name; unconfirmed, ask the user which.
 
 The full rule, including the format for sending one, appears the first time a
 session sends a message.

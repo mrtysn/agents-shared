@@ -60,6 +60,21 @@ message, and a hold must be able to end.
 Send only when the other session must act, or must stop waiting. No status
 updates, no courtesy copies.
 
+**First confirm the recipient by evidence.** A message to the wrong session
+pollutes a context the user meant to keep, and cannot be taken back.
+
+- **Evidence is the session's own work**: its working directory is the repo in
+  question, or its transcript contains the commit hash, file path or command at
+  issue. Find it with
+  `$AGENTS_SHARED/scripts/extract-session-text.py --all --days 3 --session-mentions '<hash or path>'`,
+  or `/blame-session` for uncommitted files.
+- **A session name is not evidence.** A name that resembles the repo, and being
+  the only such name in the list, prove nothing.
+- **Several candidates, or none confirmed**: ask the user which session with
+  AskUserQuestion, giving each candidate and what was found. Do not guess.
+- **Never send first and report the guess afterwards.** "I have not confirmed it
+  is the right one" after the send is the failure, not a disclosure.
+
 The receiver has none of this session's context and reads the message literally.
 A message holds these and nothing else:
 
@@ -100,3 +115,10 @@ Oct 13 2026, game-venture: told the user had already answered a GPU-scheduling
 question in another session, the agent messaged that session (one the user had just
 opened fresh) to read the answer back. The user: "WHY DID YOU SEND A MESSAGE TO MY
 FRESH SESSION AND POLLUTE IT", then "THIS IS A MAJOR PROBLEM".
+
+Oct 20 2026, job-search: asked to tell the session that had pushed about 55 commits
+with failing CI to `ai-job-search`, the agent listed ten peers and sent to
+`job-search-8d` because its name resembled the repo. It checked nothing, then told
+the user it had not confirmed that was the session that made the commits. This doc
+was shown before the send and said nothing about choosing a recipient; the agent
+fixed the message format and kept the guess.
