@@ -1,0 +1,29 @@
+# Cases for refuse-stop-while-away.sh — one per line, tab-separated:
+#   name  stretch  refusals  stop_hook_active  shells  fixture  want  refusals_after
+#
+# stretch:   open | none | closed | expired     (state the runner writes with scripts/away-obligation)
+# refusals:  refusals already made in the stretch
+# shells:    none | shell | monitor | orphan | fail   (what the stubbed shell lister prints; fail = exits 1)
+# fixture:   a transcript in hooks/tests/fixtures/away/ (without .jsonl), or `unreadable` for a missing file
+# want:      allow (no output) | block (decision block) | allow+notify (no output, notify ran)
+# refusals_after: the refusal count in the state file after the hook ran (- = no state file)
+no stretch is never refused	none	0	false	none	no-calls	allow	-
+closed stretch is never refused	closed	0	false	none	no-calls	allow	0
+expired stretch is never refused	expired	0	false	none	no-calls	allow	0
+open, nothing armed, is refused	open	0	false	none	no-calls	block	1
+second refusal still blocks	open	1	false	none	no-calls	block	2
+third attempt is let through and notified	open	2	false	none	no-calls	allow+notify	2
+stop_hook_active is let through	open	0	true	none	no-calls	allow	0
+live background shell arms	open	0	false	shell	no-calls	allow	0
+monitor block in the lister does not arm	open	0	false	monitor	no-calls	block	1
+orphan block in the lister does not arm	open	0	false	orphan	no-calls	block	1
+standing wakeup arms	open	0	false	none	wakeup-armed	allow	0
+wakeup that already fired does not arm	open	0	false	none	wakeup-fired	block	1
+wakeup fired then re-armed arms	open	0	false	none	wakeup-fired-then-rearmed	allow	0
+wakeup cancelled with stop does not arm	open	0	false	none	wakeup-stopped	block	1
+recurring cron arms	open	0	false	none	cron-armed	allow	0
+wakeup from before the user's last prompt does not arm	open	0	false	none	wakeup-before-prompt	block	1
+task notification does not end the wakeup's standing	open	0	false	none	wakeup-then-notification	allow	0
+a Monitor call does not arm	open	0	false	none	monitor-only	block	1
+lister failure fails open	open	0	false	fail	no-calls	allow	0
+unreadable transcript fails open	open	0	false	none	unreadable	allow	0

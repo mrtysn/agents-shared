@@ -1,0 +1,158 @@
+#!/bin/zsh
+# DESC: Open, close and read a session's away stretch, the state the away hooks share
+#
+# An away stretch is a span of time the user is not at the machine and the session has
+# been told to carry on alone ("keep my machine idle between 8 and 9, then carry on").
+# hooks/open-away-stretch.sh opens one from the user's `/away` command; hooks/refuse-stop-while-away.sh
+# refuses to let the session end its turn during it while nothing is armed to wake it.
+# This script owns the state file, so the hooks and an agent read and write it one way.
+#
+# One small JSON file per session in $AWAY_STATE_DIR, else
+# ${XDG_STATE_HOME:-~/.local/state}/agents-shared/away/<session>.json:
+#   quote, opened, end (epoch seconds), refusals, gave_up, closed, closed_reason
+# A stretch always has an end, at most 12 hours after it opens. Files older than 7 days are pruned.
+# AWAY_NOW (epoch seconds) replaces the clock, for the tests.
+set -euo pipefail
+zmodload zsh/datetime
+
+CAP_SECONDS=43200
+
+usage() {
+  cat <<'USAGE'
+usage: away-obligation open  [--session ID] [--quote TEXT] until HH:MM | for DURATION
+       away-obligation close [--session ID] --reason WHY
+       away-obligation status [--session ID] [--json]
+       away-obligation refuse [--session ID]      (the Stop hook: count one refusal)
+       away-obligation give-up [--session ID]     (the Stop hook: refusals used up)
+
+  until HH:MM   local time, the next time the clock reads it
+  for DURATION  2h, 90m or 1h30m
+  --session ID  defaults to $CLAUDE_CODE_SESSION_ID, which a Bash tool call carries
+
+open prints `until HH:MM`, with ` (capped at 12 hours)` when the end was cut back.
+close ends the stretch because the work it covered is finished: say why.
+USAGE
+}
+
+die() { print -u2 -r -- "away-obligation: $*"; exit 2; }
+
+state_dir=${AWAY_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/agents-shared/away}
+now=${AWAY_NOW:-$EPOCHSECONDS}
+
+cmd=${1:-}
+[[ -n $cmd ]] || { usage >&2; exit 2; }
+shift
+case $cmd in -h|--help) usage; exit 0 ;; esac
+
+session=${CLAUDE_CODE_SESSION_ID:-}
+quote=""
+reason=""
+as_json=0
+spec=()
+while (( $# )); do
+  case $1 in
+    --session) session=${2:-}; shift 2 ;;
+    --quote) quote=${2:-}; shift 2 ;;
+    --reason) reason=${2:-}; shift 2 ;;
+    --json) as_json=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) spec+=("$1"); shift ;;
+  esac
+done
+
+session=${session//[^A-Za-z0-9_-]/}
+[[ -n $session ]] || die "no session: pass --session ID (a Bash tool call has CLAUDE_CODE_SESSION_ID set)"
+file=$state_dir/$session.json
+
+hhmm() { strftime '%H:%M' "$1"; }
+
+# Epoch of the next HH:MM on the local clock, strictly after now.
+next_clock_epoch() {
+  local hm=$1 h m day t
+  [[ $hm =~ '^[0-9]{1,2}:[0-9]{2}$' ]] || return 1
+  h=${hm%%:*}; m=${hm##*:}
+  (( 10#$h < 24 && 10#$m < 60 )) || return 1
+  day=$(strftime '%Y-%m-%d' $now)
+  t=$(strftime -r '%Y-%m-%d %H:%M' "$day $(printf '%02d:%02d' $((10#$h)) $((10#$m)))")
+  if (( t <= now )); then
+    day=$(strftime '%Y-%m-%d' $(( now + 86400 )))
+    t=$(strftime -r '%Y-%m-%d %H:%M' "$day $(printf '%02d:%02d' $((10#$h)) $((10#$m)))")
+  fi
+  print -r -- $t
+}
+
+# Seconds in 2h, 90m or 1h30m.
+duration_seconds() {
+  local d=${1:l} total=0
+  [[ $d =~ '^([0-9]+h)?([0-9]+m)?$' && -n $d ]] || return 1
+  [[ $d == *h* ]] && total=$(( total + ${d%%h*} * 3600 )) && d=${d#*h}
+  [[ $d == *m* ]] && total=$(( total + ${d%%m*} * 60 ))
+  (( total > 0 )) || return 1
+  print -r -- $total
+}
+
+write_state() {  # $1 = JSON
+  mkdir -p "$state_dir"
+  print -r -- "$1" > "$file.tmp.$$" && mv "$file.tmp.$$" "$file"
+}
+
+read_state() {
+  [[ -r $file ]] || return 1
+  jq -e . "$file" >/dev/null 2>&1 || return 1
+  cat "$file"
+}
+
+case $cmd in
+  open)
+    (( ${#spec} == 2 )) || die "open takes 'until HH:MM' or 'for DURATION'"
+    case ${spec[1]} in
+      until) end=$(next_clock_epoch "${spec[2]}") || die "'${spec[2]}' is not a time of day (HH:MM, 24-hour)" ;;
+      for) secs=$(duration_seconds "${spec[2]}") || die "'${spec[2]}' is not a duration (2h, 90m, 1h30m)"
+           end=$(( now + secs )) ;;
+      *) die "open takes 'until HH:MM' or 'for DURATION'" ;;
+    esac
+    capped=""
+    if (( end > now + CAP_SECONDS )); then end=$(( now + CAP_SECONDS )); capped=" (capped at 12 hours)"; fi
+    mkdir -p "$state_dir"
+    find "$state_dir" -type f -name '*.json' -mtime +7 -delete 2>/dev/null || true
+    write_state "$(jq -cn --arg s "$session" --arg q "$quote" --argjson o "$now" --argjson e "$end" \
+      '{session: $s, quote: $q, opened: $o, end: $e, refusals: 0, gave_up: false, closed: false, closed_reason: ""}')"
+    print -r -- "until $(hhmm $end)$capped"
+    ;;
+
+  close)
+    [[ -n $reason ]] || die "close needs --reason WHY (the stretch ends because the work it covered is finished)"
+    state=$(read_state) || die "no away stretch for session $session"
+    write_state "$(print -r -- "$state" | jq -c --arg r "$reason" '.closed = true | .closed_reason = $r')"
+    print -r -- "away stretch closed: $reason"
+    ;;
+
+  status)
+    state=$(read_state) || { (( as_json )) && print -r -- '{"open":false,"why_not":"none"}' || print "no away stretch"; exit 0; }
+    out=$(print -r -- "$state" | jq -c --argjson now "$now" '
+      . + {open: ((.closed | not) and .end > $now),
+           why_not: (if .closed then "closed" elif .end <= $now then "expired" else "" end)}')
+    end=$(print -r -- "$out" | jq -r .end)
+    out=$(print -r -- "$out" | jq -c --arg h "$(hhmm $end)" '. + {end_hhmm: $h}')
+    if (( as_json )); then
+      print -r -- "$out"
+    else
+      print -r -- "$out" | jq -r 'if .open then "away until \(.end_hhmm), user said: \(.quote), refusals: \(.refusals)"
+        else "away stretch not open (\(.why_not)); ended or ends \(.end_hhmm)" end'
+    fi
+    ;;
+
+  refuse)
+    state=$(read_state) || die "no away stretch for session $session"
+    new=$(print -r -- "$state" | jq -c '.refusals += 1')
+    write_state "$new"
+    print -r -- "$new" | jq -r .refusals
+    ;;
+
+  give-up)
+    state=$(read_state) || die "no away stretch for session $session"
+    write_state "$(print -r -- "$state" | jq -c '.gave_up = true')"
+    ;;
+
+  *) usage >&2; exit 2 ;;
+esac

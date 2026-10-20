@@ -1,0 +1,28 @@
+# Cases for open-away-stretch.sh — one per line, tab-separated:
+#   name  pre  prompt  want  stretch_after
+#
+# pre:           none | open   (a stretch the runner opens, until 09:00, before the prompt)
+# want:          open (stretch opened: systemMessage + additionalContext) | closed | no-stretch | error (decision block) | silent
+# stretch_after: open | not-open | none   (what `away-obligation status` says for the session afterwards)
+# The runner sets the clock to 2026-10-20 03:00 local; \n in a prompt is decoded.
+until a time opens a stretch	none	/away until 08:00	open	open
+until a time, with the user's words	none	/away until 09:00 keep my machine idle and then carry on	open	open
+for a duration opens a stretch	none	/away for 2h	open	open
+for minutes	none	/away for 90m	open	open
+for hours and minutes	none	/away for 1h30m ok	open	open
+more than 12 hours is capped, not refused	none	/away for 30h	open	open
+a time already past today means tomorrow	none	/away until 02:00	open	open
+a second /away replaces the first	open	/away for 1h	open	open
+bare /away is an error	none	/away	error	none
+bare /away leaves an open stretch alone	open	/away	error	open
+until with no value is an error	none	/away until	error	none
+unknown word is an error	none	/away tomorrow	error	none
+a bad time is an error	none	/away until 8am	error	none
+a bad duration is an error	none	/away for soon	error	none
+off closes an open stretch	open	/away off	closed	not-open
+off with no stretch open	none	/away off	no-stretch	none
+a typed prompt that is not /away leaves the stretch open	open	please keep going	silent	open
+/away inside a sentence is silent	none	I will use /away later	silent	none
+a longer word is silent	none	/awayfoo until 08:00	silent	none
+a task notification leaves the stretch open	open	<task-notification>\n<task-id>b1</task-id>\n</task-notification>	silent	open
+a wakeup prompt leaves the stretch open	open	Check the filed job and report.	silent	open

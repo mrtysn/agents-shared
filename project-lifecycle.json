@@ -38,6 +38,12 @@
       ]
     },
     {
+      "name": "away hook tests",
+      "run": [
+        "hooks/tests/run-away-stretch.sh"
+      ]
+    },
+    {
       "name": "transcript reader tests",
       "run": [
         "python3",
