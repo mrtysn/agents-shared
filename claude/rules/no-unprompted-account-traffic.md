@@ -19,6 +19,11 @@ parallel calls to a search tool) is pacing, not a refusal: slow down and continu
 never more than about five in parallel. Where agent-request-limiter answers 429,
 stop and tell the user.
 
+The user's own sites behind Authelia (`*.mertyas.in`) take an agent login: a direct
+`curl -H "$(agent-auth header)"` from the project folder, never through the gateway.
+Never report such a site unreachable without having run it; when it refuses, say
+that no login exists for this folder.
+
 A tool an agent builds that loads pages in the user's browser is held to the same: it
 paces from each site's robots.txt (a slow floor when unreadable), stops a site at its
 first refusal, and is never updated mid-run.

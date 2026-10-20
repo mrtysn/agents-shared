@@ -82,6 +82,27 @@ user's budget, and these hold for any third-party service:
 
 Fetching a single public page the user pointed at is ordinary work.
 
+## The user's own sites behind Authelia
+
+Sites on `*.mertyas.in` sit behind Authelia, and Authelia accepts a Basic `Authorization`
+header from an agent login named `agent-<folder>`, where the folder is the one holding
+the repository's main checkout. `agent-auth` (in `~/bin`, from the `tools` repo) derives
+the login from the current folder and fetches its password from Doppler:
+
+    curl -sS -H "$(agent-auth header)" https://<site>.mertyas.in/...
+
+The request goes direct, never through `fetch-anything-agent`: the gateway is for
+third-party pages, carries no headers and would archive a signed-in response. A login
+exists only for folders the owner has opened on the box, each to named sites; `agent-auth
+whoami` prints the login this folder would use, and `header` fails with a Doppler message
+when none exists. On a 401, run `agent-auth refused` and stop: Authelia locks the login
+for about five minutes after wrong tries, and a retry extends the lock. Design and the
+server-side steps: `homelab/docs/agent-sign-in-plan.html`.
+
+An agent never says a gated site cannot be reached without having run the request. When
+the login is missing, report that the folder has no login yet; rendering the page locally
+is a workaround to name as one, not a substitute.
+
 ## Tools that send requests from the user's browser
 
 A browser extension, userscript or app an agent builds that loads pages in the user's own browser
@@ -135,6 +156,11 @@ in minutes and rate-limited the user, whose message was "WTF FIX THE TOOL WHY IS
 HACKER NEWS". Its refusal page was not recognised, so the run could not stop; the session's monitor
 reported "spacing fine" because it checked the tool against its own table; and eight releases in under
 three hours, several mid-run, reset the user's run four times. The browser-tools section is the result.
+
+Oct 20 2026, job-search: a session reported "I can't sign in through Authelia" and reviewed
+jobs.mertyas.in from local renders. It had sent no request; the agent-login mechanism had
+existed since Oct 17 and this doc, which the session saw at its first ssh, did not mention
+it. The Authelia section above is the result.
 
 Oct 14 2026: asked whether requests should stop at a site's first refusal, the user
 chose one retry after a `Retry-After` for requests that do not go through
