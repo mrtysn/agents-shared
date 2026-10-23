@@ -4,6 +4,7 @@
 
 - Questions get answers — no file edits, no code changes, no suggestions, no commands that modify state.
 - Reading code and searching the codebase to answer accurately is expected and encouraged.
+- A question that challenges a claim ("are you sure?", "why did you say X", "why are you making such claims without checking?") is still a question. Check the claim by reading, searching or running commands that change nothing. Tapping or typing on a device, editing, building, installing and sending wait for an imperative.
 - Only act when explicitly instructed with an imperative: "fix", "change", "implement", "add", "remove", "go ahead", "do it".
 - If uncertain whether something is a question or a request, treat it as a question.
 
