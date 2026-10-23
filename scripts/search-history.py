@@ -324,6 +324,8 @@ def ingest_file(db: sqlite3.Connection, f: Path, subagent: bool):
             entry = json.loads(line)
         except json.JSONDecodeError:
             continue
+        if not isinstance(entry, dict):
+            continue
         if s is not None:
             if not s["branch"] and entry.get("gitBranch"):
                 s["branch"] = entry["gitBranch"]
@@ -683,7 +685,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Search Claude Code conversation history by keyword"
     )
-    parser.add_argument("keyword", nargs="?", default=None,
+    parser.add_argument("keyword", nargs="*",
                         help='Search term: words that must all appear in a session, "a phrase" in '
                              'quotes; with regex characters, one regex')
     parser.add_argument("--days", "-d", type=int, default=DEFAULT_DAYS,
@@ -703,6 +705,9 @@ def main():
     parser.add_argument("--resume", "-r", type=int, default=0,
                         help="Resume session N from the last run (via recent-sessions)")
     args = parser.parse_args()
+    # Unquoted words arrive as separate arguments; one that holds spaces was a quoted phrase.
+    args.keyword = " ".join(f'"{w}"' if " " in w and len(args.keyword) > 1 else w
+                            for w in args.keyword) or None
 
     if args.resume:
         do_resume(args.resume)
