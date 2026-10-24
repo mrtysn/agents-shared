@@ -34,7 +34,7 @@ user's budget, and these hold for any third-party service:
   host within an hour is already too many for testing.
 - **Public code and docs hosts are ordinary reads.** Raw files and pages on GitHub, GitLab
   and official docs sites need no count stated up front, up to about 15 distinct URLs per
-  task, each fetched once and saved. Past that, state the count first. A refusal still ends it,
+  task, each fetched once and saved. Past that, state the count first. A refusal is handled
   as below. This does not cover search-engine pages, undocumented endpoints, anything
   behind a login, or any run on a server.
 - **Plain HTTP requests go through the gateway.** A request for a page, feed or API
@@ -57,15 +57,23 @@ user's budget, and these hold for any third-party service:
   calls (Google's `batchexecute`, a mobile app's private API, a scraped JSON
   route) gets the user's approval before the first request, with the plan for
   how often production will call it.
-- **A refusal ends it, except a 429 that says when to come back.** A captcha, a
-  consent wall, a "sorry" page or a 403 block page means stop and report. A 429
-  that carries a `Retry-After` of under 10 minutes is waited out once: wait that
-  long, send one more request, and stop and report if it is refused again. A 429
-  with no `Retry-After`, or a longer one, means stop and report. No header
-  variations, no second host to try from — each of those is another request
-  against a service that already said no.
-- **A refusal is never written down as a verdict on the site.** "Ends it" covers
-  requests from this session, nothing more. Do not record the host as excluded,
+- **A refusal slows the task; it does not end it.** The point of this file is not
+  spamming a site, never abandoning the work at the first no.
+  - A bot check (Cloudflare's "Just a moment" page, a captcha, a JavaScript
+    challenge) refuses the client, not the user. When the user asked for exactly
+    that page and the site holds no login of theirs, open it in their Chrome
+    through the browser extension, one page at a time, and continue there.
+    Otherwise say the page needs a browser and open it on a yes: Chrome carries
+    the user's logins, so the site sees them, not a bot.
+  - A 403, a 429 or a "sorry" page is retried after a pause: the `Retry-After` when
+    it carries one, else a minute or more, longer each time. A refusal the gateway
+    reports is its cool-down for the site: wait it out, do not re-send.
+  - Requests to that site end only after three refusals spread over several
+    minutes; then report what was tried and what each attempt answered.
+  - No header spoofing to look like a different client. Another site that hosts the
+    same file is a different service, not a way round this one.
+- **A refusal is never written down as a verdict on the site.** Giving up on a site
+  covers requests from this session, nothing more. Do not record the host as excluded,
   blocked, banned or "failed" in a skill, rule, memory, script or doc; a one-off
   429 or 403 says nothing about the site tomorrow. A skill's source list is
   changed only when the user asks, and a source you could not use is reported in
@@ -115,7 +123,8 @@ ships:
   slow floor of about 30 s, not none. Waits not given by the site start at about 10 s between pages of one
   site, never a figure picked to make a run finish sooner. A setting that speeds the tool up never goes
   below the site's floor.
-- **Recognise a refusal and stop at the first one.** A login page the site redirected to, a captcha, a
+- **Recognise a refusal and stop at the first one.** This is the one place a first refusal still ends
+  it: a tool runs unattended through many pages of one site. A login page the site redirected to, a captcha, a
   block or rate-limit page ("not able to serve your requests this quickly", "unusual traffic") ends that
   site for the run. A refusal the tool cannot recognise it cannot obey, so its tests include the pages
   of the sites it will actually reach.
@@ -165,4 +174,11 @@ it. The Authelia section above is the result.
 Oct 14 2026: asked whether requests should stop at a site's first refusal, the user
 chose one retry after a `Retry-After` for requests that do not go through
 fetch-anything, and had written that requests should "learn and adapt its pacing"
-instead of ending early. The 429 exception above is the result.
+instead of ending early. A 429 exception was the result, since replaced by the Oct 24
+entry below.
+
+Oct 24 2026, adb-reconnect: fetching the Netflix Android TV APK, an agent stopped at
+APKMirror's first refusal, a Cloudflare "Just a moment" check (HTTP 403) that the user's
+own browser passed at once. The rule's purpose is to keep agents from throttling a site
+with repeated requests, not to stop a task at the first refusal. The refusal section above
+now slows a task down instead of ending it.

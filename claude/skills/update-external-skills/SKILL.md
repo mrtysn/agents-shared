@@ -18,7 +18,8 @@ Empty means every external skill.
 These are requests to GitHub from the user's IP. Before the first run, say the count:
 one blobless fetch per distinct upstream repo (about 26 for everything), plus the blobs
 of files that actually changed. Never loop the script to test; run each mode once.
-A 429, 403 or any refusal ends the run: stop and report.
+A 429 or 403 is retried after a pause (its `Retry-After`, else a minute or more); three
+refusals spread over several minutes end the run: stop and report.
 
 ## Procedure
 

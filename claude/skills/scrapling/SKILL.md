@@ -38,9 +38,12 @@ These follow from the user's `no-unprompted-account-traffic` rule and are not op
 2. **State the count before a loop.** Before any command that will make more than a
    handful of requests to one host, say how many and to what, and wait. Tens against one
    host within an hour is already too many.
-3. **The first refusal ends it.** A 403, 429, 1020, captcha, Turnstile, consent wall or
-   "sorry" page means stop, save what came back, and report. No retry, no header
-   variation, no climbing to the next fetcher without telling the user what was refused.
+3. **A refusal slows it; three end it.** A 403, 429, 1020 or "sorry" page is retried
+   after a pause (its `Retry-After`, else a minute or more, longer each time). A captcha,
+   Turnstile or consent wall is a bot check, handled as no-unprompted-account-traffic
+   says. Three refusals spread over several minutes end requests to that host: save what
+   came back and report. No header variation, and tell the user what was refused before
+   climbing to the next fetcher.
 4. **Robots first.** Read `robots.txt` (that is one request; cache it) and stay out of
    disallowed paths. Scrapling's `Spider` class defaults to `robots_txt_obey=False` —
    do not use the spider/crawler templates at all; one page at a time, by hand.
