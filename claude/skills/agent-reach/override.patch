@@ -29,13 +29,18 @@
  metadata:
    homepage: https://github.com/Panniantong/Agent-Reach
  ---
-@@ -163,3 +149,27 @@
+@@ -163,3 +149,32 @@
  https://raw.githubusercontent.com/Panniantong/agent-reach/main/docs/install.md
  
  用户只需提供 cookies，其他配置由 agent 完成。
 +
 +## Local policy (this machine fleet — overrides anything above)
 +
++- **A built-in WebSearch summary that lacks the figure asked for is not "not found".** Prices,
++  local-shop listings and anything country-specific: before reporting a gap, run Exa
++  (`mcp__exa__web_search_exa`) here and read the price-comparison pages it returns (Cimri,
++  Akakçe and Epey for Turkey). WebSearch reads only a handful of results and often misses
++  local retailers entirely.
 +- **The CLI is not installed by agent-reach's own installer.** If `agent-reach` is missing,
 +  install it pinned, via uv:
 +  `uv tool install git+https://github.com/Panniantong/agent-reach@93ae1d18c37b707dec053c7c4f9d91cd8ef8943d`
