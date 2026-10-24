@@ -4,10 +4,16 @@
 it as a full absolute path, on its own line.** Not `dist/extension.zip`, not
 `./out/report.html`, not `~/dev/…` — `/Users/…/dev/project/dist/extension.zip`.
 
+**A command handed to a terminal outside this session is the same case.** Its
+shell is in a folder you cannot see, so a relative file operand means nothing
+there. Start it with `cd <absolute folder> &&`, or write each file operand as an
+absolute path. A name that is not a local file (a document name on a server, a
+branch, a container) is said to be one, in the same message.
+
 Outside the terminal means: attaching it to mail or WhatsApp, uploading it through
 a browser file picker, dragging it into an app, importing a zip as a temporary
 Firefox extension, revealing it in Finder — anywhere the path gets typed or pasted
-into a dialog that has no cwd.
+into a dialog that has no cwd, or a shell whose cwd you do not know.
 
 The text of an AskUserQuestion question is a message under this rule: a file it
 names is written absolute there too, and the report holding it has been sent in
