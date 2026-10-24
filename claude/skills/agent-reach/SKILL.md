@@ -157,6 +157,10 @@ https://raw.githubusercontent.com/Panniantong/agent-reach/main/docs/install.md
   (`mcp__exa__web_search_exa`) here and read the price-comparison pages it returns (Cimri,
   Akakçe and Epey for Turkey). WebSearch reads only a handful of results and often misses
   local retailers entirely.
+- **Cimri and Trendyol answer headless Chrome with a Cloudflare block.** Read their pages with
+  `mcp__exa__web_fetch_exa`, one URL per call (`maxCharacters` about 40000 reaches Cimri's
+  JSON-LD, whose `offers` carry each seller's direct listing URL). Never fetch several shop
+  pages in one burst.
 - **The CLI is not installed by agent-reach's own installer.** If `agent-reach` is missing,
   install it pinned, via uv:
   `uv tool install git+https://github.com/Panniantong/agent-reach@93ae1d18c37b707dec053c7c4f9d91cd8ef8943d`
