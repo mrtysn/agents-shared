@@ -6,9 +6,15 @@
 #
 # Everything wider is blocked: whole-tree and whole-directory discards,
 # pathspec magic, globs, reset --hard, clean -f, stash (push, save, bare)
-# and stash drop/clear, and branch switches (which can carry or clobber
-# working-tree state). A stash lifts other sessions' uncommitted work out of
+# and stash drop/clear. A stash lifts other sessions' uncommitted work out of
 # a shared tree; a failed pop leaves it stranded.
+#
+# A branch switch carries every session sharing the tree onto the new branch,
+# uncommitted edits included, so `git switch <branch>` and
+# `git checkout <branch>` pass only from a clean tree (empty
+# `git status --porcelain`), to an existing local branch, with no flags.
+# Anything else (-f, --discard-changes, -m, -c, a dirty tree, a directory
+# the hook cannot resolve) is blocked.
 #
 # To undo an edit, rewrite the file — git is not needed for that.
 # There is deliberately no override: run these yourself in your own shell.
@@ -66,12 +72,49 @@ is_single_tracked_file() {
     [ "$count" = "1" ]
 }
 
+# Set to 0 once a `cd` in the command goes somewhere the hook cannot follow;
+# a switch after it is then judged against an unknown tree and blocked.
+CWD_KNOWN=1
+
+# A switch is safe when it can neither lose work nor move anyone else's: one
+# argument naming an existing local branch, no flags, a clean tree.
+switch_is_safe() {
+    local relocated=$1
+    shift
+    [ "$relocated" = "0" ] && [ "$CWD_KNOWN" = "1" ] || return 1
+    [ $# -eq 1 ] || return 1
+    local target
+    target=$(unquote "$1")
+    case "$target" in
+        ""|-*) return 1 ;;
+    esac
+    git rev-parse --git-dir >/dev/null 2>&1 || return 1
+    git show-ref --verify --quiet "refs/heads/$target" || return 1
+    [ -z "$(git status --porcelain 2>/dev/null)" ]
+}
+
 check_segment() {
     local seg=$1
     local -a tok=()
     read -ra tok <<< "$seg"
 
     if [ ${#tok[@]} -eq 0 ]; then
+        return 0
+    fi
+
+    # Follow `cd` so a later switch is checked in the directory it runs in.
+    if [ "$(unquote "${tok[0]}")" = "cd" ]; then
+        local dir
+        dir=$(unquote "${tok[1]-}")
+        case "$dir" in
+            "~") dir=$HOME ;;
+            "~/"*) dir="$HOME/${dir#\~/}" ;;
+        esac
+        if [ ${#tok[@]} -eq 2 ] && [ -n "$dir" ] && [[ "$dir" != *'$'* ]] && cd "$dir" 2>/dev/null; then
+            :
+        else
+            CWD_KNOWN=0
+        fi
         return 0
     fi
 
@@ -136,7 +179,8 @@ check_segment() {
     local a
     case "$sub" in
         switch)
-            deny "git switch — branch switches are blocked"
+            switch_is_safe "$relocated" ${rest[@]+"${rest[@]}"} \
+                || deny "git switch — allowed only to an existing local branch, with no flags, from a clean tree (git status --porcelain empty)"
             ;;
         reset)
             for a in ${rest[@]+"${rest[@]}"}; do
@@ -167,6 +211,9 @@ check_segment() {
             esac
             ;;
         checkout|restore)
+            if [ "$sub" = "checkout" ] && switch_is_safe "$relocated" ${rest[@]+"${rest[@]}"}; then
+                return 0
+            fi
             local dashdash=-1
             local idx=0
             for a in ${rest[@]+"${rest[@]}"}; do
