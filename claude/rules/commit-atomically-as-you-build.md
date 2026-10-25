@@ -15,9 +15,14 @@ and many parallel sessions, that ask is repeated all day.
   one commit at the end of the session, and not one per file. A fix, a feature, a
   doc update: each is its own commit, landing as the work moves on.
 - **Stage only what you changed**, the way `/stg-msg-cmt` does: files and hunks you
-  wrote, never someone else's uncommitted work. Mixed file → `git add -p` your hunks.
-  Commit with a pathspec (`git commit -m "…" -- paths`): the index is shared between
-  sessions, and a bare `git commit` takes what another session staged.
+  wrote, never someone else's uncommitted work. Commit with a pathspec
+  (`git commit -m "…" -- paths`): the index is shared between sessions, and a bare
+  `git commit` takes what another session staged. A pathspec commit takes each
+  named file **from the working tree**, ignoring what you staged, so a file that
+  also holds another session's lines never goes in a pathspec: stage your hunks
+  alone (`git add -p`, or a blob built from `HEAD` via `git update-index
+  --cacheinfo`), check `git diff --cached --name-only` lists only your files, then
+  commit without a pathspec.
 - **Message** in the `/stg-msg-cmt` style: one short lowercase clause starting with
   a verb, no trailing period.
 - **Push after each commit.** A rejected push is reported, never forced; do not
