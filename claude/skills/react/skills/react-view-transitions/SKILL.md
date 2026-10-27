@@ -48,7 +48,7 @@ Reserve directional slides for hierarchical navigation (list → detail) and ord
 
 - **Next.js:** Do **not** install `react@canary` — the App Router already bundles React canary internally. `ViewTransition` works out of the box. `npm ls react` may show a stable-looking version; this is expected.
 <!-- LOCAL: removed the instruction to install react@canary outside Next.js; stay on the React the project pins -->
-- **Without Next.js:** `ViewTransition` needs a React build that ships it. Check the project's pinned React first and do not change the React channel on your own.
+- **Without Next.js:** `ViewTransition` and `addTransitionType` are stable from React 19.3. Check the project's pinned React first; if it is older, do not change the React version or channel on your own.
 <!-- LOCAL END -->
 - Browser support: Chromium 125+ (React needs the v2 object form of `startViewTransition`), Firefox 144+, Safari 18.2+. Graceful degradation on unsupported browsers.
 
