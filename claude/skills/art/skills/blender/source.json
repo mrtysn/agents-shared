@@ -2,15 +2,18 @@
   "repo": "MartinRapcan/blender-claude-skill",
   "path": "blender/SKILL.md",
   "files": [
-    "SKILL.md",
     "references/animation.md",
+    "references/detailing.md",
     "references/geometry.md",
     "references/gotchas.md",
     "references/lighting.md",
     "references/materials.md",
     "references/objects_2d.md",
     "references/rendering.md",
-    "scripts/boilerplate.py"
+    "scripts/boilerplate.py",
+    "scripts/detail_kit.py",
+    "scripts/lighting_presets.py",
+    "SKILL.md"
   ],
   "commit": "70f45e3f722e6fb7142cdeb4414891ed701dc325",
   "updated": "2026-10-27"
