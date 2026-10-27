@@ -1,6 +1,6 @@
 ---
 name: big-arrow
-description: "Point at something on the human's macOS screen with a big arrow and a sign (\"Franz, click HERE\") using the bigarrow CLI. Use whenever the human has to look at, click, type into or choose a specific spot, button, field, window, tab or menu: show me where, point to it, which button, where do I click, zeig mir wo, guide me through this UI, the human must approve or sign something, or you need the human's hand and they may not be looking at the terminal. Mandatory when it is time-critical: a code that expires, a login or payment page that times out, a build waiting on the human."
+description: "Point at something on the human's macOS screen with a big arrow and a sign (\"Franz, click HERE\"), and hand over values, secrets and questions on a floating cue card, using the bigarrow CLI. Use whenever the human has to look at, click, type into or choose a specific spot, button, field, window, tab or menu: show me where, point to it, which button, where do I click, zeig mir wo, guide me through this UI, the human must approve or sign something, or you need the human's hand and they may not be looking at the terminal; also to hand over credentials, a password, token, 2FA code, IBAN or command to paste, or to ask the human a question or a choice while they are away from the terminal. Mandatory when it is time-critical: a code that expires, a login or payment page that times out, a build waiting on the human."
 license: MIT
 allowed-tools: Bash(bigarrow:*)
 metadata:
@@ -12,8 +12,9 @@ metadata:
 `bigarrow` draws a click-through arrow with a sign, needs no permission and never takes the
 focus. Point at the thing itself, a line in the terminal is easy to miss.
 
-Needs bigarrow 0.4.6 or newer. If `bigarrow --version` prints an older one, run
-`brew upgrade franzenzenhofer/tap/bigarrow` first: an old binary prints `{{value}}` as plain text.
+Needs bigarrow 0.5.1 or newer. If `bigarrow --version` prints an older one, run
+`brew upgrade franzenzenhofer/tap/bigarrow` first: an old binary has no `card` and prints
+`{{value}}` as plain text.
 
 ```bash
 open "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
@@ -40,6 +41,30 @@ bigarrow stop
 - A click on the sign or shaft, except a copy button, removes the arrow (target clicks pass
   through). A removed arrow was seen: check the result, do not redraw. Skip `--close-button`
   unless asked.
+
+## Cards: values, secrets, answers
+
+One value to paste: a `{{value}}` chip on the sign. Two or more values, any secret, or a question:
+a cue card, a floating window with copy buttons that never takes the focus.
+
+```bash
+bigarrow card --title "Franz, log in to Hetzner" --app "Google Chrome" --field "User=franz@example.com" \
+  --secret "Password=keychain:hetzner/franz" --link https://console.hetzner.cloud --button "done=I'm in"
+bigarrow wait          # blocks until an answer: {"result":"button","value":"done","copied":["User","Password"],...}
+```
+
+- Secrets never go on the command line (`ps` shows it to everyone): `--secret` takes a source,
+  `pass:`, `keychain:<service>/<account>`, `op:`, `env:`, `file:`, or put the value in a JSON card
+  on stdin. They show as dots, copy as concealed and leave the clipboard after 30 s.
+- `--ask "Question?"` (typed reply), `--choice id=Label` (2 to 6), `--button id=Label`. `wait`
+  exits 0 for an answer, 1 when the human closed the card without one: then ask in the terminal.
+- A card with questions closes itself once every question is answered (`--keep` keeps it until
+  the X); the reply's `answers` has them all. A card with only values stays until the human's X.
+  It survives your session and the prompt hook: close it yourself when it is no longer needed,
+  `bigarrow stop --pid <pid>` or `bigarrow stop --cards`.
+- A row can point: in a JSON card, `"point": {"element": "Password"}` aims the arrow at where that
+  value goes, and it moves on when the human copies the next one. `start ... --card card.json`
+  shows an arrow and a card together. Row types and JSON: [reference.md](reference.md#cards).
 
 ## Targets
 
