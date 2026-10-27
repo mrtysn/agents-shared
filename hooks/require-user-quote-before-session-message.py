@@ -16,6 +16,14 @@ authorises nothing unless it is quoted as the instruction it is not.
 It checks provenance, not intent: any quoted user words pass. What it removes is the send
 with no user words behind it, and it leaves a grep-able claim on every send.
 
+A standing grant ("you two collaborate among each other", "no need to ask me") covers more
+than one message, to one session. A summary marked `(standing)` may quote user words from
+earlier in the session if three things hold: the user typed them, they contain one of
+STANDING_STEMS, and an earlier send to the same recipient went out quoting them fresh. So the
+grant is first used as an ordinary quote, and only that peer inherits it.
+
+  summary: User said (standing) "you guys collaborate among each other"
+
 Not gated: a send to `main`; a send to a sub-agent this session spawned (matched by the
 agentId in its spawn result, or the name it was given), which is no other session. A sub-agent
 has no typed prompts, so its send to anyone else is refused: it hands back to `main`.
@@ -34,6 +42,11 @@ sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
 from transcript_items import is_reply_boundary, is_typed_prompt, items  # noqa: E402
 
 MIN_QUOTE = 8
+# Wordings that hand coordination to the agents for good, not for one message.
+STANDING_STEMS = ("collaborat", "coordinat", "among each other", "between each other",
+                  "among yourselves", "between yourselves", "work it out", "sort it out",
+                  "no need to ask", "without asking", "don't ask me", "dont ask me",
+                  "no need to continously prompt", "no need to continuously prompt")
 
 
 def norm(s):
@@ -50,6 +63,8 @@ def refuse(reason):
         "A question or remark about a session is not an instruction to message it. If the user has not\n"
         "told you to send this, do not send it; tell the user what you found, in your reply. A send\n"
         "your own work is stuck on, with no instruction, is asked of the user with AskUserQuestion.\n"
+        "A standing grant the user gave (\"collaborate among each other\") is reused by marking the\n"
+        "summary `User said (standing) \"<their words>\"`, for a peer an earlier send already quoted it to.\n"
         "Docs: docs/on-demand/messages-between-sessions.md and send-message-gate.md.",
         file=sys.stderr,
     )
@@ -98,32 +113,47 @@ def main():
     if to in own:
         return
 
-    # The previous message to a peer: sent (its result is not a refusing hook's) and not to a sub-agent.
-    last = -1
+    # Messages to peers that went out: sent (the result is not a refusing hook's), not to a sub-agent.
+    last, sent = -1, []
     for n, it in enumerate(rows):
         if it["label"] != "SENDMSG":
             continue
         res = results.get(it.get("tool_use_id"))
-        target = (it.get("input") or {}).get("to")
+        inp = it.get("input") or {}
+        target = inp.get("to")
         if res is None or res.lstrip().startswith("PreToolUse:") or target in own or target == "main":
             continue
         last = n
+        sent.append((target, norm(str(inp.get("summary") or ""))))
 
-    said = []
-    for it in rows[last + 1:]:
+    said, said_ever = [], []
+    for n, it in enumerate(rows):
         if is_typed_prompt(it):
-            said.append(norm(it["text"]))
+            words = [norm(it["text"])]
         elif is_reply_boundary(it):
-            said.extend(norm(a) for a in answers(it["text"]))
+            words = [norm(a) for a in answers(it["text"])]
+        else:
+            continue
+        said_ever.extend(words)
+        if n > last:
+            said.extend(words)
 
     quotes = [norm(q) for q in re.findall(r'"([^"]+)"', summary)]
     quotes = [q for q in quotes if len(q) >= MIN_QUOTE]
     if not quotes:
         refuse("the call's `summary` has no quotation of the user (found %r)." % summary[:80])
-    if not any(q in s for q in quotes for s in said):
-        refuse("no quotation in `summary` appears in anything the user typed or answered since your "
-               "previous message to a peer (or since the session began).")
-
+    if any(q in s for q in quotes for s in said):
+        return
+    if "(standing)" in summary.lower():
+        for q in quotes:
+            if (any(stem in q for stem in STANDING_STEMS) and any(q in s for s in said_ever)
+                    and any(t == to and q in sm for t, sm in sent)):
+                return
+        refuse("a `(standing)` quote must be the user's words, grant coordination in its wording "
+               "(e.g. \"collaborate among each other\"), and have been quoted in an earlier send to "
+               "this same recipient.")
+    refuse("no quotation in `summary` appears in anything the user typed or answered since your "
+           "previous message to a peer (or since the session began).")
 
 if __name__ == "__main__":
     main()

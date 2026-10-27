@@ -17,3 +17,9 @@ user and its own context.
 If the user told you to: quote their words in `summary` as `User said "..."`, check the
 recipient by evidence (not by its name), and send. If only your own work is stuck, ask the
 user with AskUserQuestion; their answer is then the quotation.
+
+A standing grant covers more than one message. When the user hands coordination to the
+sessions for good ("you guys collaborate among each other", "no need to ask me"), quote it
+fresh once to the peer you are working with; after that, each further send to that same peer
+may quote it as `User said (standing) "…"`. It reaches no other peer, and an ordinary
+instruction cannot be marked standing: the quote has to say so in its own words.
