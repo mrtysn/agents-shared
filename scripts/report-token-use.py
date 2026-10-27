@@ -42,6 +42,10 @@ long job pays its full context again on its next request.
 --cuts t1,t2,... adds "intervals": the cost between each consecutive pair of times, across
 all sessions, for calibrating a quota percentage against the spend between two readings.
 
+--daily-from T adds "days": the cost of each 24-hour slice from T to --until (or now), as
+{"from", "to", "cost", "models": {model: cost}}, across all sessions. T is the slices' anchor, so a
+caller aligns them to the quota reset instead of midnight; messages before T are not in any slice.
+
 Prints one JSON object: {"window", "output_scale", "unpriced", "sessions": [...], "projects": [...]}
 sorted by cost.
 
@@ -56,7 +60,7 @@ import bisect
 import json
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -175,12 +179,15 @@ def read_messages(path, titles=None):
 
 
 def summarise(since, until, project=None, days=None, cuts=None, buckets=None, unpriced=None,
-              output_scale=OUTPUT_SCALE):
+              output_scale=OUTPUT_SCALE, day_edges=None, day_models=None):
     """cuts: sorted datetimes; buckets: a list filled with the cost between each pair;
-    unpriced: a dict filled with the requests of each model that has no price row."""
+    unpriced: a dict filled with the requests of each model that has no price row;
+    day_edges: sorted datetimes; day_models: a list filled with {model: cost} between each pair."""
     sessions = {}
     if buckets is not None:
         buckets[:] = [0.0] * max(len(cuts or []) - 1, 0)
+    if day_models is not None:
+        day_models[:] = [{} for _ in range(max(len(day_edges or []) - 1, 0))]
     for path, name, session in transcripts(project=project, days=days, subagents=True):
         key = (name, session)
         s = sessions.setdefault(key, {"project": name, "session": session, "title": None, "first": None,
@@ -213,6 +220,10 @@ def summarise(since, until, project=None, days=None, cuts=None, buckets=None, un
                 slot = bisect.bisect_right(cuts, when) - 1
                 if 0 <= slot < len(buckets):
                     buckets[slot] += cost
+            if day_models is not None:
+                slot = bisect.bisect_right(day_edges, when) - 1
+                if 0 <= slot < len(day_models):
+                    day_models[slot][model] = day_models[slot].get(model, 0.0) + cost
             add(s["total"], row)
             if is_sub:
                 add(s["sub"], row)
@@ -247,6 +258,7 @@ def main():
     ap.add_argument("--days", type=int, help="skip transcripts not modified in the last N days")
     ap.add_argument("--top", type=int, help="keep the N biggest sessions and projects")
     ap.add_argument("--cuts", help="comma list of ISO times: also print the cost between each consecutive pair, as \"intervals\"")
+    ap.add_argument("--daily-from", help="ISO time: also print the cost of each 24-hour slice from here to --until or now, as \"days\"")
     ap.add_argument("--output-scale", type=float, default=OUTPUT_SCALE,
                     help=f"multiplier for the recorded output tokens (default {OUTPUT_SCALE}; 1 = as recorded)")
     ap.add_argument("--text", action="store_true", help="print a table instead of JSON")
@@ -254,8 +266,14 @@ def main():
     since, until = parse_time(a.since), parse_time(a.until)
     cuts = sorted(parse_time(c) for c in a.cuts.split(",")) if a.cuts else None
     buckets, unpriced = [], {}
+    day_edges, day_models = None, []
+    if a.daily_from:
+        edge, stop = parse_time(a.daily_from), until or datetime.now(timezone.utc)
+        day_edges = [edge]
+        while day_edges[-1] < stop:
+            day_edges.append(day_edges[-1] + timedelta(days=1))
     sessions, projects = summarise(since, until, a.project, a.days, cuts, buckets if cuts else None, unpriced,
-                                   a.output_scale)
+                                   a.output_scale, day_edges, day_models if day_edges else None)
     if a.top:
         sessions, projects = sessions[: a.top], projects[: a.top]
     if a.text:
@@ -274,6 +292,10 @@ def main():
     if cuts:
         out["intervals"] = [{"from": cuts[i].isoformat(), "to": cuts[i + 1].isoformat(), "cost": buckets[i]}
                             for i in range(len(buckets))]
+    if day_edges:
+        out["days"] = [{"from": day_edges[i].isoformat(), "to": day_edges[i + 1].isoformat(),
+                        "cost": sum(day_models[i].values()), "models": day_models[i]}
+                       for i in range(len(day_models))]
     print(json.dumps(out))
 
 
