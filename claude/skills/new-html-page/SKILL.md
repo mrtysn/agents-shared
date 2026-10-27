@@ -7,7 +7,7 @@ allowed-tools: Bash, Read, Write, Edit, Skill
 # New HTML Page Skill
 
 Every HTML page an agent writes starts from `project-lifecycle page-new`: the house head
-(web-shared inlined, offline, light and dark, provenance stamp) plus a left contents column.
+(links the repo's `ws/` folder filled from web-shared, offline, light and dark, provenance stamp) plus a left contents column.
 The user has asked for that column by hand many times; it is the default, not an extra.
 
 Pages are local files (see the artifacts rule): never publish to Anthropic.

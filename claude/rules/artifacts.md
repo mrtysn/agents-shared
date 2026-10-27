@@ -3,7 +3,10 @@
 **Never publish an Artifact.** The Artifact tool uploads content to Anthropic's (claude.ai) servers, which leaks private machine contents off-machine — unacceptable even though artifacts are private-by-default.
 
 - A file for the user to read is a **local HTML page** on disk, whether or not they asked for HTML (the first scratch write in a session shows the rule on where a file lives and what it is); give its file path.
-- Make it self-contained: inline all CSS/JS, no CDNs, works offline.
+- Make it work offline: no CDN, API or font host at runtime. A page in a repo links that repo's `ws/`
+  folder (CSS and JS, fonts inside) by a relative path; a page written outside a repo, or `--inline`,
+  carries them inline. A page that leaves its repo (mail, a Finder drag, a server) goes through
+  `project-lifecycle page-bundle` first, which `notes-publish` and game-venture's publish already do.
 - A page the user opens from disk (`file://`) must not depend on a third-party tile, API or
   font host at runtime: such hosts block or watermark a request with no Referer (OpenStreetMap
   answers 403, CARTO's free URL stamps "API KEY REQUIRED"). Use data bundled in the page, or
@@ -22,8 +25,8 @@ starts from the `/new-html-page` skill, never from CSS written for the occasion:
 
     project-lifecycle page-new --title "<two to four words>" --section "<Heading>" … --repo <the repo it describes> --session <this session's id> --out FILE.html
 
-It writes a complete page: web-shared's stylesheets inlined with their network imports
-dropped (one file, reads offline), light and dark from the reader's preference, a
+It writes a complete page that links the repo's `ws/` folder, which it fills from web-shared (no
+network imports; a page outside a repo carries the same files inline), light and dark from the reader's preference, a
 `provenance` meta tag (repo and revision described, session, date), and **a sticky contents
 column on the left built from the section headings**: the user wants it on every report and
 has asked for it by hand each time it was missing. The sections are plain semantic HTML:
