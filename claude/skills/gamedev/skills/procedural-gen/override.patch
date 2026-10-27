@@ -1,9 +1,9 @@
 --- a/SKILL.md
 +++ b/SKILL.md
-@@ -6,7 +6,10 @@
-   corridors, BSP, random walk), and weighted loot/drop tables. Engine-neutral
-   algorithms. Use when the user mentions procedural generation, perlin/simplex
-   noise, random seed, dungeon generator, heightmap/terrain, or loot tables.
+@@ -7,7 +7,10 @@
+   tables. Engine-neutral algorithms. Use when the user mentions procedural
+   generation, perlin/simplex noise, random seed, dungeon generator, WFC,
+   heightmap/terrain, or loot tables.
 +disable-model-invocation: true
  ---
 +<!-- LOCAL: disable-model-invocation added above. The router skill carries the trigger

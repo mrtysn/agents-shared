@@ -1,10 +1,11 @@
 --- a/references/engine-detection.md
 +++ b/references/engine-detection.md
-@@ -34,7 +34,7 @@
+@@ -38,8 +38,7 @@
  | LÖVE | `conf.lua` version when declared, then the installed runtime |
  | Roblox | platform APIs are rolling; inspect current Creator Hub documentation for unstable APIs |
  
--For a new project use the baseline in `../../docs/VERSION-SUPPORT.md`. For an existing project,
+-For a new project use the baseline stated in the engine skill (the catalog-wide table is
+-`docs/VERSION-SUPPORT.md` in the source repository). For an existing project,
 +For a new project use the current stable release of the chosen engine <!-- LOCAL: upstream points at its docs/VERSION-SUPPORT.md, which is not vendored -->. For an existing project,
  preserve the detected version unless the user explicitly requests migration.
  
@@ -20,9 +21,9 @@
  (`files:`) are the cues that should select each skill. `*` in a binding is filled with the
  **detected** engine (router body §1); where an engine lacks the exact skill, see "Binding gaps".
  
-@@ -120,6 +120,9 @@
+@@ -127,6 +127,9 @@
  | `prototype-fast` | prototype fast, vertical slice, MVP game, greybox |
- | `steam-publish` | publish on Steam, Steamworks, store page, depot/build upload; `steam_appid.txt` |
+ | `steam-publish` | publish on Steam, Steamworks, store page, depot/build upload, Steam Deck compatibility review; `steam_appid.txt` |
  | `itch-publish` | publish on itch, itch.io page, `butler push`, upload build; `.itch.toml` |
 +<!-- LOCAL -->
 +| `game-harness` | test scene, state hook, headless capture, screenshot test, journey test, frame percentiles, "let the agent play it", "look at it yourself"; `tests/scenes/`, `tests/journeys/` |
@@ -32,7 +33,7 @@
  
 --- a/SKILL.md
 +++ b/SKILL.md
-@@ -46,26 +46,29 @@
+@@ -46,20 +46,24 @@
  
  Scan for the highest-confidence signal; **choose exactly one** engine. Stop at the first match.
  
@@ -44,37 +45,32 @@
 -| 1 | Godot | `project.godot` | `skills/godot/` |
 -| 2 | Unreal | `*.uproject` | `skills/unreal/` |
 -| 3 | Unity | `Assets/` **and** `ProjectSettings/ProjectVersion.txt` | `skills/unity/` |
--| 4 | Bevy | `Cargo.toml` with a `bevy` dependency | `skills/other-engines/bevy-ecs/` |
--| 5 | Phaser | `package.json` dep `phaser` | `skills/web-engines/phaser-*` |
--| 6 | PixiJS | `package.json` dep `pixi.js` | `skills/web-engines/pixijs-rendering/` |
--| 7 | three.js | `package.json` dep `three` | `skills/web-engines/threejs-*` |
--| 8 | LÖVE | `conf.lua` / `main.lua` calling `love.*` | `skills/other-engines/love2d-core/` |
--| 9 | pygame | `*.py` with `import pygame` | `skills/other-engines/pygame-core/` |
--| 10 | Roblox | `*.rbxl(x)` / `*.project.json` (Rojo) | `skills/other-engines/roblox-*` |
+-| 4 | Ebitengine | `go.mod` requiring `github.com/hajimehoshi/ebiten/v2` | `skills/ebitengine/` |
+-| 5 | Bevy | `Cargo.toml` with a `bevy` dependency | `skills/other-engines/bevy-ecs/` |
+-| 6 | Phaser | `package.json` dep `phaser` | `skills/web-engines/phaser-*` |
+-| 7 | PixiJS | `package.json` dep `pixi.js` | `skills/web-engines/pixijs-rendering/` |
+-| 8 | three.js | `package.json` dep `three` | `skills/web-engines/threejs-*` |
+-| 9 | Defold | `game.project` | `skills/other-engines/defold-core/` |
+-| 10 | LÖVE | `conf.lua` / `main.lua` calling `love.*` | `skills/other-engines/love2d-core/` |
+-| 11 | pygame | `*.py` with `import pygame` | `skills/other-engines/pygame-core/` |
+-| 12 | Roblox | `*.rbxl(x)` / `*.project.json` (Rojo) | `skills/other-engines/roblox-*` |
 +| 1 | Godot | `project.godot` | not installed |
 +| 2 | Unreal | `*.uproject` | not installed |
 +| 3 | Unity | `Assets/` **and** `ProjectSettings/ProjectVersion.txt` | not installed |
-+| 4 | Bevy | `Cargo.toml` with a `bevy` dependency | not installed |
-+| 5 | Phaser | `package.json` dep `phaser` | not installed |
-+| 6 | PixiJS | `package.json` dep `pixi.js` | not installed |
-+| 7 | three.js | `package.json` dep `three` | not installed |
-+| 8 | LÖVE | `conf.lua` / `main.lua` calling `love.*` | not installed |
-+| 9 | pygame | `*.py` with `import pygame` | not installed |
-+| 10 | Roblox | `*.rbxl(x)` / `*.project.json` (Rojo) | not installed |
++| 4 | Ebitengine | `go.mod` requiring `github.com/hajimehoshi/ebiten/v2` | not installed |
++| 5 | Bevy | `Cargo.toml` with a `bevy` dependency | not installed |
++| 6 | Phaser | `package.json` dep `phaser` | not installed |
++| 7 | PixiJS | `package.json` dep `pixi.js` | not installed |
++| 8 | three.js | `package.json` dep `three` | not installed |
++| 9 | Defold | `game.project` | not installed |
++| 10 | LÖVE | `conf.lua` / `main.lua` calling `love.*` | not installed |
++| 11 | pygame | `*.py` with `import pygame` | not installed |
++| 12 | Roblox | `*.rbxl(x)` / `*.project.json` (Rojo) | not installed |
 +<!-- LOCAL END -->
  
- For secondary signals, the Godot-C#/Unity/Bevy and multi-web disambiguation rules, monorepos,
- and plain-text engine mentions, read `references/engine-detection.md`.
- 
- After identifying the engine, read its version from project metadata or dependency locks before
- choosing APIs. Existing projects keep their pinned version unless migration is requested; the
--catalog baseline is only for new projects. The exact version sources are in the detection reference
--and `../docs/VERSION-SUPPORT.md`.
-+catalog baseline is only for new projects. The exact version sources are in the detection reference.
- 
- ## 2. Task classification (phrasing → category)
- 
-@@ -82,32 +85,24 @@
+ For secondary signals, the Godot-C#/Unity/Bevy, Defold/LÖVE/Lua and multi-web disambiguation
+ rules, monorepos, and plain-text engine mentions, read `references/engine-detection.md`.
+@@ -85,37 +89,24 @@
    words ("make a roguelike", "deckbuilder").
  - **workflows** (process/shipping): `game-jam`, `prototype-fast`, `steam-publish`,
    `itch-publish`. Triggered by process words ("publish on Steam", "vertical slice").
@@ -102,9 +98,14 @@
 -- **Unreal** (`skills/unreal/`): visual scripting `unreal-blueprints`; C++ gameplay
 -  `unreal-cpp-gameplay`; input `unreal-enhanced-input`; AI `unreal-behavior-trees`; VFX
 -  `unreal-niagara`; ship `unreal-packaging`.
+-- **Ebitengine** (`skills/ebitengine/`): `ebitengine-game` for Go 2D games and focused
+-  input, rendering, text, audio, state/testing and build work. Select only its relevant
+-  references; generating the starter is optional for an existing project.
 -- **Web** (`skills/web-engines/`): `phaser-core`, `phaser-arcade-physics`; `pixijs-rendering`;
 -  `threejs-scene-setup`, `threejs-gltf-loading`, `threejs-materials-lighting`.
--- **Other** (`skills/other-engines/`): `bevy-ecs`, `pygame-core`, `love2d-core`; Roblox foundation
+-- **Other** (`skills/other-engines/`): `bevy-ecs`, `pygame-core`, `love2d-core`; Defold
+-  `defold-core` (collections, game objects, scripts, input, messages, factories, proxies,
+-  Bob builds); Roblox foundation
 -  `roblox-luau`, persistence `roblox-datastores`, UI `roblox-ui`, remotes/security
 -  `roblox-networking`, character lifecycle `roblox-characters`, simulation/queries
 -  `roblox-physics`, and in-Studio operation `roblox-studio-workflow`.
@@ -112,13 +113,13 @@
 +vendored here. Where a row below or a genre's `composes` names one, the discipline skill owns the
 +concept and the engine API comes from the project itself; state the gap as §6 describes. -->
 +Upstream ships per-engine skills (`godot-*`, `unity-*`, `unreal-*`, `phaser-*`, `pixijs-*`,
-+`threejs-*`, `bevy-ecs`, `pygame-core`, `love2d-core`, `roblox-*`). None is installed. Treat every
++`threejs-*`, `bevy-ecs`, `pygame-core`, `love2d-core`, `defold-core`, `ebitengine-game`, `roblox-*`). None is installed. Treat every
 +engine binding named below as "engine known but no skill covers the subtask" (§6).
 +<!-- LOCAL END -->
  
  ### 3b. Disciplines — load **with** the engine skill (concept ↔ engine API)
  
-@@ -154,15 +149,20 @@
+@@ -173,15 +164,20 @@
  `game-jam` (jam, 48-hour, Ludum Dare/GMTK) · `prototype-fast` (vertical slice, MVP, greybox) ·
  `steam-publish` (Steam, Steamworks, depot; `steam_appid.txt`) · `itch-publish` (itch.io, butler;
  `.itch.toml`).
@@ -142,7 +143,7 @@
     only those. Never bulk-load a whole category.
  3. **On demand:** read a skill's bundled `references/` files only when the subtask needs that
     depth (the skill body says when).
-@@ -195,8 +195,9 @@
+@@ -214,8 +210,9 @@
  2. If the task is a pure concept/genre/workflow question, route straight to the engine-agnostic
     discipline/genre/workflow skill — no engine needed ("what's a good save format?" → `save-systems`).
  3. Only if engine choice actually blocks the answer, ask **one** targeted question ("Which engine —
@@ -154,7 +155,7 @@
  4. Never invent an engine or load an engine skill on a guess.
  
  **Engine known but no skill covers the subtask:** load the closest engine skill plus the relevant
-@@ -221,6 +222,10 @@
+@@ -243,6 +240,10 @@
  | "the camera should follow my player smoothly" | (detected engine) | `camera-systems` (+ engine movement skill) |
  | "my Unity game drops to 30 FPS, optimize it" | Unity (`Assets/`+`ProjectSettings/`) | `performance-optimization` (profile first) → engine skill |
  | "make a cohesive pixel-art player and enemy set" | (detected engine) | `create-game-assets` → relevant engine import/rendering skill |

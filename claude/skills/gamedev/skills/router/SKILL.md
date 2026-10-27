@@ -2,7 +2,7 @@
 name: router
 description: >
   Routes any game-development request to the right specialized skill(s): it detects the engine
-  (Godot, Unity, Unreal, Bevy, Phaser, PixiJS, three.js, LÖVE, pygame, Roblox) and the task, then
+  (Godot, Unity, Unreal, Ebitengine, Bevy, Phaser, PixiJS, three.js, Defold, LÖVE, pygame, Roblox) and the task, then
   reads the chosen skill before acting. Use to make a game or to decide which skill applies — for
   players, levels, enemies, shaders, art direction, sprites, tiles, textures, 3D assets, UI/UX,
   cameras, game feel, physics, input, audio, saving, multiplayer, AI, dialogue, procedural
@@ -54,21 +54,25 @@ detected so the gap can be stated, per §6. -->
 | 1 | Godot | `project.godot` | not installed |
 | 2 | Unreal | `*.uproject` | not installed |
 | 3 | Unity | `Assets/` **and** `ProjectSettings/ProjectVersion.txt` | not installed |
-| 4 | Bevy | `Cargo.toml` with a `bevy` dependency | not installed |
-| 5 | Phaser | `package.json` dep `phaser` | not installed |
-| 6 | PixiJS | `package.json` dep `pixi.js` | not installed |
-| 7 | three.js | `package.json` dep `three` | not installed |
-| 8 | LÖVE | `conf.lua` / `main.lua` calling `love.*` | not installed |
-| 9 | pygame | `*.py` with `import pygame` | not installed |
-| 10 | Roblox | `*.rbxl(x)` / `*.project.json` (Rojo) | not installed |
+| 4 | Ebitengine | `go.mod` requiring `github.com/hajimehoshi/ebiten/v2` | not installed |
+| 5 | Bevy | `Cargo.toml` with a `bevy` dependency | not installed |
+| 6 | Phaser | `package.json` dep `phaser` | not installed |
+| 7 | PixiJS | `package.json` dep `pixi.js` | not installed |
+| 8 | three.js | `package.json` dep `three` | not installed |
+| 9 | Defold | `game.project` | not installed |
+| 10 | LÖVE | `conf.lua` / `main.lua` calling `love.*` | not installed |
+| 11 | pygame | `*.py` with `import pygame` | not installed |
+| 12 | Roblox | `*.rbxl(x)` / `*.project.json` (Rojo) | not installed |
 <!-- LOCAL END -->
 
-For secondary signals, the Godot-C#/Unity/Bevy and multi-web disambiguation rules, monorepos,
-and plain-text engine mentions, read `references/engine-detection.md`.
+For secondary signals, the Godot-C#/Unity/Bevy, Defold/LÖVE/Lua and multi-web disambiguation
+rules, monorepos, and plain-text engine mentions, read `references/engine-detection.md`.
 
 After identifying the engine, read its version from project metadata or dependency locks before
 choosing APIs. Existing projects keep their pinned version unless migration is requested; the
-catalog baseline is only for new projects. The exact version sources are in the detection reference.
+catalog baseline is only for new projects. The exact version sources are in the detection reference;
+each engine skill states its new-project baseline, and the catalog-wide table is
+`docs/VERSION-SUPPORT.md` in the source repository (it is not installed with the router).
 
 ## 2. Task classification (phrasing → category)
 
@@ -100,7 +104,7 @@ File signals sharpen this: `*.yarn`/`*.ink` → `dialogue-systems`/`visual-novel
 vendored here. Where a row below or a genre's `composes` names one, the discipline skill owns the
 concept and the engine API comes from the project itself; state the gap as §6 describes. -->
 Upstream ships per-engine skills (`godot-*`, `unity-*`, `unreal-*`, `phaser-*`, `pixijs-*`,
-`threejs-*`, `bevy-ecs`, `pygame-core`, `love2d-core`, `roblox-*`). None is installed. Treat every
+`threejs-*`, `bevy-ecs`, `pygame-core`, `love2d-core`, `defold-core`, `ebitengine-game`, `roblox-*`). None is installed. Treat every
 engine binding named below as "engine known but no skill covers the subtask" (§6).
 <!-- LOCAL END -->
 
@@ -111,7 +115,7 @@ engine binding named below as "engine known but no skill covers the subtask" (§
 | art direction, game assets, sprites, tilesets, textures, icons, 3D props | `create-game-assets` | engine importer/rendering skill; `imagegen` when available |
 | enemy AI, behavior tree, pathfinding, steering | `game-ai` | `unity-navmesh` / `unreal-behavior-trees` / Godot nav |
 | BT runtime, blackboard, decorator, selector/sequence, utility AI, response curve, consideration | `ai-behavior-trees-utility-ai` | `game-ai` (model choice) / `unreal-behavior-trees` (engine assets) |
-| procedural, noise, seed, dungeon generator | `procedural-gen` | engine tilemap/grid skill |
+| procedural, noise, seed, dungeon generator, WFC | `procedural-gen` | engine tilemap/grid skill |
 | dialogue, Yarn, Ink, conversation tree | `dialogue-systems` | engine UI skill |
 | save/load, slots, persistence | `save-systems` | `roblox-datastores` / engine IO |
 | adaptive music, mixer, ducking, SFX | `audio-design` | `godot-audio` / Unity AudioMixer |
@@ -129,6 +133,17 @@ For Roblox, compose cross-engine concepts with the focused engine skill: HUD/men
 replication requests use `roblox-networking` + `roblox-luau`; respawn/rig requests use
 `roblox-characters`; physical simulation/query requests use `roblox-physics` (+
 `physics-tuning` for stability); direct place editing also uses `roblox-studio-workflow`.
+
+For Ebitengine, bind engine-specific slots to `ebitengine-game` and its relevant reference
+(input, rendering, text/UI, audio, gameplay, tilemaps or state/testing). Add only the needed
+disciplines; do not load Godot or Unity APIs from a genre's example bindings. Native 3D and a
+ready-made network backend are not supplied by this 2D skill; state those gaps when relevant.
+
+For Defold, bind engine-specific slots (movement, input, spawning, level loading, build) to
+`defold-core` and add only the needed disciplines, e.g. "add player movement to my Defold
+game" → `defold-core` + `input-systems` (+ `platformer` for a platformer). Defold has no
+dedicated GUI, tilemap or physics skill yet; use `defold-core` and its build reference's
+pointers, and state the gap.
 
 ### 3c. Genres — **compose** engine + disciplines (bind `*` to the detected engine)
 
@@ -213,6 +228,9 @@ and offer to load it if the user confirms.
 |---------|-----------------|--------------------------|
 | "add a double jump to my Godot player" | Godot (`project.godot`) | `godot-2d-movement` → `platformer` |
 | "make an inventory for my Unity RPG" | Unity (`Assets/`+`ProjectSettings/`) | `unity-scriptableobjects` → `rpg` → `save-systems` |
+| "build a 2D puzzle in Go with Ebitengine" | Ebitengine (named; later `go.mod`) | `ebitengine-game` → `puzzle` |
+| "fix a stale HUD in my Go game" | Ebitengine (`go.mod` + game imports) | `ebitengine-game` → `game-ui-ux`; read text/UI, no new scaffold |
+| "add player movement to my Defold game" | Defold (`game.project`) | `defold-core` → `input-systems` |
 | "procedural dungeon roguelike in Godot" | Godot | `godot-tilemap` → `procedural-gen` → `roguelike` |
 | "branching dialogue from a `.yarn` file" | (none required) | `dialogue-systems` (+ engine UI skill if an engine is detected) |
 | "how do I design save slots with migration?" | (none) | `save-systems` only |
