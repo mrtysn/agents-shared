@@ -54,6 +54,8 @@ Never list every flaw you notice - an exhaustive list is noise and noise is a fa
 
 Six is a cap, not a quota, and there is no minimum count. Report every issue that clears the impact bar and nothing else, so the list runs to whatever length the screen earns. Padding a thin list up to a floor is the same failure as listing every flaw, reached from the other side: the closing rules section says an item is either worth a place in the list or it is not, and that is what sets the length.
 
+**The 6 is derived rather than picked.** It is band 1's floor plus one. That band is defined as five or more heuristic violations, the largest count any band names, so a cap of five would sit exactly on it and a list stopping on its own cap cannot say whether it is a complete band-1 list or a longer one cut off. Six is the smallest cap that lets band 1's floor print in full and still read as finished. Past six the count is the finding rather than the list: the screen is a 1/4 or a 0/4 and needs a restructure or a rebuild, so the score paragraph says that instead of a seventh issue going quietly. Full derivation in `references/review-rubric.md`.
+
 An empty critique is still never the answer, so two floors hold:
 
 - **Nothing clears the bar.** That is what 4/4 means. Name the 2-3 strongest polish items instead, framed as polish, not blockers.
@@ -105,6 +107,10 @@ Always name one, even when the margin is small. A comparison that ends in "it de
 
 The closing fix list is capped at 3 and has no floor. The impact bar from Step 2c decides what goes in it, so a winner with nothing above that bar gets an empty list and says so. The two floors under 2c are review mode's: there the critique is the entire deliverable and an empty one is no answer at all, while here the verdict is the deliverable and it has already been given by the time this list starts. Padding the list to a count is the failure 2c names, and in this mode it also costs the verdict - an invented third issue in the winner reads as a reason to doubt the call.
 
+**The 3 is derived rather than picked.** Band 3/4 is defined as 1-3 polish items remaining, and 2c's second floor already reads three issues on a screen that is otherwise right as normal for that band. This list is that same list, asked about the one artifact the team is going to ship: what is left to fix in a screen whose hierarchy and craft are mostly there. So the cap is the top of the band a winner sits in when polish is all that remains, which is also why a full list of 3 and a list of one are both complete - the length is the screen, not the template.
+
+**A winner that needs more than 3 fixes is a finding about the verdict, not a list to trim.** Past three the winner is below 3/4 and what is left is craft or structure rather than polish, so the fourth issue is not dropped quietly: the paragraph that names the winner says what the score leaves to do, next to the fact that would flip the call. The list itself still stops at 3, ranked by impact.
+
 ### 3d. Output format - comparison mode
 
 ```
@@ -146,6 +152,8 @@ No artifact, a decision question instead. Skip the Before/After/Why structure en
 - One claim is the floor, and the reason is the skill's own spine: the recommendation is itself a claim, and this skill does not answer without a citation behind the answer. If not one claim holds up, the question is not answerable from what was given, and the clarifying question below is the honest output rather than a recommendation with nothing under it.
 - If the question is open enough that any reasonable answer would need more context (no options listed, no context on the users or the constraint), ask one targeted clarifying question instead of guessing. Surface 2-3 likely interpretations so the user can just pick one.
 
+**The 5 is derived rather than picked**, and it comes from band 1's floor by way of Step 5. A claim here is one cited assertion, the same unit band 1 counts when it says five or more heuristic violations, so five is the largest number of them the rubric asks any single output to stand behind. Step 5 is where that bites: its claims rest on observable facts read off an attached artifact, to the same standard as `Before` in review mode, and it states that attaching the artifact raises the evidence bar and moves neither end of this range. The cap is therefore one number shared by both modes, set where the mode that can observe something needs it, which is also why advisory mode does not get a lower one for having no artifact to read. The remaining question is why this cap sits on band 1's floor when Step 2c's sits one above it, and the answer is the score. 2c's list is printed beside a number it is the evidence for, so a list of five stopping on its own cap cannot say whether it is a complete band-1 list or a longer one cut off. Neither of the two advisory modes prints a score, nothing in either output is a count these bullets have to substantiate, and the ambiguity the extra one pays for never arises - so the cap lands on the floor itself. The two caps differ by one because the modes differ by a score, not by accident. Bands in `references/review-rubric.md`.
+
 ### Output format - advisory mode
 
 ```
@@ -163,11 +171,11 @@ If you want specifics, share a screenshot or a URL and I'll do a full review.
 A decision question with an artifact attached. The answer keeps the advisory shape; the artifact raises the evidence bar, it does not change what is being asked.
 
 - Answer the question first, in one sentence. The critique, if there is one at all, comes after.
-- The claim count is Step 4's: at most five, as many as are grounded, never padded to a number. An attached artifact raises the evidence bar and does not move either end of that range.
+- The claim count is Step 4's: at most five, as many as are grounded, never padded to a number. An attached artifact raises the evidence bar and does not move either end of that range - and that sentence is load-bearing, because Step 4's derivation of the five runs through this mode: the unit it bounds is a cited claim resting on an observed fact, which is the claim this mode makes.
 - Every claim the artifact can settle rests on an observable fact from it, to the same standard as `Before` in review mode: "the address form is nine fields deep and the page already carries a sticky order summary", not "the form looks long". Claims the artifact cannot settle - traffic, device mix, what users do next - are still allowed as general guidance, but say which they are rather than dressing them as observations.
 - Name the one observable fact that carried the recommendation. If the artifact flips the answer you would have given without it, say so plainly: that is the entire value of having it attached.
 - If the artifact does not show the element the question is about, say so in one line and answer from general guidance. Never infer the missing element from the surrounding layout.
-- Close with at most 3 review-mode issues, and only ones that bear on the decision. Everything else waits for a full review - offer it in the closing line rather than smuggling an unrequested critique in under the answer.
+- Close with at most 3 review-mode issues, and only ones that bear on the decision. The 3 is 3c's and carries its derivation: in both modes the critique rides under something else that is the deliverable, and both lists stop where a screen that is otherwise right stops needing polish. Everything else waits for a full review - offer it in the closing line rather than smuggling an unrequested critique in under the answer.
 
 ### Output format - grounded advisory mode
 
