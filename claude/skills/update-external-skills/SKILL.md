@@ -25,7 +25,11 @@ refusals spread over several minutes end the run: stop and report.
 
 1. **Clean tree.** `git status` must show no uncommitted change under `claude/skills/`.
    Otherwise a sync's diff cannot be told from earlier work. Stop and say so.
-2. **Preview.** `bash scripts/sync-external-skills.sh --dry-run $ARGUMENTS`. Writes nothing.
+2. **Preview.** `bash scripts/sync-external-skills.sh --dry-run $ARGUMENTS > <scratchpad>/dry-run.out 2>&1`,
+   then read the `=== Sync Summary ===` section from that file. Writes nothing in the repo. The
+   summary sits above a long "New upstream skills" list that ends the output, so `tail` drops it
+   and `head` drops the drift: never pipe the run, because a lost summary costs a second run of
+   GitHub traffic.
    Report the counts and the behind skills, conflicts first. If nothing is behind, stop.
    The summary's **Listing drift** section names skills where upstream added or deleted files
    compared with `source.json`'s `files`. A listed file deleted upstream makes that skill fail
