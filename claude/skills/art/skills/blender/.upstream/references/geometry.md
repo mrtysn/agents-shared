@@ -29,7 +29,7 @@ mesh = bpy.data.meshes.new("MyMesh")
 bm.to_mesh(mesh)
 bm.free()
 obj = bpy.data.objects.new("MyObj", mesh)
-bpy.context.collection.objects.link(obj)
+bpy.context.scene.collection.objects.link(obj)
 ```
 
 Build arbitrary geometry from raw verts/faces without operators:
@@ -166,11 +166,32 @@ Smooth vs flat shading is per-face and independent of normal *direction*:
 ```python
 for poly in obj.data.polygons:
     poly.use_smooth = True          # smooth shading
-# Optional: auto-smooth by angle. In 4.1+ this is a "Smooth by Angle" modifier /
-# geometry-nodes op, NOT mesh.use_auto_smooth (removed). See gotchas.md.
 ```
-For hard-surface models, smooth-shade then add a bevel/weighted-normals pass, or
-mark sharp edges. For organic models, smooth-shade everything.
+Smooth by angle (what `use_auto_smooth` used to do; that property is gone):
+```python
+with bpy.context.temp_override(active_object=obj, object=obj,
+                               selected_objects=[obj], selected_editable_objects=[obj]):
+    bpy.ops.object.shade_smooth_by_angle(angle=0.5236)   # 30°: sharper edges stay crisp
+```
+
+### Hard-surface quality: bevel everything a little
+Real objects never have mathematically sharp edges; a razor edge catches no light
+and reads as CG. A small Bevel modifier plus Weighted Normal is the cheapest big
+quality win for boxes, devices, furniture, architecture:
+
+```python
+bev = obj.modifiers.new("Bevel", "BEVEL")
+bev.width = 0.02 * max(obj.dimensions)   # ~1-3% of the object's size
+bev.segments = 3
+bev.limit_method = "ANGLE"               # only bevel actual corners
+bev.harden_normals = True
+wn = obj.modifiers.new("WeightedNormal", "WEIGHTED_NORMAL")
+wn.keep_sharp = True
+for poly in obj.data.polygons:
+    poly.use_smooth = True               # weighted normals need smooth shading
+```
+For organic models, smooth-shade everything and add a Subdivision Surface
+modifier instead.
 
 ---
 
@@ -213,7 +234,7 @@ if needed. Subdivision surface for smooth organic; set `levels` (viewport) and
 # Linked duplicates share mesh data (cheap):
 inst = bpy.data.objects.new("Inst", base.data)   # SAME mesh datablock
 inst.location = (x, y, z)
-bpy.context.collection.objects.link(inst)
+bpy.context.scene.collection.objects.link(inst)
 ```
 - **Collection instancing** and **Geometry Nodes** scale to huge counts; reach for
   Geometry Nodes when the user wants scatter/parametric/procedural systems (a

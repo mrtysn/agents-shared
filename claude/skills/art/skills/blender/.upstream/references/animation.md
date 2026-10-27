@@ -47,9 +47,21 @@ does not fully evaluate).
 Newly inserted keys default to Bezier (smooth). Control the feel by editing
 F-curves after inserting:
 
+In Blender 5.x actions are *slotted*: F-curves live in a channelbag per slot, and
+`action.fcurves` no longer exists. Get them through the helper:
+
 ```python
-action = obj.animation_data.action
-for fc in action.fcurves:
+from bpy_extras import anim_utils
+
+def object_fcurves(obj):
+    """F-curves animating `obj` (Blender 4.4+ slotted actions)."""
+    ad = obj.animation_data
+    if not ad or not ad.action:
+        return []
+    bag = anim_utils.action_get_channelbag_for_slot(ad.action, ad.action_slot)
+    return list(bag.fcurves) if bag else []
+
+for fc in object_fcurves(obj):
     for kp in fc.keyframe_points:
         kp.interpolation = "BEZIER"     # CONSTANT (steps), LINEAR, BEZIER
         kp.easing = "AUTO"              # EASE_IN, EASE_OUT, EASE_IN_OUT
@@ -61,6 +73,9 @@ for fc in action.fcurves:
 - **CONSTANT** — stop-motion / hold poses.
 - **BOUNCE / ELASTIC / BACK** — stylised overshoot.
 Add cycles (loops) with an F-Curve modifier: `fc.modifiers.new("CYCLES")`.
+Find one channel with `fc.data_path == "location" and fc.array_index == 2`.
+The same applies to any animated datablock (material node values, shape keys):
+use its own `animation_data.action` and `animation_data.action_slot`.
 
 ---
 
@@ -106,38 +121,53 @@ con.up_axis = "UP_Y"
 ## 5. Armatures / rigging basics
 
 For characters or anything that deforms. Build the armature, then keyframe pose
-bones. Bone editing needs Edit mode (use a context override).
+bones. Bone editing needs Edit mode, and edit mode follows the **view layer's
+active object**: `temp_override(active_object=arm)` is not enough (mode_set
+silently does nothing and `edit_bones.new` raises "not in edit mode"). Make the
+armature truly active instead:
 
 ```python
+scene = bpy.context.scene
+view_layer = bpy.context.view_layer
 arm_data = bpy.data.armatures.new("Arm")
 arm = bpy.data.objects.new("Arm", arm_data)
-bpy.context.collection.objects.link(arm)
+scene.collection.objects.link(arm)
 
-with bpy.context.temp_override(active_object=arm, object=arm,
-                               selected_objects=[arm]):
-    bpy.ops.object.mode_set(mode="EDIT")
-    eb = arm_data.edit_bones.new("Bone")
-    eb.head = (0, 0, 0)
-    eb.tail = (0, 0, 1)
-    child = arm_data.edit_bones.new("Bone.001")
-    child.head = (0, 0, 1); child.tail = (0, 0, 2)
-    child.parent = eb; child.use_connect = True
-    bpy.ops.object.mode_set(mode="OBJECT")
+def make_active(*objs):
+    """Select exactly `objs`; the last one becomes active."""
+    view_layer.update()            # view_layer.objects is stale after link/remove
+    for o in scene.objects:
+        o.select_set(False)
+    for o in objs:
+        o.select_set(True)
+    view_layer.objects.active = objs[-1]
 
-# Bind a mesh with automatic weights:
-with bpy.context.temp_override(active_object=arm, object=arm,
-                               selected_objects=[mesh_obj, arm]):
-    bpy.ops.object.parent_set(type="ARMATURE_AUTO")
+make_active(arm)
+bpy.ops.object.mode_set(mode="EDIT")
+root = arm_data.edit_bones.new("Bone")
+root.head, root.tail = (0, 0, 0), (0, 0, 1)
+tip = arm_data.edit_bones.new("Bone.001")
+tip.head, tip.tail = (0, 0, 1), (0, 0, 2)
+tip.parent, tip.use_connect = root, True
+bpy.ops.object.mode_set(mode="OBJECT")
+
+# Bind a mesh with automatic weights (mesh selected, armature active):
+make_active(mesh_obj, arm)
+bpy.ops.object.parent_set(type="ARMATURE_AUTO")
+print("vertex groups:", [g.name for g in mesh_obj.vertex_groups])   # one per bone
 
 # Animate a pose bone:
 scene.frame_set(1)
-pbone = arm.pose.bones["Bone"]
+pbone = arm.pose.bones["Bone.001"]
 pbone.rotation_mode = "XYZ"
 pbone.rotation_euler = (0, 0, 0)
 pbone.keyframe_insert("rotation_euler", frame=1)
 pbone.rotation_euler = (0.5, 0, 0)
 pbone.keyframe_insert("rotation_euler", frame=30)
 ```
+Automatic weights need a closed mesh around the bones with enough geometry along
+them (a column with several loop cuts, not a single 8-vertex box). If
+`vertex_groups` comes back empty, the bones are outside the mesh.
 Add an IK constraint on a pose bone for limbs (`pbone.constraints.new("IK")`).
 
 ---

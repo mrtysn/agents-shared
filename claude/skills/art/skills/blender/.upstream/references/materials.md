@@ -18,11 +18,10 @@ right or textures render wrong even when the graph is correct.
 ## 1. Basic node material
 
 ```python
-mat = bpy.data.materials.new("MyMat")
-mat.use_nodes = True
+mat = bpy.data.materials.new("MyMat")   # 5.x: node tree always exists, no use_nodes
 nodes = mat.node_tree.nodes
 links = mat.node_tree.links
-bsdf = nodes.get("Principled BSDF")     # created by default with use_nodes
+bsdf = nodes.get("Principled BSDF")     # every new material starts with one
 bsdf.inputs["Base Color"].default_value = (0.8, 0.1, 0.1, 1.0)  # RGBA, linear
 bsdf.inputs["Roughness"].default_value = 0.4
 bsdf.inputs["Metallic"].default_value = 0.0
@@ -106,19 +105,26 @@ wrong with no error. This is the most common "my textures look off" bug.
 
 ## 5. UV unwrapping
 
-Image textures need UVs. Primitives from `bmesh.ops.create_*` and `from_pydata`
-often have none or poor ones. Unwrapping is one place an operator (with override)
-is the practical tool:
+Image textures need UVs, and meshes built with `bmesh` or `from_pydata` usually
+have none. Unwrapping is one
+place an operator is the practical tool. Edit-mode operators follow the **view
+layer's active object**, so `temp_override(active_object=...)` alone fails with
+"context is incorrect"; make the object truly active instead (this is what
+`boilerplate.edit_mode(obj)` does):
 
 ```python
-# Ensure the object is in Edit mode with all faces selected, via override:
-with bpy.context.temp_override(active_object=obj, object=obj,
-                               selected_objects=[obj]):
-    bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.select_all(action="SELECT")
-    bpy.ops.uv.smart_project(angle_limit=1.15, island_margin=0.02)  # good default
-    # or bpy.ops.uv.unwrap(method="ANGLE_BASED") if seams are marked
-    bpy.ops.object.mode_set(mode="OBJECT")
+view_layer = bpy.context.view_layer
+view_layer.update()                 # view_layer.objects is stale after link/remove
+for o in bpy.context.scene.objects:
+    o.select_set(False)
+view_layer.objects.active = obj
+obj.select_set(True)
+bpy.ops.object.mode_set(mode="EDIT")
+bpy.ops.mesh.select_all(action="SELECT")
+bpy.ops.uv.smart_project(angle_limit=1.15, island_margin=0.02)   # good default
+# or bpy.ops.uv.unwrap(method="ANGLE_BASED") if seams are marked
+bpy.ops.object.mode_set(mode="OBJECT")
+print("UV layers:", [uv.name for uv in obj.data.uv_layers])
 ```
 For boxes/planes, `bpy.ops.uv.cube_project` or a simple generated UV is enough.
 For tiling/repeat, add a Mapping + Texture Coordinate node and scale the UVs.
@@ -155,4 +161,4 @@ links.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
 ```
 For glowing surfaces set `Emission Color` + `Emission Strength` on the Principled
 BSDF (a full node is unnecessary in 4.0+). Emissive materials also **light the
-scene** in Cycles and Eevee-Next — handy for screens, neon, lava.
+scene** in Cycles and EEVEE — handy for screens, neon, lava.

@@ -31,7 +31,7 @@ for bp, co in zip(spline.bezier_points, coords):
     bp.co = co
     bp.handle_left_type = bp.handle_right_type = "AUTO"
 obj = bpy.data.objects.new("Path", curve)
-bpy.context.collection.objects.link(obj)
+bpy.context.scene.collection.objects.link(obj)
 ```
 `POLY` splines are simplest (straight segments); `BEZIER` gives smooth handles;
 `NURBS` gives smooth without per-point handles. Close a loop with
@@ -49,7 +49,7 @@ thickness/volume without converting to mesh:
 curve.bevel_depth = 0.05        # round tube thickness along the curve
 curve.bevel_resolution = 4
 curve.extrude = 0.1             # flat extrusion (gives a 2D shape depth in Z)
-curve.fill_mode = "BOTH"        # cap the ends
+curve.fill_mode = "FULL"        # 3D curves: FULL/HALF/FRONT/BACK; 2D: BOTH/FRONT/BACK/NONE
 # Or use a second curve as a custom bevel profile: curve.bevel_object = profile_obj
 ```
 Convert to mesh when you need mesh editing/booleans:
@@ -72,7 +72,7 @@ txt.extrude = 0.1               # 3D depth (0 = flat)
 txt.bevel_depth = 0.01          # rounded edges
 # txt.font = bpy.data.fonts.load("/path/font.ttf")   # custom font
 obj = bpy.data.objects.new("Text", txt)
-bpy.context.collection.objects.link(obj)
+bpy.context.scene.collection.objects.link(obj)
 ```
 Text is a curve under the hood — convert to mesh/curve as in §2 for booleans or
 per-letter effects.
@@ -81,18 +81,54 @@ per-letter effects.
 
 ## 4. Grease Pencil (v3)
 
-Grease Pencil was **rewritten in Blender 4.3** ("Grease Pencil v3"); the data API
-and type id changed from earlier versions. **Verify the API at runtime** for the
-running version (print `dir(bpy.data)` for the grease-pencil collection name and
-check `bpy.app.version`). Use Grease Pencil for 2D/traditional animation, hand
-drawn looks, and annotations in 3D. If the goal is just flat vector graphics,
-filled 2D curves (§2) are usually simpler and version-stable.
+Grease Pencil was rewritten in 4.3 ("v3"). In Blender 5.x the data lives in
+`bpy.data.grease_pencils` (object type `GREASEPENCIL`); old annotations moved to
+`bpy.data.annotations`. Pre-4.3 code (`gpencil`, `GPencilStroke`, `strokes.new()`)
+does not work. Hierarchy: **GreasePencil → layers → frames → drawing → strokes →
+points**. Verified on 5.0.1 and 5.2.3 (renders in Cycles and EEVEE):
 
-Because the v3 API differs by version, the robust approach in a script is:
-1. Print the available grease-pencil datablock names/types for this version.
-2. Create the object and a layer/frame, then add strokes with point coordinates.
-If a task leans heavily on Grease Pencil, fetch the Python API docs for the exact
-running version rather than relying on any single code snippet.
+```python
+import bpy, math
+
+gp = bpy.data.grease_pencils.new("Sketch")          # GPv3 data (5.x)
+layer = gp.layers.new("Lines")
+frame = layer.frames.new(1)                          # keyframe at frame 1
+drawing = frame.drawing
+
+# One stroke = N points. Here: a circle of 64 points, closed.
+n = 64
+drawing.add_strokes([n])
+stroke = drawing.strokes[0]
+stroke.cyclic = True
+for i, pt in enumerate(stroke.points):
+    a = 2 * math.pi * i / n
+    pt.position = (math.cos(a), 0.0, math.sin(a))    # drawn in the XZ plane, faces -Y
+    pt.radius = 0.03                                 # line thickness (world units)
+    pt.opacity = 1.0
+
+mat = bpy.data.materials.new("Ink")
+bpy.data.materials.create_gpencil_data(mat)          # turns it into a GP material
+mat.grease_pencil.color = (0.05, 0.05, 0.05, 1.0)    # stroke colour
+gp.materials.append(mat)
+
+obj = bpy.data.objects.new("Sketch", gp)             # object type 'GREASEPENCIL'
+bpy.context.scene.collection.objects.link(obj)
+```
+
+Notes:
+- `drawing.add_strokes([n1, n2, ...])` adds several strokes at once with the given
+  point counts; then set each point's `position`, `radius`, `opacity`
+  (`vertex_color` for per-point colour).
+- Many points at once: write the `position` attribute in bulk with
+  `drawing.attributes["position"].data.foreach_set("vector", flat_list)`.
+- Stroke look is a material: `create_gpencil_data(mat)` then
+  `mat.grease_pencil.color` (stroke) and `.fill_color`. In 5.2 the material's
+  `show_stroke` / `show_fill` are deprecated (stroke visibility is per stroke:
+  `stroke.hide_stroke`; fill via `stroke.fill_opacity`/`fill_color`); avoid them.
+- Animation: add more frames (`layer.frames.new(frame_number)`), each with its own
+  drawing.
+- For plain flat vector graphics (logos, icons) filled 2D curves (§2) are simpler
+  and render identically in every engine.
 
 ---
 
@@ -108,15 +144,15 @@ me = bpy.data.meshes.new("Plane"); bm = bmesh.new()
 bmesh.ops.create_grid(bm, x_segments=1, y_segments=1, size=1.0)
 bm.to_mesh(me); bm.free()
 plane = bpy.data.objects.new("Sprite", me)
-bpy.context.collection.objects.link(plane)
+bpy.context.scene.collection.objects.link(plane)
 
-mat = bpy.data.materials.new("Sprite"); mat.use_nodes = True
+mat = bpy.data.materials.new("Sprite")
 nt = mat.node_tree; bsdf = nt.nodes["Principled BSDF"]
 tex = nt.nodes.new("ShaderNodeTexImage")
 tex.image = bpy.data.images.load("/path/sprite.png")
 nt.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
 nt.links.new(tex.outputs["Alpha"], bsdf.inputs["Alpha"])
-mat.blend_method = "BLEND"          # respect alpha (name may vary by version)
+mat.surface_render_method = "BLENDED"   # EEVEE: smooth alpha ("DITHERED" = default)
 plane.data.materials.append(mat)
 ```
 For a flat, unshaded look (stickers/UI), drive Emission Color from the texture and

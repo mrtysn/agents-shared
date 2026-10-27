@@ -16,24 +16,34 @@
   refraction/glass, soft shadows, caustics, accurate GI. Slower. Set
   `scene.render.engine = "CYCLES"`. Use GPU if available:
   ```python
-  scene.cycles.device = "GPU"
   prefs = bpy.context.preferences.addons["cycles"].preferences
-  prefs.compute_device_type = "OPTIX"   # or "CUDA", "HIP", "METAL", "ONEAPI"
-  prefs.get_devices()
-  for d in prefs.devices: d.use = True
+  for backend in ("OPTIX", "CUDA", "HIP", "METAL", "ONEAPI"):
+      try:
+          prefs.compute_device_type = backend
+      except TypeError:
+          continue                      # backend not compiled into this build
+      prefs.get_devices()
+      if any(d.type != "CPU" for d in prefs.devices):
+          for d in prefs.devices:
+              d.use = d.type != "CPU"
+          scene.cycles.device = "GPU"
+          break
   ```
-- **Eevee** — real-time rasteriser. Fast, great for stylised looks, previews, and
-  animation on a budget. The engine id changed: **4.2+ is `BLENDER_EEVEE_NEXT`**;
-  older is `BLENDER_EEVEE`. Set with a fallback:
+  (`boilerplate.enable_gpu()` does exactly this and returns the backend.)
+- **EEVEE** — real-time rasteriser. Fast, great for stylised looks, previews, and
+  animation on a budget. In Blender 5.x the engine id is **`BLENDER_EEVEE`**
+  (`BLENDER_EEVEE_NEXT` existed only in 4.2–4.5 and raises `TypeError` now):
   ```python
-  for eng in ("BLENDER_EEVEE_NEXT", "BLENDER_EEVEE"):
-      try: scene.render.engine = eng; break
-      except TypeError: continue
+  scene.render.engine = "BLENDER_EEVEE"
+  scene.eevee.use_raytracing = True     # proper reflections / GI
   ```
-  Eevee approximates glass/GI; for hero glass/caustics use Cycles.
+  EEVEE needs a GPU. Headless without one it renders in software and can be
+  slower than Cycles on CPU. It approximates glass/GI; for hero glass/caustics
+  use Cycles.
 
-Rule of thumb: **Cycles** when the user says photoreal/product/realistic;
-**Eevee** for speed, previews, motion graphics, toon/flat styles.
+Rule of thumb: **Cycles** when the user says photoreal/product/realistic, and on
+machines without a GPU; **EEVEE** for speed on a GPU, previews, motion graphics,
+toon/flat styles.
 
 ---
 
@@ -45,7 +55,7 @@ scene.cycles.samples = 128          # 32-64 preview, 128-512 final
 scene.cycles.use_denoising = True   # OptiX/OpenImageDenoise cleans low samples
 scene.cycles.use_adaptive_sampling = True
 
-# Eevee-Next
+# EEVEE
 scene.eevee.taa_render_samples = 64
 
 # Resolution (both)
@@ -64,12 +74,17 @@ results.
 cam_data = bpy.data.cameras.new("Camera")
 cam_data.lens = 50               # mm; 35 wide, 50 natural, 85 portrait/compressed
 cam = bpy.data.objects.new("Camera", cam_data)
-bpy.context.collection.objects.link(cam)
+bpy.context.scene.collection.objects.link(cam)
 cam.location = (7, -7, 5)
 scene.camera = cam               # MUST set the active camera or render is empty
 ```
-Aim it reliably with a `TRACK_TO` constraint at an empty (see boilerplate). Depth
-of field: `cam_data.dof.use_dof = True`, set `focus_object` and `aperture_fstop`
+For framing, prefer `boilerplate.add_framing_camera()`: it computes the distance
+from the subject's bounding sphere and the narrower field of view, so the subject
+is never cropped at any aspect ratio (`place_camera(cam, azimuth, elevation)`
+re-frames an existing camera). To aim manually, use `TRACK_TO` at an empty or
+`cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()`.
+
+Depth of field: `cam_data.dof.use_dof = True`, set `focus_object` and `aperture_fstop`
 (lower = shallower). Orthographic: `cam_data.type = "ORTHO"`,
 `cam_data.ortho_scale`.
 
@@ -95,9 +110,30 @@ animation.md §8.
 scene.render.film_transparent = True        # alpha where no object
 scene.render.image_settings.color_mode = "RGBA"
 ```
-For post effects (glow, color grade) enable the compositor:
-`scene.use_nodes = True` and build in `scene.node_tree` (Render Layers → effects →
-Composite). A Bloom/Glare node adds glow to bright emissive areas.
+For post effects (glow, colour grade, vignette) use the compositor. In 5.x the
+compositor is a **node group** assigned to the scene (`scene.node_tree` and the
+Composite node are gone; `scene.use_nodes` is deprecated). The result goes to a Group
+Output with an `"Image"` socket, and most node settings are **input sockets**:
+
+```python
+scene = bpy.context.scene
+tree = bpy.data.node_groups.new("Compositor", "CompositorNodeTree")
+tree.interface.new_socket("Image", in_out="OUTPUT", socket_type="NodeSocketColor")
+scene.compositing_node_group = tree
+
+rl = tree.nodes.new("CompositorNodeRLayers")
+glare = tree.nodes.new("CompositorNodeGlare")
+glare.inputs["Type"].default_value = "Bloom"      # menu socket, not a property
+glare.inputs["Threshold"].default_value = 1.0      # only pixels brighter than this glow
+glare.inputs["Strength"].default_value = 0.8
+glare.inputs["Size"].default_value = 0.6
+out = tree.nodes.new("NodeGroupOutput")
+tree.links.new(rl.outputs["Image"], glare.inputs["Image"])
+tree.links.new(glare.outputs["Image"], out.inputs["Image"])
+```
+Bloom only affects pixels above `Threshold`, so it needs emissive surfaces or
+bright highlights (emission strength well above 1). Print `node.inputs.keys()`
+to discover a node's settings.
 
 ---
 
@@ -112,15 +148,14 @@ for game engines, **OBJ** for simple static geometry, **USD** for pipelines.
 # glTF (recommended default for a 3D asset):
 bpy.ops.export_scene.gltf(filepath="/tmp/asset.glb", export_format="GLB")
 
-# STL for printing (4.x may use the newer io_scene name; try both):
-try:
-    bpy.ops.wm.stl_export(filepath="/tmp/asset.stl")      # 4.x+ core exporter
-except AttributeError:
-    bpy.ops.export_mesh.stl(filepath="/tmp/asset.stl")    # legacy add-on op
+# STL for 3D printing (core exporter; export_mesh.stl no longer exists):
+bpy.ops.wm.stl_export(filepath="/tmp/asset.stl")
 
-# FBX / OBJ:
+# FBX / OBJ / USD / PLY:
 bpy.ops.export_scene.fbx(filepath="/tmp/asset.fbx")
-bpy.ops.wm.obj_export(filepath="/tmp/asset.obj")          # 4.x core; legacy: export_scene.obj
+bpy.ops.wm.obj_export(filepath="/tmp/asset.obj")          # export_scene.obj was removed
+bpy.ops.wm.usd_export(filepath="/tmp/asset.usdc")
+bpy.ops.wm.ply_export(filepath="/tmp/asset.ply")
 ```
 Before export: apply transforms (`object.transform_apply`) so scale/rotation bake
 in, apply modifiers if the target format won't carry them, and pack or copy
