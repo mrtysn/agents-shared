@@ -1,0 +1,9 @@
+# session id	last raw line of the turn	want	name
+3f1bbd64-0149-4f21-acd9-c2dd148d3cb1	8987	block	feature report whose open items were the user's steps
+3f1bbd64-0149-4f21-acd9-c2dd148d3cb1	9037	block	research answer that pointed at the next work
+3f1bbd64-0149-4f21-acd9-c2dd148d3cb1	9050	block	offer in prose after "okay"
+3f1bbd64-0149-4f21-acd9-c2dd148d3cb1	9058	block	plain restatement of the offer
+3f1bbd64-0149-4f21-acd9-c2dd148d3cb1	9074	block	"the choice that shapes it" left in prose
+3f1bbd64-0149-4f21-acd9-c2dd148d3cb1	9082	block	why-did-you-stop answer, nothing asked
+3f1bbd64-0149-4f21-acd9-c2dd148d3cb1	9097	block	admitted the decision was left in prose, still nothing asked
+3f1bbd64-0149-4f21-acd9-c2dd148d3cb1	5983	pass	research sub-agent running in the background
