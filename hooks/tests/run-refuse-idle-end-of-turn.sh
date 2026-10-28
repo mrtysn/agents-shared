@@ -89,6 +89,11 @@ check "worked after the answer, then reported"       block false "$(prompt 'what
 check "answered, then a prose offer"                 block false "$(prompt 'what next?')" "$(ask)" "$(answered 'Stop here')" "$(say 'Stopping. Want me to clean up the branch?')"
 check "background agent still running"               pass  false "$(prompt 'fix the setup')" "$(spawn 1)" "$(say 'Findings come when it reports.')"
 check "background agent reported, nothing asked"     block false "$(prompt 'fix the setup')" "$(spawn 1)" "$(handback 1)" "$(say 'It fixed the setup in three commits.')"
+# A watcher launched in an earlier turn is invisible in this turn's rows; the process table decides.
+print -r -- $'#!/bin/zsh\nprint "4242  10:00  until grep -q done log; do sleep 60; done"' > $work/live-shell && chmod +x $work/live-shell
+print -r -- $'#!/bin/zsh\nexit 0' > $work/no-shell && chmod +x $work/no-shell
+SESSION_SHELLS_LISTER=$work/live-shell check "earlier-turn shell still running"  pass  false "$(prompt 'how is it going?')" "$(say 'The rebuild is at 2 of 20; its watcher reports when done.')"
+SESSION_SHELLS_LISTER=$work/no-shell   check "no shell running, nothing asked"   block false "$(prompt 'how is it going?')" "$(say 'The rebuild is at 2 of 20.')"
 check "one of two agents reported"                   pass  false "$(prompt 'fix both')" "$(spawn 1)" "$(spawn 2)" "$(handback 1)" "$(say 'One is back; waiting on the other.')"
 check "4 agents, 3 reported twice, 1 still running" pass  false "$(prompt 'classify and score')" "$(spawn 1)" "$(spawn 2)" "$(spawn 3)" "$(spawn 4)" "$(handback 1)" "$(agent_notify 1)" "$(handback 2)" "$(agent_notify 2)" "$(handback 3)" "$(agent_notify 3)" "$(say 'The scorer is still running.')"
 check "2 agents, both reported twice, nothing asked" block false "$(prompt 'classify')" "$(spawn 1)" "$(spawn 2)" "$(handback 1)" "$(agent_notify 1)" "$(handback 2)" "$(agent_notify 2)" "$(say 'Both batches are classified.')"

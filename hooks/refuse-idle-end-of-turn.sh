@@ -13,7 +13,10 @@
 #     whatever else holds (text inside quotation marks or backticks is not read: a reply that quotes a phrase to
 #     explain it is not making the offer); or
 #   - ends the turn idle: no AskUserQuestion answered since the user's last typed prompt with no work after it,
-#     no background work launched since that prompt still unreported, and no last line "Nothing left …".
+#     no background work launched since that prompt still unreported, no background shell of this session still
+#     running (scripts/list-session-background-shells.sh: a watcher launched turns ago is pending work too; the
+#     transcript alone cannot tell a live old shell from one that never reported, 2026-10-28), and no last line
+#     "Nothing left …".
 # It lets the stop through when
 #   - stop_hook_active is true (the session already continued once because of a Stop hook),
 #   - an away stretch is open (hooks/refuse-stop-while-away.sh owns those turns, and they ask nothing),
@@ -88,6 +91,11 @@ VERDICT=$(print -r -- "$ROWS" | jq -rs '
       else "idle" end
     end' 2>/dev/null) || exit 0
 [[ -n $VERDICT && $VERDICT != pass ]] || exit 0
+# A background shell launched in an earlier turn and still alive is pending work; only the process table knows.
+SHELLS=${SESSION_SHELLS_LISTER:-$HERE/../scripts/list-session-background-shells.sh}
+if [[ $VERDICT == idle && -n $SESSION && -x $SHELLS ]]; then
+  [[ -n $("$SHELLS" --session "$SESSION" 2>/dev/null) ]] && exit 0
+fi
 
 ASK="Call AskUserQuestion now: first any open decision, then the proceed question (multiSelect): one option per unfinished part of what the user asked for that you could do next, recommended first and marked (Recommended), and last \"Stop here\". A step only the user can take is an option only when your own remaining work waits on it (a login, a reboot before a test). What the user does with a finished deliverable (upload, paste, send, deploy) is never an option, and neither is work nobody asked for. The ask-open-decisions skill, step 5, has the format. Answering a question still authorizes no edits: offering the follow-up in the question is what replaces stopping."
 if [[ $VERDICT == offer* ]]; then
