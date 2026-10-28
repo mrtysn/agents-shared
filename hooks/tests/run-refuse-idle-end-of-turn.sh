@@ -107,7 +107,12 @@ check "finished asset, steps plus unasked offer"     block false "$(prompt 'make
 check "finished asset, nothing left"                 pass  false "$(prompt 'make the banner black')" "$(bash_call 1)" "$(say $ASSET_DONE)"
 check "background shell still running"              pass  false "$(prompt 'run the suites')" "$(bash_call 1 bg)" "$(say 'The suites run for about 10 minutes; I will read them when they finish.')"
 check "background shell finished, nothing asked"     block false "$(prompt 'run the suites')" "$(bash_call 1 bg)" "$(notify 1)" "$(say 'All suites pass.')"
-check "wakeup armed"                                 pass  false "$(prompt 'check at 9')" "$(call toolu_w ScheduleWakeup '{"delaySeconds":600,"prompt":"check the job"}')" "$(say 'I will check at 09:00.')"
+wf_launch() { print -r -- "$(call toolu_f$1 Workflow '{"script":"export const meta = {name: \"x\", description: \"x\"}"}')"$'\n'"$(result toolu_f$1 "Workflow launched in background. Task ID: wf$1
+Summary: x")"; }
+wf_notify() { row user "$(jq -cn --arg x "<task-notification>\n<task-id>wf$1</task-id>\n<tool-use-id>toolu_f$1</tool-use-id>\n<status>completed</status>\n</task-notification>" '$x')" task-notification; }
+check "earlier-turn workflow still running"          pass  false "$(prompt 'run the loop')" "$(wf_launch 1)" "$(say 'It runs.')" "$(prompt 'how is it going?')" "$(say 'Round 2 of the loop is building.')"
+check "earlier-turn workflow reported, nothing asked" block false "$(prompt 'run the loop')" "$(wf_launch 1)" "$(say 'It runs.')" "$(wf_notify 1)" "$(prompt 'how is it going?')" "$(say 'The loop finished.')"
+check "wakeup armed"                                pass  false "$(prompt 'check at 9')" "$(call toolu_w ScheduleWakeup '{"delaySeconds":600,"prompt":"check the job"}')" "$(say 'I will check at 09:00.')"
 check "nothing left line"                            pass  false "$(prompt 'commit it')" "$(bash_call 1)" "$(say $DONE)"
 check "nothing left line under a prose offer"        block false "$(prompt 'commit it')" "$(say $DONE_OFFER)"
 check "trigger phrase in double quotes"              pass  false "$(prompt 'why did the hook fire?')" "$(say $'It matched "tell me to" in my last answer.\n\nNothing left: that was all you asked.')"

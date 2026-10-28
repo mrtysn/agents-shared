@@ -24,7 +24,8 @@
 #   - the transcript or the reader cannot be read: it never blocks on a read it could not make.
 # Background work is an Agent spawn not set to run in the foreground, a SendMessage that resumed a sub-agent, a
 # Bash call with run_in_background or one whose timeout moved it to the background, a Monitor, ScheduleWakeup or
-# CronCreate. Each launch is matched to its own report by id, never counted: a later hand-back or task notification
+# CronCreate, and a Workflow launched in any turn whose task notification has not come (a workflow runs for many
+# turns, and its id is the "Task ID" of its launch result). Each launch is matched to its own report by id, never counted: a later hand-back or task notification
 # naming its tool_use_id, its agent id (from the launch receipt) or its background id. A finished agent reports twice
 # (hand-back and notification), so a count hides an unreported one; a resumed agent reports again under its old id,
 # so only reports after the launch count.
@@ -82,11 +83,18 @@ VERDICT=$(print -r -- "$ROWS" | jq -rs '
     | ([ $launches[] | . as $l
          | select([ $reports[] | select(.i > $l.i) | .ids[] | select(. as $x | any($l.keys[]; . == $x)) ] | length == 0) ]
        | length) as $pending
+    | ([ range(0; $rows | length) as $i | $rows[$i]
+         | select(.label == "TOOL-RESULT Workflow" and ((.text // "") | test("Task ID: ")))
+         | { i: $i, id: (.text | capture("Task ID: (?<id>[A-Za-z0-9_-]+)").id) } ]) as $workflows
+    | ([ $workflows[] | . as $w
+         | select([ $rows[$w.i + 1:][] | select(.group == "user") | .text // ""
+                    | select(contains("<task-id>" + $w.id + "</task-id>")) ] | length == 0) ]
+       | length) as $workflowsPending
     | ([ $text | split("\n")[] | select(test("\\S")) ] | last // "") as $lastLine
     | if $phrase != "" then "offer\t\($phrase)"
       elif ($prompt | length) < 60 and ($prompt | test("^\\s*(stop|stop here|that.?s (all|it)|enough|nothing else|pause|hold on|wait|no more|done for (now|today))\\b"; "i")) then "pass"
       elif $a >= 0 and $workAfterAsk == 0 then "pass"
-      elif $pending > 0 then "pass"
+      elif $pending > 0 or $workflowsPending > 0 then "pass"
       elif ($lastLine | test("^[\\s*_>#-]*nothing (else |more )?(is )?left\\b"; "i")) then "pass"
       else "idle" end
     end' 2>/dev/null) || exit 0
