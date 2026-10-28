@@ -20,8 +20,11 @@
 #   - the user's last prompt tells it to stop ("stop", "that's all", "pause"),
 #   - the transcript or the reader cannot be read: it never blocks on a read it could not make.
 # Background work is an Agent spawn not set to run in the foreground, a SendMessage that resumed a sub-agent, a
-# Bash call with run_in_background or one whose timeout moved it to the background, a Monitor, ScheduleWakeup or CronCreate; it is reported by a task notification
-# or a sub-agent hand-back (each hand-back counts, since a resumed agent hands back again under the same id).
+# Bash call with run_in_background or one whose timeout moved it to the background, a Monitor, ScheduleWakeup or
+# CronCreate. Each launch is matched to its own report by id, never counted: a later hand-back or task notification
+# naming its tool_use_id, its agent id (from the launch receipt) or its background id. A finished agent reports twice
+# (hand-back and notification), so a count hides an unreported one; a resumed agent reports again under its old id,
+# so only reports after the launch count.
 # No network, no model call.
 #
 # Covers claude/rules/end-every-turn-with-a-next-step.md. Cases: hooks/tests/run-refuse-idle-end-of-turn.sh.
@@ -42,7 +45,7 @@ if [[ -n $SESSION && -x $OBLIGATION ]]; then
   [[ $(print -rn -- "$STATE" | jq -r '.open // false' 2>/dev/null) == true ]] && exit 0
 fi
 
-ROWS=$(python3 "$READER" "$TRANSCRIPT" --kinds user,assistant,agents,calls,tools --json --max-chars 400 2>/dev/null) || exit 0
+ROWS=$(python3 "$READER" "$TRANSCRIPT" --kinds user,assistant,agents,calls,tools --launch-receipts --json --max-chars 400 2>/dev/null) || exit 0
 
 VERDICT=$(print -r -- "$ROWS" | jq -rs '
   def offer: "say the word|(do you |would you )?want me to|would you like me to|shall i |should i (go|proceed|build|run|start|do|edit|add|make|commit|fix|wire|set)|let me know (if|when|whether|which)|tell me (to|if|when|which)|if you.?d like|if you want|if you prefer|ready (to (go|proceed) )?when you are|your call|up to you|(waits?|waiting) (for|on) your (word|go|call|ok)|on your (word|go-ahead|say-so)|the (choice|decision|question)( that [a-z ]+)? (is|here is)|which (one|would you|do you)";
@@ -58,22 +61,29 @@ VERDICT=$(print -r -- "$ROWS" | jq -rs '
     | ([ $tail | match(offer; "gi") | .string ] | last // "") as $phrase
     | ([ range(0; $turn | length) as $i | select($turn[$i].label == "RESULT AskUserQuestion") | $i ] | max // -1) as $a
     | ([ $turn[$a + 1:][] | select(.group == "calls" or .label == "AGENT-SPAWN" or .label == "SENDMSG") ] | length) as $workAfterAsk
-    | ([ $turn[] | select(
-           (.label == "AGENT-SPAWN" and ((.input.run_in_background // true) != false))
-           or (.group == "calls" and .tool == "Bash" and (.input.run_in_background // false) == true)
-           or (.group == "calls" and (.tool == "Monitor" or .tool == "CronCreate"))
-           or (.group == "calls" and .tool == "ScheduleWakeup" and ((.input.stop // false) | not))
-           or (.label == "RESULT SendMessage" and ((.text // "") | test("resumedAgentId")))
-           or (.label == "TOOL-RESULT Bash" and ((.text // "") | test("moved to the background \\(ID:")))) ] | length) as $launched
-    | ([ $turn[] | select(.group == "user") | .text // "" | capture("<agent-message from=\"(?<id>[^\"]+)\"").id ] | length) as $handbacks
-    | ([ $turn[] | select(.group == "user") | .text // "" | capture("<tool-use-id>(?<id>[^<]+)</tool-use-id>").id ]
-       | unique | length + $handbacks) as $reported
-    | ([ $turn[] | select(.label == "RESULT Agent") ] | length) as $syncDone
+    | ([ range(0; $turn | length) as $i | $turn[$i] | select(.group == "user") | .text // ""
+         | { i: $i, ids: [ capture("<agent-message from=\"(?<id>[^\"]+)\"").id, capture("<task-id>(?<id>[^<]+)</task-id>").id,
+                           capture("<tool-use-id>(?<id>[^<]+)</tool-use-id>").id ] } ]) as $reports
+    | ([ range(0; $turn | length) as $i | $turn[$i] as $r
+         | if $r.label == "AGENT-SPAWN" and (($r.input.run_in_background // true) != false) then
+             { i: $i, keys: ([ $r.tool_use_id ] + [ $turn[] | select(.label == "RESULT Agent" and .tool_use_id == $r.tool_use_id)
+                                                    | .text // "" | capture("agentId: (?<id>[A-Za-z0-9]+)").id ]) }
+           elif $r.group == "calls" and $r.tool == "Bash" and ($r.input.run_in_background // false) == true then { i: $i, keys: [ $r.tool_use_id ] }
+           elif $r.group == "calls" and ($r.tool == "Monitor" or $r.tool == "CronCreate") then { i: $i, keys: [ $r.tool_use_id ] }
+           elif $r.group == "calls" and $r.tool == "ScheduleWakeup" and (($r.input.stop // false) | not) then { i: $i, keys: [] }
+           elif $r.label == "RESULT SendMessage" and (($r.text // "") | test("resumedAgentId")) then
+             { i: $i, keys: ([ $r.tool_use_id ] + [ $r.text | capture("\"resumedAgentId\":\\s*\"(?<id>[^\"]+)\"").id ]) }
+           elif $r.label == "TOOL-RESULT Bash" and (($r.text // "") | test("moved to the background \\(ID:")) then
+             { i: $i, keys: ([ $r.tool_use_id ] + [ $r.text | capture("background \\(ID: (?<id>[^)]+)\\)").id ]) }
+           else empty end ]) as $launches
+    | ([ $launches[] | . as $l
+         | select([ $reports[] | select(.i > $l.i) | .ids[] | select(. as $x | any($l.keys[]; . == $x)) ] | length == 0) ]
+       | length) as $pending
     | ([ $text | split("\n")[] | select(test("\\S")) ] | last // "") as $lastLine
     | if $phrase != "" then "offer\t\($phrase)"
       elif ($prompt | length) < 60 and ($prompt | test("^\\s*(stop|stop here|that.?s (all|it)|enough|nothing else|pause|hold on|wait|no more|done for (now|today))\\b"; "i")) then "pass"
       elif $a >= 0 and $workAfterAsk == 0 then "pass"
-      elif $launched > ($reported + $syncDone) then "pass"
+      elif $pending > 0 then "pass"
       elif ($lastLine | test("^[\\s*_>#-]*nothing (else |more )?(is )?left\\b"; "i")) then "pass"
       else "idle" end
     end' 2>/dev/null) || exit 0

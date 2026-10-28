@@ -41,7 +41,9 @@ result() {  # id text
 ask() { call toolu_q AskUserQuestion '{"questions":[{"question":"Next?","header":"Next","options":[{"label":"Build it"},{"label":"Stop here"}],"multiSelect":true}]}'; }
 answered() { result toolu_q "Your questions have been answered: \"Next?\"=\"${1:-Build it}\""; }
 bash_call() { call toolu_b$1 Bash "{\"command\":\"echo $1\"${2:+,\"run_in_background\":true}}"; }
-spawn() { call toolu_a$1 Agent '{"description":"do a thing","prompt":"do it","model":"sonnet"}'; }
+spawn() { print -r -- "$(call toolu_a$1 Agent '{"description":"do a thing","prompt":"do it","model":"sonnet"}')"$'\n'"$(result toolu_a$1 "Async agent launched successfully. (internal metadata)
+agentId: a$1 (internal ID)")"; }
+agent_notify() { row user "$(jq -cn --arg x "<task-notification>\n<task-id>a$1</task-id>\n<tool-use-id>toolu_a$1</tool-use-id>\n<status>completed</status>\n<result>This agent's report was delivered to you as a message</result>\n</task-notification>" '$x')" task-notification; }
 handback() { jq -cn --arg x "<agent-message from=\"a$1\">\n[Subagent hand-back] done" '{type: "queue-operation", operation: "enqueue",
     timestamp: "2026-10-28T05:01:00.000Z", sessionId: "00000000-0000-4000-8000-000000000003", content: $x}'; }
 resume() { print -r -- "$(call toolu_s$1 SendMessage "{\"to\":\"a$1\",\"message\":\"critique this\"}")"$'\n'"$(result toolu_s$1 "{\"success\":true,\"message\":\"Resuming agent a$1\",\"resumedAgentId\":\"a$1\"}")"; }
@@ -88,7 +90,10 @@ check "answered, then a prose offer"                 block false "$(prompt 'what
 check "background agent still running"               pass  false "$(prompt 'fix the setup')" "$(spawn 1)" "$(say 'Findings come when it reports.')"
 check "background agent reported, nothing asked"     block false "$(prompt 'fix the setup')" "$(spawn 1)" "$(handback 1)" "$(say 'It fixed the setup in three commits.')"
 check "one of two agents reported"                   pass  false "$(prompt 'fix both')" "$(spawn 1)" "$(spawn 2)" "$(handback 1)" "$(say 'One is back; waiting on the other.')"
-check "resumed agent still running"                  pass  false "$(prompt 'vet it')" "$(spawn 1)" "$(handback 1)" "$(resume 1)" "$(say 'Waiting on its critique.')"
+check "4 agents, 3 reported twice, 1 still running" pass  false "$(prompt 'classify and score')" "$(spawn 1)" "$(spawn 2)" "$(spawn 3)" "$(spawn 4)" "$(handback 1)" "$(agent_notify 1)" "$(handback 2)" "$(agent_notify 2)" "$(handback 3)" "$(agent_notify 3)" "$(say 'The scorer is still running.')"
+check "2 agents, both reported twice, nothing asked" block false "$(prompt 'classify')" "$(spawn 1)" "$(spawn 2)" "$(handback 1)" "$(agent_notify 1)" "$(handback 2)" "$(agent_notify 2)" "$(say 'Both batches are classified.')"
+check "agent reported by notification only"          block false "$(prompt 'classify')" "$(spawn 1)" "$(agent_notify 1)" "$(say 'Classified.')"
+check "resumed agent still running"                 pass  false "$(prompt 'vet it')" "$(spawn 1)" "$(handback 1)" "$(resume 1)" "$(say 'Waiting on its critique.')"
 check "resumed agent reported, nothing asked"        block false "$(prompt 'vet it')" "$(spawn 1)" "$(handback 1)" "$(resume 1)" "$(handback 1)" "$(say 'Both rounds are in.')"
 check "foreground shell moved to the background"     pass  false "$(prompt 'run the tests')" "$(bash_call 1)" "$(result toolu_b1 'Command did not complete within its 120s timeout and was moved to the background (ID: bx1). You will be notified when it completes.')" "$(say 'The suite still runs.')"
 check "moved shell finished, nothing asked"          block false "$(prompt 'run the tests')" "$(bash_call 1)" "$(result toolu_b1 'Command did not complete within its 120s timeout and was moved to the background (ID: bx1).')" "$(notify 1)" "$(say 'All pass.')"

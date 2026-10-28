@@ -97,7 +97,7 @@ def session_rows(path, project, session, want, a):
     if a.since_last_user:
         rows = since_last_user(rows)
     return [r for r in rows if r["group"] in want and (a.subagents or not r["sidechain"])
-            and not is_noise(r["label"], r["text"])]
+            and (a.launch_receipts or not is_noise(r["label"], r["text"]))]
 
 
 FIRST_TIME = re.compile(r'"timestamp":\s*"([^"]+)"')
@@ -135,6 +135,9 @@ def main():
                     help="with --all: print how many sessions match and the earliest and latest time they cover, then stop "
                          "(the edge to state in any report: nothing earlier is visible)")
     ap.add_argument("--subagents", action="store_true", help="include sub-agent transcripts (their rows have sidechain true)")
+    ap.add_argument("--launch-receipts", action="store_true",
+                    help="keep a background agent's launch result (its agentId) and the task notification that "
+                         "duplicates its hand-back, which are dropped as noise otherwise")
     ap.add_argument("--kinds", default="user,assistant,agents",
                     help=f"comma list of {','.join(KINDS)} (default: user,assistant,agents)")
     ap.add_argument("--json", action="store_true", help="print JSON rows, one per line, instead of text")
