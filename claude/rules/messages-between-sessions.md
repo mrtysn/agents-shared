@@ -12,7 +12,7 @@ Send only when the user told you to, or your own work is stuck until that sessio
 acts; a user's question or remark about a session is not an instruction to message
 it. A hook refuses a send to a peer whose `summary` does not quote words the user
 typed, or answered in a question, after your previous send. A standing grant ("collaborate
-among each other") is reused for the peer it was first sent to as `User said (standing) "…"`.
+among each other") covers any peer already messaged, as `User said (standing) "…"`.
 Send only to a session confirmed by evidence (its cwd, or its transcript holding
 the commit or file at issue), never by a name; unconfirmed, ask the user which.
 

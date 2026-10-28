@@ -17,10 +17,12 @@ It checks provenance, not intent: any quoted user words pass. What it removes is
 with no user words behind it, and it leaves a grep-able claim on every send.
 
 A standing grant ("you two collaborate among each other", "no need to ask me") covers more
-than one message, to one session. A summary marked `(standing)` may quote user words from
-earlier in the session if three things hold: the user typed them, they contain one of
-STANDING_STEMS, and an earlier send to the same recipient went out quoting them fresh. So the
-grant is first used as an ordinary quote, and only that peer inherits it.
+than one message, to the peers already in the conversation. A summary marked `(standing)` may
+quote user words from anywhere in the session if three things hold: the user typed them, they
+contain one of STANDING_STEMS, and an earlier send to the same recipient went out. The grant need
+not have been quoted in that earlier send: requiring it once left a grant given between two sends
+unusable, and the user was asked for words again after saying "please collaborate fully"
+(2026-10-28). A peer never messaged before still needs a fresh quote.
 
   summary: User said (standing) "you guys collaborate among each other"
 
@@ -43,7 +45,7 @@ from transcript_items import is_reply_boundary, is_typed_prompt, items  # noqa: 
 
 MIN_QUOTE = 8
 # Wordings that hand coordination to the agents for good, not for one message.
-STANDING_STEMS = ("collaborat", "coordinat", "among each other", "between each other",
+STANDING_STEMS = ("collab", "coordinat", "work together", "among each other", "between each other",
                   "among yourselves", "between yourselves", "work it out", "sort it out",
                   "no need to ask", "without asking", "don't ask me", "dont ask me",
                   "no need to continously prompt", "no need to continuously prompt")
@@ -64,7 +66,7 @@ def refuse(reason):
         "told you to send this, do not send it; tell the user what you found, in your reply. A send\n"
         "your own work is stuck on, with no instruction, is asked of the user with AskUserQuestion.\n"
         "A standing grant the user gave (\"collaborate among each other\") is reused by marking the\n"
-        "summary `User said (standing) \"<their words>\"`, for a peer an earlier send already quoted it to.\n"
+        "summary `User said (standing) \"<their words>\"`, for a peer this session has already messaged.\n"
         "Docs: docs/on-demand/messages-between-sessions.md and send-message-gate.md.",
         file=sys.stderr,
     )
@@ -147,11 +149,11 @@ def main():
     if "(standing)" in summary.lower():
         for q in quotes:
             if (any(stem in q for stem in STANDING_STEMS) and any(q in s for s in said_ever)
-                    and any(t == to and q in sm for t, sm in sent)):
+                    and any(t == to for t, _ in sent)):
                 return
         refuse("a `(standing)` quote must be the user's words, grant coordination in its wording "
-               "(e.g. \"collaborate among each other\"), and have been quoted in an earlier send to "
-               "this same recipient.")
+               "(e.g. \"collaborate among each other\"), and go to a peer this session has already "
+               "messaged; a first message to a peer needs a fresh quote.")
     refuse("no quotation in `summary` appears in anything the user typed or answered since your "
            "previous message to a peer (or since the session began).")
 

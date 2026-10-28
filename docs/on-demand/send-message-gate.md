@@ -19,7 +19,8 @@ recipient by evidence (not by its name), and send. If only your own work is stuc
 user with AskUserQuestion; their answer is then the quotation.
 
 A standing grant covers more than one message. When the user hands coordination to the
-sessions for good ("you guys collaborate among each other", "no need to ask me"), quote it
-fresh once to the peer you are working with; after that, each further send to that same peer
-may quote it as `User said (standing) "…"`. It reaches no other peer, and an ordinary
-instruction cannot be marked standing: the quote has to say so in its own words.
+sessions for good ("you guys collaborate among each other", "no need to ask me"), every
+further send to a peer this session has already messaged may quote it as
+`User said (standing) "…"`, whenever in the session the user typed it. A peer never messaged
+before needs a fresh quote first, and an ordinary instruction cannot be marked standing: the
+quote has to say so in its own words.
