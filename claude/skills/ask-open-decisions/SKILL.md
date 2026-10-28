@@ -1,5 +1,5 @@
 ---
-description: Ask the user every decision still open in this session with the AskUserQuestion tool — one self-contained question per decision, your recommendation first — instead of leaving them listed in prose or a table, then ask which outstanding items to proceed with and start on them. Use when the user invokes /ask-open-decisions, says "ask me the questions", "ask me the open questions", "ask them via the ask user question tool", or when a long reply listed decisions the user now has to answer by hand. /outstanding runs it as its last step.
+description: Ask the user every decision still open in this session with the AskUserQuestion tool — one self-contained question per decision, your recommendation first — instead of leaving them listed in prose or a table, then ask which outstanding items to proceed with and start on them. Its proceed question (step 5) is also how every turn with work or user steps left ends. Use when the user invokes /ask-open-decisions, says "ask me the questions", "ask me the open questions", "ask them via the ask user question tool", or when a long reply listed decisions the user now has to answer by hand. /outstanding runs it as its last step.
 argument-hint: [optional scope hint, e.g. "just the deploy ones"]
 user-invocable: true
 allowed-tools: AskUserQuestion, Bash, Read, Glob, Grep
@@ -64,7 +64,10 @@ accurate it is.
    moving forward, so the final question asks what to build next. It is asked every run,
    including when no decision is open.
    - **Items** are the outstanding work in this session: tasks listed as not started or
-     unfinished, and next steps already agreed, and Blocked or Yours items. A Yours item's option is "Walk me through it" (the steps written out) or, where an agent path exists, "Do it yourself". Take them in the order the session's own
+     unfinished, and next steps already agreed, and Blocked or Yours items. A Yours item (a step only the user can take) is an item like any
+     other, never a reason to skip this question: its option is "I'll do it now, walk me through it"
+     (the steps written out), "Done, check the result" once the steps were given, or, where an agent
+     path exists, "Do it yourself". Take them in the order the session's own
      list shows; that order is the execution order, so there is no ranking question.
    - `multiSelect: true`. One option per item: the label names the item in full, the
      description says the concrete action that will be taken. Items you recommend doing
@@ -76,8 +79,8 @@ accurate it is.
      a decision's answer changes what the items are, or the slots are full, ask it as its
      own round straight after, with no prose in between.
    - Parked or deferred items the user already set aside are not offered again.
-   - A "Walk me through it" option the user has passed over once is not offered again in
-     the same session; the user knows how to do their own step and asks when they want it.
+   - A walk-through the user has passed over once is not offered again in the same session;
+     the Yours item stays in the question as "Done, check the result".
 
 6. **Close with a record** of what was decided: a short table, one row per decision,
    `Decision | Chosen | What happens next`, plus a row for the items picked to proceed.
@@ -89,7 +92,8 @@ accurate it is.
 ## When there is nothing to ask
 
 With no open decision and no outstanding item of any owner, say so in one line:
-`No open decisions in this session.` Do not invent questions to have something to ask.
+`Nothing left: no open decisions and no outstanding items.` Do not invent questions to have
+something to ask.
 
 With no open decision but outstanding items, there is still the proceed question. Do not
 stop at "no open decisions".
