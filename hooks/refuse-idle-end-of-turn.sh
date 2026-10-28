@@ -10,7 +10,8 @@
 #
 # It blocks ({"decision":"block"}) when the last assistant text
 #   - offers work or poses a choice in prose ("want me to", "say the word", "if you'd like", "the choice is"),
-#     whatever else holds; or
+#     whatever else holds (text inside quotation marks or backticks is not read: a reply that quotes a phrase to
+#     explain it is not making the offer); or
 #   - ends the turn idle: no AskUserQuestion answered since the user's last typed prompt with no work after it,
 #     no background work launched since that prompt still unreported, and no last line "Nothing left …".
 # It lets the stop through when
@@ -52,7 +53,7 @@ VERDICT=$(print -r -- "$ROWS" | jq -rs '
     ($rows[$p].text // "" | (capture("<command-args>(?<a>[\\s\\S]*)</command-args>").a // .)) as $prompt
     | $rows[$p + 1:] as $turn
     | ([ $turn[] | select(.group == "assistant") | .text ] | last // "") as $text
-    | ($text | .[(length - 600 | if . < 0 then 0 else . end):]) as $tail
+    | ($text | .[(length - 600 | if . < 0 then 0 else . end):] | gsub("\"[^\"]*\"|`[^`]*`|“[^”]*”"; " ")) as $tail
     | ([ $tail | match(offer; "gi") | .string ] | last // "") as $phrase
     | ([ range(0; $turn | length) as $i | select($turn[$i].label == "RESULT AskUserQuestion") | $i ] | max // -1) as $a
     | ([ $turn[$a + 1:][] | select(.group == "calls" or .label == "AGENT-SPAWN" or .label == "SENDMSG") ] | length) as $workAfterAsk
