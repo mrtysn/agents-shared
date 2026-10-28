@@ -18,7 +18,11 @@ If the user told you to: quote their words in `summary` as `User said "..."`, ch
 recipient by evidence (not by its name), and send. If only your own work is stuck, ask the
 user with AskUserQuestion; their answer is then the quotation.
 
-A standing grant covers more than one message. When the user hands coordination to the
+An instruction covers the conversation with its peer, not one message. Once a send to a
+peer went out quoting the user, every later send to that same peer may quote the same
+words again, however long the exchange runs. A different peer needs its own quote.
+
+A standing grant reaches further. When the user hands coordination to the
 sessions for good ("you guys collaborate among each other", "no need to ask me"), every
 further send to a peer this session has already messaged may quote it as
 `User said (standing) "…"`, whenever in the session the user typed it. A peer never messaged

@@ -7,9 +7,15 @@ taken back (docs/on-demand/messages-between-sessions.md). The rule is that the u
 words are the only authority for sending one. This hook makes the call prove it: the call's
 `summary` (the one field the recipient never sees) must contain a quotation, in double
 quotes, that appears in a prompt the user typed, or in an answer they gave to an
-AskUserQuestion, later than this session's previous message to a peer. So one instruction
-covers one message, and a question or remark about a session ("isn't X working on that?")
-authorises nothing unless it is quoted as the instruction it is not.
+AskUserQuestion, later than this session's previous message to a peer. A question or remark
+about a session ("isn't X working on that?") authorises nothing unless it is quoted as the
+instruction it is not.
+
+An instruction covers the conversation with the peer it was first quoted to, not one message:
+a later send to that same peer may quote the same words again, however many messages the
+exchange takes. Allowing one message per instruction made the user re-authorise every reply of
+a two-session exchange ("what if the convo needs to take 20 turns??", 2026-10-28). Another peer
+still needs a fresh quote.
 
   summary: User said "let that session know of what they are causing"
 
@@ -62,6 +68,8 @@ def refuse(reason):
         "`summary` (the recipient never sees it) as a quotation from something the user typed, or\n"
         "answered in an AskUserQuestion, after your previous message to a peer:\n\n"
         '    summary: User said "<their words>"\n\n'
+        "The quote that opened a conversation with a peer covers every later send to that same peer:\n"
+        "quote it again.\n"
         "A question or remark about a session is not an instruction to message it. If the user has not\n"
         "told you to send this, do not send it; tell the user what you found, in your reply. A send\n"
         "your own work is stuck on, with no instruction, is asked of the user with AskUserQuestion.\n"
@@ -146,6 +154,10 @@ def main():
         refuse("the call's `summary` has no quotation of the user (found %r)." % summary[:80])
     if any(q in s for q in quotes for s in said):
         return
+    # An instruction to message a peer covers the conversation with that peer, not one message.
+    for q in quotes:
+        if any(q in s for s in said_ever) and any(t == to and q in sm for t, sm in sent):
+            return
     if "(standing)" in summary.lower():
         for q in quotes:
             if (any(stem in q for stem in STANDING_STEMS) and any(q in s for s in said_ever)

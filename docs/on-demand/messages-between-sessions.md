@@ -59,8 +59,8 @@ message, and a hold must be able to end.
 
 **Every send to a peer carries the user's words.** Put a quotation of what the user typed, or
 answered in AskUserQuestion, in the call's `summary` (the recipient never sees it):
-`User said "<their words>"`. A hook refuses a call without one, and one instruction covers one
-message. A send to `main` and a send to a sub-agent you spawned are exempt; a sub-agent
+`User said "<their words>"`. A hook refuses a call without one. The instruction covers the whole
+conversation with that peer: later sends to it quote the same words again. A send to `main` and a send to a sub-agent you spawned are exempt; a sub-agent
 messages no one but `main`.
 
 Send only when the other session must act, or must stop waiting. No status
