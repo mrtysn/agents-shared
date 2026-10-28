@@ -44,6 +44,7 @@ bash_call() { call toolu_b$1 Bash "{\"command\":\"echo $1\"${2:+,\"run_in_backgr
 spawn() { call toolu_a$1 Agent '{"description":"do a thing","prompt":"do it","model":"sonnet"}'; }
 handback() { jq -cn --arg x "<agent-message from=\"a$1\">\n[Subagent hand-back] done" '{type: "queue-operation", operation: "enqueue",
     timestamp: "2026-10-28T05:01:00.000Z", sessionId: "00000000-0000-4000-8000-000000000003", content: $x}'; }
+resume() { print -r -- "$(call toolu_s$1 SendMessage "{\"to\":\"a$1\",\"message\":\"critique this\"}")"$'\n'"$(result toolu_s$1 "{\"success\":true,\"message\":\"Resuming agent a$1\",\"resumedAgentId\":\"a$1\"}")"; }
 notify() { row user "$(jq -cn --arg x "<task-notification>\n<task-id>t$1</task-id>\n<tool-use-id>toolu_b$1</tool-use-id>\n<status>completed</status>\n</task-notification>" '$x')" task-notification; }
 
 check() {  # name want active transcript-lines...
@@ -70,6 +71,9 @@ GOAHEAD=$'The skill is drafted. Say go ahead and I\'ll edit its SKILL.md.'
 STEPS=$'To do that I need from Ecem: her CV and the signed form.'
 DONE=$'Committed and pushed (ab12cd3).\n\nNothing left: the fix is in and the tests pass.'
 DONE_OFFER=$'Committed.\n\nWant me to also add a test?\nNothing left otherwise.'
+ASSET_STEPS=$'The banner is made: /Users/x/brand/x-banner-black.png.\n\nWhat\'s left is all yours:\n- **Upload the banner** to X.\n- **Bios:** paste the GitHub and YouTube text.\n- **hire@:** check in ImprovMX that it forwards to your inbox.'
+ASSET_STEPS_OFFER=$ASSET_STEPS$'\n\nIf you want the site to match the banner, I can change its dark background to pure black.'
+ASSET_DONE=$'The banner is made: /Users/x/brand/x-banner-black.png.\n\nNothing left: the black banner you asked for is made.'
 
 check "report of user steps, nothing asked"          block false "$(prompt 'build T14')" "$(bash_call 1)" "$(say $REPORT)"
 check "research answer, nothing asked"               block false "$(prompt 'find videos with guitars with known ground truths?')" "$(say $SOURCES)"
@@ -84,7 +88,14 @@ check "answered, then a prose offer"                 block false "$(prompt 'what
 check "background agent still running"               pass  false "$(prompt 'fix the setup')" "$(spawn 1)" "$(say 'Findings come when it reports.')"
 check "background agent reported, nothing asked"     block false "$(prompt 'fix the setup')" "$(spawn 1)" "$(handback 1)" "$(say 'It fixed the setup in three commits.')"
 check "one of two agents reported"                   pass  false "$(prompt 'fix both')" "$(spawn 1)" "$(spawn 2)" "$(handback 1)" "$(say 'One is back; waiting on the other.')"
-check "background shell still running"               pass  false "$(prompt 'run the suites')" "$(bash_call 1 bg)" "$(say 'The suites run for about 10 minutes; I will read them when they finish.')"
+check "resumed agent still running"                  pass  false "$(prompt 'vet it')" "$(spawn 1)" "$(handback 1)" "$(resume 1)" "$(say 'Waiting on its critique.')"
+check "resumed agent reported, nothing asked"        block false "$(prompt 'vet it')" "$(spawn 1)" "$(handback 1)" "$(resume 1)" "$(handback 1)" "$(say 'Both rounds are in.')"
+check "foreground shell moved to the background"     pass  false "$(prompt 'run the tests')" "$(bash_call 1)" "$(result toolu_b1 'Command did not complete within its 120s timeout and was moved to the background (ID: bx1). You will be notified when it completes.')" "$(say 'The suite still runs.')"
+check "moved shell finished, nothing asked"          block false "$(prompt 'run the tests')" "$(bash_call 1)" "$(result toolu_b1 'Command did not complete within its 120s timeout and was moved to the background (ID: bx1).')" "$(notify 1)" "$(say 'All pass.')"
+check "finished asset, user's own steps listed"     block false "$(prompt 'make the banner black')" "$(bash_call 1)" "$(say $ASSET_STEPS)"
+check "finished asset, steps plus unasked offer"     block false "$(prompt 'make the banner black')" "$(bash_call 1)" "$(say $ASSET_STEPS_OFFER)"
+check "finished asset, nothing left"                 pass  false "$(prompt 'make the banner black')" "$(bash_call 1)" "$(say $ASSET_DONE)"
+check "background shell still running"              pass  false "$(prompt 'run the suites')" "$(bash_call 1 bg)" "$(say 'The suites run for about 10 minutes; I will read them when they finish.')"
 check "background shell finished, nothing asked"     block false "$(prompt 'run the suites')" "$(bash_call 1 bg)" "$(notify 1)" "$(say 'All suites pass.')"
 check "wakeup armed"                                 pass  false "$(prompt 'check at 9')" "$(call toolu_w ScheduleWakeup '{"delaySeconds":600,"prompt":"check the job"}')" "$(say 'I will check at 09:00.')"
 check "nothing left line"                            pass  false "$(prompt 'commit it')" "$(bash_call 1)" "$(say $DONE)"

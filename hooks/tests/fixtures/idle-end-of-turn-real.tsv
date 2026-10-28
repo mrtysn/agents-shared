@@ -7,3 +7,5 @@
 3f1bbd64-0149-4f21-acd9-c2dd148d3cb1	9082	block	why-did-you-stop answer, nothing asked
 3f1bbd64-0149-4f21-acd9-c2dd148d3cb1	9097	block	admitted the decision was left in prose, still nothing asked
 3f1bbd64-0149-4f21-acd9-c2dd148d3cb1	5983	pass	research sub-agent running in the background
+c8255760-8f0d-4975-92f2-62fdfb93fecf	3391	block	finished banner, then the user's own upload and paste steps listed
+c8255760-8f0d-4975-92f2-62fdfb93fecf	3511	pass	sub-agent resumed with SendMessage, critique still due
