@@ -6,6 +6,9 @@ This does not override [question handling](question-handling.md) or
 [stated desires](stated-desires.md): decisiveness applies to *how* to carry out
 work already agreed, never to deciding that work should begin.
 
+Never end a turn idle: keep working on what is authorized, or ask the next step with
+AskUserQuestion ([end every turn with a next step](end-every-turn-with-a-next-step.md)).
+
 ## While the user is away
 
 "No questions, go" means do not block on questions. It does not mean stop

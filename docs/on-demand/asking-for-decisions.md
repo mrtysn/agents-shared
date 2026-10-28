@@ -3,7 +3,8 @@
 **When a decision is genuinely the user's, ask with the AskUserQuestion tool.**
 Never bury the ask in prose — no "say the word", "let me know if you'd like me to",
 "I can do X if you want". A decision buried in a paragraph is a decision the user
-has to re-type by hand.
+has to re-type by hand. `hooks/refuse-idle-end-of-turn.sh` refuses, once, a turn that
+ends on a prose offer or choice, or with nothing asked and nothing left running.
 
 ## Each question must stand alone
 

@@ -1,7 +1,11 @@
 # Asking for decisions
 
 **When a decision is genuinely the user's, ask with the AskUserQuestion tool.**
-Never bury the ask in prose ("say the word", "let me know if you'd like me to").
+Never bury the ask in prose ("say the word", "let me know if you'd like me to",
+"the choice is…"). Every turn that does not continue working ends with this tool,
+carrying the open decisions and the proceed question; steps only the user can take
+are options in it, not a reason to skip it
+([end every turn with a next step](end-every-turn-with-a-next-step.md)).
 
 Each question stands alone: it carries the facts the decision turns on, explains
 each option inside the option, puts the recommended option first marked

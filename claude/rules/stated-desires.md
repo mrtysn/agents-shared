@@ -27,7 +27,9 @@ An imperative aimed at implementation, given after the approach is settled:
 2. Recommend one, with the reason, per [chase the ideal](chase-the-ideal.md).
 3. Name what only the user can supply, and anything with a privacy or
    irreversibility consequence.
-4. Stop. Wait for the build order.
+4. Ask with AskUserQuestion: the forks, then whether to build it as recommended.
+   Wait for the pick; do not build before it, and do not end the turn on a prose proposal
+   ([end every turn with a next step](end-every-turn-with-a-next-step.md)).
 
 Read-only investigation to inform the proposal is welcome — say that is what it
 is. Groundwork that silently turns into edits is the failure this rule exists to
