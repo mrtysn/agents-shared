@@ -1,5 +1,5 @@
 ---
-description: Ask the user every decision still open in this session with the AskUserQuestion tool — one self-contained question per decision, your recommendation first — instead of leaving them listed in prose or a table, then ask which outstanding items to proceed with and start on them. Its proceed question (step 5) is also how every turn with work or user steps left ends. Use when the user invokes /ask-open-decisions, says "ask me the questions", "ask me the open questions", "ask them via the ask user question tool", or when a long reply listed decisions the user now has to answer by hand. /outstanding runs it as its last step.
+description: Ask the user every decision still open in this session with the AskUserQuestion tool — one self-contained question per decision, your recommendation first — instead of leaving them listed in prose or a table, then ask which outstanding items to proceed with and start on them. Its proceed question (step 5) is also how every turn with unfinished work left ends. Use when the user invokes /ask-open-decisions, says "ask me the questions", "ask me the open questions", "ask them via the ask user question tool", or when a long reply listed decisions the user now has to answer by hand. /outstanding runs it as its last step.
 argument-hint: [optional scope hint, e.g. "just the deploy ones"]
 user-invocable: true
 allowed-tools: AskUserQuestion, Bash, Read, Glob, Grep
@@ -63,12 +63,15 @@ accurate it is.
 5. **Finish with the proceed question.** Answering the decisions is the last step before
    moving forward, so the final question asks what to build next. It is asked every run,
    including when no decision is open.
-   - **Items** are the outstanding work in this session: tasks listed as not started or
-     unfinished, and next steps already agreed, and Blocked or Yours items. A Yours item (a step only the user can take) is an item like any
-     other, never a reason to skip this question: its option is "I'll do it now, walk me through it"
-     (the steps written out), "Done, check the result" once the steps were given, or, where an agent
-     path exists, "Do it yourself". Take them in the order the session's own
-     list shows; that order is the execution order, so there is no ranking question.
+   - **Items** are the unfinished parts of what the user asked for in this session: tasks
+     listed as not started or unfinished, next steps already agreed, and Blocked or Yours
+     items. A Yours item is a step only the user can take that your own remaining work
+     waits on (a login, a device in hand); its option is "I'll do it now, walk me through
+     it", "Done, check the result" once the steps were given, or, where an agent path
+     exists, "Do it yourself". What the user does with a finished deliverable (upload,
+     paste, send, deploy) is never an item, and neither is work nobody asked for. Take
+     them in the order the session's own list shows; that order is the execution order,
+     so there is no ranking question.
    - `multiSelect: true`. One option per item: the label names the item in full, the
      description says the concrete action that will be taken. Items you recommend doing
      carry `(Recommended)`, and in practice that is usually all of them. Last option:

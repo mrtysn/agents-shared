@@ -100,7 +100,7 @@ Layout, exactly:
 
 Rules for the items:
 - **Item** — name it as the user named it. No embellishment.
-- **State** — exactly one of: Blocked, Yours, Uncommitted, Partial, Running, Not started. `Yours` is a step only the user can perform (a physical button, a login, a click in an app). Never Deferred: deferred items belong to Set aside.
+- **State** — exactly one of: Blocked, Yours, Uncommitted, Partial, Running, Not started. `Yours` is a step only the user can perform (a physical button, a login, a click in an app) that the agent's own remaining work waits on. What the user does with a finished deliverable (upload it, paste it, send it, deploy it) is never a row in either list: it is the point of the task, not work left. Never Deferred: deferred items belong to Set aside.
 - **Next step** — one concrete, actionable move, anchored to where the work lives: a `file.cs:line`, a branch name, or the exact command. Not "finish it" — the actual edit or invocation. For a Blocked item, name the exact decision or answer you need. For a `Yours` item, the next step is the numbered steps the user performs: the app, the screen, the control, what they should see, and how to undo it. First check that an agent cannot do the step itself (a self-test, a CLI, ssh); if it can, the item is Not started, not Yours.
 - Order by what the user should see first: Blocked (needs them), then Yours, then Uncommitted (cheapest to close), Partial, Running, Not started.
 - **Self-contained** — no session-local shorthand: no "option B", "the fix", bare codes, or truncated links. Full repo-relative paths, full URLs, and enough words that each row reads cold, weeks later, without this conversation open.
@@ -142,4 +142,4 @@ every time the list has any row. It puts each decision to the user through AskUs
 self-contained, with your recommendation first, and ends with the proceed question, whose
 options include the Yours rows. A list of only Yours rows, or with nothing needing a
 decision, still gets the proceed question: never skip this step. Only an empty list ends
-with the one line `Nothing left: <why>.`
+with the one line `Nothing left: <what was delivered>.`
