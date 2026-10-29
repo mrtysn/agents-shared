@@ -117,7 +117,9 @@ When a decision turns on something seen, or on more context than a terminal prom
    scaffold refuses a question with options and no `multi`. `true` for options that can be
    combined (several features to keep, a "both" answer would make sense), `false` only when
    exactly one must win (a font, one layout). When unsure, ask whether the user could want two:
-   if yes, `true`. `allow_other` and `skippable` default to true. Full format: `project_lifecycle/decision.py`. Screenshots go
+   if yes, `true`. A long list the user prunes (items scored keep, to untick) gets `"checked": true`
+   on each option that starts ticked; a "Recommended" badge alone leaves the box empty.
+   `allow_other` and `skippable` default to true. Full format: `project_lifecycle/decision.py`. Screenshots go
    in the same folder.
 2. **Scaffold**:
 
