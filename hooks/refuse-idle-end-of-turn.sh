@@ -42,6 +42,10 @@ command -v jq >/dev/null 2>&1 || exit 0
 [[ $(print -rn -- "$INPUT" | jq -r '.stop_hook_active // false' 2>/dev/null) == true ]] && exit 0
 SESSION=$(print -rn -- "$INPUT" | jq -r '.session_id // empty' 2>/dev/null)
 TRANSCRIPT=$(print -rn -- "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
+# The transcript lags the conversation: when Stop fires, the turn's final reply is often not written yet, and the
+# reply before it would be judged instead (2026-10-30, notebook: three "Nothing left" replies refused). The payload
+# carries the final reply; the transcript's last reply is only the fallback for a payload without it.
+LAST=$(print -rn -- "$INPUT" | jq -r '.last_assistant_message // empty' 2>/dev/null)
 [[ -r $TRANSCRIPT && -r $READER ]] || exit 0
 
 if [[ -n $SESSION && -x $OBLIGATION ]]; then
@@ -51,7 +55,7 @@ fi
 
 ROWS=$(python3 "$READER" "$TRANSCRIPT" --kinds user,assistant,agents,calls,tools --launch-receipts --json --max-chars 400 2>/dev/null) || exit 0
 
-VERDICT=$(print -r -- "$ROWS" | jq -rs '
+VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" '
   def offer: "say the word|(do you |would you )?want me to|would you like me to|shall i |should i (go|proceed|build|run|start|do|edit|add|make|commit|fix|wire|set)|let me know (if|when|whether|which)|tell me (to|if|when|which)|if you.?d like|if you want|if you prefer|ready (to (go|proceed) )?when you are|your call|up to you|(waits?|waiting) (for|on) your (word|go|call|ok)|on your (word|go-ahead|say-so)|the (choice|decision|question)( that [a-z ]+)? (is|here is)|which (one|would you|do you)";
   [ .[] | select(type == "object" and (.sidechain | not)) ] as $rows
   | ([ range(0; $rows | length) as $i | $rows[$i]
@@ -60,7 +64,7 @@ VERDICT=$(print -r -- "$ROWS" | jq -rs '
   | if $p < 0 then "pass" else
     ($rows[$p].text // "" | (capture("<command-args>(?<a>[\\s\\S]*)</command-args>").a // .)) as $prompt
     | $rows[$p + 1:] as $turn
-    | ([ $turn[] | select(.group == "assistant") | .text ] | last // "") as $text
+    | (if $last != "" then $last else [ $turn[] | select(.group == "assistant") | .text ] | last // "" end) as $text
     | ($text | .[(length - 600 | if . < 0 then 0 else . end):] | gsub("\"[^\"]*\"|`[^`]*`|“[^”]*”"; " ")) as $tail
     | ([ $tail | match(offer; "gi") | .string ] | last // "") as $phrase
     | ([ range(0; $turn | length) as $i | select($turn[$i].label == "RESULT AskUserQuestion") | $i ] | max // -1) as $a

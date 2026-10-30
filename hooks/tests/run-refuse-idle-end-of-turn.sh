@@ -56,9 +56,17 @@ check() {  # name want active transcript-lines...
   run_case "$name" $want $active $t
 }
 
-run_case() {  # name want active transcript
-  local name=$1 want=$2 active=$3 t=$4 out got=pass
-  out=$(jq -cn --arg p $t --argjson a $active '{session_id: "s", transcript_path: $p, stop_hook_active: $a, hook_event_name: "Stop"}' | $HOOK)
+check_last() {  # name want last-assistant-message transcript-lines...: the transcript lags, the payload has the reply
+  local name=$1 want=$2 last=$3; shift 3
+  local t=$work/$total.jsonl
+  print -rl -- "$@" > $t
+  run_case "$name" $want false $t "$last"
+}
+
+run_case() {  # name want active transcript [last-assistant-message]
+  local name=$1 want=$2 active=$3 t=$4 last=${5:-} out got=pass
+  out=$(jq -cn --arg p $t --argjson a $active --arg l "$last" '{session_id: "s", transcript_path: $p, stop_hook_active: $a,
+    hook_event_name: "Stop"} + (if $l != "" then {last_assistant_message: $l} else {} end)' | $HOOK)
   [[ $(print -r -- "$out" | jq -r '.decision // empty' 2>/dev/null) == block ]] && got=block
   total=$(( total + 1 ))
   if [[ $got == $want ]]; then (( verbose )) && print "ok    $name"
@@ -118,7 +126,9 @@ check "nothing left line under a prose offer"        block false "$(prompt 'comm
 check "trigger phrase in double quotes"              pass  false "$(prompt 'why did the hook fire?')" "$(say $'It matched "tell me to" in my last answer.\n\nNothing left: that was all you asked.')"
 check "trigger phrase in backticks"                  pass  false "$(prompt 'why did the hook fire?')" "$(say $'It matched `want me to` in my last answer.\n\nNothing left: that was all you asked.')"
 check "offer beside a quoted phrase"                 block false "$(prompt 'why did the hook fire?')" "$(say $'It matched "tell me to". Want me to fix it?')"
-check "user said stop"                               pass  false "$(prompt 'stop')" "$(say 'Stopped. The branch is left as it was.')"
+check_last "nothing left in payload, transcript behind" pass "$DONE" "$(prompt 'commit it')" "$(bash_call 1)"
+check_last "offer in payload, transcript behind"        block "$DONE_OFFER" "$(prompt 'commit it')" "$(bash_call 1)" "$(say $DONE)"
+check "user said stop"                              pass  false "$(prompt 'stop')" "$(say 'Stopped. The branch is left as it was.')"
 check "user said that's all"                         pass  false "$(prompt "that's all for today")" "$(say 'Done.')"
 check "already continuing (stop_hook_active)"        pass  true  "$(prompt 'build it')" "$(say $REPORT)"
 check "missing transcript"                           pass  false
