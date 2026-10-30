@@ -154,6 +154,9 @@ user pastes JSON from a form opened from disk, write it to `<FORM>.answers.json`
 - **A table whose cells hold sentences needs `<table class="ws-table--wrap">`.** A plain
   `<table>` is styled as data: every cell `nowrap` and right-aligned, so prose cells run off
   the column and scroll. Use the plain one only for short values and numbers.
+- **Inline SVG text uses `font-family: inherit`**, never `system-ui`: in a PDF printed from Chrome,
+  the system font is embedded as Type 3 glyphs that Foxit and other readers show as garbage.
+  Check with `pdffonts FILE.pdf`: no `Type 3` rows.
 - **The column lists `<h2>` sections only**; a page whose headings are `<h3>` has no column.
 - **Links are set up by the head**: every link except an in-page `#anchor` opens in a new tab
   with `rel="noopener noreferrer"`. Write plain `<a href>`; never add `target` yourself.
