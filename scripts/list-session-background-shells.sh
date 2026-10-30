@@ -24,7 +24,9 @@ again; a block that is still printed is still alive.
 A background shell is a child of a `claude` process whose stdout is a
 .../<SESSION_ID>/tasks/<id>.output file. A session resumed under a new
 `claude` process keeps its older shells under the old process, so every
-`claude` process is checked, not only the current one. Orphans are found
+`claude` process is checked, not only the current one. After /clear the
+conversation has a new id while task files keep the process's first one, so
+the id the caller's own shell writes under is matched too. Orphans are found
 through the same task files (under /tmp/claude-<uid>/*/<SESSION_ID>/tasks),
 so a child that redirected its own output and lost its shell is not found.
 
@@ -88,6 +90,19 @@ while (( anc > 1 )); do
   anc=${par[$anc]:-0}
 done
 
+# /clear gives the conversation a new session id, but the claude process keeps
+# writing task output under the id it started with. The caller's own shell writes
+# to that folder, so its session id is matched as well.
+sessions=($session)
+for a in ${(k)ancestor}; do
+  [[ ${cmdof[$a]:-} == *shell-snapshots* ]] || continue
+  out=$(lsof -a -p $a -d 1 -Fn 2>/dev/null | awk '/^n/ { print substr($0,2) }')
+  [[ $out == */tasks/*.output ]] || continue
+  out=${out%/tasks/*}
+  sessions+=(${out:t})
+done
+sessions=(${(u)sessions})
+
 has_claude_ancestor() {
   local p=${par[$1]:-0}
   while (( p > 1 )); do
@@ -128,8 +143,10 @@ done
 typeset -A seen
 if (( ${#candidates} )); then
   pids=${(j:,:)candidates}
-  owned=$(lsof -a -p "$pids" -d 1 -Fpn 2>/dev/null | awk -v s="/$session/tasks/" '
-    /^p/ { p=substr($0,2) } /^n/ && index($0, s) { print p }')
+  owned=$(lsof -a -p "$pids" -d 1 -Fpn 2>/dev/null | awk -v s="${(j: :)sessions}" '
+    BEGIN { n = split(s, ids, " ") }
+    /^p/ { p=substr($0,2) }
+    /^n/ { for (i = 1; i <= n; i++) if (index($0, "/" ids[i] "/tasks/")) { print p; break } }')
   # A Monitor's shell writes to a pipe, not a task file: it carries no session id,
   # so it is attributed through the claude process this script runs under.
   piped=$(lsof -a -p "$pids" -d 1 -Fpft 2>/dev/null | awk '
@@ -163,7 +180,8 @@ if (( ${#candidates} )); then
 fi
 
 # Orphans: still writing to this session's task files, no claude above them.
-tasks_dirs=(/tmp/claude-$(id -u)/*/$session/tasks(N/))
+tasks_dirs=()
+for s in $sessions; do tasks_dirs+=(/tmp/claude-$(id -u)/*/$s/tasks(N/)); done
 if (( ${#tasks_dirs} )); then
   for p in $(lsof -Fp +D $tasks_dirs 2>/dev/null | awk '/^p/ { print substr($0,2) }' | sort -un); do
     (( ${seen[$p]:-0} )) && continue
