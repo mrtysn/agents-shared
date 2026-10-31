@@ -80,7 +80,10 @@ Pages are local files (see the artifacts rule): never publish to Anthropic.
    cut at the right edge there is the crop, not an overflow. A real 320 px check needs a
    browser window resized to 320 (claude-in-chrome's `resize_window` on a local server).
 6. **Hand over** the absolute path on its own line. Mention once that `notes-publish` can
-   serve it, never run it unprompted.
+   serve it, never run it unprompted. Publishing from a session leaves the page private:
+   `--audience` is refused in an agent session, and a `!` command at the prompt runs inside
+   it, so it is refused too. To make a page public, give the user the `cd <folder> &&
+   notes-publish --audience public FILE` line in a code block for a separate terminal window.
 
 ## Progress page: long work shown live
 
