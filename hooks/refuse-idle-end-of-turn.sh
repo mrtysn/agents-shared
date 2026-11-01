@@ -60,7 +60,7 @@ fi
 ROWS=$(python3 "$READER" "$TRANSCRIPT" --kinds user,assistant,agents,calls,tools --launch-receipts --json --max-chars 400 2>/dev/null) || exit 0
 
 VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" '
-  def offer: "say the word|(do you |would you )?want me to|would you like me to|shall i |should i (go|proceed|build|run|start|do|edit|add|make|commit|fix|wire|set)|let me know (if|when|whether|which)|tell me (to|if|when|which)|if you.?d like|if you want|if you prefer|ready (to (go|proceed) )?when you are|your call|up to you|(waits?|waiting) (for|on) your (word|go|call|ok)|on your (word|go-ahead|say-so)|the (choice|decision|question)( that [a-z ]+)? (is|here is)|which (one|would you|do you)";
+  def offer: "say the word|(do you |would you )?want me to|would you like me to|shall i |should i (go|proceed|build|run|start|do|edit|add|make|commit|fix|wire|set)|let me know (if|when|whether|which)|(?<!will )(?<!ll )(?<!to )(?<!would )(?<!can )(?<!could )(?<!it )(?<!that )tell me (to|if|when|which)|if you.?d like|if you want|if you prefer|ready (to (go|proceed) )?when you are|your call|up to you|(waits?|waiting) (for|on) your (word|go|call|ok)|on your (word|go-ahead|say-so)|the (choice|decision|question)( that [a-z ]+)? (is|here is)|which (one|would you|do you)";
   [ .[] | select(type == "object" and (.sidechain | not)) ] as $rows
   | ([ range(0; $rows | length) as $i | $rows[$i]
        | select(.group == "user" and .label == "USER" and .origin == "human" and (.meta | not)

@@ -99,6 +99,8 @@ check "worked after the answer, then reported"       block false "$(prompt 'what
 check "answered, then a prose offer"                 block false "$(prompt 'what next?')" "$(ask)" "$(answered 'Stop here')" "$(say 'Stopping. Want me to clean up the branch?')"
 check "slash command queued mid-turn"                 pass  false "$(prompt 'build T14')" "$(queued '/be-literal why are you holding it back?')" "$(bash_call 1)" "$(say $REPORT)"
 check "slash command queued, prose offer"              pass  false "$(prompt 'build T14')" "$(queued '/outstanding')" "$(say 'Built. Want me to commit it?')"
+check "a waiter will tell me when: not an offer"       pass  false "$(prompt 'run the test')" "$(bash_call 1 bg)" "$(say 'The read runs on the laptop. A waiter will tell me when it finishes.')"
+check "tell me when: an offer"                         block false "$(prompt 'run the test')" "$(say 'The test is ready. Tell me when you want it run.')"
 check "plain message queued mid-turn, still idle"      block false "$(prompt 'build T14')" "$(queued 'also check the logs')" "$(bash_call 1)" "$(say $REPORT)"
 check "background agent still running"               pass  false "$(prompt 'fix the setup')" "$(spawn 1)" "$(say 'Findings come when it reports.')"
 check "background agent reported, nothing asked"     block false "$(prompt 'fix the setup')" "$(spawn 1)" "$(handback 1)" "$(say 'It fixed the setup in three commits.')"
