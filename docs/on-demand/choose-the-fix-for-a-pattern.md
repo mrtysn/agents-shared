@@ -28,6 +28,7 @@ second thing. Find out why the first did not work:
 | Guidance every session needs whatever it is doing | rule in `claude/rules/` | loaded at launch, everywhere, so **every session pays for it**; keep a short core and put the full text on demand |
 | Relevant to one project only | that repo's `CLAUDE.md` | loaded when working in that repo |
 | Relevant only when working with certain files | that repo's `.claude/rules/` with `paths:` frontmatter | loads on a file match, which saves context |
+| A preference for any repo, not tied to a tool call, not needed in every session (a way to answer, a style) | a clause folded into a rule that already loads (`communication-style.md`, `answer-shape.md`) | no new launch cost; a new rule file is the last resort |
 | Machine-specific, private, or a path | a gitignored local file | `agents-shared` is **public** |
 | A rule that matters only at a tool call | trigger row in `hooks/rule-triggers.tsv` plus a doc at `docs/on-demand/<id>.md` | `deny-once` fires before the action, `note-once` alongside it; **tool calls only** (PreToolUse), matched on `command`, `file_path`, `content` or `url` |
 | Something that must run at a fixed moment unconditionally (rules are context, not enforcement), the moment is not a tool call, or the check needs its own logic | hook, wired by hand into `settings.json` and listed in the README | `nudge-transcript-parsers.sh` is a worked example of a check with state; the system-one repo's `system-one-prompt.sh` sees a typed prompt and `system-one-stop.sh` the final message |
