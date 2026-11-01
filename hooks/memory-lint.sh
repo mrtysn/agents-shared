@@ -17,6 +17,10 @@
 #     instruction stays in the index line.
 #   - any other file being created: its slug must not match a rule in
 #     <config>/rules/. A memory restating a loaded rule costs twice and drifts.
+#   - any other file being created: its frontmatter must say `scope: project`.
+#     Writing that line is the moment the author decides the fact concerns only
+#     this project; a fact for any other repo is refused toward the
+#     choose-the-fix table.
 #
 # Only the lines being introduced are checked, so a whole-file rewrite of an
 # index that already carries old offenders is not blocked for them.
@@ -39,6 +43,10 @@ input=$(cat)
 tool=$(printf '%s' "$input" | jq -r '.tool_name // empty')
 path=$(printf '%s' "$input" | jq -r '.tool_input.file_path // empty')
 [ -n "$path" ] || exit 0
+
+# Resolve `..` when the folder exists, so a path that climbs out of a memory
+# bucket is judged by where it lands.
+resolved_dir=$(cd "$(dirname "$path")" 2>/dev/null && pwd -P) && path="$resolved_dir/$(basename "$path")"
 
 case "$path" in
     */projects/*/memory/*.md) ;;
@@ -118,4 +126,13 @@ for rule in "$on_demand_dir"/*.md; do
         fail "$base duplicates the rule text in docs/on-demand/$rname.md, which a hook shows at the action. Write no memory for it; edit the rule if it is wrong."
     fi
 done
+
+# --- new memory file: scope declared ----------------------------------------
+
+# A project memory loads only in sessions launched in this project. A fact that
+# would change behaviour in another repo never reaches those sessions from here.
+scope=$(printf '%s\n' "$text" | sed -n '1,/^---$/{/^---$/!p;}' | sed -n 's/^[[:space:]]*scope:[[:space:]]*//p' | head -1 | tr -d '[:space:]')
+if [ "$scope" != "project" ]; then
+    fail "$base declares no scope. A memory loads only in sessions launched in this project. If the fact would change behaviour in any other repo, it is not project memory: choose its home from $HERE/../docs/on-demand/choose-the-fix-for-a-pattern.md (a trigger row, a clause in a rule that already loads, a new rule, or a local file). If it concerns only this project, add \`scope: project\` under \`metadata:\` in the frontmatter."
+fi
 exit 0

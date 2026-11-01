@@ -6,9 +6,10 @@
 # The fixture memory dir holds MEMORY.md with one existing offending line, a
 # `type: feedback` entry named no-curl-pipe, and a `type: project` entry named
 # finances. The fixture rules dir holds no-hardcoded-paths.md.
+# New memory files need `scope: project` in their frontmatter.
 #
 # --- not a memory path: always pass
-pass	Write	../../elsewhere/notes.md	- [x](x.md) — 3,316,271 TL in cash
+pass	Write	../../../elsewhere/notes.md	- [x](x.md) — 3,316,271 TL in cash
 # --- index lines: topic-only for facts
 pass	Write	MEMORY.md	- [Finances](finances.md) — Firefly stack, burn report
 block	Write	MEMORY.md	- [Finances](finances.md) — quit job Aug 2026, zero income
@@ -29,9 +30,15 @@ block	Write	MEMORY.md	- [New thing](new-thing.md) — decided on 2026-09-08
 block	Write	rule-dup:no-hardcoded-paths	body
 block	Write	rule-dup:feedback_no_hardcoded_paths	body
 block	Write	rule-dup:No-Hardcoded-Paths	body
-pass	Write	rule-dup:no-hardcoded-defaults	body
+pass	Write	rule-dup:no-hardcoded-defaults	---\nname: x\nmetadata:\n  type: feedback\n  scope: project\n---\nbody
 # --- editing an existing memory file is not a duplicate
 pass	Write	finances.md	rewritten body with 3,316,271 TL in it
 block	Write	rule-dup:window-focus	body
 block	Write	rule-dup:feedback_memory_hygiene	body
-pass	Write	rule-dup:window-title	body
+pass	Write	rule-dup:window-title	---\nname: x\nmetadata:\n  type: feedback\n  scope: project\n---\nbody
+# --- new memory files: scope must be declared as project
+block	Write	rule-dup:clipboard-habits	---\nname: x\nmetadata:\n  type: feedback\n---\nbody
+block	Write	rule-dup:clipboard-habits	body without any frontmatter
+block	Write	rule-dup:clipboard-habits	---\nname: x\nmetadata:\n  type: feedback\n  scope: global\n---\nbody
+pass	Write	rule-dup:clipboard-habits	---\nname: x\nmetadata:\n  type: feedback\n  scope: project\n---\nbody
+block	Write	rule-dup:clipboard-habits	---\nname: x\n---\nscope: project in the body only

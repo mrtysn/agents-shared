@@ -16,7 +16,19 @@ for that split.
   mistake, and nobody opens a file to check whether an action is forbidden.
 - **Rules come first.** Before writing a memory, check `~/.claude/rules/`. If a
   rule already covers it, write nothing; if the rule is wrong, fix the rule.
+- **Ask whether it reaches beyond this project.** A memory loads only in sessions
+  launched in its bucket, and there is no user-level auto-memory folder (user scope
+  is `~/.claude/rules/` and `~/.claude/CLAUDE.md`). If the fact would change what an
+  agent does in any other repo (a habit to stop, a tool to use, a way to answer), it
+  is not project memory. Choose its home from
+  [choose the fix for a pattern](choose-the-fix-for-a-pattern.md), cheapest first:
+  a trigger row when it binds to a tool call, a clause in a rule that already
+  loads when it is a style preference, a new rule only when every session needs it,
+  a local file when it is private. A rule loads in every session, so it is the
+  costly option, not the default.
+- **Declare the scope.** A new memory file says `scope: project` under `metadata:`
+  once you have decided the fact concerns only this project.
 
-`hooks/memory-lint.sh` enforces the two checkable halves — index-line shape and
-rule collision — and rejects the write with a reason. Bucket choice is judgment
-and stays yours.
+`hooks/memory-lint.sh` enforces the three checkable halves — index-line shape, rule
+collision and the scope line — and rejects the write with a reason. Bucket choice
+and whether the fact is really project-only stay yours.
