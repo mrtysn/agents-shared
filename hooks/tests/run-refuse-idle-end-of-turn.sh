@@ -46,6 +46,8 @@ agentId: a$1 (internal ID)")"; }
 agent_notify() { row user "$(jq -cn --arg x "<task-notification>\n<task-id>a$1</task-id>\n<tool-use-id>toolu_a$1</tool-use-id>\n<status>completed</status>\n<result>This agent's report was delivered to you as a message</result>\n</task-notification>" '$x')" task-notification; }
 handback() { jq -cn --arg x "<agent-message from=\"a$1\">\n[Subagent hand-back] done" '{type: "queue-operation", operation: "enqueue",
     timestamp: "2026-10-28T05:01:00.000Z", sessionId: "00000000-0000-4000-8000-000000000003", content: $x}'; }
+queued() { jq -cn --arg x "$1" '{type: "queue-operation", operation: "enqueue",
+    timestamp: "2026-10-28T05:01:00.000Z", sessionId: "00000000-0000-4000-8000-000000000003", content: $x}'; }
 resume() { print -r -- "$(call toolu_s$1 SendMessage "{\"to\":\"a$1\",\"message\":\"critique this\"}")"$'\n'"$(result toolu_s$1 "{\"success\":true,\"message\":\"Resuming agent a$1\",\"resumedAgentId\":\"a$1\"}")"; }
 notify() { row user "$(jq -cn --arg x "<task-notification>\n<task-id>t$1</task-id>\n<tool-use-id>toolu_b$1</tool-use-id>\n<status>completed</status>\n</task-notification>" '$x')" task-notification; }
 
@@ -95,6 +97,9 @@ check "slash-command answer, nothing asked"          block false "$(prompt $'<co
 check "ended on an answered question"                pass  false "$(prompt 'what next?')" "$(say 'Two items remain.')" "$(ask)" "$(answered 'Stop here')" "$(say 'Stopping here.')"
 check "worked after the answer, then reported"       block false "$(prompt 'what next?')" "$(ask)" "$(answered)" "$(bash_call 1)" "$(say 'Built and committed.')"
 check "answered, then a prose offer"                 block false "$(prompt 'what next?')" "$(ask)" "$(answered 'Stop here')" "$(say 'Stopping. Want me to clean up the branch?')"
+check "slash command queued mid-turn"                 pass  false "$(prompt 'build T14')" "$(queued '/be-literal why are you holding it back?')" "$(bash_call 1)" "$(say $REPORT)"
+check "slash command queued, prose offer"              pass  false "$(prompt 'build T14')" "$(queued '/outstanding')" "$(say 'Built. Want me to commit it?')"
+check "plain message queued mid-turn, still idle"      block false "$(prompt 'build T14')" "$(queued 'also check the logs')" "$(bash_call 1)" "$(say $REPORT)"
 check "background agent still running"               pass  false "$(prompt 'fix the setup')" "$(spawn 1)" "$(say 'Findings come when it reports.')"
 check "background agent reported, nothing asked"     block false "$(prompt 'fix the setup')" "$(spawn 1)" "$(handback 1)" "$(say 'It fixed the setup in three commits.')"
 # A watcher launched in an earlier turn is invisible in this turn's rows; the process table decides.

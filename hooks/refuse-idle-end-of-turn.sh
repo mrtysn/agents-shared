@@ -18,6 +18,10 @@
 #     transcript alone cannot tell a live old shell from one that never reported, 2026-10-28), and no last line
 #     "Nothing left …".
 # It lets the stop through when
+#   - the user typed a slash command during this turn (a USER(queued) row starting with "/"): Claude Code holds
+#     such a message until the turn ends, while plain text is folded in mid-turn, so a refused stop keeps the
+#     user waiting on their own command (2026-11-01: a /be-literal question sat queued 20+ minutes, and a refusal
+#     here turned the turn's end into another question),
 #   - stop_hook_active is true (the session already continued once because of a Stop hook),
 #   - an away stretch is open (hooks/refuse-stop-while-away.sh owns those turns, and they ask nothing),
 #   - the user's last prompt tells it to stop ("stop", "that's all", "pause"),
@@ -95,7 +99,9 @@ VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" '
                     | select(contains("<task-id>" + $w.id + "</task-id>")) ] | length == 0) ]
        | length) as $workflowsPending
     | ([ $text | split("\n")[] | select(test("\\S")) ] | last // "") as $lastLine
-    | if $phrase != "" then "offer\t\($phrase)"
+    | ([ $turn[] | select(.label == "USER(queued)" and ((.text // "") | test("^\\s*/[A-Za-z]"))) ] | length > 0) as $slashQueued
+    | if $slashQueued then "pass"
+      elif $phrase != "" then "offer\t\($phrase)"
       elif ($prompt | length) < 60 and ($prompt | test("^\\s*(stop|stop here|that.?s (all|it)|enough|nothing else|pause|hold on|wait|no more|done for (now|today))\\b"; "i")) then "pass"
       elif $a >= 0 and $workAfterAsk == 0 then "pass"
       elif $pending > 0 or $workflowsPending > 0 then "pass"
