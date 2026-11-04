@@ -65,6 +65,11 @@ local tools absent). Runtimes and engines a repo needs come from that repo's own
 SessionStart hook, gated on `CLAUDE_CODE_REMOTE=true`. The environment caches the setup
 for about seven days, so the cloud copy can lag `main` by that much.
 
+To start a cloud session from a local one, run `claude --cloud "<task>"` in the repo. A
+routine (RemoteTrigger) also runs in the cloud but is excluded from cloud-session credit
+promotions, and an Agent call with `isolation: "remote"` ran on the local machine on
+2026-11-04 while reporting success: check `uname` before trusting either as "cloud".
+
 ## Syncing an existing machine
 
 ```bash
