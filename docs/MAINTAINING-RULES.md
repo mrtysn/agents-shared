@@ -49,6 +49,22 @@ scripts does not matter, but a skill invoked before `import.sh` has run will fai
 
 Verify with `/context` in a session — every rule should appear under **Memory files**.
 
+## Setting up a cloud environment
+
+Claude Code cloud sessions (claude.ai/code) read no user `settings.json`, so hooks never
+reach them. Rules, skills and commands do, through the environment's setup script:
+
+```bash
+git clone --depth 1 https://github.com/mrtysn/agents-shared "$HOME/dev/agents-shared"
+bash "$HOME/dev/agents-shared/scripts/cloud-setup.sh"
+```
+
+`cloud-setup.sh` installs zsh, fzf and tree, runs `init-global.sh`, and writes a user
+`CLAUDE.md` with what differs in the cloud (push to the session's branch, never `main`;
+local tools absent). Runtimes and engines a repo needs come from that repo's own
+SessionStart hook, gated on `CLAUDE_CODE_REMOTE=true`. The environment caches the setup
+for about seven days, so the cloud copy can lag `main` by that much.
+
 ## Syncing an existing machine
 
 ```bash
