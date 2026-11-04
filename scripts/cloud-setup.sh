@@ -27,22 +27,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 
-# ── Tools that rules and skills call ────────────────────────────────────────
-# Several hooks and skill scripts are zsh; fzf and tree are used by skills.
-missing=()
-for tool in zsh fzf tree; do
-    command -v "$tool" >/dev/null 2>&1 || missing+=("$tool")
-done
-if [ "${#missing[@]}" -gt 0 ]; then
-    if command -v apt-get >/dev/null 2>&1; then
-        apt-get update -qq
-        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${missing[@]}"
-    else
-        echo "cloud-setup: no apt-get here; install ${missing[*]} by hand" >&2
-    fi
-fi
-
 # ── Rules, skills and commands into ~/.claude ───────────────────────────────
+# First, so nothing optional below can stop the session from getting them.
 bash "$REPO_DIR/scripts/init-global.sh"
 
 # ── $AGENTS_SHARED for the shell the Bash tool uses ─────────────────────────
@@ -81,5 +67,27 @@ on the owner's Mac. The rules in ~/.claude/rules/ still apply, with these differ
   enforces them but you.
 - **No paid API calls and no live requests to third-party sites** unless the task says so.
 EOF
+
+# ── Tools that rules and skills call, best effort ───────────────────────────
+# Several hooks and skill scripts are zsh; fzf and tree are used by skills. A failed
+# install warns and the setup still succeeds: on 2026-11-04 the image's dpkg failed to
+# configure zsh-common, and under `set -e` that stopped the script before the rules
+# were linked. One `dpkg --configure -a` retry covers a half-configured package.
+missing=()
+for tool in zsh fzf tree; do
+    command -v "$tool" >/dev/null 2>&1 || missing+=("$tool")
+done
+if [ "${#missing[@]}" -gt 0 ]; then
+    if command -v apt-get >/dev/null 2>&1; then
+        export DEBIAN_FRONTEND=noninteractive
+        if ! { apt-get update -qq && apt-get install -y -qq "${missing[@]}"; }; then
+            dpkg --configure -a || true
+            apt-get install -y -qq "${missing[@]}" \
+                || echo "cloud-setup: WARNING: could not install ${missing[*]}; zsh scripts will not run" >&2
+        fi
+    else
+        echo "cloud-setup: WARNING: no apt-get here; install ${missing[*]} by hand" >&2
+    fi
+fi
 
 printf '\n=== cloud-setup done ===\n  Claude dir: %s\n  Repo:       %s\n\n' "$CLAUDE_DIR" "$REPO_DIR"
