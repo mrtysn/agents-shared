@@ -274,8 +274,7 @@ case "${1:-}" in
                exit 0 ;;
     --list)    menu | cut -f2; exit 0 ;;
     --menu-json) menu_json; exit $? ;;
-    # Answered below, once the folder menu's helpers are defined.
-    --folders-json) folders_json_wanted=1 ;;
+    # --folders-json is answered below, once the folder menu's helpers are defined.
     --init)    [[ "${2:-}" == zsh ]] || { print -u2 "clo: --init supports zsh only"; exit 1; }
                init_zsh; exit 0 ;;
 esac
@@ -403,18 +402,21 @@ folders_json() {
     local -a names paths tags when order
     local i t
     collect_folders
+    # Fields are split on \x1f, which no path or tag holds; a tab could be in a folder name.
+    local us=$'\x1f'
     {
         t="$(last_session "$DEV_ROOT" || true)"
-        print -r -- "$DEV_ROOT"$'\t'"${DEV_ROOT:t}"$'\t'"dev-root"$'\t'"${t:-}"$'\t'"${t:+$(ago "$t")}"
+        print -r -- "$DEV_ROOT$us${DEV_ROOT:t}${us}dev-root$us${t:-}$us${t:+$(ago "$t")}"
         for i in "${order[@]}"; do
             t="${when[$i]:-}"
-            print -r -- "${paths[$i]}"$'\t'"${names[$i]}"$'\t'"${tags[$i]}"$'\t'"$t"$'\t'"${t:+$(ago "$t")}"
+            print -r -- "${paths[$i]}$us${names[$i]}$us${tags[$i]}$us$t$us${t:+$(ago "$t")}"
         done
-    } | jq -R -s 'split("\n") | map(select(length > 0) | split("\t")
+    } | jq -R -s 'split("\n") | map(select(length > 0) | split("\u001f")
         | {path: .[0], name: .[1], tags: (.[2] | split(" ") | map(select(length > 0))),
            last: (if .[3] == "" then null else (.[3] | tonumber) end), age: (if .[4] == "" then null else .[4] end)})'
 }
-if (( ${folders_json_wanted:-0} )); then folders_json; exit $?; fi
+# The one flag the dispatcher above leaves to this point: its helpers had to exist first.
+[[ "${1:-}" == --folders-json ]] && { folders_json; exit $?; }
 
 effort_rows=($'unset\tunset' $'low\tlow' $'medium\tmedium' $'high\thigh' $'xhigh\txhigh' $'max\tmax')
 # session_rows <dir> — <dir>'s sessions, newest first, as rows whose value is
