@@ -38,6 +38,8 @@ Usage:
                           clo here: Sonnet unless 1-4 says otherwise, medium effort); without one it opens the model menu there.
                           Examples: clo adb-reconnect | clo adb-rec 3 | clo GNM 2 --prompt "why 3?"
   clo --list              Print the menu entries and exit
+  clo --folders-json      Print the folder menu as JSON, in its order (folders with a session
+                          first, most recent on top): [{path, name, tags, last, age}]
   clo --menu-json         Print the model menu, your last model and each model's
                           remembered effort as one JSON object and exit:
                           {"models":[{"value","label"}...],"last":"","effort":{"model":"effort"}}
@@ -272,6 +274,8 @@ case "${1:-}" in
                exit 0 ;;
     --list)    menu | cut -f2; exit 0 ;;
     --menu-json) menu_json; exit $? ;;
+    # Answered below, once the folder menu's helpers are defined.
+    --folders-json) folders_json_wanted=1 ;;
     --init)    [[ "${2:-}" == zsh ]] || { print -u2 "clo: --init supports zsh only"; exit 1; }
                init_zsh; exit 0 ;;
 esac
@@ -346,12 +350,12 @@ ago() {
     fi
 }
 
-# path <TAB> dimmed age + tags <TAB> name, for every folder local-repos-list reports,
-# after rows for the dev root itself and the current folder. Falls back to the dev root's
-# immediate subfolders, untagged, when local-repos-list is not installed.
-folder_menu() {
-    local dim=$'\e[2m' off=$'\e[0m' here="${PWD/#$HOME/~}"
-    local -a names paths tags
+# collect_folders — fill names, paths, tags, when and order with every folder
+# local-repos-list reports (the dev root's immediate subfolders, untagged, when it is not
+# installed). order lists their indexes: folders with a Claude session first, most recent on
+# top; the rest keep alphabetical order.
+collect_folders() {
+    names=() paths=() tags=() when=() order=()
     local name dir tag i
     if command -v local-repos-list >/dev/null && command -v jq >/dev/null; then
         while IFS=$'\t' read -r name dir tag; do
@@ -363,12 +367,19 @@ folder_menu() {
             names+=("${dir:t}") paths+=("$dir") tags+=("")
         done
     fi
-    # Folders with a Claude session come first, most recent on top; the rest
-    # keep alphabetical order. The dev root and the current folder always lead.
-    local -a when order
-    for (( i = 1; i <= $#names; i++ )); do when[$i]="$(last_session "${paths[$i]}")"; done
+    # A folder with no session makes last_session fail; that is an empty "when", not an error.
+    for (( i = 1; i <= $#names; i++ )); do when[$i]="$(last_session "${paths[$i]}" || true)"; done
     order=(${(f)"$(for (( i = 1; i <= $#names; i++ )); do print -r -- "${when[$i]:-0}"$'\t'"$i"; done \
         | sort -t$'\t' -k1,1nr -k2,2n | cut -f2)"})
+}
+
+# path <TAB> dimmed age + tags <TAB> name, for every folder collect_folders found, after rows
+# for the dev root itself and the current folder.
+folder_menu() {
+    local dim=$'\e[2m' off=$'\e[0m' here="${PWD/#$HOME/~}"
+    local -a names paths tags when order
+    local tag i
+    collect_folders
     # Age and tags go first, padded to one width, so every name starts in the
     # same column however long it is; fzf searches only the last field, the name.
     local tw=${#${DEV_ROOT/#$HOME/~}} t
@@ -383,6 +394,27 @@ folder_menu() {
     row "$PWD" "$here" ""
     for i in "${order[@]}"; do row "${paths[$i]}" "${names[$i]}" "${tags[$i]}"; done
 }
+
+# folders_json — the folder menu's rows as JSON, for clo-web's New session form: the dev root
+# first, then the folders in the menu's order, each {path, name, tags, last (epoch seconds or
+# null), age ("5m", "3d" or null)}.
+folders_json() {
+    [[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT" ]] || { print -u2 "clo --folders-json: DEV_ROOT must be an existing folder"; return 2; }
+    local -a names paths tags when order
+    local i t
+    collect_folders
+    {
+        t="$(last_session "$DEV_ROOT" || true)"
+        print -r -- "$DEV_ROOT"$'\t'"${DEV_ROOT:t}"$'\t'"dev-root"$'\t'"${t:-}"$'\t'"${t:+$(ago "$t")}"
+        for i in "${order[@]}"; do
+            t="${when[$i]:-}"
+            print -r -- "${paths[$i]}"$'\t'"${names[$i]}"$'\t'"${tags[$i]}"$'\t'"$t"$'\t'"${t:+$(ago "$t")}"
+        done
+    } | jq -R -s 'split("\n") | map(select(length > 0) | split("\t")
+        | {path: .[0], name: .[1], tags: (.[2] | split(" ") | map(select(length > 0))),
+           last: (if .[3] == "" then null else (.[3] | tonumber) end), age: (if .[4] == "" then null else .[4] end)})'
+}
+if (( ${folders_json_wanted:-0} )); then folders_json; exit $?; fi
 
 effort_rows=($'unset\tunset' $'low\tlow' $'medium\tmedium' $'high\thigh' $'xhigh\txhigh' $'max\tmax')
 # session_rows <dir> — <dir>'s sessions, newest first, as rows whose value is
