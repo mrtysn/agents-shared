@@ -104,6 +104,9 @@ check "tell me when: an offer"                         block false "$(prompt 'ru
 check "plain message queued mid-turn, still idle"      block false "$(prompt 'build T14')" "$(queued 'also check the logs')" "$(bash_call 1)" "$(say $REPORT)"
 check "background agent still running"               pass  false "$(prompt 'fix the setup')" "$(spawn 1)" "$(say 'Findings come when it reports.')"
 check "background agent reported, nothing asked"     block false "$(prompt 'fix the setup')" "$(spawn 1)" "$(handback 1)" "$(say 'It fixed the setup in three commits.')"
+check "agent from an earlier turn still running"     pass  false "$(prompt 'vet the plan')" "$(spawn 1)" "$(say 'The reviewer is out.')" "$(prompt 'also search the web')" "$(say 'Both run; I relay them when they report.')"
+check "agent from an earlier turn, since reported"   block false "$(prompt 'vet the plan')" "$(spawn 1)" "$(say 'The reviewer is out.')" "$(prompt 'what did it say?')" "$(handback 1)" "$(say 'It found two gaps.')"
+check "agent resumed in an earlier turn, running"    pass  false "$(prompt 'vet the plan')" "$(spawn 1)" "$(handback 1)" "$(resume 1)" "$(say 'Critique round sent.')" "$(prompt 'ok')" "$(say 'Waiting on its critique.')"
 # A watcher launched in an earlier turn is invisible in this turn's rows; the process table decides.
 print -r -- $'#!/bin/zsh\nprint "4242  10:00  until grep -q done log; do sleep 60; done"' > $work/live-shell && chmod +x $work/live-shell
 print -r -- $'#!/bin/zsh\nexit 0' > $work/no-shell && chmod +x $work/no-shell

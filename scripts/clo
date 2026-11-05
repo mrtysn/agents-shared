@@ -53,6 +53,12 @@ defaults in settings.json are untouched. The model menu opens on your last
 model, and the effort menu on the effort you last used with that model.
 "unset" passes no --effort, so Claude Code's own default applies.
 
+Every launch runs inside a tmux session named after the folder (clo-web-3f), so the
+session can be reached later from another terminal: clo-web's phone page, `tmux attach`,
+or iTerm's tmux integration. In iTerm the session is attached in control mode (tmux -CC)
+and drawn as a native tab or window (Settings → General → tmux decides which). Inside
+tmux already, or with CLO_TMUX=0, or without tmux installed, claude runs in this terminal.
+
 Launched outside $DEV_ROOT, or from $DEV_ROOT itself, clo first asks where to launch: $DEV_ROOT itself,
 the current folder (shown as its path, where the cursor starts), or any folder
 local-repos-list reports, with its tags. Folders you last used Claude in come
@@ -150,6 +156,29 @@ split_args() {
     done
 }
 
+# run_claude [claude args...] — replace this process with claude, inside a tmux session named
+# after the folder, so the session can be reached from another terminal later (clo-web's phone
+# page, `tmux attach`, iTerm's tmux -CC). Inside iTerm the session is attached in control mode,
+# which iTerm draws as a native tab or window. Already inside tmux, or with CLO_TMUX=0, or
+# without tmux, claude runs in this terminal as before. CLO_TMUX_SOCKET names a tmux server
+# (`tmux -L`) for tests, and skips control mode.
+run_claude() {
+    if [[ -z "${TMUX:-}" && "${CLO_TMUX:-1}" != 0 ]] && command -v tmux >/dev/null; then
+        local -a t=(tmux)
+        [[ -n "${CLO_TMUX_SOCKET:-}" ]] && t+=(-L "$CLO_TMUX_SOCKET")
+        [[ "${TERM_PROGRAM:-}" == iTerm.app && -z "${CLO_TMUX_SOCKET:-}" ]] && t+=(-CC)
+        local base="${${PWD:t}//[^A-Za-z0-9_-]/-}" name
+        repeat 20 {
+            name="$base-$(printf %02x $(( RANDOM % 256 )))"
+            "${t[@]}" has-session -t "=$name" 2>/dev/null || break
+        }
+        local cmd="claude" a
+        for a in "$@"; do cmd+=" ${(q)a}"; done
+        exec "${t[@]}" new-session -s "$name" -c "$PWD" "$cmd"
+    fi
+    exec claude "$@"
+}
+
 # launch_claude <dir> <model> <effort> <first message or ""> [claude args...]
 # cd to <dir> and replace this process with claude. Effort "unset" or empty passes
 # no --effort. The first message goes last, after any extra args.
@@ -161,7 +190,7 @@ launch_claude() {
     cd -- "$dir"
     # Tell the shell function (clo --init zsh) where to leave the terminal.
     if [[ -n "${CLO_CD_FILE:-}" ]]; then print -r -- "$PWD" > "$CLO_CD_FILE"; fi
-    exec claude "${args[@]}" "$@" ${prompt:+"$prompt"}
+    run_claude "${args[@]}" "$@" ${prompt:+"$prompt"}
 }
 
 # launch_cmd [args after "launch"] — `clo launch`: no menus, state recorded
@@ -855,4 +884,4 @@ esac
 # Tell the shell function (clo --init zsh) where to leave the terminal.
 [[ -n "${CLO_CD_FILE:-}" ]] && print -r -- "$PWD" > "$CLO_CD_FILE"
 rm -rf -- "$CLO_RUN"   # exec skips the EXIT trap
-exec claude "${launch[@]}" "${rest[@]}" ${prompt:+"$prompt"}
+run_claude "${launch[@]}" "${rest[@]}" ${prompt:+"$prompt"}

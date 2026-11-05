@@ -26,10 +26,11 @@
 #   - an away stretch is open (hooks/refuse-stop-while-away.sh owns those turns, and they ask nothing),
 #   - the user's last prompt tells it to stop ("stop", "that's all", "pause"),
 #   - the transcript or the reader cannot be read: it never blocks on a read it could not make.
-# Background work is an Agent spawn not set to run in the foreground, a SendMessage that resumed a sub-agent, a
-# Bash call with run_in_background or one whose timeout moved it to the background, a Monitor, ScheduleWakeup or
-# CronCreate, and a Workflow launched in any turn whose task notification has not come (a workflow runs for many
-# turns, and its id is the "Task ID" of its launch result). Each launch is matched to its own report by id, never counted: a later hand-back or task notification
+# Background work is an Agent spawn not set to run in the foreground or a SendMessage that resumed a sub-agent,
+# both in any turn (a reviewer spawned two prompts back is still pending work); a Bash call with
+# run_in_background or one whose timeout moved it to the background, a Monitor, ScheduleWakeup or CronCreate,
+# in this turn; and a Workflow launched in any turn whose task notification has not come (a workflow runs for
+# many turns, and its id is the "Task ID" of its launch result). Each launch is matched to its own report by id, never counted: a later hand-back or task notification
 # naming its tool_use_id, its agent id (from the launch receipt) or its background id. A finished agent reports twice
 # (hand-back and notification), so a count hides an unreported one; a resumed agent reports again under its old id,
 # so only reports after the launch count.
@@ -73,18 +74,22 @@ VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" '
     | ([ $tail | match(offer; "gi") | .string ] | last // "") as $phrase
     | ([ range(0; $turn | length) as $i | select($turn[$i].label == "RESULT AskUserQuestion") | $i ] | max // -1) as $a
     | ([ $turn[$a + 1:][] | select(.group == "calls" or .label == "AGENT-SPAWN" or .label == "SENDMSG") ] | length) as $workAfterAsk
-    | ([ range(0; $turn | length) as $i | $turn[$i] | select(.group == "user") | .text // ""
+    # Reports and launches are indexed over the whole transcript: a sub-agent spawned, or resumed, in an earlier
+    # turn is still pending work until its report comes (2026-11-05, link-keeper: a reviewer spawned two prompts
+    # back was running, and three stops were refused as idle). The other kinds count only within this turn.
+    | ([ range(0; $rows | length) as $i | $rows[$i] | select(.group == "user") | .text // ""
          | { i: $i, ids: [ capture("<agent-message from=\"(?<id>[^\"]+)\"").id, capture("<task-id>(?<id>[^<]+)</task-id>").id,
                            capture("<tool-use-id>(?<id>[^<]+)</tool-use-id>").id ] } ]) as $reports
-    | ([ range(0; $turn | length) as $i | $turn[$i] as $r
+    | ([ range(0; $rows | length) as $i | $rows[$i] as $r
          | if $r.label == "AGENT-SPAWN" and (($r.input.run_in_background // true) != false) then
-             { i: $i, keys: ([ $r.tool_use_id ] + [ $turn[] | select(.label == "RESULT Agent" and .tool_use_id == $r.tool_use_id)
+             { i: $i, keys: ([ $r.tool_use_id ] + [ $rows[] | select(.label == "RESULT Agent" and .tool_use_id == $r.tool_use_id)
                                                     | .text // "" | capture("agentId: (?<id>[A-Za-z0-9]+)").id ]) }
+           elif $r.label == "RESULT SendMessage" and (($r.text // "") | test("resumedAgentId")) then
+             { i: $i, keys: ([ $r.tool_use_id ] + [ $r.text | capture("\"resumedAgentId\":\\s*\"(?<id>[^\"]+)\"").id ]) }
+           elif $i <= $p then empty
            elif $r.group == "calls" and $r.tool == "Bash" and ($r.input.run_in_background // false) == true then { i: $i, keys: [ $r.tool_use_id ] }
            elif $r.group == "calls" and ($r.tool == "Monitor" or $r.tool == "CronCreate") then { i: $i, keys: [ $r.tool_use_id ] }
            elif $r.group == "calls" and $r.tool == "ScheduleWakeup" and (($r.input.stop // false) | not) then { i: $i, keys: [] }
-           elif $r.label == "RESULT SendMessage" and (($r.text // "") | test("resumedAgentId")) then
-             { i: $i, keys: ([ $r.tool_use_id ] + [ $r.text | capture("\"resumedAgentId\":\\s*\"(?<id>[^\"]+)\"").id ]) }
            elif $r.label == "TOOL-RESULT Bash" and (($r.text // "") | test("moved to the background \\(ID:")) then
              { i: $i, keys: ([ $r.tool_use_id ] + [ $r.text | capture("background \\(ID: (?<id>[^)]+)\\)").id ]) }
            else empty end ]) as $launches
