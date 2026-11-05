@@ -116,5 +116,20 @@ emulator, always `-s emulator-5554`.
 - **Apps for a non-technical person**: mistaps must be harmless, so risky toggles and menus sit
   behind a deliberate action (the user's words on grandma-launcher).
 - Cloud config such as `google-services.json` is gitignored and optional at build time, as in adb-reconnect.
+- **A native terminal client** (clo-remote's `android/`, built 2026-11-05 and tried on the headless
+  emulator): Termux's `terminal-view` and `terminal-emulator` come from JitPack
+  (`com.github.termux.termux-app:*:v0.118.0`, filtered to that group in `settings.gradle.kts`; the
+  libraries are Apache 2.0 per Termux's LICENSE.md). `TerminalView` and `TerminalSession` are `final`:
+  watch the view with `addOnLayoutChangeListener`, never subclass. A session needs a local pty
+  process, so a remote terminal runs `sh -c 'stty raw -echo; exec toybox nc 127.0.0.1 <port>'` and the
+  app bridges that loopback port to its WebSocket. The view repaints only when
+  `TerminalSessionClient.onTextChanged` calls `view.onScreenUpdated()`; without it the screen stays
+  black with a lone cursor. Call `requestFocus()` after layout (`view.post {}`), or hardware and
+  `input text` keys fall through to the next Compose button (Enter once pressed "back").
+- **Emulator against a server on the Mac**: the emulator reaches the host's loopback at `10.0.2.2`;
+  allow cleartext for that one host in `network_security_config.xml`. Never point a test at a real
+  session of the user's: attaching a client resizes tmux for everyone, so run a second server on its
+  own tmux socket and port. Preseed the app's settings with
+  `adb -s emulator-5554 shell run-as <package> …` into `shared_prefs/`.
 - `assembleRelease` only when a baseline profile matters (grandma-launcher); it is signed with the
   debug key for a sideloaded app. Otherwise install the debug build.
