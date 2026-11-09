@@ -51,6 +51,12 @@
       ]
     },
     {
+      "name": "clo launch tests",
+      "run": [
+        "scripts/tests/test-clo-launch.zsh"
+      ]
+    },
+    {
       "name": "external skill links",
       "run": [
         "bash",
