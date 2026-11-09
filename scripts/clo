@@ -58,7 +58,9 @@ model, and the effort menu on the effort you last used with that model.
 Every launch runs inside a tmux session named after the folder (clo-web-3f), so the
 session can be reached later from another terminal: clo-web's phone page, `tmux attach`,
 or iTerm's tmux integration. In iTerm the session is attached in control mode (tmux -CC)
-and drawn as a native tab or window (Settings → General → tmux decides which). Inside
+and drawn as a tab in the window clo ran in, with this tab buried, once iTerm → Settings →
+General → tmux opens tmux windows as "Tabs in the attaching window" and buries the client
+session (clo prints this when they are not set). Inside
 tmux already, or with CLO_TMUX=0, or without tmux installed, claude runs in this terminal.
 
 Launched outside $DEV_ROOT, or from $DEV_ROOT itself, clo first asks where to launch: $DEV_ROOT itself,
@@ -158,6 +160,19 @@ split_args() {
     done
 }
 
+# warn_iterm_tmux_prefs — print the fix when iTerm's tmux integration would open the session
+# in a new window (OpenTmuxWindowsIn other than 2, tabs in the attaching window) or leave the
+# tmux client tab showing (AutoHideTmuxClientSession off). Unset keys are iTerm's defaults,
+# which are both wrong for clo.
+warn_iterm_tmux_prefs() {
+    local open bury
+    open="$(defaults read com.googlecode.iterm2 OpenTmuxWindowsIn 2>/dev/null)"
+    bury="$(defaults read com.googlecode.iterm2 AutoHideTmuxClientSession 2>/dev/null)"
+    [[ "$open" == 2 && "$bury" == 1 ]] && return
+    print -u2 "clo: iTerm will open this session in a new window and keep this tab as tmux's client."
+    print -u2 "clo: fix once in iTerm → Settings → General → tmux: open tmux windows as \"Tabs in the attaching window\", and tick \"Automatically bury the tmux client session after connecting\"."
+}
+
 # run_claude [claude args...] — replace this process with claude, inside a tmux session named
 # after the folder, so the session can be reached from another terminal later (clo-web's phone
 # page, `tmux attach`, iTerm's tmux -CC). Inside iTerm the session is attached in control mode,
@@ -171,6 +186,7 @@ run_claude() {
         local -a t=(tmux) cc=()
         [[ -n "${CLO_TMUX_SOCKET:-}" ]] && t+=(-L "$CLO_TMUX_SOCKET")
         [[ "${TERM_PROGRAM:-}" == iTerm.app && -z "${CLO_TMUX_SOCKET:-}" ]] && cc=(-CC)
+        (( ${#cc} )) && warn_iterm_tmux_prefs
         local base="${${PWD:t}//[^A-Za-z0-9_-]/-}" name
         repeat 20 {
             name="$base-$(printf %02x $(( RANDOM % 256 )))"
