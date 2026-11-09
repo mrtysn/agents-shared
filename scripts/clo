@@ -166,9 +166,11 @@ split_args() {
 # (`tmux -L`) for tests, and skips control mode.
 run_claude() {
     if [[ -z "${TMUX:-}" && "${CLO_TMUX:-1}" != 0 ]] && command -v tmux >/dev/null; then
-        local -a t=(tmux)
+        # -CC goes on new-session only: on any other command iTerm also enters tmux mode,
+        # and has-session's expected "can't find session" shows as a failed attach.
+        local -a t=(tmux) cc=()
         [[ -n "${CLO_TMUX_SOCKET:-}" ]] && t+=(-L "$CLO_TMUX_SOCKET")
-        [[ "${TERM_PROGRAM:-}" == iTerm.app && -z "${CLO_TMUX_SOCKET:-}" ]] && t+=(-CC)
+        [[ "${TERM_PROGRAM:-}" == iTerm.app && -z "${CLO_TMUX_SOCKET:-}" ]] && cc=(-CC)
         local base="${${PWD:t}//[^A-Za-z0-9_-]/-}" name
         repeat 20 {
             name="$base-$(printf %02x $(( RANDOM % 256 )))"
@@ -176,7 +178,7 @@ run_claude() {
         }
         local cmd="claude" a
         for a in "$@"; do cmd+=" ${(q)a}"; done
-        exec "${t[@]}" new-session -s "$name" -c "$PWD" "$cmd"
+        exec "${t[@]}" "${cc[@]}" new-session -s "$name" -c "$PWD" "$cmd"
     fi
     exec claude "$@"
 }
