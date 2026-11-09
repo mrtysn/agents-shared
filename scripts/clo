@@ -166,8 +166,8 @@ split_args() {
 # which are both wrong for clo.
 warn_iterm_tmux_prefs() {
     local open bury
-    open="$(defaults read com.googlecode.iterm2 OpenTmuxWindowsIn 2>/dev/null)"
-    bury="$(defaults read com.googlecode.iterm2 AutoHideTmuxClientSession 2>/dev/null)"
+    open="$(defaults read com.googlecode.iterm2 OpenTmuxWindowsIn 2>/dev/null || true)"
+    bury="$(defaults read com.googlecode.iterm2 AutoHideTmuxClientSession 2>/dev/null || true)"
     [[ "$open" == 2 && "$bury" == 1 ]] && return
     print -u2 "clo: iTerm will open this session in a new window and keep this tab as tmux's client."
     print -u2 "clo: fix once in iTerm → Settings → General → tmux: open tmux windows as \"Tabs in the attaching window\", and tick \"Automatically bury the tmux client session after connecting\"."
@@ -194,7 +194,11 @@ run_claude() {
         }
         local cmd="claude" a
         for a in "$@"; do cmd+=" ${(q)a}"; done
-        exec "${t[@]}" "${cc[@]}" new-session -s "$name" -c "$PWD" "$cmd"
+        # A running tmux server starts the session with its own environment, so a
+        # session from another Claude config (a resume) has to be handed its config dir.
+        local -a env=()
+        [[ -n "${CLAUDE_CONFIG_DIR:-}" ]] && env=(-e "CLAUDE_CONFIG_DIR=$CLAUDE_CONFIG_DIR")
+        exec "${t[@]}" "${cc[@]}" new-session -s "$name" -c "$PWD" "${env[@]}" "$cmd"
     fi
     exec claude "$@"
 }
@@ -282,6 +286,9 @@ case "${1:-}" in
                fi
                launch_claude "$fast_dir" "$fast_model" medium "$fast_prompt" "${rest[@]}" ;;
     launch)    shift; launch_cmd "$@" ;;
+    # --run-claude ARGS: run claude in this folder the way every launch does (inside tmux).
+    # recent-sessions.py resumes through it.
+    --run-claude) shift; run_claude "$@" ;;
     # One name per line for tab completion: each folder's own name and, for nested
     # ones, its path under $DEV_ROOT.
     --repo-names) [[ -n "${DEV_ROOT:-}" ]] || exit 0

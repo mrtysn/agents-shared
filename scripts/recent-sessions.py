@@ -141,6 +141,11 @@ def resume_session(sid: str, claude_args: list[str] = ()) -> None:
         os.chdir(cwd)
     if config and config != DEFAULT_CONFIG_DIR:
         os.environ["CLAUDE_CONFIG_DIR"] = config
+    # clo, beside this script, runs claude inside tmux like every other launch, so a
+    # resumed session can be reached from clo-remote too.
+    clo = Path(__file__).resolve().parent / "clo"
+    if os.access(clo, os.X_OK):
+        os.execv(str(clo), [str(clo), "--run-claude", "--resume", sid, *claude_args])
     os.execvp("claude", ["claude", "--resume", sid, *claude_args])
 
 
