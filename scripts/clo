@@ -176,13 +176,17 @@ warn_iterm_tmux_prefs() {
 # place_iterm_tmux_tab — iTerm appends the tmux tab at the end of the window; start
 # iterm-place-tmux-tab.py in the background to move it into this tab's place once this
 # tab is buried. Only when tmux tabs open in this window and uv can run the script.
+# Waits (up to 3 s) until the helper has read this tab's position, since attaching
+# buries this tab and its position is gone after that.
 place_iterm_tmux_tab() {
     local id="${ITERM_SESSION_ID:-}" helper="${self:h}/iterm-place-tmux-tab.py"
-    [[ "$id" == w<->t<->p<->:* ]] || return 0
+    [[ "$id" == *:* ]] || return 0
     [[ "$(defaults read com.googlecode.iterm2 OpenTmuxWindowsIn 2>/dev/null || true)" == 2 ]] || return 0
     command -v uv >/dev/null && [[ -x "$helper" ]] || return 0
-    local index="${${id#w<->t}%%p*}"
-    "$helper" --gateway "${id#*:}" --index "$index" >>"$HOME/Library/Logs/clo-iterm-tab.log" 2>&1 &!
+    local ready; ready="$(mktemp -u "${TMPDIR:-/tmp}/clo-tab.XXXXXX")"
+    "$helper" --gateway "${id#*:}" --ready "$ready" >>"$HOME/Library/Logs/clo-iterm-tab.log" 2>&1 &!
+    repeat 30 { [[ -e "$ready" ]] && break; sleep 0.1 }
+    rm -f -- "$ready"
 }
 
 # run_claude [claude args...] — replace this process with claude, inside a tmux session named

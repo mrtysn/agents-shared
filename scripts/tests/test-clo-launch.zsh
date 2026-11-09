@@ -70,7 +70,7 @@ check "CLO_TMUX=0 runs claude directly" 0 \
     "claude --model y" -- CLO_TMUX=0 -- --run-claude --model y
 
 check "tab placer starts when tmux tabs open in the attaching window" 0 \
-    "uv run --quiet --script */iterm-place-tmux-tab.py --gateway ABC-1 --index 13" -- \
+    "uv run --quiet --script */iterm-place-tmux-tab.py --gateway ABC-1 --ready *" -- \
     TERM_PROGRAM=iTerm.app STUB_OPEN=2 ITERM_SESSION_ID=w0t13p0:ABC-1 -- --run-claude
 check "no tab placer when tmux opens native windows" 0 \
     "tmux -CC new-session*" -- TERM_PROGRAM=iTerm.app STUB_OPEN=0 ITERM_SESSION_ID=w0t13p0:ABC-1 -- --run-claude
