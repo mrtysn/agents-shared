@@ -29,6 +29,9 @@ Usage:
   usage-survey.py --json          one JSON object with every aggregate
   usage-survey.py --since 2026-08-01
   usage-survey.py --samples 20    also print sample corrections / judgments
+  usage-survey.py --no-index      parse every transcript; by default a per-file index under
+                                  $XDG_CACHE_HOME (else ~/.cache)/usage-survey/ keeps each file's
+                                  result until its mtime or size changes
 """
 
 import argparse
@@ -426,6 +429,81 @@ def scan_transcript(path, slug, sidechain=False):
                     elif name == "AskUserQuestion":
                         s["ask_user_question"] += 1
     return s
+
+
+# ---------------------------------------------------------------- per-file index
+
+# Every transcript's scan_transcript result, kept in a file under the user's cache dir and
+# keyed on (path, mtime, size): a rerun parses only the files that changed since the last one.
+# A changed file is parsed again whole. The index is tied to this script's own bytes, so an
+# edit to the parser starts a fresh one.
+COUNTER_KEYS = tuple(k for k, v in scan_transcript(os.devnull + ".none", "").items()
+                     if isinstance(v, collections.Counter))
+
+
+def index_path():
+    base = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
+    return os.path.join(base, "usage-survey", "index.json")
+
+
+def _script_hash():
+    import hashlib
+    with open(os.path.realpath(__file__), "rb") as fh:
+        return hashlib.sha1(fh.read()).hexdigest()
+
+
+class ScanIndex:
+    """Per-file scan results on disk. `scan` returns a cached result when the file's mtime and
+    size match, else parses it and records the new result; `save` drops entries whose file is
+    gone and writes the index when anything changed."""
+
+    def __init__(self, path):
+        self.path, self.version = path, _script_hash()
+        self.files, self.seen, self.changed = {}, set(), False
+        self.parsed = 0
+        if path:
+            try:
+                with open(path, encoding="utf-8") as fh:
+                    data = json.load(fh)
+                if data.get("version") == self.version:
+                    self.files = data.get("files") or {}
+            except (OSError, ValueError, AttributeError):
+                pass
+
+    def scan(self, path, slug, sidechain=False):
+        self.seen.add(path)
+        try:
+            st = os.stat(path)
+            stamp = [st.st_mtime_ns, st.st_size, slug, sidechain]
+        except OSError:
+            stamp = None
+        hit = self.files.get(path)
+        if stamp and hit and hit.get("stamp") == stamp:
+            s = dict(hit["scan"])
+            for k in COUNTER_KEYS:
+                s[k] = collections.Counter(s[k])
+            return s
+        s = scan_transcript(path, slug, sidechain)
+        self.parsed += 1
+        if stamp:
+            self.files[path] = {"stamp": stamp, "scan": s}
+            self.changed = True
+        return s
+
+    def save(self):
+        for path in [p for p in self.files if p not in self.seen and not os.path.exists(p)]:
+            del self.files[path]
+            self.changed = True
+        if not (self.path and self.changed):
+            return
+        try:
+            os.makedirs(os.path.dirname(self.path), exist_ok=True)
+            tmp = f"{self.path}.{os.getpid()}.tmp"
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump({"version": self.version, "files": self.files}, fh, separators=(",", ":"))
+            os.replace(tmp, self.path)
+        except OSError:
+            pass
 
 
 # ---------------------------------------------------------------- history.jsonl
@@ -1011,6 +1089,11 @@ def main():
     ap.add_argument("--sample", type=int, default=0, metavar="N",
                      help="--dump-asks: keep about N question rows, whole calls, stratified across projects")
     ap.add_argument("--seed", type=int, default=1, help="--sample: shuffle seed (default 1)")
+    ap.add_argument("--no-index", action="store_true",
+                     help="parse every transcript, neither reading nor writing the per-file index")
+    ap.add_argument("--index", metavar="FILE", help="per-file index to use (default: " + index_path() + ")")
+    ap.add_argument("--config-dir", action="append", metavar="DIR",
+                     help="scan this Claude config dir instead of discovering them; repeatable")
     args = ap.parse_args()
 
     if args.dump_prompts:
@@ -1042,7 +1125,8 @@ def main():
 
     sessions = []
     history = None
-    for cfg in config_dirs():
+    index = ScanIndex(None if args.no_index else (args.index or index_path()))
+    for cfg in args.config_dir or config_dirs():
         projects = os.path.join(cfg, "projects")
         for slug in sorted(os.listdir(projects)):
             pdir = os.path.join(projects, slug)
@@ -1053,7 +1137,7 @@ def main():
             for entry in sorted(os.listdir(pdir)):
                 full = os.path.join(pdir, entry)
                 if entry.endswith(".jsonl"):
-                    s = scan_transcript(full, slug)
+                    s = index.scan(full, slug)
                     dt = parse_ts(s["first_ts"])
                     if since and (dt is None or dt < since):
                         continue
@@ -1061,7 +1145,7 @@ def main():
                 elif os.path.isdir(os.path.join(full, "subagents")):
                     for sub in os.listdir(os.path.join(full, "subagents")):
                         if sub.endswith(".jsonl"):
-                            s = scan_transcript(os.path.join(full, "subagents", sub), slug, sidechain=True)
+                            s = index.scan(os.path.join(full, "subagents", sub), slug, sidechain=True)
                             dt = parse_ts(s["first_ts"])
                             if since and (dt is None or dt < since):
                                 continue
@@ -1075,6 +1159,7 @@ def main():
             history["count"] += h["count"]
             history["sessions"] += h["sessions"]
 
+    index.save()
     agg = aggregate(sessions, history)
     if args.json:
         json.dump(jsonable(agg), sys.stdout, indent=1)

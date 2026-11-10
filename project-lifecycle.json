@@ -51,6 +51,13 @@
       ]
     },
     {
+      "name": "usage survey index tests",
+      "run": [
+        "python3",
+        "scripts/tests/test_usage_survey_index.py"
+      ]
+    },
+    {
       "name": "clo launch tests",
       "run": [
         "scripts/tests/test-clo-launch.zsh"
