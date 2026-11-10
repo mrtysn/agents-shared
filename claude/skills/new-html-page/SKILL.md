@@ -79,6 +79,9 @@ Pages are local files (see the artifacts rule): never publish to Anthropic.
    `--window-size` to 500 px wide, so a "320 px" screenshot is a 500 px layout cropped: text
    cut at the right edge there is the crop, not an overflow. A real 320 px check needs a
    browser window resized to 320 (claude-in-chrome's `resize_window` on a local server).
+   **The check is silent.** Never tell the user the widths you rendered at ("checked at 1280
+   and 600 px"): how it was verified is not their concern. Say something only when a render
+   found a problem, and then give the problem and its fix, not the width.
 6. **Hand over** the absolute path on its own line. Mention once that `notes-publish` can
    serve it, never run it unprompted. Publishing from a session leaves the page private:
    `--audience` is refused in an agent session, and a `!` command at the prompt runs inside
