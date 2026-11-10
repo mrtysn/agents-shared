@@ -6,7 +6,9 @@
 #
 # Idempotent. Re-run after adding, renaming, or removing commands/skills:
 #   • new sources are linked
-#   • wrong-target symlinks are repaired
+#   • wrong-target symlinks into this repo, and dangling ones, are repaired
+#   • live symlinks into another repo (a private skill linked by its own install.sh)
+#     are left alone and reported, never repointed
 #   • orphaned symlinks (source renamed/deleted upstream) are pruned
 #   • real local override files (non-symlinks) are left untouched
 #
@@ -43,6 +45,7 @@ UNLINK=0
 
 linked=0 fixed=0 pruned=0
 skipped_local=()
+skipped_foreign=()
 RESULT=""
 
 mkdir -p "$DST_COMMANDS" "$DST_SKILLS" "$DST_RULES"
@@ -52,15 +55,26 @@ mkdir -p "$DST_COMMANDS" "$DST_SKILLS" "$DST_RULES"
 #   fixed    a symlink that pointed elsewhere was repaired
 #   current  already correct, nothing to do
 #   skipped  a real (non-symlink) file is there — a local override; left as-is
+#   foreign  a live symlink into another repo (a private skill of the same name,
+#            linked by that repo's install.sh) — left as-is, never repointed
 link_one() {
-    local src="$1" dst="$2"
+    local src="$1" dst="$2" target
+    dst_last="$dst"
     if [ -L "$dst" ]; then
-        if [ "$(readlink "$dst")" = "$src" ]; then RESULT=current; return; fi
+        target="$(readlink "$dst")"
+        if [ "$target" = "$src" ]; then RESULT=current; return; fi
+        # A dangling link is ours from a moved checkout: repair it. A live one
+        # pointing outside this repo belongs to another repo: leave it.
+        case "$target" in
+            "$REPO_DIR"/*) ;;
+            *) if [ -e "$dst" ]; then RESULT=foreign; return; fi ;;
+        esac
         rm "$dst"; ln -s "$src" "$dst"; RESULT=fixed; return
     fi
     if [ -e "$dst" ]; then RESULT=skipped; return; fi
     ln -s "$src" "$dst"; RESULT=linked
 }
+
 
 # prune_dir <dst_dir> <src_dir> — drop symlinks that point into src_dir but whose
 # target no longer exists (renamed/removed upstream). With --unlink, drop every
@@ -98,6 +112,7 @@ for src in "$SRC_COMMANDS"/*.md; do
         linked) linked=$((linked + 1)) ;;
         fixed)  fixed=$((fixed + 1)) ;;
         skipped) skipped_local+=("$(basename "$src")"); continue ;;
+        foreign) skipped_foreign+=("$(basename "$src") -> $(readlink "$dst_last")"); continue ;;
     esac
     cmd_total=$((cmd_total + 1))
 done
@@ -111,6 +126,7 @@ for src in "$SRC_SKILLS"/*/; do
         linked) linked=$((linked + 1)) ;;
         fixed)  fixed=$((fixed + 1)) ;;
         skipped) skipped_local+=("$(basename "$src")"); continue ;;
+        foreign) skipped_foreign+=("$(basename "$src") -> $(readlink "$dst_last")"); continue ;;
     esac
     skill_total=$((skill_total + 1))
 done
@@ -126,6 +142,7 @@ for src in "$SRC_RULES"/*.md; do
         linked) linked=$((linked + 1)) ;;
         fixed)  fixed=$((fixed + 1)) ;;
         skipped) skipped_local+=("$(basename "$src")"); continue ;;
+        foreign) skipped_foreign+=("$(basename "$src") -> $(readlink "$dst_last")"); continue ;;
     esac
     rule_total=$((rule_total + 1))
 done
@@ -181,5 +198,9 @@ printf '  Rules:    %d linked\n'                "$rule_total"
 printf '  Changes:  +%d new, ~%d repaired, -%d pruned\n' "$linked" "$fixed" "$pruned"
 if [ ${#skipped_local[@]} -gt 0 ]; then
     printf '  Local overrides preserved: %s\n' "${skipped_local[*]}"
+fi
+if [ ${#skipped_foreign[@]} -gt 0 ]; then
+    printf '  Name taken by another repo, not linked (rename one of them):\n'
+    printf '    %s\n' "${skipped_foreign[@]}"
 fi
 printf '\n'
