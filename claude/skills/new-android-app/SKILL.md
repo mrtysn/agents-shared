@@ -67,22 +67,24 @@ emulator, always `-s emulator-5554`.
    only entry, with `JAVA_HOME` (Java 17) and `ANDROID_HOME` set. APK:
    `app/build/outputs/apk/debug/app-debug.apk`. Bare-SDK: `./build.zsh` (tools present in
    build-tools 36.1.0; not re-run here).
-5. **Try it on the emulator before the phone.** AVD `Medium_Phone_API_36.0` exists. Headless, so no
-   window takes focus (commands from the grandma-launcher session; not re-run here):
+5. **Try it on the emulator before the phone.** The machine has one shared headless emulator (AVD
+   `Medium_Phone_API_36.0`, 12G /data), used by every session. `ensure-android-emulator` boots it
+   only if it is not already running, waits for boot, wakes it, and prints `emulator-5554`. Never
+   boot a second one or `emu kill` it: another session may be mid-test. The install and app commands
+   below are from the grandma-launcher session and were not re-run here:
 
-       ~/Library/Android/sdk/emulator/emulator -avd Medium_Phone_API_36.0 -no-window -no-audio \
-         -no-snapshot -no-boot-anim -gpu swiftshader_indirect >/dev/null 2>&1 &
-       until [ "$(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d '\r')" = 1 ]; do sleep 5; done
+       ensure-android-emulator
        adb -s emulator-5554 install -r app/build/outputs/apk/debug/app-debug.apk
        adb -s emulator-5554 shell am start -n <package>/.MainActivity
        adb -s emulator-5554 exec-out screencap -p > <scratchpad>/home.png
        adb -s emulator-5554 shell uiautomator dump /sdcard/u.xml
        adb -s emulator-5554 logcat -d -t 200 | grep -E 'AndroidRuntime|FATAL|<package>'
-       adb -s emulator-5554 emu kill
 
    Read the screenshot PNG: a launch that did not crash is not a layout check. `uiautomator dump`
-   gives tap targets for `input tap`. A sleeping emulator needs `input keyevent KEYCODE_WAKEUP` and
-   `wm dismiss-keyguard`. When done, `emu kill` and confirm nothing is left (`pgrep -fl qemu-system`).
+   gives tap targets for `input tap`. Leave the emulator running when done. Uninstall your own test
+   app if it is large, since /data is shared. ADB Reconnect is gaining an emulator row and an
+   `install` verb (`~/dev/adb-reconnect/docs/emulator-support-plan.md`); once they exist, use them
+   instead of raw adb.
 6. **Install on the user's phone**, only the one they named, through ADB Reconnect (the flow used for
    grandma-launcher on the Xiaomi; not re-run here):
 
