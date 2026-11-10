@@ -42,3 +42,20 @@ the unfinished part of the request: the user's use of a deliverable is never an 
 user step counts only when the agent's own remaining work waits on it, and unasked work is
 not offered. The hook's message says the same, and it counts a sub-agent resumed with
 SendMessage as pending, after it refused a turn that was waiting on one.
+
+## Requested content is a text-only turn
+
+The rule above pushes every turn to end in an AskUserQuestion, and that pushed requested content
+into the wrong place. A survey of the user's sessions since 2026-09-11 found 14 instances in 12
+sessions where the user asked to see something and did not get it: "list me all the names you
+suggested chronologically", "claude why do you ignore my table request", "I said give me the text
+already". Two shapes: the agent wrote the content as text in the same turn as a following tool call,
+and the screen showed a one-line summary in its place (confirmed with screenshots for text before an
+AskUserQuestion and text before a Skill call); or it asked a question or took an action instead of
+giving the content.
+
+The fix is at the source. The rule now says content the user asked to see is the last text of a turn
+with no tool call, and needs no proceed question until the next turn. `hooks/refuse-idle-end-of-turn.sh`
+lets such a turn end, so it does not fight the rule, and `hooks/refuse-requested-content-before-tool-call.sh`
+refuses, once per turn, the content written ahead of a question, skill, agent or session-message call.
+Both read one pattern, `hooks/show-request-pattern.txt`.

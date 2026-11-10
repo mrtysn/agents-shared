@@ -21,6 +21,12 @@ a device in hand, a reboot before a test), and only after checking you cannot do
 yourself. Work nobody asked for (restyling something to match, a related cleanup) is
 not offered either.
 
+**Content the user asked to see is the last text of a turn with no tool call.** List, show,
+give me, repeat, where is, table mean the content itself, not a summary or a decision. Text
+written before a tool call (AskUserQuestion, Skill, Agent or any other) can be collapsed on
+the user's screen to one summary line, so deliver it in a turn that ends in text only; that
+turn needs no proceed question, which comes in the next turn.
+
 **An answer that points at work still ends with the question.** Answering authorizes
 no edits ([question handling](question-handling.md)); offering the work as an option
 is what replaces stopping. A wish ends the same way: the proposal, then the question
@@ -29,6 +35,9 @@ is what replaces stopping. A wish ends the same way: the proposal, then the ques
 Exceptions: the user said stop, an `/away` stretch (decide, never ask), or a
 background job you are waiting on with nothing else to do.
 
-`hooks/refuse-idle-end-of-turn.sh` (Stop) refuses, once, a turn that ends otherwise.
+`hooks/refuse-idle-end-of-turn.sh` (Stop) refuses, once, a turn that ends otherwise, and lets
+a text-only turn through when the user asked to see content;
+`hooks/refuse-requested-content-before-tool-call.sh` (PreToolUse) refuses, once, that content
+written ahead of a question, skill or agent call.
 
 Provenance: [docs/provenance/end-every-turn-with-a-next-step.md](../../docs/provenance/end-every-turn-with-a-next-step.md).

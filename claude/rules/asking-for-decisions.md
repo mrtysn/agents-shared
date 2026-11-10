@@ -6,6 +6,8 @@ Never bury the ask in prose ("say the word", "let me know if you'd like me to",
 carrying the open decisions and the proceed question; steps only the user can take
 are options in it, not a reason to skip it
 ([end every turn with a next step](end-every-turn-with-a-next-step.md)).
+A question never stands in for content the user asked to see: the content comes first, as the
+last text of a turn with no tool call.
 
 Each question stands alone: it carries the facts the decision turns on, explains
 each option inside the option, puts the recommended option first marked
