@@ -143,6 +143,16 @@ check "user said that's all"                         pass  false "$(prompt "that
 check "already continuing (stop_hook_active)"        pass  true  "$(prompt 'build it')" "$(say $REPORT)"
 check "missing transcript"                           pass  false
 
+# Content the user asked to see is delivered as the last text of a turn with no tool call; no proceed question.
+NAMES=$'Here are the names you were given, oldest first: Aster, Birch, Cedar, Dune, Ember, Fable.'
+check "asked to see content, text-only turn"          pass  false "$(prompt 'list me all the names you suggested chronologically')" "$(say $NAMES)"
+check "asked to see content, after work"              pass  false "$(prompt 'give me the text already')" "$(bash_call 1)" "$(say $NAMES)"
+check "asked to see content, table prompt"            pass  false "$(prompt 'claude why do you ignore my table request')" "$(say $NAMES)"
+check "asked to see content, slash args"              pass  false "$(prompt $'<command-message>x</command-message>\n<command-name>/x</command-name>\n<command-args>show me them</command-args>')" "$(say $NAMES)"
+check "asked to see content, but a prose offer ends it" block false "$(prompt 'list me all the names')" "$(say "$NAMES"$'\n\nWant me to rename one?')"
+check "asked to see content, only a short line"       block false "$(prompt 'list me all the names')" "$(say 'Done.')"
+check "no request for content, same text"             block false "$(prompt 'rename the project')" "$(say $NAMES)"
+
 AWAY_OBLIGATION=$work/away-open check "away stretch open"  pass  false "$(prompt 'build it')" "$(say $REPORT)"
 
 # Real tails: cut the recorded transcript at the last line of the turn and run the hook on it.

@@ -25,6 +25,10 @@
 #   - stop_hook_active is true (the session already continued once because of a Stop hook),
 #   - an away stretch is open (hooks/refuse-stop-while-away.sh owns those turns, and they ask nothing),
 #   - the user's last prompt tells it to stop ("stop", "that's all", "pause"),
+#   - the user's last prompt asked to see content (hooks/show-request-pattern.txt: "list me", "show me", "where is",
+#     "table") and the turn ends in 40+ characters of text with no prose offer: content is delivered as the last text
+#     of a turn with no tool call, and the proceed question comes in the next turn (hooks/refuse-requested-content-
+#     before-tool-call.sh refuses the same content written before a tool call),
 #   - the transcript or the reader cannot be read: it never blocks on a read it could not make.
 # Background work is an Agent spawn not set to run in the foreground or a SendMessage that resumed a sub-agent,
 # both in any turn (a reviewer spawned two prompts back is still pending work); a Bash call with
@@ -58,9 +62,12 @@ if [[ -n $SESSION && -x $OBLIGATION ]]; then
   [[ $(print -rn -- "$STATE" | jq -r '.open // false' 2>/dev/null) == true ]] && exit 0
 fi
 
+SHOW_PATTERN=""
+[[ -r $HERE/show-request-pattern.txt ]] && SHOW_PATTERN=$(head -n1 $HERE/show-request-pattern.txt)
+
 ROWS=$(python3 "$READER" "$TRANSCRIPT" --kinds user,assistant,agents,calls,tools --launch-receipts --json --max-chars 400 2>/dev/null) || exit 0
 
-VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" '
+VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" --arg show "$SHOW_PATTERN" '
   def offer: "say the word|(do you |would you )?want me to|would you like me to|shall i |should i (go|proceed|build|run|start|do|edit|add|make|commit|fix|wire|set)|let me know (if|when|whether|which)|(?<!will )(?<!ll )(?<!to )(?<!would )(?<!can )(?<!could )(?<!it )(?<!that )tell me (to|if|when|which)|if you.?d like|if you want|if you prefer|ready (to (go|proceed) )?when you are|your call|up to you|(waits?|waiting) (for|on) your (word|go|call|ok)|on your (word|go-ahead|say-so)|the (choice|decision|question)( that [a-z ]+)? (is|here is)|which (one|would you|do you)";
   [ .[] | select(type == "object" and (.sidechain | not)) ] as $rows
   | ([ range(0; $rows | length) as $i | $rows[$i]
@@ -109,6 +116,7 @@ VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" '
       elif $phrase != "" then "offer\t\($phrase)"
       elif ($prompt | length) < 60 and ($prompt | test("^\\s*(stop|stop here|that.?s (all|it)|enough|nothing else|pause|hold on|wait|no more|done for (now|today))\\b"; "i")) then "pass"
       elif $a >= 0 and $workAfterAsk == 0 then "pass"
+      elif $show != "" and ($prompt | test($show)) and ($text | length) >= 40 then "pass"
       elif $pending > 0 or $workflowsPending > 0 then "pass"
       elif ($lastLine | test("^[\\s*_>#-]*nothing (else |more )?(is )?left\\b"; "i")) then "pass"
       else "idle" end
