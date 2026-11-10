@@ -11,7 +11,11 @@
 # 2. Stale background shells. A Stop hook cannot reach the model without blocking, so the warning rides on
 #    the next prompt: this session's background shells running over 60 minutes, from
 #    scripts/list-session-background-shells.sh (SESSION_SHELLS_LISTER overrides it), as one line. Silent when
-#    none. The lister costs about 100 ms, so its verdict is cached per session for 5 minutes.
+#    none. The lister costs 0.5-0.9 s cold (it snapshots every process and listening socket), and this
+#    hook's limit in settings.json is 3 s, so the prompt never waits on it: the hook prints the cached
+#    verdict whatever its age and refreshes a cache older than 5 minutes in a detached process. A
+#    session's first prompt carries no shells line. A prompt once timed out here (2026-11-10) because the
+#    cache was written only after the lister returned, so a killed run left the next prompt cold again.
 #
 # Both lines were part of the system-one prompt hook until 2026-10-15 and never used its model. They leave
 # in one additionalContext, newline-joined, skill line first. Never blocks; fails open and silent on any
@@ -46,18 +50,30 @@ STATE_DIR="$CONFIG_DIR/nudge-named-skills"
 SHELLS_WARN=""
 SHELLS_LISTER="${SESSION_SHELLS_LISTER:-$HERE/../scripts/list-session-background-shells.sh}"
 SHELLS_CACHE="${TMPDIR:-/tmp}/session-shells-warn-$(printf '%s' "$SESSION" | tr -dc 'A-Za-z0-9_-')"
+SHELLS_LOCK="$SHELLS_CACHE.refreshing"
+refresh_shells() { # runs detached from the prompt: list the shells, then replace the cache in one move
+    local stale n first warn=""
+    stale=$("$SHELLS_LISTER" --session "$SESSION" --older-than 60 2>/dev/null)
+    if [ -n "$stale" ]; then
+        # Top-level lines only: the lister indents a shell's children.
+        n=$(printf '%s\n' "$stale" | grep -c '^[^ ]')
+        first=$(printf '%s\n' "$stale" | head -1 | cut -c1-120)
+        warn="This session has $n background shell(s) running over 60 minutes (first: $first). Check whether each is still needed and stop the rest."
+    fi
+    printf '%s' "$warn" > "$SHELLS_CACHE.tmp.$$" 2>/dev/null && mv "$SHELLS_CACHE.tmp.$$" "$SHELLS_CACHE" 2>/dev/null
+    rmdir "$SHELLS_LOCK" 2>/dev/null
+}
 if [ -n "$SESSION" ] && [ -x "$SHELLS_LISTER" ]; then
-    if [ -n "$(find "$SHELLS_CACHE" -mmin -5 2>/dev/null)" ]; then
-        SHELLS_WARN=$(cat "$SHELLS_CACHE" 2>/dev/null)
-    else
-        STALE=$("$SHELLS_LISTER" --session "$SESSION" --older-than 60 2>/dev/null)
-        if [ -n "$STALE" ]; then
-            # Top-level lines only: the lister indents a shell's children.
-            STALE_N=$(printf '%s\n' "$STALE" | grep -c '^[^ ]')
-            STALE_FIRST=$(printf '%s\n' "$STALE" | head -1 | cut -c1-120)
-            SHELLS_WARN="This session has $STALE_N background shell(s) running over 60 minutes (first: $STALE_FIRST). Check whether each is still needed and stop the rest."
+    # The prompt never waits on the lister (0.5-0.9 s cold, and the hook's limit is 3 s): it uses the
+    # cached verdict whatever its age, and a cache older than 5 minutes (or none) is refreshed in a
+    # detached process. A session's first prompt therefore carries no shells line; the next one does.
+    [ -r "$SHELLS_CACHE" ] && SHELLS_WARN=$(cat "$SHELLS_CACHE" 2>/dev/null)
+    if [ -z "$(find "$SHELLS_CACHE" -mmin -5 2>/dev/null)" ]; then
+        # one refresh at a time; a lock older than 2 minutes belongs to a killed refresh
+        [ -n "$(find "$SHELLS_LOCK" -mmin +2 2>/dev/null)" ] && rmdir "$SHELLS_LOCK" 2>/dev/null
+        if mkdir "$SHELLS_LOCK" 2>/dev/null; then
+            (refresh_shells) </dev/null >/dev/null 2>&1 &
         fi
-        printf '%s' "$SHELLS_WARN" > "$SHELLS_CACHE" 2>/dev/null
     fi
 fi
 

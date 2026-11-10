@@ -75,12 +75,42 @@ while IFS=$'\t' read -r expected prompt; do
     check "$expected <- $prompt" "$ok"
 done < "$CASES"
 
+# The shells line is refreshed in a detached process, so a session's first prompt carries none: prime
+# the session with one prompt, wait for its cache, and the next prompt carries the line.
+prime() { # lister session
+    run "$1" "$2" "hello there how are you doing today" >/dev/null
+    local i
+    for i in $(seq 1 50); do [ -e "$TMPDIR/session-shells-warn-$2" ] && return 0; sleep 0.1; done
+    return 1
+}
+out=$(run "$WORK/lister-shell" shells-first "hello there how are you doing today" | context)
+[ -z "$out" ] && check "first prompt carries no shells line" 1 || check "first prompt carries no shells line" 0
+prime "$WORK/lister-shell" shells-a
 out=$(run "$WORK/lister-shell" shells-a "hello there how are you doing today" | context)
 case "$out" in *"1 background shell(s) running over 60 minutes"*) check "shells line alone" 1 ;; *) check "shells line alone" 0 ;; esac
+prime "$WORK/lister-shell" shells-b
 out=$(run "$WORK/lister-shell" shells-b "please use search-history to find that" | context)
 case "$out" in *"/search-history"*"background shell"*) check "skill line then shells line" 1 ;; *) check "skill line then shells line" 0 ;; esac
+prime "$WORK/lister-shell" shells-c
 out=$(run "$WORK/lister-shell" shells-c "<agent-message from=\"x\"> done </agent-message>" | context)
 case "$out" in *"background shell"*) check "shells line on relayed text" 1 ;; *) check "shells line on relayed text" 0 ;; esac
+
+# A slow lister never delays a prompt: cold cache, and a stale cache that is used as it stands.
+cat > "$WORK/lister-slow" <<'STUB'
+#!/bin/bash
+sleep 5
+echo "bash 4242 elapsed 90m: sleep 9999"
+STUB
+chmod +x "$WORK/lister-slow"
+start=$(date +%s)
+run "$WORK/lister-slow" slow-cold "hello there how are you doing today" >/dev/null
+[ $(( $(date +%s) - start )) -lt 3 ] && check "cold cache does not wait on the lister" 1 || check "cold cache does not wait on the lister" 0
+printf '%s' "This session has 2 background shell(s) running over 60 minutes (first: old). Check." > "$TMPDIR/session-shells-warn-slow-stale"
+touch -t 202001010000 "$TMPDIR/session-shells-warn-slow-stale"
+start=$(date +%s)
+out=$(run "$WORK/lister-slow" slow-stale "hello there how are you doing today" | context)
+[ $(( $(date +%s) - start )) -lt 3 ] && check "stale cache does not wait on the lister" 1 || check "stale cache does not wait on the lister" 0
+case "$out" in *"2 background shell(s)"*) check "stale cache is still used" 1 ;; *) check "stale cache is still used" 0 ;; esac
 out=$(run "$WORK/lister-none" shells-d "hello there how are you doing today" | context)
 [ -z "$out" ] && check "no shells, no skill, no output" 1 || check "no shells, no skill, no output" 0
 out=$(run "$WORK/does-not-exist" shells-e "hello there how are you doing today" | context)
