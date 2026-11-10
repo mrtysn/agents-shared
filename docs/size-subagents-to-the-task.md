@@ -67,6 +67,9 @@ costs a brief, a report and a context of its own.
   cleanly until its timeout (up to 30 minutes).
 - **Where any file it produces goes**, per
   [decide file location and format by reader](on-demand/decide-file-location-and-format-by-reader.md).
+  An Explore agent is read-only and refuses to write a file even through Bash, so its brief
+  asks for findings in the report and the parent saves them (2026-11-10: two of three
+  Explore surveys briefed to write a scratch file handed back unwritten).
 
 ## Provenance
 

@@ -80,7 +80,8 @@ deny() {
         guide_limits
         echo
         echo "Put this table, these limits and a ~250-word report cap in the sub-agent's brief,"
-        echo "and name where any file it produces goes. Re-issue the call."
+        echo "and name where any file it produces goes (an Explore agent is read-only and refuses to"
+        echo "write files: ask it for findings in its report, not a file). Re-issue the call."
     } >&2
     exit 2
 }
@@ -143,7 +144,7 @@ Edits never go in the haiku row: nothing checks a sub-agent's edits mid-run. Whe
 Keep it small while it runs:
 $(guide_limits)
 
-Put this table, these limits and a ~250-word report cap in the sub-agent's brief, and name where any file it produces goes."
+Put this table, these limits and a ~250-word report cap in the sub-agent's brief, and name where any file it produces goes (an Explore agent is read-only and refuses to write files: ask it for findings in its report, not a file)."
 fi
 [ "$IMPL" = 1 ] && deny "$IMPL_SENTENCE"
 
