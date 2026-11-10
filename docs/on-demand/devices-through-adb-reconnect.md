@@ -4,21 +4,21 @@
 `adb` against a real device.** Device work goes through the app's agent door:
 
     adb-reconnect devices
-    adb-reconnect device <name> status | connect | ui | screenshot | notifications | tap | key | open-settings | push
+    adb-reconnect device <name> status | connect | ui | screenshot | notifications | tap | key | open-settings | push | install <apk>
     adb-reconnect device <name> shell -- <command>     # only once the owner allows shell for that device
 
 Every adb call from any session goes through that one server. A raw `adb reconnect offline`,
 `disconnect`, `connect` or `kill-server` drops or redirects connections the owner's mirrors and other
 sessions depend on. A raw `adb install` skips the app's busy guard and activity log.
 
-- **Installing an APK on a phone:** the door has no `install` verb yet
-  (`~/dev/adb-reconnect/docs/emulator-support-plan.md`). Use `push` to `/sdcard/Download` and ask
-  the owner to tap it, or `shell -- pm install …` where shell is allowed. Do not use raw adb.
+- **Installing an APK:** `adb-reconnect device <name> install /abs/path/app.apk` (`install -r`,
+  600 s by default, `--timeout` for more). Never raw `adb install`.
 - **A phone dropped off:** `adb-reconnect device <name> connect`, never `adb reconnect` or
   `adb connect`.
-- **The one exception** is the shared headless emulator: `ensure-android-emulator` starts it if
-  needed and prints `emulator-5554`, and `adb -s emulator-5554 …` is allowed. Never boot a second
-  one, and never `emu kill` it.
+- **The shared headless emulator** is the app's `Emulator` row, with no raw-adb exception:
+  `adb-reconnect device emulator connect` boots it if needed (so does `ensure-android-emulator`), and
+  every verb works on it, `shell` included. Never boot a second one; `stop-emulator` waits for the
+  owner's click.
 
 Read `~/dev/adb-reconnect/CLAUDE.md` for the full rules.
 

@@ -31,11 +31,10 @@ Do not ask about the repo here; `/new-repo` does.
 Read `~/dev/adb-reconnect/CLAUDE.md` first (a subdirectory CLAUDE.md does not load by itself; the
 grandma-launcher session ran adb directly and only read it afterwards). Its rules: agents do not run
 `adb` against a real device and never kill or restart the adb server; device work goes through
-`adb-reconnect devices | device <name> status|connect|push|shell -- …|screenshot|ui|tap`. `shell`
-needs "Let agents run shell commands" switched on for that device; if it is off, say so, or push the
-APK to `/sdcard/Download` for the user to tap. The user works phone and watch in parallel: pin every
-call with `-s <serial>`, disconnect by address. The one direct-adb exception is your own headless
-emulator, always `-s emulator-5554`.
+`adb-reconnect devices | device <name> status|connect|install|push|shell -- …|screenshot|ui|tap`.
+`shell` needs "Let agents run shell commands" switched on for that device; if it is off, say so. The
+shared headless emulator is the app's `Emulator` row and goes through the same door, with shell on by
+default: there is no raw-adb exception for it any more.
 
 ## Steps
 
@@ -68,34 +67,34 @@ emulator, always `-s emulator-5554`.
    `app/build/outputs/apk/debug/app-debug.apk`. Bare-SDK: `./build.zsh` (tools present in
    build-tools 36.1.0; not re-run here).
 5. **Try it on the emulator before the phone.** The machine has one shared headless emulator (AVD
-   `Medium_Phone_API_36.0`, 12G /data), used by every session. `ensure-android-emulator` boots it
-   only if it is not already running, waits for boot, wakes it, and prints `emulator-5554`. Never
-   boot a second one or `emu kill` it: another session may be mid-test. The install and app commands
-   below are from the grandma-launcher session and were not re-run here:
+   `Medium_Phone_API_36.0`, 12G /data), used by every session and owned by ADB Reconnect as its
+   `Emulator` row. `connect` boots it only if it is not running, waits for the boot (about 30 s cold)
+   and wakes it; `ensure-android-emulator` does the same and prints `emulator-5554`. Never boot a
+   second one; `stop-emulator` waits for the owner's click, so do not ask for it. `connect`, `install`,
+   `ui`, `screenshot` and `shell` were run on it on 2026-11-10; the `am start` and `logcat` lines were not:
 
-       ensure-android-emulator
-       adb -s emulator-5554 install -r app/build/outputs/apk/debug/app-debug.apk
-       adb -s emulator-5554 shell am start -n <package>/.MainActivity
-       adb -s emulator-5554 exec-out screencap -p > <scratchpad>/home.png
-       adb -s emulator-5554 shell uiautomator dump /sdcard/u.xml
-       adb -s emulator-5554 logcat -d -t 200 | grep -E 'AndroidRuntime|FATAL|<package>'
+       adb-reconnect device emulator connect
+       adb-reconnect device emulator install "$PWD/app/build/outputs/apk/debug/app-debug.apk"
+       adb-reconnect device emulator shell -- am start -n <package>/.MainActivity
+       adb-reconnect device emulator screenshot          # prints the PNG's path
+       adb-reconnect device emulator ui                  # one line per control with its centre
+       adb-reconnect device emulator shell -- logcat -d -t 200 | grep -E 'AndroidRuntime|FATAL|<package>'
 
-   Read the screenshot PNG: a launch that did not crash is not a layout check. `uiautomator dump`
-   gives tap targets for `input tap`. Leave the emulator running when done. Uninstall your own test
-   app if it is large, since /data is shared. ADB Reconnect is gaining an emulator row and an
-   `install` verb (`~/dev/adb-reconnect/docs/emulator-support-plan.md`); once they exist, use them
-   instead of raw adb.
+   Read the screenshot PNG: a launch that did not crash is not a layout check. `ui` gives tap targets
+   for `adb-reconnect device emulator tap <x> <y>`. Leave the emulator running when done. Uninstall
+   your own test app if it is large (`shell -- pm uninstall <package>`), since /data is shared.
 6. **Install on the user's phone**, only the one they named, through ADB Reconnect (the flow used for
    grandma-launcher on the Xiaomi; not re-run here):
 
        adb-reconnect device "<name>" status
-       adb-reconnect device "<name>" push app/build/outputs/apk/debug/app-debug.apk /sdcard/Download
-       adb-reconnect device "<name>" shell -- 'cp /sdcard/Download/app-debug.apk /data/local/tmp/a.apk && pm install -r /data/local/tmp/a.apk'
+       adb-reconnect device "<name>" install "$PWD/app/build/outputs/apk/debug/app-debug.apk"
 
-   A script that installs itself (`./build.zsh --install "<device>"` in pad-bridge, lava-lamp,
-   link-keeper) takes the serial from `adb-reconnect --serial "<name or hardware serial>" --wait 30`
-   and then runs `adb -s "$serial" install -r`; copy that block from pad-bridge. It takes a named
-   device and refuses without one: no default ("a default would put a build on the wrong one").
+   `install` runs `install -r` (600 s by default, `--timeout` for more) and needs "Let agents tap,
+   install and open settings", which is on unless the owner turned it off. A script that installs
+   itself (`./build.zsh --install "<device>"`) calls the same `adb-reconnect device "<device>" install`.
+   pad-bridge, lava-lamp and link-keeper still run raw `adb -s "$serial" install -r` after
+   `adb-reconnect --serial`; do not copy that block. The script takes a named device and refuses
+   without one: no default ("a default would put a build on the wrong one").
    Xiaomi/HyperOS needs "Install via USB" on and refuses adb while locked. Sideloaded apps are signed
    with the debug key so `install -r` updates in place; a different key needs an uninstall, which
    wipes app data: ask first. A special permission (`WRITE_SECURE_SETTINGS`) is one `pm grant` per
@@ -132,6 +131,6 @@ emulator, always `-s emulator-5554`.
   allow cleartext for that one host in `network_security_config.xml`. Never point a test at a real
   session of the user's: attaching a client resizes tmux for everyone, so run a second server on its
   own tmux socket and port. Preseed the app's settings with
-  `adb -s emulator-5554 shell run-as <package> …` into `shared_prefs/`.
+  `adb-reconnect device emulator shell -- run-as <package> …` into `shared_prefs/`.
 - `assembleRelease` only when a baseline profile matters (grandma-launcher); it is signed with the
   debug key for a sideloaded app. Otherwise install the debug build.
