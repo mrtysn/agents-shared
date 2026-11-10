@@ -144,11 +144,11 @@ regen_patch() {
 }
 
 # link_targets <md> <skill_dir> — absolute-ish paths of the relative links in one .md file
-# (markdown links, and {baseDir}/… references). Code-like targets are dropped.
+# (markdown links, and {baseDir}/… references). Code-like targets and any target with a scheme (http:, mailto:, node:) are dropped.
 link_targets() {
     local md="$1" d="$2"
     { grep -o -E '\]\([^)[:space:]]+\)' "$md" 2>/dev/null | sed -E 's/^\]\(//; s/\)$//' \
-        | grep -v -E '^(https?:|mailto:|#|/)' | sed -E 's/[#?].*$//' | grep -E '\.[A-Za-z0-9]+$' \
+        | grep -v -E '^([A-Za-z][A-Za-z0-9+.-]*:|#|/)' | sed -E 's/[#?].*$//' | grep -E '\.[A-Za-z0-9]+$' \
         | while IFS= read -r t; do echo "$(dirname "$md")/$t"; done
       grep -o -E '\{baseDir\}/[^[:space:]`)"'"'"']+' "$md" 2>/dev/null | sed -E 's#^\{baseDir\}/##' \
         | while IFS= read -r t; do echo "$d/$t"; done
