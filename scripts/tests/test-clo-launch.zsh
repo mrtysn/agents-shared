@@ -12,11 +12,12 @@ cat > "$stub/tmux" <<EOF
 #!/bin/zsh
 print -r -- "tmux \$*" >> "$calls"
 [[ \$1 == has-session ]] && exit 1
+[[ \$1 == display ]] && { print -r -- "\${STUB_PANES:-11} work-7f"; exit 0; }
 exit 0
 EOF
 cat > "$stub/claude" <<EOF
 #!/bin/zsh
-print -r -- "claude \$*" >> "$calls"
+print -r -- "claude \$* name=\${CLAUDE_CODE_SESSION_NAME:-}" >> "$calls"
 EOF
 # STUB_OPEN sets OpenTmuxWindowsIn; every other key reads as missing (defaults fails).
 cat > "$stub/defaults" <<EOF
@@ -75,6 +76,32 @@ check "tab placer starts when tmux tabs open in the attaching window" 0 \
 check "no tab placer when tmux opens native windows" 0 \
     "tmux -CC new-session*" -- TERM_PROGRAM=iTerm.app STUB_OPEN=0 ITERM_SESSION_ID=w0t13p0:ABC-1 -- --run-claude
 [[ "$(<"$calls")" != *uv* ]] || { (( fails++ )); print "FAIL tab placer ran with native windows"; }
+
+base="${${stub:t}//[^A-Za-z0-9_-]/-}"  # clo names a session after the folder, which is $stub
+check "the tmux name is handed to claude as its peer name" 0 \
+    "tmux new-session -s $base-?? -c * -e CLAUDE_CODE_SESSION_NAME=$base-?? claude" -- \
+    TERM_PROGRAM=Apple_Terminal -- --run-claude
+[[ "$(<"$calls")" =~ "new-session -s ([^ ]+) .*CLAUDE_CODE_SESSION_NAME=([^ ]+)" && $match[1] == $match[2] ]] \
+    || { (( fails++ )); print "FAIL tmux and peer names differ"; }
+mkdir -p "$stub/.claude/sessions"
+for h in {0..255}; do printf '{"name": "%s-%02x"}\n' "$base" $h; done > "$stub/.claude/sessions/1.json"
+check "a name a running session already has as its peer name is skipped" 0 \
+    "tmux new-session*" -- TERM_PROGRAM=Apple_Terminal -- --run-claude
+[[ "$(grep -c 'tmux has-session' "$calls")" == 20 ]] || { (( fails++ )); print "FAIL taken peer names were not skipped"; }
+rm -f -- "$stub/.claude/sessions/1.json"
+check "alone in a tmux session, claude takes the session's name" 0 \
+    "claude --model z name=work-7f" -- TMUX=/tmp/s,1,0 -- --run-claude --model z
+check "with several panes, claude names itself" 0 \
+    "claude --model z name=" -- TMUX=/tmp/s,1,0 STUB_PANES=12 -- --run-claude --model z
+[[ "$(<"$calls")" != *name=work-7f* ]] || { (( fails++ )); print "FAIL shared pane name"; }
+: > "$stub/cd"
+check "tmux mode marks the client tab for closing" 0 \
+    "tmux -CC new-session*" -- TERM_PROGRAM=iTerm.app CLO_CD_FILE="$stub/cd" -- --run-claude
+[[ -e "$stub/cd.close" ]] || { (( fails++ )); print "FAIL no close marker in tmux mode"; }
+rm -f -- "$stub/cd.close"
+check "no close marker outside tmux mode" 0 \
+    "tmux new-session*" -- TERM_PROGRAM=Apple_Terminal CLO_CD_FILE="$stub/cd" -- --run-claude
+[[ ! -e "$stub/cd.close" ]] || { (( fails++ )); print "FAIL close marker outside tmux mode"; }
 
 print "clo launch tests: $n cases, $fails failed"
 (( fails == 0 ))

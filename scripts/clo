@@ -206,17 +206,39 @@ run_claude() {
         local base="${${PWD:t}//[^A-Za-z0-9_-]/-}" name
         repeat 20 {
             name="$base-$(printf %02x $(( RANDOM % 256 )))"
-            "${t[@]}" has-session -t "=$name" 2>/dev/null || break
+            "${t[@]}" has-session -t "=$name" 2>/dev/null && continue
+            peer_name_taken "$name" || break
         }
         local cmd="claude" a
         for a in "$@"; do cmd+=" ${(q)a}"; done
         # A running tmux server starts the session with its own environment, so a
         # session from another Claude config (a resume) has to be handed its config dir.
-        local -a env=()
-        [[ -n "${CLAUDE_CONFIG_DIR:-}" ]] && env=(-e "CLAUDE_CONFIG_DIR=$CLAUDE_CONFIG_DIR")
+        # CLAUDE_CODE_SESSION_NAME makes the tmux name the session's peer name as well, the
+        # name CC Sessions shows; Claude Code's generated title is unaffected.
+        local -a env=(-e "CLAUDE_CODE_SESSION_NAME=$name")
+        [[ -n "${CLAUDE_CONFIG_DIR:-}" ]] && env+=(-e "CLAUDE_CONFIG_DIR=$CLAUDE_CONFIG_DIR")
+        # In tmux mode this tab is iTerm's hidden tmux client, and it shows again as a bare
+        # shell once tmux ends; the marker tells the shell function (clo --init zsh) to close it.
+        (( ${#cc} )) && [[ -n "${CLO_CD_FILE:-}" ]] && : > "$CLO_CD_FILE.close"
         exec "${t[@]}" "${cc[@]}" new-session -s "$name" -c "$PWD" "${env[@]}" "$cmd"
     fi
+    # Alone in a tmux session (clo-remote starts sessions this way), the tmux session's name
+    # becomes the peer name; with several panes they would share it, so Claude picks its own.
+    if [[ -n "${TMUX:-}" && -z "${CLAUDE_CODE_SESSION_NAME:-}" ]] && command -v tmux >/dev/null; then
+        local one; one="$(tmux display -p '#{session_windows}#{window_panes} #S' 2>/dev/null || true)"
+        [[ "$one" == "11 "* ]] && export CLAUDE_CODE_SESSION_NAME="${one#11 }"
+    fi
     exec claude "$@"
+}
+
+# peer_name_taken NAME — whether a running Claude Code session already has NAME as its peer
+# name; Claude Code keeps one small file per running session in its config dir.
+peer_name_taken() {
+    local f
+    for f in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/sessions/*.json(N); do
+        grep -q "\"name\": *\"$1\"" "$f" 2>/dev/null && return 0
+    done
+    return 1
 }
 
 # launch_claude <dir> <model> <effort> <first message or ""> [claude args...]
@@ -268,6 +290,13 @@ clo() {
     CLO_CD_FILE="$f" command clo "$@"
     rc=$?
     d="$(cat -- "$f" 2>/dev/null)"
+    # "$f.close": the session ran in iTerm's tmux mode, this tab was the hidden tmux client,
+    # and after tmux ends it is only a stray shell.
+    if [[ -e "$f.close" ]]; then
+        command rm -f -- "$f" "$f.close"
+        (( rc == 0 )) && exit 0
+        return $rc
+    fi
     command rm -f -- "$f"
     [[ -n "$d" && -d "$d" && "$d" != "$PWD" ]] && cd -- "$d"
     return $rc
