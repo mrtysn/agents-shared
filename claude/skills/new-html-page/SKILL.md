@@ -79,10 +79,11 @@ Pages are local files (see the artifacts rule): never publish to Anthropic.
    `--window-size` to 500 px wide, so a "320 px" screenshot is a 500 px layout cropped: text
    cut at the right edge there is the crop, not an overflow. A real 320 px check needs a
    browser window resized to 320 (claude-in-chrome's `resize_window` on a local server).
-   **The check is silent.** Never tell the user the widths you rendered at ("checked at 1280
-   and 600 px"): how it was verified is not their concern. Say something only when a render
-   found a problem, and then give the problem and its fix, not the width.
-6. **Hand over** the absolute path on its own line. Mention once that `notes-publish` can
+6. **Hand over** the absolute path on its own line, then the finding in a line or two. The
+   closing reply never says how the page was checked (widths, "rendered", "reads cleanly"),
+   how it is built (contents column, `ws-` components, offline, light and dark), or where the
+   file lives ("stays local", "nothing to commit"), and never lists its sections. Two things
+   are said: a problem a render found, with its fix, and a check that could not run. Mention once that `notes-publish` can
    serve it, never run it unprompted. Publishing from a session leaves the page private:
    `--audience` is refused in an agent session, and a `!` command at the prompt runs inside
    it, so it is refused too. To make a page public, give the user the `cd <folder> &&
