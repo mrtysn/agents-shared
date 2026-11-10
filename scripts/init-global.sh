@@ -147,6 +147,30 @@ export DEV_ROOT="$DEV_ROOT"
 EOF
 mv "$ENV_FILE.tmp" "$ENV_FILE"
 
+# Claude Code's Bash tool does not read ~/.zshrc.base, so skills that run
+# "$AGENTS_SHARED/scripts/…" found it empty. Its settings.json env reaches every
+# tool call; the value goes there too, merged into what the file already holds.
+SETTINGS_FILE="$CLAUDE_DIR/settings.json"
+if [ -f "$SETTINGS_FILE" ] && command -v python3 >/dev/null; then
+    python3 - "$SETTINGS_FILE" "$REPO_DIR" <<'PY'
+import json, os, shutil, sys
+path, repo = sys.argv[1], sys.argv[2]
+with open(path) as f:
+    text = f.read()
+assert text.strip(), f"{path} is empty; not rewriting it"
+data = json.loads(text)
+env = data.setdefault("env", {})
+if env.get("AGENTS_SHARED") != repo:
+    env["AGENTS_SHARED"] = repo
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    shutil.copymode(path, tmp)
+    os.replace(tmp, path)
+PY
+fi
+
 # ── Summary ─────────────────────────────────────────────────────────────────
 printf '\n=== agents-shared global setup complete ===\n'
 printf '  Target:   %s\n'                       "$CLAUDE_DIR"
