@@ -16,7 +16,8 @@ sessions depend on. A raw `adb install` skips the app's busy guard and activity 
 - **A phone dropped off:** `adb-reconnect device <name> connect`, never `adb reconnect` or
   `adb connect`.
 - **The shared headless emulator** is the app's `Emulator` row, with no raw-adb exception:
-  `adb-reconnect device emulator connect` boots it if needed (so does `ensure-android-emulator`), and
+  `adb-reconnect device emulator connect --for "<why>"` boots it if needed (so does
+  `ensure-android-emulator --for "<why>"`); the owner sees who started it and why, and it stops after 30 idle minutes. And
   every verb works on it, `shell` included. Never boot a second one; `stop-emulator` waits for the
   owner's click.
 

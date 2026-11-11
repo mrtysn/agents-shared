@@ -69,11 +69,12 @@ default: there is no raw-adb exception for it any more.
 5. **Try it on the emulator before the phone.** The machine has one shared headless emulator (AVD
    `Medium_Phone_API_36.0`, 12G /data), used by every session and owned by ADB Reconnect as its
    `Emulator` row. `connect` boots it only if it is not running, waits for the boot (about 30 s cold)
-   and wakes it; `ensure-android-emulator` does the same and prints `emulator-5554`. Never boot a
+   and wakes it; `ensure-android-emulator --for "<why>"` does the same and prints `emulator-5554`. `--for`
+   is shown to the owner with who started it; one an agent started stops itself after 30 idle minutes. Never boot a
    second one; `stop-emulator` waits for the owner's click, so do not ask for it. `connect`, `install`,
    `ui`, `screenshot` and `shell` were run on it on 2026-11-10; the `am start` and `logcat` lines were not:
 
-       adb-reconnect device emulator connect
+       adb-reconnect device emulator connect --for "trying <app name> before the phone"
        adb-reconnect device emulator install "$PWD/app/build/outputs/apk/debug/app-debug.apk"
        adb-reconnect device emulator shell -- am start -n <package>/.MainActivity
        adb-reconnect device emulator screenshot          # prints the PNG's path
