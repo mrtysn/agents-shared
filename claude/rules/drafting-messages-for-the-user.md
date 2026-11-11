@@ -16,6 +16,8 @@ It goes out under their name, so every word in it is a claim they make.
   "together", and an ask says what it helps the work do. No line casts the recipient as
   someone to be sorted or managed ("so I know where to start with each of you"); that
   reads as condescending however it was meant.
+- **Turkish without the circumflex.** Write "hala", "halihazırda", "kar", never "hâlâ",
+  "hâlihazırda", "kâr": the user's written Turkish does not use â, î or û.
 - Copy-ready text goes in a code block.
 
 A Stop hook (`hooks/refuse-unasked-draft-reply.sh`) refuses, once, a drafted reply to
