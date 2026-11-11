@@ -43,7 +43,7 @@ sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
 MIN_QUOTE = 8
 CACHE_SECONDS = 86400
 MEDIA = re.compile(r"\.(png|jpe?g|gif|webp|avif|heic|bmp|tiff?|svg|ico|mp4|mov|webm|mkv|m4v|mp3|wav|m4a|ogg|flac|pdf)$", re.I)
-PUSH = re.compile(r"(?:^|[;&|(]\s*|\s)git((?:\s+-[Cc]\s+\S+)*)\s+push\b([^;&|\n#]*)")
+PUSH = re.compile(r"(?:^|[;&|(\n])\s*git((?:\s+-[Cc]\s+\S+)*)\s+push\b([^;&|\n#]*)")
 MARK_CODE = re.compile(r"#\s*public-push:\s*no personal content", re.I)
 MARK_USER = re.compile(r'#\s*public-push:\s*user approved\s+"([^"]+)"', re.I)
 
@@ -138,6 +138,16 @@ def outgoing(cwd, args):
     return remote, out.split()
 
 
+def approved_push(command):
+    """True when the command is a git push carrying the user-approved marker on that line, not a
+    command that merely contains the marker text (a test file written through a heredoc)."""
+    m = PUSH.search(command)
+    if not m:
+        return False
+    end = command.find("\n", m.end())
+    return bool(MARK_USER.search(command[m.end():end if end >= 0 else None]))
+
+
 def form_answers(command, cwd):
     """The user's words from the answers file of a decision form a `decision-wait` call served."""
     m = re.search(r"decision-wait\s+(\"[^\"]+\"|'[^']+'|\S+)", command)
@@ -169,7 +179,7 @@ def user_words_since_last_approved_push(path):
                if it["label"].startswith("TOOL-RESULT") and it["text"].lstrip().startswith("PreToolUse:")}
     last = -1
     for n, it in enumerate(rows):
-        if it["label"] == "CALL Bash" and MARK_USER.search(it["text"]) and it.get("tool_use_id") not in refused:
+        if it["label"] == "CALL Bash" and approved_push(it["text"]) and it.get("tool_use_id") not in refused:
             last = n
     said = []
     for n, it in enumerate(rows):
