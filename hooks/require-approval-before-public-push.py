@@ -175,11 +175,13 @@ def form_answers(command, cwd):
 def user_words_since_last_approved_push(path):
     from transcript_items import is_reply_boundary, is_typed_prompt, items  # noqa: E402
     rows = list(items(path, want={"user", "agents", "calls", "tools"}))
-    refused = {it.get("tool_use_id") for it in rows
-               if it["label"].startswith("TOOL-RESULT") and it["text"].lstrip().startswith("PreToolUse:")}
+    # Only a push that ran counts: a refused one never did, and the call being checked now is
+    # already in the transcript with no result yet.
+    ran = {it.get("tool_use_id") for it in rows
+           if it["label"].startswith("TOOL-RESULT") and not it["text"].lstrip().startswith("PreToolUse:")}
     last = -1
     for n, it in enumerate(rows):
-        if it["label"] == "CALL Bash" and approved_push(it["text"]) and it.get("tool_use_id") not in refused:
+        if it["label"] == "CALL Bash" and approved_push(it["text"]) and it.get("tool_use_id") in ran:
             last = n
     said = []
     for n, it in enumerate(rows):
