@@ -28,3 +28,4 @@ never-truncate-before-reading	Write	content	open\([^)]*,[[:space:]]*['"]w['"]	-	
 commit-only-your-paths	Bash	command	(^|[;&|(`])[[:space:]]*git[[:space:]]+(-C[[:space:]]+[^[:space:]]+[[:space:]]+)?commit([[:space:]]|$)	[[:space:]]--[[:space:]]+[^[:space:]-]	deny-once
 devices-through-adb-reconnect	Bash	command	(^|[;&|(`/])[[:space:]]*adb[[:space:]]	-	deny-once
 external-drive-mount-points	Bash	command	(^|[;&|(`])[[:space:]]*(ls|diskutil|df)[[:space:]].*(/Volumes|list|info|external)|grep[^;&|]*/Volumes	-	note-once
+drive-mac-ui-through-agent-ui-clicker	Bash	command	osascript.*System Events|(^|[;&|(`])[[:space:]]*(cliclick|screencapture)[[:space:]]	agent-ui-clicker	note-once
