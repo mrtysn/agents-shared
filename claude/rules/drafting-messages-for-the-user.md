@@ -13,9 +13,9 @@ It goes out under their name, so every word in it is a claim they make.
   No stock lines ("See you then", "Looking forward", "Hope you're well") unless
   they write that way.
 - **Collaborative and kind.** Write as a teammate among peers: shared work is "we" and
-  "together", and an ask says what it helps the work do. No line sizes up, sorts or manages
-  the recipient ("so I know where to start with each of you", "whether you've done X
-  before"); that reads as condescending however it was meant.
+  "together", and an ask says what it helps the work do. No line casts the recipient as
+  someone to be sorted or managed ("so I know where to start with each of you"); that
+  reads as condescending however it was meant. Asking about their experience is fine.
 - Copy-ready text goes in a code block.
 
 A Stop hook (`hooks/refuse-unasked-draft-reply.sh`) refuses, once, a drafted reply to
