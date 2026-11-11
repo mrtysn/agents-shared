@@ -23,8 +23,10 @@ echo "$n" > "$count_file"
 
 # CC Sessions' Guards menu makes this file to skip the ask in every session, until removed
 all_file="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/subagent-guard/bypass-all-sessions"
-
-if (( n > BUDGET )) && [[ ! -e "$asked_file" ]] && [[ ! -e "$all_file" ]]; then
+# A session launched with CLAUDE_SUBAGENT_GUARD_BYPASS=1 skips the ask: an orchestrator sets
+# it on the sessions it starts, whose design, build, review and fix agents pass the budget.
+if (( n > BUDGET )) && [[ ! -e "$asked_file" ]] && [[ ! -e "$all_file" ]] \
+   && [[ "${CLAUDE_SUBAGENT_GUARD_BYPASS:-}" != 1 ]]; then
   : > "$asked_file"
   echo "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"ask\",\"permissionDecisionReason\":\"Spawn #$n this session (budget $BUDGET) — approve for the rest of this session?\"}}"
 fi

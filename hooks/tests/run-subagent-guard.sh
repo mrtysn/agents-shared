@@ -36,6 +36,16 @@ check deny /p/x/subagents/agent-1.jsonl
 # removed, the next spawn past the budget asks again
 rm -f "$CFG/subagent-guard/bypass-all-sessions"
 check ask /p/x.jsonl
+# launched with CLAUDE_SUBAGENT_GUARD_BYPASS=1, a fresh session past its budget passes; nesting is still refused
+rm -f "/tmp/claude-spawn-count-$SID" "/tmp/claude-spawn-asked-$SID"
+export CLAUDE_SUBAGENT_GUARD_BYPASS=1
+for _ in 1 2 3 4 5 6 7 8 9 10; do check pass /p/x.jsonl; done
+check deny /p/x/subagents/agent-1.jsonl
+unset CLAUDE_SUBAGENT_GUARD_BYPASS
+# unset again, a fresh session asks past its budget
+rm -f "/tmp/claude-spawn-count-$SID" "/tmp/claude-spawn-asked-$SID"
+for _ in 1 2 3 4 5 6 7 8; do check pass /p/x.jsonl; done
+check ask /p/x.jsonl
 
 echo "$((total - fail))/$total passed"
 [ "$fail" = 0 ]
