@@ -1,1 +1,1 @@
-(?i)\b(list|show|give|repeat|print|display)\b.{0,20}\b(me|us)\b|\bwhere is\b|\btable\b|\ball the\b
+(?i)\b(list|show|give|repeat|print|display)\b.{0,20}\b(me|us)\b|\bwhere is\b|\btable\b|\ball the\b|\b(repeat|reprint)\s+(the|them|it|those|these|that|only)\b
