@@ -39,4 +39,16 @@ and many parallel sessions, that ask is repeated all day.
 - Anything that should never be in git — secrets, local config, generated output
   the repo ignores — stays out regardless.
 
+## A public repo waits for approval
+
+**Pushing to a public repo publishes, and a force-push does not take it back.** New
+personal information goes to one only after the user approves each item: names of
+people or companies, contact addresses, clients, business terms or prices, unreleased
+projects, private repos described, pictures of private work. Commit it locally, show
+the user the list, ask with AskUserQuestion, and push only what they approve; the rest
+waits on a branch with no upstream. `hooks/require-approval-before-public-push.py`
+refuses a push to a public GitHub repo whose command carries neither
+`# public-push: no personal content` (refused anyway when an image or other media goes
+out) nor `# public-push: user approved "<their words>"`.
+
 Provenance: [docs/provenance/commit-atomically-as-you-build.md](../../docs/provenance/commit-atomically-as-you-build.md).
