@@ -16,7 +16,9 @@ A push to a public repo passes when the command carries one of two markers, in a
 
   git push  # public-push: user approved "<the user's words>"
       The quotation (8+ characters, case and spacing ignored) must appear in a prompt the
-      user typed, or an answer they gave to an AskUserQuestion, later than this session's
+      user typed, an answer they gave to an AskUserQuestion, or an answer they submitted on a
+      decision form (`project-lifecycle decision-wait FORM`, read from FORM.answers.json: each
+      note's text, and each pick as "<question id>: <option id>"), later than this session's
       previous approved public push.
 
 A push that sends no new commits (a rewind, a branch delete, an up-to-date push) passes with
@@ -136,6 +138,30 @@ def outgoing(cwd, args):
     return remote, out.split()
 
 
+def form_answers(command, cwd):
+    """The user's words from the answers file of a decision form a `decision-wait` call served."""
+    m = re.search(r"decision-wait\s+(\"[^\"]+\"|'[^']+'|\S+)", command)
+    if not m:
+        return []
+    form = os.path.expanduser(m.group(1).strip("'\""))
+    if not os.path.isabs(form):
+        form = os.path.join(cwd, form)
+    try:
+        with open(os.path.splitext(form)[0] + ".answers.json") as fh:
+            answers = json.load(fh).get("answers") or {}
+    except (OSError, ValueError, AttributeError):
+        return []
+    words = []
+    for qid, a in answers.items():
+        if not isinstance(a, dict):
+            continue
+        if a.get("text"):
+            words.append(norm(str(a["text"])))
+        picks = a.get("choices") or ([a["choice"]] if a.get("choice") else [])
+        words.extend(norm(f"{qid}: {c}") for c in picks)
+    return words
+
+
 def user_words_since_last_approved_push(path):
     from transcript_items import is_reply_boundary, is_typed_prompt, items  # noqa: E402
     rows = list(items(path, want={"user", "agents", "calls", "tools"}))
@@ -149,7 +175,9 @@ def user_words_since_last_approved_push(path):
     for n, it in enumerate(rows):
         if n <= last:
             continue
-        if is_typed_prompt(it):
+        if it["label"] == "CALL Bash" and "decision-wait" in it["text"]:
+            said.extend(form_answers(it["text"], it.get("cwd") or ""))
+        elif is_typed_prompt(it):
             said.append(norm(it["text"]))
         elif is_reply_boundary(it):
             said.extend(norm(p.split('"', 1)[0]) for p in it["text"].split('"="')[1:])

@@ -64,6 +64,13 @@ APPROVED_PUSH = [call("b1", "Bash", {"command": 'git push  # public-push: user a
                  result("b1", "pushed")]
 
 
+FORM = os.path.join(TMP, "form.html")
+with open(os.path.join(TMP, "form.answers.json"), "w") as fh:
+    json.dump({"answers": {"arch-page": {"choice": "remove", "text": "no names in the images as well"},
+                           "side": {"choices": ["oj", "lavalamp"]}}}, fh)
+FORM_CALL = [call("f1", "Bash", {"command": f"project-lifecycle decision-wait {FORM} --json"}), result("f1", "running")]
+
+
 def run(command, cwd, rows=()):
     with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, dir=TMP) as fh:
         for r in rows:
@@ -90,6 +97,12 @@ CASES = [
      ASK + APPROVED_PUSH, 2),
     ("a refused push does not use up the approval", 'git push  # public-push: user approved "yes push those two items"',
      PUB, ASK + [APPROVED_PUSH[0], result("b1", "PreToolUse:Bash hook error: BLOCKED")], 0),
+    ("a decision-form note passes", 'git push  # public-push: user approved "no names in the images as well"', PUB, FORM_CALL, 0),
+    ("a decision-form pick passes", 'git push  # public-push: user approved "arch-page: remove"', PUB, FORM_CALL, 0),
+    ("a pick the form does not hold", 'git push  # public-push: user approved "arch-page: keep it"', PUB, FORM_CALL, 2),
+    ("a form served before the last approved push does not count",
+     'git push  # public-push: user approved "arch-page: remove"', PUB,
+     FORM_CALL + [call("b2", "Bash", {"command": 'git push  # public-push: user approved "arch-page: remove"'}), result("b2", "pushed")], 2),
     ("private repo passes", "git push", PRIV, [], 0),
     ("non-GitHub remote passes", "git push", OTHER, [], 0),
     ("nothing new to send passes", "git push", SAME, [], 0),
