@@ -26,6 +26,9 @@ has not been communicated.
   bunny)"). `hooks/require-question-facts-in-question.sh` refuses an undefined letter.
 - **Put the recommended option first** and mark it `(Recommended)`.
 - **Batch related decisions** into one call rather than asking serially.
+- **One concern per question.** A question whose text explains two unrelated things is two
+  questions. The closing question's items follow the same split, and a design choice of the
+  agent's own is a decision with options, never an item in it.
 - **At most four options per question.** A long list inside one question (a
   multi-select of dozens of packages) is the thing that reads as "asked in bulk":
   group it into categories, one question each, or move it to an HTML decision form.

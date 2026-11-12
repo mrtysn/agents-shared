@@ -79,6 +79,10 @@ accurate it is.
      `Stop here`, which does nothing.
    - **Four options at most.** With more than three items, the first three get their own
      option and the rest share one labelled with what it covers.
+   - **One concern per question.** Items about different things (a build and a device install)
+     are separate questions, each carrying only its own facts; items of one concern share one
+     multiSelect question. A choice about how something should work is a decision, asked on its
+     own with its options, never an item.
    - **Same call as the decisions** when a slot is free (the limit is four questions). If
      a decision's answer changes what the items are, or the slots are full, ask it as its
      own round straight after, with no prose in between.
