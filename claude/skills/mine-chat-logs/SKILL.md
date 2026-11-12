@@ -9,7 +9,7 @@ argument-hint: <what to find in the chat logs>
 
 Reads the user's past sessions and reports what is in them. **It reports findings and
 decides nothing.** Whether a pattern earns a skill or rule is
-`pattern-discovery-for-new-skill`, which calls this skill for its evidence. Any other
+`pattern-discovery-agent-fix`, which calls this skill for its evidence. Any other
 skill or agent session calls it the same way: run the steps it needs, take back the
 files and counts.
 
@@ -26,7 +26,7 @@ says why.
 | One past conversation found again ("find the chat where...") | `search-history` to find the session, then `extract-session-text.py <id> --around <time>` or `--grep` |
 | Every time something happened, across sessions | steps 2 to 6 below |
 | How one session fared | `extract-session-text.py <id> --kinds user,assistant,calls --chunk-chars 60000 --out <scratch>/s`, then read the chunks |
-| Their own typed prompts matching a phrase, counted | `find-repeated-user-prompts.py` (see `pattern-discovery-for-new-skill`) |
+| Their own typed prompts matching a phrase, counted | `find-repeated-user-prompts.py` (see `pattern-discovery-agent-fix`) |
 
 Three surveys already exist; when the question is one of them, run it first:
 `find-interrupted-responses.py` (dropped connections and what was typed next),

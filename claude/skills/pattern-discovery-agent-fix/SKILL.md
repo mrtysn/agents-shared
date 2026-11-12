@@ -5,7 +5,7 @@ allowed-tools: Bash, Read, Agent
 argument-hint: <the message, habit or failure to look for>
 ---
 
-# pattern-discovery-for-new-skill
+# pattern-discovery-agent-fix
 
 The user repeats a request or keeps correcting the same failure. This skill measures
 it, explains it, and says which fix it earns. **The verdict comes first and builds

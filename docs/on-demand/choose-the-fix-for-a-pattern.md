@@ -3,7 +3,7 @@
 The one table of where an instruction or a fix goes. It is shown once per session, by
 `hooks/show-rule-at-action.sh`, the first time a session writes a rule, a skill, a hook
 script, a trigger row, an on-demand doc or a `CLAUDE.md`. It is also read by
-`docs/MAINTAINING-RULES.md` when a new rule arrives, by `pattern-discovery-for-new-skill`
+`docs/MAINTAINING-RULES.md` when a new rule arrives, by `pattern-discovery-agent-fix`
 when it writes its verdict, and by `vet-fable` when the subject under review is which fix
 to build. It lives here, not in `claude/rules/`, so no session pays for it at launch.
 
@@ -68,7 +68,7 @@ when that is not.
 
 ## Provenance
 
-Oct 14 2026: three runs of `pattern-discovery-for-new-skill` ended in a verdict worded
+Oct 14 2026: three runs of `pattern-discovery-agent-fix` (then named pattern-discovery-for-new-skill) ended in a verdict worded
 "skill or rule". The chat-log run's own finding was that agents did not know the shared
 reader existed, which a trigger or hook fixes and a skill does not. Another ended
 "neither" with "enforce the existing rules" and no word for how. A third was a
