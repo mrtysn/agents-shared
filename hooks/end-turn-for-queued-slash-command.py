@@ -25,19 +25,15 @@ sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
 from transcript_items import pending_queued_commands  # noqa: E402
 
 
-def hhmm(ts):
-    return ts[11:16] if len(ts) >= 16 else "earlier"
-
-
 def command_name(content):
     return content.split()[0].lstrip("/")
 
 
 def message(p, opener):
     cmd = p["content"].split()[0]
-    return (f"{opener}The user queued `{p['content'][:120]}` at {hhmm(p['time'])} (UTC). Claude Code runs a queued "
-            f"slash command only when this turn ends. Finish the current step, commit it, and end the turn with a "
-            f"short text report. No AskUserQuestion, and do not run `{cmd}` yourself.")
+    return (f"{opener}The user queued `{cmd}`. Claude Code runs a queued slash command only when this turn ends. "
+            f"Finish the current step, commit it, and end the turn with a short text report. "
+            f"No AskUserQuestion, and do not run `{cmd}` yourself.")
 
 
 def marker_dir():
@@ -62,7 +58,7 @@ def main():
             skill = str((data.get("tool_input") or {}).get("skill", "")).lstrip("/")
             hit = next((p for p in pending if command_name(p["content"]) == skill), None)
             if hit:
-                reason = (f"`/{skill}` is queued (at {hhmm(hit['time'])} UTC) and runs when this turn ends; invoking it "
+                reason = (f"`/{skill}` is queued and runs when this turn ends; invoking it "
                           f"here runs it twice. End the turn with a short text report instead.")
         if reason:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse",

@@ -38,8 +38,14 @@ queued = [q("enqueue", "/pattern-discovery-agent-fix")]
 r = run(queued, "PreToolUse", "AskUserQuestion")
 check("a question is refused while a slash command is queued", r and r["permissionDecision"] == "deny"
       and "/pattern-discovery-agent-fix" in r["permissionDecisionReason"])
+r = run([q("enqueue", "/pattern-discovery-agent-fix why did this problem occur")], "PreToolUse", "AskUserQuestion")
+check("the refusal names the command, not the words typed after it or a time",
+      r and "/pattern-discovery-agent-fix" in r["permissionDecisionReason"]
+      and "why did this problem occur" not in r["permissionDecisionReason"]
+      and "UTC" not in r["permissionDecisionReason"])
 r = run(queued, "PreToolUse", "Skill", {"skill": "pattern-discovery-agent-fix"})
-check("invoking the queued skill is refused", r and r["permissionDecision"] == "deny")
+check("invoking the queued skill is refused", r and r["permissionDecision"] == "deny"
+      and "UTC" not in r["permissionDecisionReason"])
 check("another skill is let through", run(queued, "PreToolUse", "Skill", {"skill": "vet-fable"}) is None)
 check("other tools are let through before the call", run(queued, "PreToolUse", "Bash") is None)
 r = run(queued, "PostToolUse", "Bash", name="once")
