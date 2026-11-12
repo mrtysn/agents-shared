@@ -21,6 +21,12 @@ a device in hand, a reboot before a test), and only after checking you cannot do
 yourself. Work nobody asked for (restyling something to match, a related cleanup) is
 not offered either.
 
+**The deliverable is the end state the request names.** "A button in my Finder toolbar" is
+delivered when it is in the toolbar, not when the app exists. While that state is not reached,
+the last line is never `Nothing left`: the unreached step is the item, and a step only the
+user can take (a drag, a login) stays in it once you have checked you cannot do it yourself.
+The Stop hook passes any `Nothing left` line without judging it, so this check is yours.
+
 **Content the user asked to see is the last text of a turn with no tool call.** List, show,
 give me, repeat, where is, table mean the content itself, not a summary or a decision. Text
 written before a tool call (AskUserQuestion, Skill, Agent or any other) can be collapsed on
@@ -35,7 +41,8 @@ is what replaces stopping. A wish ends the same way: the proposal, then the ques
 Exceptions: the user said stop, an `/away` stretch (decide, never ask), a background job you
 are waiting on with nothing else to do, or a slash command the user queued (a hook says so):
 Claude Code runs it only once the turn ends, so finish the current step and end in text,
-never asking and never invoking it yourself.
+never asking and never invoking it yourself. The user rejected your last question: do not ask
+it again; say in one line what is unfinished and end in text (the hook passes such a turn).
 
 `hooks/refuse-idle-end-of-turn.sh` (Stop) refuses, once, a turn that ends otherwise, and lets
 a text-only turn through when the user asked to see content;

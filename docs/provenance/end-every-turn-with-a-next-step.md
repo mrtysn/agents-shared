@@ -68,3 +68,13 @@ such a turn end (since 2026-11-01, a `/be-literal` that sat 20 minutes), but not
 kept the turn open. The rule's exceptions now name a queued slash command, and
 `hooks/end-turn-for-queued-slash-command.py` says so after a tool call and refuses the question, and a hand-run
 of the same skill, which ran it twice more here before the queue ran it a third time.
+
+2026-11-12, notebook: a user asked for a button in the Finder toolbar. The agent built the app, never placed it
+in the toolbar, and closed "Nothing left: … the signing guard is in place", counting the placement as the user's
+use of a finished deliverable. The user: "why does this agent say nothing left while we clearly havent added it
+to the finder window yet. this was clearly discussed". The hook passes any `Nothing left` line without judging
+it, so the rule now says the deliverable is the end state the request names. Meanwhile the Stop hook refused
+three turns in a row after the user rejected two AskUserQuestion calls ("I asked a question stay on the fucking
+topic"): a `[Request interrupted by user for tool use]` marker was read as a fresh prompt, so the rejected
+question fell outside the turn and the turn counted as idle. The marker is no longer a prompt, and a question
+rejected between the previous prompt and this one lets the turn end.

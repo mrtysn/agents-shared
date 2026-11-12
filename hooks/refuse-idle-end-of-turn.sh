@@ -22,6 +22,8 @@
 #     such a message until the turn ends, while plain text is folded in mid-turn, so a refused stop keeps the
 #     user waiting on their own command (2026-11-01: a /be-literal question sat queued 20+ minutes, and a refusal
 #     here turned the turn's end into another question),
+#   - the user rejected an AskUserQuestion between their previous prompt and this one ("doesn't want to proceed"):
+#     asking again repeats what they refused. A "[Request interrupted" marker is not a prompt,
 #   - stop_hook_active is true (the session already continued once because of a Stop hook),
 #   - an away stretch is open (hooks/refuse-stop-while-away.sh owns those turns, and they ask nothing),
 #   - the user's last prompt tells it to stop ("stop", "that's all", "pause"),
@@ -72,7 +74,15 @@ VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" --arg show "$SHOW_PATT
   [ .[] | select(type == "object" and (.sidechain | not)) ] as $rows
   | ([ range(0; $rows | length) as $i | $rows[$i]
        | select(.group == "user" and .label == "USER" and .origin == "human" and (.meta | not)
-                and ((.text // "") | test("^\\s*<(bash-|local-command)") | not)) | $i ] | max // -1) as $p
+                and ((.text // "") | test("^\\s*<(bash-|local-command)") | not)
+                and ((.text // "") | test("^\\s*\\[Request interrupted") | not)) | $i ]) as $prompts
+  | ($prompts | max // -1) as $p
+  | ($prompts | if length > 1 then .[-2] else -1 end) as $prevPrompt
+  # A question the user rejected between the previous prompt and this one: asking again repeats what they refused
+  # (2026-11-12, notebook: three refusals in a row after two rejected questions; the interrupt marker had also been
+  # read as a fresh prompt, so the rejected question fell outside the turn).
+  | ([ $rows[$prevPrompt + 1:(if $p < 0 then 0 else $p end)][] | select(.label == "RESULT AskUserQuestion"
+       and ((.text // "") | test("doesn.t want to proceed"))) ] | length > 0) as $rejected
   | if $p < 0 then "pass" else
     ($rows[$p].text // "" | (capture("<command-args>(?<a>[\\s\\S]*)</command-args>").a // .)) as $prompt
     | $rows[$p + 1:] as $turn
@@ -115,6 +125,7 @@ VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" --arg show "$SHOW_PATT
     | if $slashQueued then "pass"
       elif $phrase != "" then "offer\t\($phrase)"
       elif ($prompt | length) < 60 and ($prompt | test("^\\s*(stop|stop here|that.?s (all|it)|enough|nothing else|pause|hold on|wait|no more|done for (now|today))\\b"; "i")) then "pass"
+      elif $rejected then "pass"
       elif $a >= 0 and $workAfterAsk == 0 then "pass"
       elif $show != "" and ($prompt | test($show)) and ($text | length) >= 40 then "pass"
       elif $pending > 0 or $workflowsPending > 0 then "pass"

@@ -97,7 +97,12 @@ check "slash-command answer, nothing asked"          block false "$(prompt $'<co
 check "ended on an answered question"                pass  false "$(prompt 'what next?')" "$(say 'Two items remain.')" "$(ask)" "$(answered 'Stop here')" "$(say 'Stopping here.')"
 check "worked after the answer, then reported"       block false "$(prompt 'what next?')" "$(ask)" "$(answered)" "$(bash_call 1)" "$(say 'Built and committed.')"
 check "answered, then a prose offer"                 block false "$(prompt 'what next?')" "$(ask)" "$(answered 'Stop here')" "$(say 'Stopping. Want me to clean up the branch?')"
-check "slash command queued mid-turn"                 pass  false "$(prompt 'build T14')" "$(queued '/be-literal why are you holding it back?')" "$(bash_call 1)" "$(say $REPORT)"
+REJECTED="The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed."
+INTERRUPT='[Request interrupted by user for tool use]'
+check "question rejected, interrupt marker, then text" pass  false "$(prompt 'fix it')" "$(ask)" "$(result toolu_q $REJECTED)" "$(prompt $INTERRUPT)" "$(say 'Understood.')"
+check "question rejected, user complains, text"        pass  false "$(prompt 'fix it')" "$(ask)" "$(result toolu_q $REJECTED)" "$(prompt $INTERRUPT)" "$(prompt 'stay on topic')" "$(say 'Here is the answer.')"
+check "question rejected, prose offer still blocks"    block false "$(prompt 'fix it')" "$(ask)" "$(result toolu_q $REJECTED)" "$(prompt 'why?')" "$(say 'Because of X. Want me to fix it?')"
+check "slash command queued mid-turn"                pass  false "$(prompt 'build T14')" "$(queued '/be-literal why are you holding it back?')" "$(bash_call 1)" "$(say $REPORT)"
 check "slash command queued, prose offer"              pass  false "$(prompt 'build T14')" "$(queued '/outstanding')" "$(say 'Built. Want me to commit it?')"
 check "a waiter will tell me when: not an offer"       pass  false "$(prompt 'run the test')" "$(bash_call 1 bg)" "$(say 'The read runs on the laptop. A waiter will tell me when it finishes.')"
 check "tell me when: an offer"                         block false "$(prompt 'run the test')" "$(say 'The test is ready. Tell me when you want it run.')"
