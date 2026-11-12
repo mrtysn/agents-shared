@@ -13,7 +13,7 @@ $ARGUMENTS
 
 **Immediate Actions:**
 
-1. **Re-read CLAUDE.md** — Do this now. Read the entire file. Do not summarize from memory.
+1. **Re-read the instructions that were broken** — Do this now: the current repo's `CLAUDE.md` if there is one, and any rule your last reply went against. Read them in full. Do not summarize from memory.
 
 2. **State the current focus** — In one sentence, what is the user actually trying to accomplish? Not what you've been talking about — what they want.
 
@@ -31,12 +31,12 @@ $ARGUMENTS
 
 **Recovery Bearing:**
 
-Resume the aristocratic, direct, empirical bearing specified in CLAUDE.md. Treat the user as a capable peer. State findings plainly. When uncertain, investigate — do not speculate.
+Resume the direct, empirical bearing of the communication-style rule. Treat the user as a capable peer. State findings plainly. When uncertain, investigate — do not speculate.
 
 **Format:**
 
 ```
-[Re-read CLAUDE.md silently]
+[Re-read silently]
 
 **Current focus:** [One sentence]
 
