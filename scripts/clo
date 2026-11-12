@@ -23,13 +23,17 @@ Usage:
                           Fast mode in the current folder instead of notebook:
                           no menus, Sonnet at medium effort unless a model
                           number is given; --prompt works as in `clo f`.
-  clo launch --dir D --model M [--effort E] [--prompt text] [-- claude args...]
+  clo launch --dir D --model M [--effort E] [--prompt text] [--launched-by NAME] [-- claude args...]
                           No menus, never fzf: cd to D and run claude --model M
                           [--effort E], the first message after any extra args.
                           D must be an existing folder and M non-empty, else exit
                           2. Effort unset or omitted passes no --effort. Records M
                           as your last model and E as its effort, as a menu pick
                           does. (The fast modes above record nothing.)
+                          --launched-by NAME (or CLO_LAUNCHED_BY=NAME on any launch)
+                          marks the tmux session as started by the agent whose peer
+                          name is NAME (tmux option @launched_by); CC Sessions and
+                          clo-remote list it under "Agent-launched".
   clo NAME [1|2|3|4] [--prompt text]
                           Launch in the folder called NAME under $DEV_ROOT, at any depth
                           local-repos-list reports (bench/GNM matches GNM or bench/GNM).
@@ -220,7 +224,17 @@ run_claude() {
         # In tmux mode this tab is iTerm's hidden tmux client, and it shows again as a bare
         # shell once tmux ends; the marker tells the shell function (clo --init zsh) to close it.
         (( ${#cc} )) && [[ -n "${CLO_CD_FILE:-}" ]] && : > "$CLO_CD_FILE.close"
-        exec "${t[@]}" "${cc[@]}" new-session -s "$name" -c "$PWD" "${env[@]}" "$cmd"
+        # CLO_LAUNCHED_BY (clo launch --launched-by) marks a session another agent started:
+        # the tmux option @launched_by holds that agent's peer name, set in the same command
+        # as the session so no reader sees it unmarked. CC Sessions and clo-remote list such
+        # sessions in their own group.
+        local -a mark=()
+        [[ -n "${CLO_LAUNCHED_BY:-}" ]] && mark=(";" set-option -t "=$name" @launched_by "$CLO_LAUNCHED_BY")
+        exec "${t[@]}" "${cc[@]}" new-session -s "$name" -c "$PWD" "${env[@]}" "$cmd" "${mark[@]}"
+    fi
+    # Already inside tmux: the marker goes on the tmux session this pane is in.
+    if [[ -n "${TMUX:-}" && -n "${CLO_LAUNCHED_BY:-}" ]] && command -v tmux >/dev/null; then
+        tmux set-option @launched_by "$CLO_LAUNCHED_BY" 2>/dev/null || true
     fi
     # Alone in a tmux session (clo-remote starts sessions this way), the tmux session's name
     # becomes the peer name; with several panes they would share it, so Claude picks its own.
@@ -260,11 +274,13 @@ launch_cmd() {
     local dir="" model="" effort="" prompt=""
     while (( $# )); do
         case "$1" in
-            --dir|--model|--effort|--prompt)
+            --dir|--model|--effort|--prompt|--launched-by)
                 (( $# >= 2 )) || { print -u2 "clo launch: $1 needs a value (clo --help)"; exit 2; }
                 case "$1" in
                     --dir) dir="$2" ;; --model) model="$2" ;;
                     --effort) effort="$2" ;; --prompt) prompt="$2" ;;
+                    --launched-by) [[ -n "$2" ]] || { print -u2 "clo launch: --launched-by needs the launching session's peer name"; exit 2; }
+                                   export CLO_LAUNCHED_BY="$2" ;;
                 esac
                 shift 2 ;;
             -h|--help) usage; exit 0 ;;

@@ -94,6 +94,20 @@ check "alone in a tmux session, claude takes the session's name" 0 \
 check "with several panes, claude names itself" 0 \
     "claude --model z name=" -- TMUX=/tmp/s,1,0 STUB_PANES=12 -- --run-claude --model z
 [[ "$(<"$calls")" != *name=work-7f* ]] || { (( fails++ )); print "FAIL shared pane name"; }
+check "CLO_LAUNCHED_BY marks the new tmux session in the same command" 0 \
+    "tmux new-session -s $base-?? * claude ; set-option -t =$base-?? @launched_by orch-1f" -- \
+    TERM_PROGRAM=Apple_Terminal CLO_LAUNCHED_BY=orch-1f -- --run-claude
+check "clo launch --launched-by marks the session" 0 \
+    "tmux new-session * claude --model m* ; set-option -t =* @launched_by orch-2a" -- \
+    TERM_PROGRAM=Apple_Terminal -- launch --dir "$stub" --model m --launched-by orch-2a
+check "clo launch --launched-by with no name exits 2" 2 -- \
+    TERM_PROGRAM=Apple_Terminal -- launch --dir "$stub" --model m --launched-by ""
+check "no marker without CLO_LAUNCHED_BY" 0 \
+    "tmux new-session*" -- TERM_PROGRAM=Apple_Terminal -- --run-claude
+[[ "$(<"$calls")" != *@launched_by* ]] || { (( fails++ )); print "FAIL marker set without a launcher"; }
+check "inside tmux the marker goes on the current session" 0 \
+    "tmux set-option @launched_by orch-3c" "claude --model z" -- \
+    TMUX=/tmp/s,1,0 CLO_LAUNCHED_BY=orch-3c -- --run-claude --model z
 : > "$stub/cd"
 check "tmux mode marks the client tab for closing" 0 \
     "tmux -CC new-session*" -- TERM_PROGRAM=iTerm.app CLO_CD_FILE="$stub/cd" -- --run-claude
