@@ -217,6 +217,12 @@ def pending_queued_commands(path):
     (which carries no content) takes the head, and `popAll` (the user pulled the queue back into the
     prompt) empties it. Returns the slash commands left, [{"time", "content"}], oldest first.
     """
+    def key(content):
+        # A cross-session message is enqueued with a hop-chain="…" attribute that its remove record
+        # leaves out; matched exactly, the message stayed queued and a later dequeue popped it instead
+        # of the slash command behind it.
+        return re.sub(r' hop-chain="[^"]*"', "", content.strip())
+
     queue = []
     with open(path, encoding="utf-8") as fh:
         for raw in fh:
@@ -237,7 +243,7 @@ def pending_queued_commands(path):
                 queue = queue[1:]
             elif op == "remove":
                 for i, p in enumerate(queue):
-                    if p["content"] == content.strip():
+                    if key(p["content"]) == key(content):
                         del queue[i]
                         break
     return [p for p in queue if p["content"].startswith("/")]

@@ -51,6 +51,10 @@ check("a delivered command is not pending",
 check("a dequeue takes the head of the queue, not a later command",
       run([q("enqueue", "plain text first")] + queued + [{"type": "queue-operation", "operation": "dequeue"}],
           "PreToolUse", "AskUserQuestion") is not None)
+check("a removed cross-session message whose remove lacks its hop-chain leaves the queue",
+      run([q("enqueue", '<cross-session-message from="x" hop-chain="ab12" from-name="peer">\nhi'),
+           q("remove", '<cross-session-message from="x" from-name="peer">\nhi')] + queued
+          + [{"type": "queue-operation", "operation": "dequeue"}], "PreToolUse", "AskUserQuestion") is None)
 check("a plain-text queued message is not a command",
       run([q("enqueue", "also, how do I detach?")], "PreToolUse", "AskUserQuestion") is None)
 check("a queue pulled back into the prompt is not pending",
