@@ -1,6 +1,6 @@
 # Drafting messages the user sends
 
-**A message drafted for the user to send says only what the user has said.**
+**A message or document drafted for the user to send says only what the user has said.**
 It goes out under their name, so every word in it is a claim they make.
 
 - **Only what they gave.** No claims, numbers, feelings, compliments or extra
@@ -12,6 +12,9 @@ It goes out under their name, so every word in it is a claim they make.
 - **Their voice.** Read their sent messages in that thread before drafting.
   No stock lines ("See you then", "Looking forward", "Hope you're well") unless
   they write that way.
+- **One voice, chosen first.** Before writing, settle who speaks and to whom: the voice
+  the user's earlier sent documents to that reader use, else the one the user picks. Keep it
+  in every line: no outside narrator on the user's own work.
 - **The whole thread first.** Before drafting, read every message in the thread: every
   channel, file and screenshot the user gave. Answer every message still open to the
   user, and never ask for something already sent.
