@@ -1,6 +1,6 @@
 # The shape of an answer
 
-Four failures, all the same mistake in different clothes: making an answer look
+Three failures, all the same mistake in different clothes: making an answer look
 like more than it is. These extend [communication style](communication-style.md),
 which says answer the literal question first — this says what that costs when
 it's ignored.
@@ -48,15 +48,7 @@ AirPods search and a page read while still blank; its menu had a LIFESTYLE headp
 category, and it stocked the Marshall earbuds being priced. The user: "zuhal sells a
 lot of goodies. learn to read it!!!"
 
-## "SIMPLER" means plainer, not less
-
-**A request to simplify is a request to rewrite in plainer words, keeping every
-piece of information.** Deleting the substantive content and returning the
-remaining fragment is not simplification — it is answering a different, smaller
-question.
-
-If something genuinely must be dropped to make a message readable, say what was
-dropped in one clause. Silent removal reads as an admission the content was
-filler, and it destroys precisely the parts that were hardest to arrive at.
+A request to simplify ("SIMPLER") is the keyword defined in
+[user abbreviations](user-abbreviations.md): plainer words, every piece of information kept.
 
 Provenance: [docs/provenance/answer-shape.md](../../docs/provenance/answer-shape.md).
