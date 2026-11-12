@@ -20,8 +20,10 @@
 # gif, svg, mp4, mov, webm, pdf, md, csv, json, txt or zip; URLs with "://" and glob patterns
 # with "*" or "?" are not file paths)
 # unless that path is ABSOLUTE and appears in a visible assistant text block since the user last
-# spoke. A relative path is refused even when prose had it: the question must stand alone, so
-# it names the absolute path too. Same reader call, same fail-open behaviour.
+# spoke. A relative path to a file the user opens outside the terminal (html, htm, png, jpg, jpeg,
+# gif, svg, mp4, mov, webm, pdf, zip) is refused even when prose had it: the question must stand
+# alone, so it names the absolute path too. A relative md, csv, json or txt path is a code or config
+# reference, read in the terminal, and stays relative. Same reader call, same fail-open behaviour.
 #
 # A third trigger needs no transcript: a label coined in the session. Refused (exit 2) when the
 # questions or their options name a letter label (capitals A to H) as "option B", "pair A",
@@ -107,6 +109,8 @@ if [ -n "$PATHS" ]; then
                 printf '%s' "$VISIBLE" | grep -Fq -- "$P" && continue
                 WHY="the absolute path $P never appeared in visible text since the user last spoke" ;;
             *)
+                # A relative code or config reference (a .md, .csv, .json or .txt file) is read, not opened.
+                case "$(printf '%s' "$P" | tr 'A-Z' 'a-z')" in *.md|*.csv|*.json|*.txt) continue ;; esac
                 WHY="the question names a relative path ($P); name the absolute path in the question text too, since a question stands alone" ;;
         esac
         cat >&2 <<MSG

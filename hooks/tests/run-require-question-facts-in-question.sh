@@ -86,6 +86,9 @@ check 'path in question, no text refuses' 2 "Which of $ABS reads better?" "$f"
 f=$(mk path-rel "$(u 'go')" "$(say "Report: $ABS")")
 check 'relative path in question, absolute in prose refuses' 2 'Which of games/a/b.html reads better?' "$f"
 check 'absolute path in question and in prose allows' 0 "Which of $ABS reads better?" "$f"
+check 'relative config reference allows' 0 'Should .claude/settings.json change?' "$f"
+check 'relative doc reference allows' 0 'Is docs/next-session.md still right?' "$f"
+check 'relative image still refuses' 2 'Is out/layout.png right?' "$f"
 f=$(mk path-notes "$(u 'go')" "$(say 'Working on it, one moment.')")
 check 'absolute path in question, prose without it refuses' 2 "Which of $ABS reads better?" "$f"
 f=$(mk path-earlier "$(u 'first')" "$(say "Report: $ABS")" "$(u 'second')" "$(say 'noted')")
