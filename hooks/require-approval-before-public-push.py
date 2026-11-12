@@ -86,7 +86,9 @@ def repo_dir(command, start, git_opts, cwd):
         return os.path.expanduser(m[-1].strip("'\""))
     cds = re.findall(r"(?:^|[;&|]\s*)cd\s+(\"[^\"]+\"|'[^']+'|\S+)\s*(?:&&|;)", command[:start])
     if cds:
-        d = os.path.expanduser(cds[-1].strip("'\""))
+        # The shell expands $VAR in a cd target unless it is single-quoted (cd "$AGENTS_SHARED").
+        d = cds[-1] if cds[-1].startswith("'") else os.path.expandvars(cds[-1])
+        d = os.path.expanduser(d.strip("'\""))
         return d if os.path.isabs(d) else os.path.join(cwd, d)
     return cwd
 

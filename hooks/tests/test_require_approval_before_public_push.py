@@ -81,7 +81,7 @@ def run(command, cwd, rows=()):
             r.setdefault("sessionId", "s")
             fh.write(json.dumps(r) + "\n")
     payload = {"tool_name": "Bash", "cwd": cwd, "transcript_path": fh.name, "tool_input": {"command": command}}
-    env = {**os.environ, "XDG_CACHE_HOME": CACHE}
+    env = {**os.environ, "XDG_CACHE_HOME": CACHE, "PUSH_TEST_PUB": PUB}
     return subprocess.run([sys.executable, "-I", HOOK], input=json.dumps(payload), text=True,
                           capture_output=True, env=env).returncode
 
@@ -91,6 +91,8 @@ CASES = [
     ("public push with no marker", "git push", PUB, [], 2),
     ("public push via cd prefix", f"cd {PUB} && git push origin main", "/", [], 2),
     ("cd prefix from an unrelated cwd", f"cd {PUB} && git push origin main  # public-push: no personal content", PRIV, [], 0),
+    ("cd to a variable resolves it", 'cd "$PUSH_TEST_PUB" && git push origin main  # public-push: no personal content', PRIV, [], 0),
+    ("cd to a variable still needs the marker", 'cd "$PUSH_TEST_PUB" && git push origin main', PRIV, [], 2),
     ("public push via git -C", f"git -C {PUB} push", "/", [], 2),
     ("code-only marker passes", "git push  # public-push: no personal content", PUB, [], 0),
     ("code-only marker refused when an image goes out", "git push  # public-push: no personal content", PUB_IMG, [], 2),
