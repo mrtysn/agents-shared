@@ -35,6 +35,11 @@ web-shared styles the elements. Keep tables to three or four short columns, wide
 scroll. `--layout plain` is for a page with a single section. `project-lifecycle page-head`
 alone prints just the `<head>` for a page that must be laid out by hand.
 
+**One topic, one page.** A later step of the same work (a design after a plan, findings
+after a survey) is new sections in the page that already exists, re-rendered from its
+source; never a new file beside it. A decision form is the one separate file, and its
+answers go into the main page.
+
 ## Publishing is a separate, deliberate step
 
 A page is local by default. When it is meant for someone else, it goes out with
