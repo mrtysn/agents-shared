@@ -88,12 +88,15 @@ ASSET_STEPS_OFFER=$ASSET_STEPS$'\n\nIf you want the site to match the banner, I 
 ASSET_DONE=$'The banner is made: /Users/x/brand/x-banner-black.png.\n\nNothing left: the black banner you asked for is made.'
 
 check "report of user steps, nothing asked"          block false "$(prompt 'build T14')" "$(bash_call 1)" "$(say $REPORT)"
-check "research answer, nothing asked"               block false "$(prompt 'find videos with guitars with known ground truths?')" "$(say $SOURCES)"
+check "research answer, no tool call: ends with the answer" pass false "$(prompt 'find videos with guitars with known ground truths?')" "$(say $SOURCES)"
+check "research answer after a search, nothing asked" block false "$(prompt 'find videos with guitars with known ground truths?')" "$(bash_call 1)" "$(say $SOURCES)"
+check "one-word reply the user asked for, no tool"   pass  false "$(prompt 'reply with the single word ok, nothing else, use no tools')" "$(say 'ok')"
 check "choice posed in prose"                        block false "$(prompt 'what are we setting up? why have you stopped?')" "$(say $CHOICE)"
 check "announced next step, then ended"              block false "$(prompt 'render it')" "$(bash_call 1)" "$(say $ANNOUNCE)"
 check "permission asked in prose for settled work"   block false "$(prompt 'improve the skill')" "$(say $GOAHEAD)"
-check "user-steps list"                              block false "$(prompt 'apply for her')" "$(say $STEPS)"
-check "slash-command answer, nothing asked"          block false "$(prompt $'<command-message>be-literal</command-message>\n<command-name>/be-literal</command-name>\n<command-args>why had you stopped?</command-args>')" "$(say 'I stopped because the answer was the whole task as I read it.')"
+check "user-steps list, no tool call"                pass  false "$(prompt 'apply for her')" "$(say $STEPS)"
+check "user-steps list after work"                   block false "$(prompt 'apply for her')" "$(bash_call 1)" "$(say $STEPS)"
+check "slash-command answer, no tool call"           pass  false "$(prompt $'<command-message>be-literal</command-message>\n<command-name>/be-literal</command-name>\n<command-args>why had you stopped?</command-args>')" "$(say 'I stopped because the answer was the whole task as I read it.')"
 check "ended on an answered question"                pass  false "$(prompt 'what next?')" "$(say 'Two items remain.')" "$(ask)" "$(answered 'Stop here')" "$(say 'Stopping here.')"
 check "worked after the answer, then reported"       block false "$(prompt 'what next?')" "$(ask)" "$(answered)" "$(bash_call 1)" "$(say 'Built and committed.')"
 check "answered, then a prose offer"                 block false "$(prompt 'what next?')" "$(ask)" "$(answered 'Stop here')" "$(say 'Stopping. Want me to clean up the branch?')"
@@ -110,13 +113,14 @@ check "plain message queued mid-turn, still idle"      block false "$(prompt 'bu
 check "background agent still running"               pass  false "$(prompt 'fix the setup')" "$(spawn 1)" "$(say 'Findings come when it reports.')"
 check "background agent reported, nothing asked"     block false "$(prompt 'fix the setup')" "$(spawn 1)" "$(handback 1)" "$(say 'It fixed the setup in three commits.')"
 check "agent from an earlier turn still running"     pass  false "$(prompt 'vet the plan')" "$(spawn 1)" "$(say 'The reviewer is out.')" "$(prompt 'also search the web')" "$(say 'Both run; I relay them when they report.')"
-check "agent from an earlier turn, since reported"   block false "$(prompt 'vet the plan')" "$(spawn 1)" "$(say 'The reviewer is out.')" "$(prompt 'what did it say?')" "$(handback 1)" "$(say 'It found two gaps.')"
+check "agent from an earlier turn, since reported"   block false "$(prompt 'vet the plan')" "$(spawn 1)" "$(say 'The reviewer is out.')" "$(prompt 'what did it say?')" "$(handback 1)" "$(bash_call 1)" "$(say 'It found two gaps.')"
+check "agent from an earlier turn, relayed with no tool" pass false "$(prompt 'vet the plan')" "$(spawn 1)" "$(say 'The reviewer is out.')" "$(prompt 'what did it say?')" "$(handback 1)" "$(say 'It found two gaps.')"
 check "agent resumed in an earlier turn, running"    pass  false "$(prompt 'vet the plan')" "$(spawn 1)" "$(handback 1)" "$(resume 1)" "$(say 'Critique round sent.')" "$(prompt 'ok')" "$(say 'Waiting on its critique.')"
 # A watcher launched in an earlier turn is invisible in this turn's rows; the process table decides.
 print -r -- $'#!/bin/zsh\nprint "4242  10:00  until grep -q done log; do sleep 60; done"' > $work/live-shell && chmod +x $work/live-shell
 print -r -- $'#!/bin/zsh\nexit 0' > $work/no-shell && chmod +x $work/no-shell
 SESSION_SHELLS_LISTER=$work/live-shell check "earlier-turn shell still running"  pass  false "$(prompt 'how is it going?')" "$(say 'The rebuild is at 2 of 20; its watcher reports when done.')"
-SESSION_SHELLS_LISTER=$work/no-shell   check "no shell running, nothing asked"   block false "$(prompt 'how is it going?')" "$(say 'The rebuild is at 2 of 20.')"
+SESSION_SHELLS_LISTER=$work/no-shell   check "no shell running, nothing asked"   block false "$(prompt 'how is it going?')" "$(bash_call 1)" "$(say 'The rebuild is at 2 of 20.')"
 check "one of two agents reported"                   pass  false "$(prompt 'fix both')" "$(spawn 1)" "$(spawn 2)" "$(handback 1)" "$(say 'One is back; waiting on the other.')"
 check "4 agents, 3 reported twice, 1 still running" pass  false "$(prompt 'classify and score')" "$(spawn 1)" "$(spawn 2)" "$(spawn 3)" "$(spawn 4)" "$(handback 1)" "$(agent_notify 1)" "$(handback 2)" "$(agent_notify 2)" "$(handback 3)" "$(agent_notify 3)" "$(say 'The scorer is still running.')"
 check "2 agents, both reported twice, nothing asked" block false "$(prompt 'classify')" "$(spawn 1)" "$(spawn 2)" "$(handback 1)" "$(agent_notify 1)" "$(handback 2)" "$(agent_notify 2)" "$(say 'Both batches are classified.')"
@@ -134,7 +138,7 @@ wf_launch() { print -r -- "$(call toolu_f$1 Workflow '{"script":"export const me
 Summary: x")"; }
 wf_notify() { row user "$(jq -cn --arg x "<task-notification>\n<task-id>wf$1</task-id>\n<tool-use-id>toolu_f$1</tool-use-id>\n<status>completed</status>\n</task-notification>" '$x')" task-notification; }
 check "earlier-turn workflow still running"          pass  false "$(prompt 'run the loop')" "$(wf_launch 1)" "$(say 'It runs.')" "$(prompt 'how is it going?')" "$(say 'Round 2 of the loop is building.')"
-check "earlier-turn workflow reported, nothing asked" block false "$(prompt 'run the loop')" "$(wf_launch 1)" "$(say 'It runs.')" "$(wf_notify 1)" "$(prompt 'how is it going?')" "$(say 'The loop finished.')"
+check "earlier-turn workflow reported, nothing asked" block false "$(prompt 'run the loop')" "$(wf_launch 1)" "$(say 'It runs.')" "$(wf_notify 1)" "$(prompt 'how is it going?')" "$(bash_call 1)" "$(say 'The loop finished.')"
 check "wakeup armed"                                pass  false "$(prompt 'check at 9')" "$(call toolu_w ScheduleWakeup '{"delaySeconds":600,"prompt":"check the job"}')" "$(say 'I will check at 09:00.')"
 check "nothing left line"                            pass  false "$(prompt 'commit it')" "$(bash_call 1)" "$(say $DONE)"
 check "nothing left line under a prose offer"        block false "$(prompt 'commit it')" "$(say $DONE_OFFER)"
@@ -156,7 +160,7 @@ check "asked to see content, table prompt"            pass  false "$(prompt 'cla
 check "asked to see content, slash args"              pass  false "$(prompt $'<command-message>x</command-message>\n<command-name>/x</command-name>\n<command-args>show me them</command-args>')" "$(say $NAMES)"
 check "asked to see content, but a prose offer ends it" block false "$(prompt 'list me all the names')" "$(say "$NAMES"$'\n\nWant me to rename one?')"
 check "asked to see content, only a short line"       block false "$(prompt 'list me all the names')" "$(say 'Done.')"
-check "no request for content, same text"             block false "$(prompt 'rename the project')" "$(say $NAMES)"
+check "no request for content, same text after work"  block false "$(prompt 'rename the project')" "$(bash_call 1)" "$(say $NAMES)"
 
 AWAY_OBLIGATION=$work/away-open check "away stretch open"  pass  false "$(prompt 'build it')" "$(say $REPORT)"
 

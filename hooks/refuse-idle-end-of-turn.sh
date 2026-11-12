@@ -31,6 +31,9 @@
 #     "table") and the turn ends in 40+ characters of text with no prose offer: content is delivered as the last text
 #     of a turn with no tool call, and the proceed question comes in the next turn (hooks/refuse-requested-content-
 #     before-tool-call.sh refuses the same content written before a tool call),
+#   - the turn made no tool call and the reply has text and no prose offer: a conversational answer ends with the
+#     answer, even a one-word one the user asked for (survey 2026-11-12, scripts/survey-stop-hook-refusals.py: of 66 idle refusals on such turns,
+#     45 ended in a bare "Nothing left" or text only, 9 forced questions were rejected, 12 were useful),
 #   - the transcript or the reader cannot be read: it never blocks on a read it could not make.
 # Background work is an Agent spawn not set to run in the foreground or a SendMessage that resumed a sub-agent,
 # both in any turn (a reviewer spawned two prompts back is still pending work); a Bash call with
@@ -70,7 +73,7 @@ SHOW_PATTERN=""
 ROWS=$(python3 "$READER" "$TRANSCRIPT" --kinds user,assistant,agents,calls,tools --launch-receipts --json --max-chars 400 2>/dev/null) || exit 0
 
 VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" --arg show "$SHOW_PATTERN" '
-  def offer: "say the word|(do you |would you )?want me to|would you like me to|shall i |should i (go|proceed|build|run|start|do|edit|add|make|commit|fix|wire|set)|let me know (if|when|whether|which)|(?<!will )(?<!ll )(?<!to )(?<!would )(?<!can )(?<!could )(?<!it )(?<!that )tell me (to|if|when|which)|if you.?d like|if you want|if you prefer|ready (to (go|proceed) )?when you are|your call|up to you|(waits?|waiting) (for|on) your (word|go|call|ok)|on your (word|go-ahead|say-so)|the (choice|decision|question)( that [a-z ]+)? (is|here is)|which (one|would you|do you)";
+  def offer: "say the word|say go ahead|(do you |would you )?want me to|would you like me to|shall i |should i (go|proceed|build|run|start|do|edit|add|make|commit|fix|wire|set)|let me know (if|when|whether|which)|(?<!will )(?<!ll )(?<!to )(?<!would )(?<!can )(?<!could )(?<!it )(?<!that )tell me (to|if|when|which)|if you.?d like|if you want|if you prefer|ready (to (go|proceed) )?when you are|your call|up to you|(waits?|waiting) (for|on) your (word|go|call|ok)|on your (word|go-ahead|say-so)|the (choice|decision|question)( that [a-z ]+)? (is|here is)|which (one|would you|do you)";
   [ .[] | select(type == "object" and (.sidechain | not)) ] as $rows
   | ([ range(0; $rows | length) as $i | $rows[$i]
        | select(.group == "user" and .label == "USER" and .origin == "human" and (.meta | not)
@@ -91,6 +94,7 @@ VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" --arg show "$SHOW_PATT
     | ([ $tail | match(offer; "gi") | .string ] | last // "") as $phrase
     | ([ range(0; $turn | length) as $i | select($turn[$i].label == "RESULT AskUserQuestion") | $i ] | max // -1) as $a
     | ([ $turn[$a + 1:][] | select(.group == "calls" or .label == "AGENT-SPAWN" or .label == "SENDMSG") ] | length) as $workAfterAsk
+    | ([ $turn[] | select(.group == "calls" or .label == "AGENT-SPAWN" or .label == "SENDMSG" or .label == "ASK") ] | length) as $turnCalls
     # Reports and launches are indexed over the whole transcript: a sub-agent spawned, or resumed, in an earlier
     # turn is still pending work until its report comes (2026-11-05, link-keeper: a reviewer spawned two prompts
     # back was running, and three stops were refused as idle). The other kinds count only within this turn.
@@ -128,6 +132,7 @@ VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" --arg show "$SHOW_PATT
       elif $rejected then "pass"
       elif $a >= 0 and $workAfterAsk == 0 then "pass"
       elif $show != "" and ($prompt | test($show)) and ($text | length) >= 40 then "pass"
+      elif $turnCalls == 0 and ($text | length) > 0 and ($show == "" or ($prompt | test($show) | not)) then "pass"
       elif $pending > 0 or $workflowsPending > 0 then "pass"
       elif ($lastLine | test("^[\\s*_>#-]*nothing (else |more )?(is )?left\\b"; "i")) then "pass"
       else "idle" end
