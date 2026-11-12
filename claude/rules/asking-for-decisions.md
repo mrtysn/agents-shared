@@ -20,8 +20,9 @@ see; pick the rest without asking, and every name, picked or offered, says what
 the thing does (verb-object, never a metaphor noun).
 
 **LOCO** from the user, typed as an answer or a reply, means lack of context: the
-question or message left out facts they need. So do "i dont get X" and "what does X
-mean" about something you just wrote. Send it again at once with what the thing is, why
+question or message left out facts they need. So do a lone "what", "i dont get X" and
+"what does X mean" about something you just wrote; after an interrupt, a lone "what"
+asks what you were doing, so say that. Send it again at once with what the thing is, why
 it is asked now and what each option does, in the text itself. Do not defend the first
 version ([user abbreviations](user-abbreviations.md)).
 
