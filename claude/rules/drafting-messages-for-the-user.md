@@ -39,6 +39,8 @@ It goes out under their name, so every word in it is a claim they make.
 - Copy-ready text goes in a code block.
 
 A Stop hook (`hooks/refuse-unasked-draft-reply.sh`) refuses, once, a drafted reply to
-a pasted message when nothing was asked since the paste.
+a pasted message when nothing was asked since the paste. `hooks/note-lesson-on-revised-draft.sh` (Stop)
+asks, once, that a correction to a revised draft be recorded as a lesson in the drafting
+skill's Lessons table.
 
 Provenance: [docs/provenance/drafting-messages-for-the-user.md](../../docs/provenance/drafting-messages-for-the-user.md).
