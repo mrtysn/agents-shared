@@ -42,20 +42,23 @@ It does **not** hold this session's conclusion, recommendation, "we decided", or
 plan is good. Where the user wants the reviewer to know what already exists, point at the
 files and let it check them itself.
 
-**Read budget.** Name the exact files and line ranges the question turns on, and leave
-out files it does not. A reviewer that reads a whole rules file or script it did not need
-adds that file to every later request. Any command it is told to run gets a line range
-or a size cap (`--since`, `head -n`, a result limit); an uncapped extraction of a large
-transcript is the same cost. Neutral numbers this session already computed
-(a count, a size) go in with how they were derived, so the reviewer can re-check them.
-Never a summary of what a file says: that is this session's reading, and the stance
-rides in with it.
+**Scope of reading.** A file list chosen by this session is a selection, and a selection
+carries this session's view of what matters: the reviewer cannot see what was left out. So:
 
-**A question about structure** (pages, routes, modules, a layout this session changed):
-add the history of the files at issue, capped (`git log --format='%h %ad %s' --date=short -n 40
--- <paths>`), and name the last commit before this session's changes so the reviewer can
-read the earlier version itself. Today's files alone hide what a redirect or an empty slot
-used to be, and the reviewer will fill it with a fresh design.
+- **A question about a whole project, design or structure** (pages, routes, modules, an
+  architecture, "is this split right"): give the repo root and tell the reviewer to read
+  whatever it needs, including the full git history on every branch and earlier versions
+  of files (`git show <sha>:<path>`). Do not pick files for it. The user's words that bear
+  on it go in verbatim. (Nov 2026: a brief that named eight current files hid that the
+  page it proposed adding had been the main page all along; the user: "can you do a proper
+  subagent review. what is this partial context selection??")
+- **A question about one artifact** (a diff, a plan, a single script, one page): name that
+  artifact by absolute path, and let the reviewer follow it wherever it leads.
+- Any command it is told to run on something large (a transcript, a log) gets a size cap
+  (`--since`, `head -n`, a result limit). Neutral numbers this session already computed (a
+  count, a size) go in with how they were derived, so the reviewer can re-check them.
+- Never a summary of what a file says: that is this session's reading, and the stance
+  rides in with it.
 
 **A question about which fix to build** (a rule, skill, trigger row, hook, mod or
 script): add `$AGENTS_SHARED/docs/on-demand/choose-the-fix-for-a-pattern.md` to the files to read,
