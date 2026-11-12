@@ -29,3 +29,4 @@ commit-only-your-paths	Bash	command	(^|[;&|(`])[[:space:]]*git[[:space:]]+(-C[[:
 devices-through-adb-reconnect	Bash	command	(^|[;&|(`/])[[:space:]]*adb[[:space:]]	-	deny-once
 external-drive-mount-points	Bash	command	(^|[;&|(`])[[:space:]]*(ls|diskutil|df)[[:space:]].*(/Volumes|list|info|external)|grep[^;&|]*/Volumes	-	note-once
 drive-mac-ui-through-agent-ui-clicker	Bash	command	osascript.*System Events|(^|[;&|(`])[[:space:]]*(cliclick|screencapture)[[:space:]]	agent-ui-clicker	note-once
+sign-a-script-app-for-permission-grants	Bash	command	(^|[;&|(`])[[:space:]]*osacompile[[:space:]]|codesign[^;&|]*[[:space:]]-s[[:space:]]+-([[:space:]]|$)	-	note-once
