@@ -51,6 +51,12 @@ transcript is the same cost. Neutral numbers this session already computed
 Never a summary of what a file says: that is this session's reading, and the stance
 rides in with it.
 
+**A question about structure** (pages, routes, modules, a layout this session changed):
+add the history of the files at issue, capped (`git log --format='%h %ad %s' --date=short -n 40
+-- <paths>`), and name the last commit before this session's changes so the reviewer can
+read the earlier version itself. Today's files alone hide what a redirect or an empty slot
+used to be, and the reviewer will fill it with a fresh design.
+
 **A question about which fix to build** (a rule, skill, trigger row, hook, mod or
 script): add `$AGENTS_SHARED/docs/on-demand/choose-the-fix-for-a-pattern.md` to the files to read,
 resolved to its absolute path. It is a reference table, not this session's view, so it
