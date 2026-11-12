@@ -123,6 +123,9 @@ def visibility(owner, name):
 
 def outgoing(cwd, args):
     """Commits the push would send that the remote does not have, and the remote's name."""
+    # Shell redirections are not refspecs: `2>&1` reaches here as `2>` (PUSH stops at `&`),
+    # `> /dev/null` as two words. Read as a source, `2>` made rev-list fail and refused the push.
+    args = re.sub(r"(?:^|\s)\d*(?:>>?|<)&?\s*(?:[^\s&|;<>]+)?", " ", args)
     try:
         words = shlex.split(args)
     except ValueError:
