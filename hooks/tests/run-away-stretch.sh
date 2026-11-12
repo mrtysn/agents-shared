@@ -153,9 +153,9 @@ while IFS=$'\t' read -r name stretch refusals active shells fixture want after; 
   [[ -r $AWAY_STATE_DIR/$session.json ]] && count=$(jq -r .refusals $AWAY_STATE_DIR/$session.json)
   [[ $got == $want && $count == $after ]]
   report $? "stop: $name" "want $want/$after got $got/$count"
-  if [[ $got == block ]]; then   # the block message carries the quote, the end time and the way out
+  if [[ $got == block ]]; then   # the block message carries the end time and the way out, never the user's own words
     reason=$(print -r -- "$out" | jq -r .reason)
-    [[ $reason == "Away stretch open (user said: 'keep my machine idle until 9', until "*"). Nothing is armed to wake this session."*"away-obligation close --reason '<why>'." ]]
+    [[ $reason == "Away stretch open (until "*"). Nothing is armed to wake this session."*"away-obligation close --reason '<why>'." && $reason != *"keep my machine idle"* ]]
     report $? "stop: $name (block message)" "message was: $reason"
   fi
 done < $STOP_CASES

@@ -59,7 +59,7 @@ case $VERB in
     if ! OUT=$("$OBLIGATION" open --session "$SESSION" --quote "$QUOTE" "$VERB" "${WORDS[3]}" 2>&1); then
       refuse "${OUT#away-obligation: }. $USAGE_TEXT"
     fi
-    CONTEXT="The user opened an away stretch ($OUT; they said: '$QUOTE'). They are not at the machine, and nobody will answer questions: decide and report. Before ending any turn during the stretch, arm a waiter on the next thing you owe: ScheduleWakeup at its due time, or Bash run_in_background with an until-loop that exits on every end state of the job you filed (ok, failed, cancelled), and read its result when it fires. A Stop hook refuses the end of turn while nothing is armed. If the work is truly finished: away-obligation close --reason '<why>'."
+    CONTEXT="The user opened an away stretch ($OUT). They are not at the machine, and nobody will answer questions: decide and report. Before ending any turn during the stretch, arm a waiter on the next thing you owe: ScheduleWakeup at its due time, or Bash run_in_background with an until-loop that exits on every end state of the job you filed (ok, failed, cancelled), and read its result when it fires. A Stop hook refuses the end of turn while nothing is armed. If the work is truly finished: away-obligation close --reason '<why>'."
     jq -cn --arg m "Away stretch open $OUT" --arg c "$CONTEXT" \
       '{systemMessage: $m, hookSpecificOutput: {hookEventName: "UserPromptSubmit", additionalContext: $c}}'
     exit 0

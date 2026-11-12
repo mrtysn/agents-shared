@@ -83,5 +83,5 @@ if (( REFUSALS >= MAX_REFUSALS )); then
 fi
 
 "$OBLIGATION" refuse --session "$SESSION" >/dev/null 2>&1 || exit 0
-REASON="Away stretch open (user said: '$QUOTE', until $END_HHMM). Nothing is armed to wake this session. Arm a waiter on the next thing you owe: ScheduleWakeup at its due time, or Bash run_in_background with an until-loop that exits on every end state of the job you filed (ok, failed, cancelled). Read its result when it fires. Ask no questions during this stretch; decide and report. If the work is truly finished: away-obligation close --reason '<why>'."
+REASON="Away stretch open (until $END_HHMM). Nothing is armed to wake this session. Arm a waiter on the next thing you owe: ScheduleWakeup at its due time, or Bash run_in_background with an until-loop that exits on every end state of the job you filed (ok, failed, cancelled). Read its result when it fires. Ask no questions during this stretch; decide and report. If the work is truly finished: away-obligation close --reason '<why>'."
 jq -cn --arg r "$REASON" '{decision: "block", reason: $r}'
