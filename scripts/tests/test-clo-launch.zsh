@@ -95,8 +95,22 @@ check "with several panes, claude names itself" 0 \
     "claude --model z name=" -- TMUX=/tmp/s,1,0 STUB_PANES=12 -- --run-claude --model z
 [[ "$(<"$calls")" != *name=work-7f* ]] || { (( fails++ )); print "FAIL shared pane name"; }
 check "CLO_LAUNCHED_BY marks the new tmux session in the same command" 0 \
-    "tmux new-session -s $base-?? * claude ; set-option -t =$base-?? @launched_by orch-1f" -- \
+    "tmux new-session -s $base-?? * claude ; set-option -t =$base-??: @launched_by orch-1f" -- \
     TERM_PROGRAM=Apple_Terminal CLO_LAUNCHED_BY=orch-1f -- --run-claude
+# The stub accepts any target; replay the recorded command, detached, on a real tmux server of its
+# own, since `set-option -t` resolves a pane target, where a bare "=name" is not found.
+real_tmux="$(PATH="${PATH//$stub:/}" whence -p tmux 2>/dev/null)"
+if [[ -n "$real_tmux" ]]; then
+    sock="clo-test-$$"
+    recorded=(${=${"$(grep 'new-session' "$calls")"#tmux }})
+    recorded[1]=(new-session -d)
+    recorded[$recorded[(i)claude]]=cat
+    "$real_tmux" -L "$sock" -f /dev/null "${recorded[@]}" 2>/dev/null
+    got="$("$real_tmux" -L "$sock" list-panes -a -F '#{@launched_by}' 2>/dev/null)"
+    "$real_tmux" -L "$sock" kill-server 2>/dev/null
+    (( n++ ))
+    [[ "$got" == orch-1f ]] || { (( fails++ )); print -r -- "FAIL a real tmux did not take the marker (got: ${got:-nothing})"; }
+fi
 check "clo launch --launched-by marks the session" 0 \
     "tmux new-session * claude --model m* ; set-option -t =* @launched_by orch-2a" -- \
     TERM_PROGRAM=Apple_Terminal -- launch --dir "$stub" --model m --launched-by orch-2a

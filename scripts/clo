@@ -229,7 +229,7 @@ run_claude() {
         # as the session so no reader sees it unmarked. CC Sessions and clo-remote list such
         # sessions in their own group.
         local -a mark=()
-        [[ -n "${CLO_LAUNCHED_BY:-}" ]] && mark=(";" set-option -t "=$name" @launched_by "$CLO_LAUNCHED_BY")
+        [[ -n "${CLO_LAUNCHED_BY:-}" ]] && mark=(";" set-option -t "=$name:" @launched_by "$CLO_LAUNCHED_BY")
         exec "${t[@]}" "${cc[@]}" new-session -s "$name" -c "$PWD" "${env[@]}" "$cmd" "${mark[@]}"
     fi
     # Already inside tmux: the marker goes on the tmux session this pane is in.
