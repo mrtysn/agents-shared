@@ -15,6 +15,9 @@ It goes out under their name, so every word in it is a claim they make.
 - **One voice, chosen first.** Before writing, settle who speaks and to whom: the voice
   the user's earlier sent documents to that reader use, else the one the user picks. Keep it
   in every line: no outside narrator on the user's own work.
+- **Every reference has an owner.** No "their", "it" or "as planned" the recipient cannot
+  resolve from that sentence alone; name the person or thing. Before showing a draft, reread
+  it as the recipient, and reread every sentence a revision touched.
 - **The whole thread first.** Before drafting, read every message in the thread: every
   channel, file and screenshot the user gave. Answer every message still open to the
   user, and never ask for something already sent.
