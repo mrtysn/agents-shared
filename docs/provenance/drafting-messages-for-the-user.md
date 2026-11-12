@@ -16,3 +16,10 @@ prompt was an image with no text.
 A blind review shaped three choices: the test is "an unanswered question in the message
 means no draft yet", the ask goes through AskUserQuestion, and "a question about a
 draft is answered, not re-drafted" went into question handling instead of here.
+
+2026-11-12. A survey of the user's corrections to drafts over three weeks found the same
+patterns recurring after the rule existed: asks for things already sent, open messages left
+unanswered, pressure the user never set, several asks lumped into one, promised deliverables
+that were not ready, lines about the message itself, extra mentions, and a stiff register.
+The user confirmed each new line on a decision form. The promise line also covers what the
+user chooses to reveal: a recipient sees only what the user decided to tell them.
