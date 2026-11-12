@@ -29,4 +29,11 @@ answering the user, and it does not mean wait for them.
 - **A report states what still runs.** Name every loop, unit or process the run left
   behind, with when it ends. "Stops by itself" without a time is not a statement.
 
+## Built-in first
+
+Before proposing a paid service, an API key, or new heavy software, use what macOS and
+the machine already have. Text in an image or PDF: `ocr-image FILE...` (Vision, no
+network), not a vision-model read, tesseract or an OCR API. When no built-in can do the
+job, say what was checked, then name the cost.
+
 Provenance: [docs/provenance/working-style.md](../../docs/provenance/working-style.md).
