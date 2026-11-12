@@ -125,6 +125,18 @@ which keeps `hooks/note-skill-groups-used-here.sh` quiet in this repo. The file 
 machine-local: a fresh clone starts without the choice, because the groups exist only in
 this machine's `~/.claude/skills`.
 
+### 4d. Trust the folder for Claude Code
+
+A repo this skill creates is the user's own, so Claude Code's "trust this folder" dialog is
+answered up front, and a session started there from the phone is not stopped on it:
+
+```bash
+node "$AGENTS_SHARED/scripts/trust-claude-folder.mjs" "$(pwd -P)"
+```
+
+It prints `trusted <path>` or `already trusted <path>`. Run it only for a repo created here,
+never for a clone of someone else's.
+
 ### 5. Confirm visibility, then create remote and push
 
 Re-confirm with AskUserQuestion, in one question that states account, repo name, description and visibility, and wait for the pick. A public repo is its own option, never the default.
