@@ -2,7 +2,7 @@
 description: Find out whether something the user keeps typing, or a failure they keep correcting, deserves a fix, and which one: a skill, rule, trigger row, hook, mod or script (a repeated request, a repeated failure, a tone cue such as "more than one ?", or a tool they are weighing). Counts the matching prompts in recent transcripts, reads their context, groups them, explains why the user does it, gives a verdict, and on a yes writes the fix. Use when the user says "scour my recent chats for my patterns", "how often do I ask for X", "find the times this happened", "I got tired of asking the same thing", "would this tool help me", "fix it at its source", "fix your rule", or asks whether a repeated request should become a skill.
 user-invocable: true
 allowed-tools: Bash, Read, Agent
-argument-hint: <the message, habit or failure to look for>
+argument-hint: [the message, habit or failure to look for; empty means the failure just discussed]
 ---
 
 # pattern-discovery-agent-fix
@@ -14,6 +14,10 @@ nothing.** Step 8 then asks whether to build the fix, and builds it only on a ye
 **When the user points at one instance** ("fix it at its source", "fix your rule") the
 cause is in this session: skip the count (steps 2-3), keep step 5's coverage search and
 step 6's "why did it not fire", then give the verdict.
+
+**Called with no argument**, the subject is the failure or rule discussed just before in
+this session. State it in one line, then take the one-instance path above. Ask what to
+look for only when nothing in the session names a failure.
 
 ## 1. Say which kind of pattern
 
