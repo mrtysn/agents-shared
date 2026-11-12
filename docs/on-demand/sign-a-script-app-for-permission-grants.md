@@ -14,6 +14,12 @@ Before the first launch, and before sending the user to any permission pane:
 4. Launch it once after the grant. An alert that comes back means the identity is wrong:
    do not send the user back to the pane, and do not relaunch in a loop.
 
+An app that clicks a menu item through System Events opens the menu first (`click menu bar
+item "<Menu>" of menu bar 1`, then a short `delay`). A closed menu reports its items as
+disabled, and clicking a disabled item does nothing and raises no error, so the app exits
+cleanly having done nothing. Press Escape when the item is still disabled after the menu is
+open.
+
 Provenance: Nov 12 2026, the Merge Finder Windows applet. It was signed ad-hoc as `applet`,
 and the user was sent to the Accessibility pane three times. The user: "claude we fucking
 did this step already". See also the memory `adhoc-signing-voids-tcc-grants`.
