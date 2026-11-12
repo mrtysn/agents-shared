@@ -42,7 +42,8 @@ The search HTML carries the result as JSON. Read it, not the cards:
 ```js
 const h = await (await fetch('/tr/search.html?query=' + encodeURIComponent(q))).text();
 const i = h.indexOf('window.__PRELOADED_STATE__ = '), j = h.indexOf('</script>', i);
-const ap = JSON.parse(h.slice(i + 29, j).replace(/;\s*$/, '')).apolloState;
+// the state is a JavaScript literal holding `undefined`, which JSON.parse refuses
+const ap = JSON.parse(h.slice(i + 29, j).replace(/;\s*$/, '').replace(/:undefined([,}\]])/g, ':null$1')).apolloState;
 for (const k of Object.keys(ap).filter(k => k.startsWith('GraphqlProduct:'))) {
   const p = ap[k], id = p.id;
   const inStock = ap['CofrOnlineStatusFeature:Media:tr:' + id]?.isAvailableAndBuyable;
@@ -51,6 +52,13 @@ for (const k of Object.keys(ap).filter(k => k.startsWith('GraphqlProduct:'))) {
   // p.title, location.origin + p.url
 }
 ```
+
+## Trendyol
+
+The search HTML embeds the result list as `"products":[…]` inside
+`window["__single-search-result__PROPS"]`. Cut out the array by bracket depth and parse it.
+Each product has `brand`, `name`, `url`, and `price.current`. A `priceLabels` entry that says
+"sepette" marks a cart price. The search lists only items in stock.
 
 ## D&R
 
