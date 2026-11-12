@@ -50,8 +50,14 @@ check "asked with AskUserQuestion first"       pass  false "$(prompt '[Image #1]
 check "typed prompt, no paste"                 pass  false "$(prompt 'reword the second line')" "$(say $DRAFT)"
 check "image prompt, no draft"                 pass  false "$(prompt '[Image #1]')" "$(say 'The client accepted the scope.')"
 check "code block, not a message"              pass  false "$(prompt '[Image #1]')" "$(say $CODE)"
-check "greeting without sign-off"              pass  false "$(prompt '[Image #1]')" "$(say $NOSIGN)"
+check "greeting without sign-off"              block false "$(prompt '[Image #1]')" "$(say $NOSIGN)"
 check "question asked before the paste"        block false "$(prompt 'draft it')" "$(ask)" "$(prompt '[Image #2]')" "$(say $DRAFT)"
+DISCORD=$'```\nHi @MadNan\n\nThe technical plan comes Monday.\n```'
+MENTION=$'```\n@Ege thanks for the builds, could you add me to the repositories?\n```'
+DECORATOR=$'```\n@app.route("/health")\ndef health(): return "ok"\n```'
+check "discord draft, no sign-off"             block false "$(prompt '[Image #1]')" "$(say $DISCORD)"
+check "mention-led draft"                      block false "$(prompt '[Image #1]')" "$(say $MENTION)"
+check "decorator code is not a message"        pass  false "$(prompt '[Image #1]')" "$(say $DECORATOR)"
 check "missing transcript"                     pass  false
 
 (( verbose || fail )) && print

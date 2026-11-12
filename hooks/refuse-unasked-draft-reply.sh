@@ -10,9 +10,9 @@
 #   - stop_hook_active is false (the session is not already continuing because of a Stop hook),
 #   - the user's last typed prompt carries a pasted image or a <pasted_content> block (an inbound message),
 #   - no AskUserQuestion call was made after that prompt,
-#   - the last assistant text holds a fenced block shaped like a message: its first line a greeting ending in a
-#     comma or ! (Hi, Hello, Hey, Dear, Merhaba, Selam…) and a later line a sign-off (Best, Regards, Thanks, Cheers,
-#     Teşekkürler, Saygılarımla…).
+#   - the last assistant text holds a fenced block shaped like a message: its first line a greeting (Hi, Hello,
+#     Hey, Dear, Thanks, Merhaba, Selam…) or an @-mention followed by words, with no code punctuation (= ( { ;).
+#     Until 2026-11-12 a sign-off line was also required, which missed every chat draft.
 # Then it blocks with {"decision":"block"} and the check to make. The continuation passes (stop_hook_active),
 # so it refuses at most once per turn. Any read failure lets the stop through. No network, no model call.
 #
@@ -43,28 +43,26 @@ VERDICT=$(print -r -- "$ROWS" | jq -rs '
     end' 2>/dev/null) || exit 0
 [[ -n $VERDICT && $VERDICT != pass ]] || exit 0
 
-# A fenced block whose first non-empty line is a greeting ending in a comma or !, and a later line a sign-off.
-GREETING='^(hi|hello|hey|dear|merhaba|selam|selamlar|good (morning|afternoon|evening))\b|^[[:alpha:]çğıöşüİ]+ (selamlar|merhaba)\b'
-SIGNOFF='^(best|best regards|kind regards|warm regards|regards|thanks|thank you|many thanks|cheers|sincerely|teşekkürler|teşekkür ederim|saygılarımla|sevgiler|iyi çalışmalar)\b'
+# A fenced block whose first non-empty line opens like a message: a greeting, or an @-mention followed by words,
+# with no code punctuation on that line. A sign-off is not required: chat messages have none.
+GREETING='^(hi|hello|hey|dear|thanks|thank you|merhaba|selam|selamlar|good (morning|afternoon|evening))\b|^[[:alpha:]çğıöşüİ]+ (selamlar|merhaba)\b|^@[[:alpha:]][[:alnum:]_.]*[ ,]+[[:alpha:]]'
 found=0
 inblock=0
 first=""
-signed=0
 for line in "${(@f)VERDICT}"; do
   if [[ $line == '```'* ]]; then
     if (( inblock )); then
-      if [[ $first == *[,!] ]] && print -r -- "$first" | grep -qiE "$GREETING" && (( signed )); then found=1; break; fi
+      if [[ -n $first && $first != *[\=\(\{\;]* ]] && print -r -- "$first" | grep -qiE "$GREETING"; then found=1; break; fi
       inblock=0
     else
-      inblock=1; first=""; signed=0
+      inblock=1; first=""
     fi
     continue
   fi
   (( inblock )) || continue
   trimmed=${line##[[:space:]]#}
   [[ -z $trimmed ]] && continue
-  if [[ -z $first ]]; then first=$trimmed; continue; fi
-  print -r -- "$trimmed" | grep -qiE "$SIGNOFF" && signed=1
+  [[ -z $first ]] && first=$trimmed
 done
 (( found )) || exit 0
 
