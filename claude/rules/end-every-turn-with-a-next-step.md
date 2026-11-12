@@ -48,7 +48,7 @@ it again; say in one line what is unfinished and end in text (the hook passes su
 `hooks/refuse-idle-end-of-turn.sh` (Stop) refuses, once, a turn that ends otherwise, and lets
 a text-only turn through when the user asked to see content;
 `hooks/refuse-requested-content-before-tool-call.sh` (PreToolUse) refuses, once, that content
-written ahead of a question, skill or agent call; `hooks/end-turn-for-queued-slash-command.py`
+written ahead of a question, skill or agent call, and a copy-ready draft (a fenced block) written ahead of any tool call; `hooks/end-turn-for-queued-slash-command.py`
 says when a slash command is queued and refuses the question or the skill call meanwhile.
 
 Provenance: [docs/provenance/end-every-turn-with-a-next-step.md](../../docs/provenance/end-every-turn-with-a-next-step.md).

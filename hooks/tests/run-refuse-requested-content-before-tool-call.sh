@@ -45,15 +45,18 @@ failed=0
 
 mk() { local f="$TMP/$1.jsonl"; shift; { for line in "$@"; do printf '%s\n' "$line"; done; } > "$f"; printf '%s' "$f"; }
 
-# check NAME WANT TOOL TRANSCRIPT [SESSION]: each case gets its own session id so markers never collide.
+# check NAME WANT TOOL TRANSCRIPT [SESSION] [KIND]: each case gets its own session id so markers never collide.
+# KIND (show or draft) says which refusal message a refusal must carry.
 check() {
-    local name=$1 want=$2 tool=$3 file=$4 session=${5:-case-$total} payload got=0 err
+    local name=$1 want=$2 tool=$3 file=$4 session=${5:-case-$total} kind=${6:-show} payload got=0 err remedy
     payload=$(jq -cn --arg t "$tool" --arg f "$file" --arg s "$session" '{tool_name:$t, session_id:$s, transcript_path:$f, tool_input:{}}')
     err=$(printf '%s' "$payload" | "$HOOK" 2>&1 >/dev/null) || got=$?
     total=$((total + 1))
     if [ "$got" = "$want" ]; then
         [ "$VERBOSE" = 1 ] && printf 'ok    %s\n' "$name"
-        if [ "$want" = 2 ] && ! printf '%s' "$err" | grep -q 'End this turn with the content as plain text and no tool call'; then
+        remedy='End this turn with the content as plain text and no tool call'
+        [ "$kind" = draft ] && remedy='End this turn with the draft as the last text and no tool call'
+        if [ "$want" = 2 ] && ! printf '%s' "$err" | grep -q "$remedy"; then
             failed=$((failed + 1)); printf 'FAIL  %s: refusal gives no remedy\n' "$name"
         fi
     else
@@ -108,6 +111,40 @@ f=$(mk text-after-answer "$(prompt 'list me all the names')" "$(ask q1)" "$(resu
 check 'text written after an answered call refuses' 2 Skill "$f"
 f=$(mk earlier-turn "$(prompt 'list me all the names' 2026-11-10T09:00:00.000Z)" "$(say "$CONTENT")" "$(prompt 'fix the build' 2026-11-10T10:00:00.000Z)" "$(ask q1)")
 check 'content from an earlier turn does not count' 0 AskUserQuestion "$f"
+
+# A copy-ready draft (fenced block) written ahead of a tool call, whatever the prompt asked for.
+DRAFT=$'Here is the reply:\n\n```\nHi Alex,\nthanks for the update.\n```'
+f=$(mk draft-bash "$(prompt 'not a good way to put it i think')" "$(say "$DRAFT")" "$(call t1 Bash '{"command":"git commit"}')")
+check 'draft + Bash refuses' 2 Bash "$f" s-draft-bash draft
+check 'draft + Bash, second attempt in the same turn allows' 0 Bash "$f" s-draft-bash draft
+f=$(mk draft-edit "$(prompt 'not a good way to put it i think')" "$(say "$DRAFT")" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'draft + Edit refuses' 2 Edit "$f" s-draft-edit draft
+f=$(mk draft-write "$(prompt 'tidy that')" "$(say "$DRAFT")" "$(call t1 Write '{"file_path":"/x"}')")
+check 'draft + Write refuses' 2 Write "$f" s-draft-write draft
+f=$(mk draft-ask "$(prompt 'not a good way to put it i think')" "$(say "$DRAFT")" "$(ask q1)")
+check 'draft + AskUserQuestion refuses with the draft message' 2 AskUserQuestion "$f" s-draft-ask draft
+f=$(mk draft-skill "$(prompt 'tidy that')" "$(say "$DRAFT")" "$(call t1 Skill '{"skill":"x"}')")
+check 'draft + Skill refuses' 2 Skill "$f" s-draft-skill draft
+f=$(mk draft-agent "$(prompt 'tidy that')" "$(say "$DRAFT")" "$(call t1 Agent '{"description":"d","prompt":"p"}')")
+check 'draft + Agent refuses' 2 Agent "$f" s-draft-agent draft
+f=$(mk draft-sendmsg "$(prompt 'tidy that')" "$(say "$DRAFT")" "$(call t1 SendMessage '{"to":"a","message":"m"}')")
+check 'draft + SendMessage refuses' 2 SendMessage "$f" s-draft-sendmsg draft
+f=$(mk draft-read "$(prompt 'not a good way to put it i think')" "$(say "$DRAFT")" "$(call t1 Read '{"file_path":"/x"}')")
+check 'draft + Read is not in the matcher list' 0 Read "$f" s-draft-read
+f=$(mk plain-bash "$(prompt 'not a good way to put it i think')" "$(say 'Fixing the wording now, then committing it.')" "$(call t1 Bash '{"command":"git commit"}')")
+check 'plain prose + Bash allows' 0 Bash "$f" s-plain-bash
+f=$(mk draft-earlier "$(prompt 'draft the email' 2026-11-10T09:00:00.000Z)" "$(say "$DRAFT")" "$(prompt 'fix the build' 2026-11-10T10:00:00.000Z)" "$(call t1 Bash '{"command":"ls"}')")
+check 'a fenced block from an earlier turn does not count' 0 Bash "$f" s-draft-earlier
+f=$(mk draft-answered "$(prompt 'not a good way to put it i think')" "$(say "$DRAFT")" "$(call t1 Bash '{"command":"ls"}')" "$(result t1 'ok')" "$(call t2 Bash '{"command":"git commit"}')")
+check 'a later Bash after an answered call allows' 0 Bash "$f" s-draft-answered
+f=$(mk draft-after-answer "$(prompt 'not a good way to put it i think')" "$(call t1 Bash '{"command":"ls"}')" "$(result t1 'ok')" "$(say "$DRAFT")" "$(call t2 Bash '{"command":"git commit"}')")
+check 'a draft written after an answered call refuses' 2 Bash "$f" s-draft-after-answer draft
+
+# A sub-agent's call (agent_id in the input) is never refused, whoever wrote the draft in the parent's turn.
+f=$(mk draft-subagent "$(prompt 'tidy that')" "$(say "$DRAFT")" "$(call t1 Agent '{"description":"d","prompt":"p"}')")
+got=0; jq -cn --arg f "$f" '{tool_name:"Bash", session_id:"s-subagent", agent_id:"a1", transcript_path:$f, tool_input:{}}' | "$HOOK" >/dev/null 2>&1 || got=$?
+total=$((total + 1))
+if [ "$got" = 0 ]; then [ "$VERBOSE" = 1 ] && echo 'ok    sub-agent call allows'; else failed=$((failed + 1)); echo "FAIL  sub-agent call: got $got"; fi
 
 # Fail open.
 check 'transcript missing allows' 0 AskUserQuestion "$TMP/nonexistent.jsonl"
