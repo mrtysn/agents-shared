@@ -78,3 +78,11 @@ three turns in a row after the user rejected two AskUserQuestion calls ("I asked
 topic"): a `[Request interrupted by user for tool use]` marker was read as a fresh prompt, so the rejected
 question fell outside the turn and the turn counted as idle. The marker is no longer a prompt, and a question
 rejected between the previous prompt and this one lets the turn end.
+
+2026-11-12: at the user's choice ("Message backend-multi-10"), a session sent a ledger change to the
+orchestrator session that owned it. Its next /outstanding listed that change as its own `Running` item. The
+user: "ok but thats not this sessions outstanding?", then "then why list it?". Nothing in the rule or in
+/outstanding, ask-open-decisions and closing-time said whose an item is. All four now leave out work handed
+to another session unless this session's remaining work waits on it, and /outstanding records it under Set
+aside as Handed off, saying whether it has landed. A Fable review turned down filing it under Done, which
+would have claimed an unchecked change as finished.

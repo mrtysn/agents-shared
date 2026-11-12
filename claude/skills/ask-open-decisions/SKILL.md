@@ -69,7 +69,8 @@ accurate it is.
      waits on (a login, a device in hand); its option is "I'll do it now, walk me through
      it", "Done, check the result" once the steps were given, or, where an agent path
      exists, "Do it yourself". What the user does with a finished deliverable (upload,
-     paste, send, deploy) is never an item, and neither is work nobody asked for. Take
+     paste, send, deploy) is never an item, and neither is work nobody asked for. Work
+     handed to another session is not an item unless your own remaining work waits on it. Take
      them in the order the session's own list shows; that order is the execution order,
      so there is no ranking question.
    - `multiSelect: true`. One option per item: the label names the item in full, the

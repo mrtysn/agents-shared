@@ -30,6 +30,7 @@ outstanding items so that a wrong call is caught at a glance rather than lost:
 - **Deferred** — the user postponed it in their own words ("later", "not now", "next pass", "after X"). Your guess that they will want it someday is not a postponement.
 - **Decided, not doing** — "leave it", "keep it", "no", "not needed", or an offer of yours they turned down. A settled decision, not a postponement.
 - **Dropped** — a later decision rescoped or replaced it ("HTTP only for now").
+- **Handed off** — sent to another session because the user chose that route or that session holds the file. Check whether it landed and say so; never assume. It stays Outstanding when this session's remaining work waits on it, when this session passed it on unasked, or when the recipient was not confirmed by evidence.
 
 When unsure whether an item is a next target or set aside, it is a next target: a false
 entry in Outstanding costs a glance, a missed task costs the task.
@@ -100,7 +101,7 @@ Layout, exactly:
 
 Rules for the items:
 - **Item** — name it as the user named it. No embellishment.
-- **State** — exactly one of: Blocked, Yours, Uncommitted, Partial, Running, Not started. `Yours` is a step only the user can perform (a physical button, a login, a click in an app) that the agent's own remaining work waits on. What the user does with a finished deliverable (upload it, paste it, send it, deploy it) is never a row in either list: it is the point of the task, not work left. Never Deferred: deferred items belong to Set aside.
+- **State** — exactly one of: Blocked, Yours, Uncommitted, Partial, Running, Not started. `Yours` is a step only the user can perform (a physical button, a login, a click in an app) that the agent's own remaining work waits on. What the user does with a finished deliverable (upload it, paste it, send it, deploy it) is never a row in either list: it is the point of the task, not work left. Never Deferred: deferred items belong to Set aside. `Running` is only this session's own processes.
 - **Next step** — one concrete, actionable move, anchored to where the work lives: a `file.cs:line`, a branch name, or the exact command. Not "finish it" — the actual edit or invocation. For a Blocked item, name the exact decision or answer you need. For a `Yours` item, the next step is the numbered steps the user performs: the app, the screen, the control, what they should see, and how to undo it. First check that an agent cannot do the step itself (a self-test, a CLI, ssh); if it can, the item is Not started, not Yours.
 - Order by what the user should see first: Blocked (needs them), then Yours, then Uncommitted (cheapest to close), Partial, Running, Not started.
 - **Self-contained** — no session-local shorthand: no "option B", "the fix", bare codes, or truncated links. Full repo-relative paths, full URLs, and enough words that each row reads cold, weeks later, without this conversation open.
@@ -115,6 +116,7 @@ no state tag and no next step, so it never reads as work:
 - <item, self-contained>. Decided, not doing: "<the user's words>"
 - <item>. Deferred: "<the user's words>"
 - <item>. Dropped: <what replaced it>
+- <item>. Handed off: to <session>, "<the user's words>"; <landed in <commit> | not landed when checked>
 ```
 
 Quote the user's own words for Deferred and Decided, not doing, so a misreading is visible.
