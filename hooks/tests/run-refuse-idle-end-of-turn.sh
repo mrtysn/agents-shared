@@ -87,6 +87,7 @@ ASSET_STEPS=$'The banner is made: /Users/x/brand/x-banner-black.png.\n\nWhat\'s 
 ASSET_STEPS_OFFER=$ASSET_STEPS$'\n\nIf you want the site to match the banner, I can change its dark background to pure black.'
 ASSET_DONE=$'The banner is made: /Users/x/brand/x-banner-black.png.\n\nNothing left: the black banner you asked for is made.'
 
+check "user step due later, named on the Nothing left line" pass false "$(prompt 'record the welcome email')" "$(bash_call 1)" "$(say $'Recorded (commit ab12cd3).\n\nNothing left: the email is recorded. Yours by 2026-11-19: the background check, recorded in log.html.')"
 check "report of user steps, nothing asked"          block false "$(prompt 'build T14')" "$(bash_call 1)" "$(say $REPORT)"
 check "research answer, no tool call: ends with the answer" pass false "$(prompt 'find videos with guitars with known ground truths?')" "$(say $SOURCES)"
 check "research answer after a search, nothing asked" block false "$(prompt 'find videos with guitars with known ground truths?')" "$(bash_call 1)" "$(say $SOURCES)"

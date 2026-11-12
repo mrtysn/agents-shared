@@ -74,7 +74,7 @@ accurate it is.
      listed as not started or unfinished, next steps already agreed, and Blocked or Yours
      items. A Yours item is a step only the user can take that your own remaining work
      waits on (a login, a device in hand); its option is "I'll do it now, walk me through
-     it", "Done, check the result" once the steps were given, or, where an agent path
+     it", "Done, check the result" only after the user says they went to do it, or, where an agent path
      exists, "Do it yourself". What the user does with a finished deliverable (upload,
      paste, send, deploy) is never an item, and neither is work nobody asked for. Work
      handed to another session is not an item unless your own remaining work waits on it. Take
@@ -95,7 +95,7 @@ accurate it is.
      own round straight after, with no prose in between.
    - Parked or deferred items the user already set aside are not offered again.
    - A walk-through the user has passed over once is not offered again in the same session;
-     the Yours item stays in the question as "Done, check the result".
+     the Yours item is named on the closing line instead.
 
 6. **Close with a record** of what was decided: a short table, one row per decision,
    `Decision | Chosen | What happens next`, plus a row for the items picked to proceed.

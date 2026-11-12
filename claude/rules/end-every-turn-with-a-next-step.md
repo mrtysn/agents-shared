@@ -18,7 +18,10 @@ finished deliverable (upload it, paste it, send it, deploy it, tell someone) is 
 point of the task, never an item: do not list it, offer it, or walk through it. A step
 only the user can take counts only when your own remaining work waits on it (a login,
 a device in hand, a reboot before a test), and only after checking you cannot do it
-yourself. Work nobody asked for (restyling something to match, a related cleanup) is
+yourself. A step of the user's with a later date is not an item: write it where the repo
+keeps open items, and name it on the closing line: `Nothing left: <delivered>. Yours by
+<date>: <step>, recorded in <file>.` Never ask whether a step is done in the turn that
+introduced it; ask when the user raises it or a later session reads the record. Work nobody asked for (restyling something to match, a related cleanup) is
 not offered either. Work handed to another session at the user's direction is not an item
 either, unless your own remaining work waits on it.
 
