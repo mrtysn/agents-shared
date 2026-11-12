@@ -32,9 +32,33 @@
 # the same call's text as "B: …", "B = …", "B — …" or "B (…)". The letters were named on a form
 # or in earlier prose; the user deciding from the prompt alone does not know what they stand for.
 #
+# A fourth trigger only nudges and never refuses: when the hook ends with exit 0 and a question text is over
+# 300 characters with no blank line, or an option description holds a line break (the terminal renders it as
+# a replacement character) or is over 240 characters, the agent gets a PreToolUse additionalContext with the
+# layout template (survey 2026-11-12: 51% of 4,572 questions had no blank line in a long text). It reads the
+# call alone, so it waits for nothing.
+#
 # Bash, not zsh, to match the hooks beside it.
 
 INPUT=$(cat)
+
+# A nudge that never blocks: when the hook ends with exit 0 and the question breaks the layout, the agent
+# gets a note (PreToolUse additionalContext) with the template. Read from the call alone, no transcript.
+LAYOUT=$(printf '%s' "$INPUT" | jq -r '
+  [ .tool_input.questions[]? |
+    (if ((.question // "") | length) > 300 and (((.question // "") | test("\n[ \t]*\n")) | not) then "paragraph" else empty end),
+    (if any(.options[]?; ((.description // "") | test("[\r\n]"))) then "break" else empty end),
+    (if any(.options[]?; ((.description // "") | length) > 240) then "long" else empty end)
+  ] | unique | join(",")' 2>/dev/null) || LAYOUT=""
+emit_layout_nudge() {
+    local msg="Question layout (docs/on-demand/asking-for-decisions.md):"
+    case ",$LAYOUT," in *,paragraph,*) msg="$msg a question text over 300 characters is one paragraph and renders as one bold block." ;; esac
+    case ",$LAYOUT," in *,break,*) msg="$msg a line break inside an option description renders as a replacement character." ;; esac
+    case ",$LAYOUT," in *,long,*) msg="$msg an option description over 240 characters crowds the options." ;; esac
+    msg="$msg Next time: the topic on line 1, a blank line, one fact per line (numbered when they are items), a blank line, the question alone on the last line; describe each item once, in its option or in a fact line; keep each option description to one line."
+    jq -cn --arg c "$msg" '{hookSpecificOutput: {hookEventName: "PreToolUse", additionalContext: $c}}'
+}
+trap 'rc=$?; [ "$rc" -eq 0 ] && [ -n "$LAYOUT" ] && emit_layout_nudge' EXIT
 
 ALLTEXT=$(printf '%s' "$INPUT" | jq -r '[.tool_input.questions[]? | .question, (.options[]? | .label, .description)] | map(select(type == "string")) | join("\n")' 2>/dev/null) || ALLTEXT=""
 NOUNS='option|direction|pair|plan|variant|version|choice|route|design|palette|approach|layout'

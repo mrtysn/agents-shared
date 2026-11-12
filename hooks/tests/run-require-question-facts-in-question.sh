@@ -132,6 +132,30 @@ f=$(mk lag "$(u 'go')" "$(think)")
 check 'path text written a moment after the hook starts allows' 0 "Which of $ABS_LAG reads better?" "$f"
 wait
 
+# Layout nudge: exit 0 with an additionalContext, never a refusal. NAME WANT(1 = nudge, 0 = none) QUESTIONS-JSON.
+nudge() {
+    local name=$1 want=$2 qs=$3 out got=0 code=0
+    out=$(jq -cn --argjson q "$qs" '{tool_name:"AskUserQuestion", transcript_path:"/nonexistent", tool_input:{questions:$q}}' | "$HOOK" 2>/dev/null) || code=$?
+    printf '%s' "$out" | grep -q additionalContext && got=1
+    total=$((total + 1))
+    if [ "$got" = "$want" ] && [ "$code" = 0 ]; then
+        [ "$VERBOSE" = 1 ] && printf 'ok    %s\n' "$name"
+    else
+        failed=$((failed + 1)); printf 'FAIL  %s: want nudge %s, got %s (exit %s)\n' "$name" "$want" "$got" "$code"
+    fi
+}
+LONG=$(printf 'word %.0s' $(seq 1 70))
+LONGDESC=$(printf 'word %.0s' $(seq 1 55))
+nudge 'long one-paragraph question nudges' 1 "$(jq -cn --arg q "$LONG" '[{question:$q, header:"h", options:[{label:"a", description:"short"}]}]')"
+nudge 'long question with a blank line is quiet' 0 "$(jq -cn --arg q "Topic${LONG:0:0}"$'\n\n'"$LONG" '[{question:$q, header:"h", options:[{label:"a", description:"short"}]}]')"
+nudge 'short question is quiet' 0 '[{"question":"Build it?","header":"h","options":[{"label":"a","description":"short"}]}]'
+nudge 'line break inside a description nudges' 1 '[{"question":"Build it?","header":"h","options":[{"label":"a","description":"one\ntwo"}]}]'
+nudge 'description over 240 characters nudges' 1 "$(jq -cn --arg d "$LONGDESC" '[{question:"Build it?", header:"h", options:[{label:"a", description:$d}]}]')"
+nudge 'description at 200 characters is quiet' 0 "$(jq -cn --arg d "${LONGDESC:0:200}" '[{question:"Build it?", header:"h", options:[{label:"a", description:$d}]}]')"
+got=0; printf '%s' "{\"tool_name\":\"AskUserQuestion\",\"transcript_path\":\"/nonexistent\",\"tool_input\":{\"questions\":[{\"question\":\"Pair B or C?\",\"header\":\"h\",\"options\":[{\"label\":\"a\",\"description\":\"$(printf 'x%.0s' $(seq 1 260))\"}]}]}}" | "$HOOK" >/dev/null 2>&1 || got=$?
+total=$((total + 1))
+if [ "$got" = 2 ]; then [ "$VERBOSE" = 1 ] && echo 'ok    a refusal stays a refusal when the layout also nudges'; else failed=$((failed + 1)); echo "FAIL  refusal with nudge: got $got"; fi
+
 # Fail open.
 check 'transcript missing allows' 0 "$ABOVE" "$TMP/nonexistent.jsonl"
 payload=$(jq -cn --arg q "$ABOVE" '{tool_name:"AskUserQuestion", tool_input:{questions:[{question:$q}]}}')
