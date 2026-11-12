@@ -61,8 +61,11 @@ accurate it is.
 4. **Ask in rounds of at most four questions** (the tool's limit), most consequential
    first: decisions that block other work, then irreversible or outward-facing ones,
    then the rest. Continue with the next round after each answer until none are left.
-   A question the user answered with a counter-question or a note is still open: answer
-   it and ask it again, rewritten with what was learned.
+   A question the user answered with a counter-question or a note is still open: ask it
+   again with the answer inside the new question, and no text written before the call.
+   Line 1 is "You asked: …", then the answer one fact per line, a blank line, then the
+   decision rewritten with what was learned. An answer of more than about six lines goes in
+   a text-only turn whose last line names the decision still open.
 
 5. **Finish with the proceed question.** Answering the decisions is the last step before
    moving forward, so the final question asks what to build next. It is asked every run,

@@ -22,7 +22,10 @@ the thing does (verb-object, never a metaphor noun).
 The question text is laid out in lines, never one paragraph: the topic on line 1, a blank
 line, one fact per line (numbered when they are items), a blank line, then the question
 alone on the last line. Line breaks render in the terminal. Options that are exact
-wording, a diff or a layout go in `preview` (single-choice questions only).
+wording, a diff or a layout go in `preview` (single-choice questions only). An answer the
+user types into a question's answer box that asks something is answered inside the re-asked
+question ("You asked: …", the answer one fact per line, then the decision), with no text
+before the call.
 
 **An answer that names the user's own candidates is not a pick.** "A? or B." leaves the
 choice open: ask again with exactly those candidates as the options, and never choose
