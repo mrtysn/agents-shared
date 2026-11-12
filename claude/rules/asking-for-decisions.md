@@ -19,6 +19,10 @@ confirmed with the tool before they run. Ask only for names the user will type o
 see; pick the rest without asking, and every name, picked or offered, says what
 the thing does (verb-object, never a metaphor noun).
 
+**An answer that names the user's own candidates is not a pick.** "A? or B." leaves the
+choice open: ask again with exactly those candidates as the options, and never choose
+among them yourself or announce "I'm taking X". Only the user's explicit selection settles it.
+
 The user's keywords (LOCO, ETA, SIMPLER) are typed as answers and replies; each is
 defined in [user abbreviations](user-abbreviations.md), and a reply that is one follows its
 row.

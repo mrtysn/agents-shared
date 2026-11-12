@@ -112,3 +112,8 @@ again only in thinking. When the user did not see something, the first check is
 before it (the text stays visible after the box is dismissed). The path check in
 `hooks/require-question-facts-in-question.sh` is the guard: a question naming a file is refused
 unless its absolute path was sent in visible text.
+
+Nov 12 2026: asked which host name a landing page should get, the user answered with their
+own candidates ("subdomains? or sub."). The agent wrote "I'm taking subdomains" and offered a
+build question built on it. The user: "wdym I'm taking? when I ask you options you dont get to
+choose on your own".
