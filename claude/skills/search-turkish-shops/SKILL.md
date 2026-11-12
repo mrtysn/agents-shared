@@ -33,8 +33,11 @@ rule format; `tests/test_retail_rules.py` checks it). When a shop answers differ
    open on that shop, with `fetch()` of the shop's own search endpoint, parsed in the page. No
    hidden iframes and no page-by-page navigation: both load every asset and get the browser
    throttled or challenged.
-3. **Small shops** (D&R, Idefix, music stores): one search page's brand filter shows which brands
-   they carry; search only those.
+3. **Small shops** (D&R, Idefix, music stores): read the shop's menu and the category that
+   holds the product (music stores keep consumer headphones under LIFESTYLE or Hi-Fi), and its
+   brand filter; search only the brands it carries. A shop is written off for a product only
+   after its categories are read and its "no result" message is seen on screen, never from an
+   empty read of a page still loading.
 4. **Read structured data where the shop has it**: embedded state or JSON (MediaMarkt's
    `__PRELOADED_STATE__.apolloState`) beats parsing cards. `readers.md` has the reader for each shop
    that has one.
