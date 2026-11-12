@@ -22,7 +22,11 @@ A push to a public repo passes when the command carries one of two markers, in a
       previous approved public push.
 
 A push that sends no new commits (a rewind, a branch delete, an up-to-date push) passes with
-no marker. Private, internal and non-GitHub remotes pass. Visibility comes from `gh repo view`,
+no marker. The hook runs before the command, so when a commit is made earlier in the same
+command (commit, merge, pull, cherry-pick, revert, am or rebase, then the push) that commit
+does not exist yet: it counts as outgoing, and for the media check the changed, staged and
+untracked files in the working tree stand in for it. Heredoc bodies are text, not commands,
+and are skipped when looking for a push. Private, internal and non-GitHub remotes pass. Visibility comes from `gh repo view`,
 cached a day under ${XDG_CACHE_HOME:-~/.cache}/agents-shared/repo-visibility/; when it cannot be
 found the push is refused. Provenance: 2026-11-10, a site rebuild full of new personal content
 went to a public repo in a routine push, and the user said "we will only commit such sensitive
@@ -44,6 +48,10 @@ MIN_QUOTE = 8
 CACHE_SECONDS = 86400
 MEDIA = re.compile(r"\.(png|jpe?g|gif|webp|avif|heic|bmp|tiff?|svg|ico|mp4|mov|webm|mkv|m4v|mp3|wav|m4a|ogg|flac|pdf)$", re.I)
 PUSH = re.compile(r"(?:^|[;&|(\n])\s*git((?:\s+-[Cc]\s+\S+)*)\s+push\b([^;&|\n#]*)")
+# Something earlier in the same command that makes new commits before the push runs.
+MAKES_COMMITS = re.compile(r"(?:^|[;&|(\n])\s*git(?:\s+-[Cc]\s+\S+)*\s+(?:commit|merge|pull|cherry-pick|revert|am|rebase)\b")
+# A heredoc: its opening line, then its body up to the line holding only its delimiter.
+HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1[^\n]*\n.*?\n\s*\2\s*(?:\n|$)", re.S)
 MARK_CODE = re.compile(r"#\s*public-push:\s*no personal content", re.I)
 MARK_USER = re.compile(r'#\s*public-push:\s*user approved\s+"([^"]+)"', re.I)
 
@@ -205,15 +213,18 @@ def main():
         refuse("the hook could not read its input.")
     if data.get("tool_name") != "Bash":
         return
-    m = PUSH.search(command)
+    # The command with each heredoc body dropped and its opening line kept.
+    scan = HEREDOC.sub(lambda h: h.group(0).split("\n", 1)[0] + "\n", command)
+    m = PUSH.search(scan)
     if not m:
         return
 
-    d = repo_dir(command, m.start(1), m.group(1), cwd)
+    d = repo_dir(scan, m.start(1), m.group(1), cwd)
     remote, commits = outgoing(d, m.group(2))
+    pending = not commits and bool(MAKES_COMMITS.search(scan[:m.start()]))
     url = git(d, "remote", "get-url", "--push", remote)
     slug = github_slug(url) if url else None
-    if not slug or not commits:
+    if not slug or not (commits or pending):
         return
     vis = visibility(*slug)
     if vis is None:
@@ -235,14 +246,19 @@ def main():
         refuse(f"the quote {mu.group(1)!r} is not in anything the user typed or answered since "
                f"this session's previous approved public push.")
     if MARK_CODE.search(command):
-        media = git(d, "log", "--format=", "--name-only", "--diff-filter=AM", *commits[:200], "--no-walk") or ""
+        media = ""
+        if commits:
+            media += git(d, "log", "--format=", "--name-only", "--diff-filter=AM", *commits[:200], "--no-walk") or ""
+        if pending:
+            media += "\n" + (git(d, "ls-files", "--modified", "--others", "--exclude-standard") or "")
+            media += "\n" + (git(d, "diff", "--cached", "--name-only", "--diff-filter=AM") or "")
         found = sorted({f for f in media.split() if MEDIA.search(f)})
         if not found:
             return
         refuse(f"{repo} is public and this push adds or changes media, which needs the user's approval: "
                + ", ".join(found[:8]) + ("…" if len(found) > 8 else "") + ".")
-    refuse(f"{repo} is PUBLIC, and this push sends {len(commits)} new commit(s) with no "
-           f"`# public-push:` marker.")
+    what = f"{len(commits)} new commit(s)" if commits else "the commit made earlier in this command"
+    refuse(f"{repo} is PUBLIC, and this push sends {what} with no `# public-push:` marker.")
 
 
 if __name__ == "__main__":

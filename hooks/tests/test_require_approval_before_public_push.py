@@ -42,6 +42,10 @@ PUB_IMG = repo("pubimg", "https://github.com/t/pub.git", ["a.ts", "shot.jpg"])
 PRIV = repo("priv", "git@github.com:t/priv.git", ["a.ts"])
 SAME = repo("same", "git@github.com:t/pub.git", [])
 OTHER = repo("other", "git@gitlab.com:t/pub.git", ["a.ts"])
+PRIV_SAME = repo("privsame", "git@github.com:t/priv.git", [])
+SAME_IMG = repo("sameimg", "git@github.com:t/pub.git", [])
+with open(os.path.join(SAME_IMG, "new.png"), "w") as fh:
+    fh.write("png")
 
 
 def user(text):
@@ -116,6 +120,15 @@ CASES = [
     ("nothing new to send passes", "git push", SAME, [], 0),
     ("rewind to an ancestor passes", "git push --force-with-lease origin HEAD~1:refs/heads/main", PUB, [], 0),
     ("explicit refspec with new commits", "git push origin main:refs/heads/main", PUB, [], 2),
+    ("commit and push in one command, nothing outgoing yet", "git commit -q -m x -- b.ts && git push -q", SAME, [], 2),
+    ("commit and push in one command with the marker",
+     "git commit -q -m x && git push  # public-push: no personal content", SAME, [], 0),
+    ("commit and push in one command with a new image",
+     "git commit -q -m x && git push  # public-push: no personal content", SAME_IMG, [], 2),
+    ("commit and push to a private repo", "git commit -q -m x && git push", PRIV_SAME, [], 0),
+    ("a push written inside a heredoc body is text",
+     "cat > n.md <<'X'\nso in git commit && git push the commit does\nX\necho done", PUB, [], 0),
+    ("a real push after a heredoc is still checked", "cat > n.md <<'X'\nhello\nX\ngit push", PUB, [], 2),
 ]
 
 failed = 0
