@@ -47,10 +47,12 @@ rule format; `tests/test_retail_rules.py` checks it). When a shop answers differ
 - Load the claude-in-chrome tools and select the browser per the chrome-bridge memory.
 - **A human check** (Cloudflare checkbox, "Güvenlik" page): open the tab, ask the user to click,
   and carry on with other shops. Never click a check yourself.
-- **A refusal mid-run** (a 403, "you have been blocked"): stop every request to that shop for
-  the day, mark its cells "not checked" on the page, and record it in the rule's `reach`. Each
-  search counts against the user's own browser, and a shop remembers the day before: n11,
-  MediaMarkt and Hepsiburada all refused on 2026-11-12 after two days of searching.
+- **A refusal** (a 403, "you have been blocked", Cloudflare's "Attention Required"): stop
+  requests to that shop and mark its cells "not checked". Then load one other shop's home page:
+  if several shops refuse even their home page, the cause is the network, not the searching.
+  Ask the user whether a VPN is on. A commercial VPN exit is a datacenter address that these
+  shops block. On 2026-11-12, n11, MediaMarkt, Pazarama and PttAVM refused, and Hepsiburada
+  challenged, through a Mullvad exit, and all five served normally once it was off.
 - **Long runs**: a `javascript_tool` call times out at 45 s. Start the loop without awaiting it,
   save the result to `localStorage` when it ends, and read it in a later call. A Chrome restart
   or a disconnect kills the loop; the saved result survives.

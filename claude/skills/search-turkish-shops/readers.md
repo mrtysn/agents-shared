@@ -44,10 +44,14 @@ const h = await (await fetch('/tr/search.html?query=' + encodeURIComponent(q))).
 const i = h.indexOf('window.__PRELOADED_STATE__ = '), j = h.indexOf('</script>', i);
 // the state is a JavaScript literal holding `undefined`, which JSON.parse refuses
 const ap = JSON.parse(h.slice(i + 29, j).replace(/;\s*$/, '').replace(/:undefined([,}\]])/g, ':null$1')).apolloState;
+// price entries are keyed by a JSON string ('CofrPriceFeature:{"id":"Media:tr:1256507",…}'),
+// so index them by their own id field
+const PF = {};
+for (const k of Object.keys(ap)) if (k.startsWith('CofrPriceFeature')) PF[ap[k].id] = ap[k];
 for (const k of Object.keys(ap).filter(k => k.startsWith('GraphqlProduct:'))) {
   const p = ap[k], id = p.id;
   const inStock = ap['CofrOnlineStatusFeature:Media:tr:' + id]?.isAvailableAndBuyable;
-  const pf = ap['CofrPriceFeature:Media:tr:' + id];
+  const pf = PF['Media:tr:' + id];
   const amount = Math.min(...[pf?.price?.amount, pf?.promoPrice?.amount].filter(Boolean));
   // p.title, location.origin + p.url
 }
