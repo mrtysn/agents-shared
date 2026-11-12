@@ -26,6 +26,12 @@ It goes out under their name, so every word in it is a claim they make.
   promised"), and no references the recipient has to decode ("as you asked").
 - **Address only who needs it.** No @-mention of someone already following the
   conversation unless the line is for them alone.
+- **Wording by the reader's role.** In a work folder, look up each recipient's role in
+  its `notes/people.md`. Write to people who build in technical terms; to people who run
+  the business, say what each thing does for the product, the users or the money. A message
+  to both leads with the outcome. A folder whose people file has no "Company structure"
+  section gets one before the first draft: who decides, who builds, who coordinates, and
+  which channel reaches whom.
 - **Plain register.** Plain words, no pretentious phrasing, no barrage of questions; soft
   asks ("have a look") over demands ("please confirm").
 - **A drafting skill, when one is listed.** If the session lists a skill for drafting

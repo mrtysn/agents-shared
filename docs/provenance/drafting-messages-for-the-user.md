@@ -23,3 +23,9 @@ unanswered, pressure the user never set, several asks lumped into one, promised 
 that were not ready, lines about the message itself, extra mentions, and a stiff register.
 The user confirmed each new line on a decision form. The promise line also covers what the
 user chooses to reveal: a recipient sees only what the user decided to tell them.
+
+2026-11-12, later. A client document written in engineering terms had to be rewritten for
+readers who run the business, while the same client's developers needed the technical terms.
+The user asked for one general layer across every work folder instead of a per-client rule:
+wording follows each recipient's role, read from the folder's people file, which carries a
+short company-structure section.
