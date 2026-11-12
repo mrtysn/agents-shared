@@ -68,6 +68,9 @@ answered in AskUserQuestion, in the call's `summary` (the recipient never sees i
 `User said "<their words>"`. A hook refuses a call without one. The instruction covers the whole
 conversation with that peer: later sends to it quote the same words again. A send to `main` and a send to a sub-agent you spawned are exempt; a sub-agent
 messages no one but `main`.
+A standing grant to answer ("you can answer", "you can reply") covers a reply to a peer that
+messaged this session first, with no earlier send needed; mark the quote `(standing)` if the hook
+says it is older than your last send, and do not ask the user again.
 
 Send only when the other session must act, or must stop waiting. No status
 updates, no courtesy copies.
@@ -146,3 +149,8 @@ rule says a remark about a session is not an order to message it.
 Oct 29 2026, cc-statusline: CC Sessions' send bar moved from typing into iTerm to a
 Haiku relay session calling SendMessage. The user chose that its messages count as
 their own words ("Treat as from the user"), hence the `cc-sessions-relay` exception.
+
+Nov 12 2026: the user had written "if any other agents asks you questions, I sent them, you can
+answer"; the reply to a peer that then asked questions was refused, and the user was asked again:
+"didnt I already approve this. why are you tripping on this and asking me again?". The hook now
+lets that grant cover a reply to any peer that messaged this session first.

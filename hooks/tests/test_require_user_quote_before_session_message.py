@@ -27,6 +27,20 @@ def send(tid, to, summary="x"):
     return call(tid, "SendMessage", {"to": to, "summary": summary, "message": "m"})
 
 
+def run_err(rows, to, summary):
+    with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as fh:
+        for r in rows:
+            r.setdefault("sessionId", "s")
+            fh.write(json.dumps(r) + "\n")
+    payload = {"tool_name": "SendMessage", "transcript_path": fh.name,
+               "tool_input": {"to": to, "summary": summary, "message": "m"}}
+    try:
+        return subprocess.run([sys.executable, "-I", HOOK], input=json.dumps(payload), text=True,
+                              capture_output=True).stderr
+    finally:
+        os.unlink(fh.name)
+
+
 def run(rows, to, summary, agent_id=None):
     with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as fh:
         for r in rows:
@@ -49,6 +63,20 @@ SPAWN = [call("a1", "Agent", {"description": "d", "prompt": "p", "name": "review
          result("a1", "Async agent launched successfully.\nagentId: a07bcb8441794d92e (internal)")]
 GRANT = [user("what is more efficient? you guys collaborate among each other. no need to ask me"),
          send("g1", "peer", 'User said "you guys collaborate among each other"'), result("g1", "ok")]
+
+SOCK = "uds:/tmp/cc-socks/78997.sock"
+ANSWER = "if any other agents asks you questions, I sent them, you can answer"
+
+
+def inbound(frm, name="peer-b"):
+    return {"type": "user", "message": {"role": "user", "content":
+            '<cross-session-message from="%s" from-name="%s" from-mode="prompting">a question</cross-session-message>' % (frm, name)}}
+
+
+# The grant typed, a send to peer A, then peer B writes first.
+REPLY = [user(ANSWER), send("r1", "peer-a", 'User said "tell them about the CI"'), result("r1", "ok"),
+         user("carry on"), inbound(SOCK)]
+QUOTE = 'User said "you can answer"'
 
 CASES = [
     ("quote of a typed prompt passes", [user("please let that session know of what they are causing")],
@@ -120,6 +148,16 @@ CASES = [
      "peer", 'User said (standing) "you guys collaborate among each other"', None, 2),
     ("a standing grant must be the user's words",
      GRANT, "peer", 'User said (standing) "collaborate freely with every session"', None, 2),
+    ("a standing grant covers a reply to an inbound peer, by address", REPLY, SOCK, QUOTE, None, 0),
+    ("a standing grant covers a reply to an inbound peer, by from-name", REPLY, "peer-b", QUOTE, None, 0),
+    ("the reply passes marked (standing) too", REPLY, SOCK, 'User said (standing) "you can answer"', None, 0),
+    ("a grant with no inbound message from that peer is refused", REPLY[:-1], SOCK, QUOTE, None, 2),
+    ("an inbound message from X does not open a reply to Y", REPLY, "peer-y", QUOTE, None, 2),
+    ("an inbound peer with a quote that has no stem is refused",
+     [user("tell them hi please"), send("r1", "peer-a", 'User said "tell them hi please"'), result("r1", "ok"),
+      user("carry on"), inbound(SOCK)], SOCK, 'User said "tell them hi please"', None, 2),
+    ("a stale quote is refused with the (standing) hint, not an ask",
+     REPLY[:-1], SOCK, QUOTE, None, 2),
     ("a sub-agent never messages a peer", [user("tell the session about the CI")], "x",
      'User said "tell the session about the CI"', "sub-1", 2),
     ("a sub-agent may hand back to main", [], "main", "", "sub-1", 0),
@@ -139,7 +177,13 @@ def main():
     if subprocess.run([sys.executable, "-I", HOOK], input=payload, text=True, capture_output=True).returncode != 2:
         failed += 1
         print("FAIL  unreadable transcript must be refused")
-    print("\n%d cases, %d failed" % (len(CASES) + 1, failed))
+    # A stale quote's refusal says to mark it (standing), and does not tell the agent to ask the user.
+    stale = [user(ANSWER), send("r1", "peer-a"), result("r1", "ok"), user("carry on")]
+    err = run_err(stale, SOCK, QUOTE)
+    if '(standing) "you can answer"' not in err or "AskUserQuestion" in err:
+        failed += 1
+        print("FAIL  stale-quote refusal text: %r" % err)
+    print("\n%d cases, %d failed" % (len(CASES) + 2, failed))
     sys.exit(1 if failed else 0)
 
 

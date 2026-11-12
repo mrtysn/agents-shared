@@ -28,3 +28,13 @@ further send to a peer this session has already messaged may quote it as
 `User said (standing) "…"`, whenever in the session the user typed it. A peer never messaged
 before needs a fresh quote first, and an ordinary instruction cannot be marked standing: the
 quote has to say so in its own words.
+
+A reply to a peer that messaged this session first needs no earlier send. The peer's own
+`<cross-session-message>` identifies it (its `from` address or `from-name`), and a standing quote
+that grants answering ("you can answer", "you can reply", "answer them", "reply to them") covers
+that reply, marked `(standing)` or not, however old the quote is. If the hook refuses a quote the
+user did say, it tells you to mark it `User said (standing) "..."`; do not ask the user again.
+
+Provenance: 2026-11-12, after the user wrote "if any other agents asks you questions, I sent
+them, you can answer" and the reply to a peer that then asked questions was refused anyway:
+"didnt I already approve this. why are you tripping on this and asking me again?".

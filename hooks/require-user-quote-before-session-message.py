@@ -32,6 +32,14 @@ unusable, and the user was asked for words again after saying "please collaborat
 
   summary: User said (standing) "you guys collaborate among each other"
 
+A peer that messaged this session first is the exception: its own `<cross-session-message>` names
+it, and a reply pollutes nothing. A quote that grants answering ("if any other agents asks you
+questions, I sent them, you can answer") covers a reply to every peer the transcript holds an
+inbound message from, marked `(standing)` or not, however old it is next to the last send. Without
+this a grant typed before the peer wrote was refused three ways and the user was asked again: "didnt
+I already approve this ... I really dislike this asking again" (2026-11-12). The inbound message must
+be one the transcript holds from that peer; an outbound-first send to a fresh session stays gated.
+
 Not gated: a send to `main`; a send to a sub-agent this session spawned (matched by the
 agentId in its spawn result, or the name it was given), which is no other session. A sub-agent
 has no typed prompts, so its send to anyone else is refused: it hands back to `main`.
@@ -54,14 +62,44 @@ MIN_QUOTE = 8
 STANDING_STEMS = ("collab", "coordinat", "work together", "among each other", "between each other",
                   "among yourselves", "between yourselves", "work it out", "sort it out",
                   "no need to ask", "without asking", "don't ask me", "dont ask me",
-                  "no need to continously prompt", "no need to continuously prompt")
+                  "no need to continously prompt", "no need to continuously prompt",
+                  "you can answer", "you can reply", "answer them", "reply to them")
 
 
 def norm(s):
     return " ".join(s.lower().split())
 
 
-def refuse(reason):
+def inbound_peers(rows):
+    """The `from` address and `from-name` of every peer message the transcript holds."""
+    peers = set()
+    for it in rows:
+        if it["group"] != "user":
+            continue
+        m = re.match(r"\s*<cross-session-message\b([^>]*)>", it["text"] or "")
+        if not m:
+            continue
+        for attr in ("from", "from-name"):
+            a = re.search(r"(?<![\w-])" + attr + r"=(?:\"([^\"]*)\"|(\S+))", m.group(1))
+            if a and (a.group(1) or a.group(2)):
+                peers.add(a.group(1) or a.group(2))
+    return peers
+
+
+def refuse(reason, stale=None):
+    if stale:
+        print(
+            "BLOCKED: " + reason + "\n\n"
+            "Do not ask the user again: the quote is in their words, only older than your last send.\n"
+            "If it is a standing grant (it says to collaborate, or to answer or reply), mark the summary\n"
+            "and send again:\n\n"
+            '    summary: User said (standing) "' + stale + '"\n\n'
+            "A `(standing)` quote passes for a peer this session has already messaged, and for a reply\n"
+            "to a peer that messaged this session first (its `from` address or `from-name`).\n"
+            "Docs: docs/on-demand/messages-between-sessions.md and send-message-gate.md.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
     print(
         "BLOCKED: " + reason + "\n\n"
         "A message to another session needs the user's own words behind it. Put them in the call's\n"
@@ -136,6 +174,7 @@ def main():
         last = n
         sent.append((target, norm(str(inp.get("summary") or ""))))
 
+    inbound = inbound_peers(rows)
     said, said_ever = [], []
     for n, it in enumerate(rows):
         if is_typed_prompt(it):
@@ -158,14 +197,24 @@ def main():
     for q in quotes:
         if any(q in s for s in said_ever) and any(t == to and q in sm for t, sm in sent):
             return
+    # A standing grant covers a reply to a peer that wrote first, marked or not, however old it is.
+    if to in inbound:
+        for q in quotes:
+            if any(stem in q for stem in STANDING_STEMS) and any(q in s for s in said_ever):
+                return
     if "(standing)" in summary.lower():
         for q in quotes:
             if (any(stem in q for stem in STANDING_STEMS) and any(q in s for s in said_ever)
                     and any(t == to for t, _ in sent)):
                 return
-        refuse("a `(standing)` quote must be the user's words, grant coordination in its wording "
-               "(e.g. \"collaborate among each other\"), and go to a peer this session has already "
-               "messaged; a first message to a peer needs a fresh quote.")
+        refuse("a `(standing)` quote must be the user's words, grant coordination or answering in its "
+               "wording (e.g. \"collaborate among each other\", \"you can answer\"), and go to a peer "
+               "this session has already messaged or one that messaged this session first; a first "
+               "message to any other peer needs a fresh quote.")
+    stale = next((q for q in quotes if any(q in s for s in said_ever)), None)
+    if stale:
+        refuse("the quotation in `summary` is something the user said, but before your previous "
+               "message to a peer.", stale=stale)
     refuse("no quotation in `summary` appears in anything the user typed or answered since your "
            "previous message to a peer (or since the session began).")
 
