@@ -85,6 +85,8 @@ check 'a short list before the call refuses' 2 AskUserQuestion "$f"
 f=$(mk table "$(prompt 'what is in the table?')" "$(say $'| a | b |\n|---|---|')" "$(ask q1)")
 check 'a table before the call refuses' 2 AskUserQuestion "$f"
 
+f=$(mk capability "$(prompt $'can the sessions app show a list of these and allow me to edit/add/remove?\nor maybe the other app\neither or?')" "$(say "$CONTENT")" "$(ask q1)")
+check 'a capability question that says "show a list of these and allow me" allows' 0 AskUserQuestion "$f"
 f=$(mk plain "$(prompt 'fix the build')" "$(say "$CONTENT")" "$(ask q1)")
 check 'prompt that asks for no content allows' 0 AskUserQuestion "$f"
 f=$(mk where "$(prompt 'where is the config file?')" "$(say "$CONTENT")" "$(ask q1)")

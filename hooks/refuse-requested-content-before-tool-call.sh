@@ -86,6 +86,6 @@ KEY=$(printf '%s_%s' "${SESSION:-nosession}" "$OUT" | tr -c 'A-Za-z0-9._-' '_')
 mkdir -p "$DIR" 2>/dev/null && : > "$DIR/$KEY" 2>/dev/null || exit 0
 
 cat >&2 <<MSG
-BLOCKED: you were asked to show content and wrote it in the same turn as a tool call. Text before a tool call can be collapsed on the user's screen to one line. End this turn with the content as plain text and no tool call (no proceed question needed), then make the call next turn.
+BLOCKED: you were asked to show content and wrote it in the same turn as a tool call. Text before a tool call can be collapsed on the user's screen to one line. End this turn with the content as plain text and no tool call (no proceed question needed). If a decision is also open, state it in that closing text and say the question follows on the user's next message.
 MSG
 exit 2
