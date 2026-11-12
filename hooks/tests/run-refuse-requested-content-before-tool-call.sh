@@ -146,6 +146,15 @@ got=0; jq -cn --arg f "$f" '{tool_name:"Bash", session_id:"s-subagent", agent_id
 total=$((total + 1))
 if [ "$got" = 0 ]; then [ "$VERBOSE" = 1 ] && echo 'ok    sub-agent call allows'; else failed=$((failed + 1)); echo "FAIL  sub-agent call: got $got"; fi
 
+# A draft that ended a finished reply was shown: what resumes the session afterwards closes it.
+meta() { row user "$(jq -cn --arg x "$1" '$x')" "" "${2:-2026-11-10T10:00:30.000Z}" | jq -c '. + {isMeta: true} | del(.origin)'; }
+f=$(mk draft-stophook "$(prompt 'not a good way to put it i think')" "$(say "$DRAFT")" "$(meta $'Stop hook feedback:\nYou are ending the turn idle')" "$(call t1 Bash '{"command":"git commit"}')")
+check 'draft, Stop-hook feedback, then Bash allows' 0 Bash "$f" s-draft-stophook
+f=$(mk draft-notify "$(prompt 'not a good way to put it i think')" "$(say "$DRAFT")" "$(row user "$(jq -cn '"<task-notification>\n<task-id>x</task-id>\n</task-notification>"')" "" | jq -c 'del(.origin)')" "$(call t1 Bash '{"command":"ls"}')")
+check 'draft, task notification, then Bash allows' 0 Bash "$f" s-draft-notify
+f=$(mk draft-stophook-newdraft "$(prompt 'tidy that')" "$(say "$DRAFT")" "$(meta 'Stop hook feedback: x')" "$(say "$DRAFT")" "$(call t1 Bash '{"command":"ls"}')")
+check 'a new draft after the Stop-hook feedback refuses' 2 Bash "$f" s-draft-stophook-new draft
+
 # Fail open.
 check 'transcript missing allows' 0 AskUserQuestion "$TMP/nonexistent.jsonl"
 printf 'not json at all\n' > "$TMP/garbage.jsonl"

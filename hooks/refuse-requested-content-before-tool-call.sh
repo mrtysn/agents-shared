@@ -21,7 +21,9 @@
 #      - no earlier call of those tools, answered, follows that text: this is the first call after it.
 #   2. draft: the call is AskUserQuestion, Skill, Agent, SendMessage, Bash, Edit or Write, whatever the prompt says, and
 #      - the turn holds assistant text with a fenced code block (a line starting with three backticks) since the last typed prompt;
-#      - no earlier call of any tool, answered, follows that text: this is the first call after it.
+#      - no earlier call of any tool, answered, follows that text: this is the first call after it;
+#      - no end of turn follows that text: a Stop-hook feedback row, a task notification or an agent message after it
+#        means the reply was finished and shown, and the draft does not count.
 #      For Bash, Edit and Write the hook exits at once when the transcript holds no fence, and reads the transcript once.
 # Once per turn: a marker file keyed by session id and prompt time under
 # ${XDG_CACHE_HOME:-$HOME/.cache}/agents-shared/refuse-requested-content-before-tool-call/.
@@ -91,8 +93,12 @@ verdict() {
           end) as $s
         | if ($s | startswith("show")) then $s else
           ([ range(0; $turn | length) as $i | $turn[$i]
-             | select(.group == "assistant" and ((.text // "") | test("(?m)^[ \\t]*```"))) | $i ] | first // -1) as $d
-          | if $d >= 0 and answered($turn; $d + 1; "^(CALL |ASK$|SENDMSG$|AGENT-SPAWN$)") == 0 then "draft\t" + $time else $s end
+             | select(.group == "user" and .origin != "human"
+                      and (.label == "NOTIFY" or ((.text // "") | test("^\\s*(Stop hook feedback:|<task-notification|<agent-message)")))) | $i ] | max // -1) as $c
+          | $turn[$c + 1:] as $open
+          | ([ range(0; $open | length) as $i | $open[$i]
+               | select(.group == "assistant" and ((.text // "") | test("(?m)^[ \\t]*```"))) | $i ] | first // -1) as $d
+          | if $d >= 0 and answered($open; $d + 1; "^(CALL |ASK$|SENDMSG$|AGENT-SPAWN$)") == 0 then "draft\t" + $time else $s end
         end
       end' 2>/dev/null
 }
