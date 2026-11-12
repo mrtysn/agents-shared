@@ -22,7 +22,9 @@ In this order, taking the first that fits:
 
 The mechanism of a fix (rule, trigger row, hook, skill, script, mod) is chosen from
 `docs/on-demand/choose-the-fix-for-a-pattern.md` in agents-shared, which shows itself
-the first time a session writes one.
+the first time a session writes one. When the user says "fix it at its source" or
+"fix your rule" about an agent's own behaviour, run `/pattern-discovery-for-new-skill`:
+it finds why existing coverage did not hold, and writes the fix once the user agrees.
 
 ## How far to go
 

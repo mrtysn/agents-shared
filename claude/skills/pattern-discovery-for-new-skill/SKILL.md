@@ -1,5 +1,5 @@
 ---
-description: Find out whether something the user keeps typing, or a failure they keep correcting, deserves a fix, and which one: a skill, rule, trigger row, hook, mod or script (a repeated request, a repeated failure, a tone cue such as "more than one ?", or a tool they are weighing). Counts the matching prompts in recent transcripts, reads their context, groups them, explains why the user does it, and gives a verdict. Use when the user says "scour my recent chats for my patterns", "how often do I ask for X", "find the times this happened", "I got tired of asking the same thing", "would this tool help me", or asks whether a repeated request should become a skill.
+description: Find out whether something the user keeps typing, or a failure they keep correcting, deserves a fix, and which one: a skill, rule, trigger row, hook, mod or script (a repeated request, a repeated failure, a tone cue such as "more than one ?", or a tool they are weighing). Counts the matching prompts in recent transcripts, reads their context, groups them, explains why the user does it, gives a verdict, and on a yes writes the fix. Use when the user says "scour my recent chats for my patterns", "how often do I ask for X", "find the times this happened", "I got tired of asking the same thing", "would this tool help me", "fix it at its source", "fix your rule", or asks whether a repeated request should become a skill.
 user-invocable: true
 allowed-tools: Bash, Read, Agent
 argument-hint: <the message, habit or failure to look for>
@@ -8,9 +8,12 @@ argument-hint: <the message, habit or failure to look for>
 # pattern-discovery-for-new-skill
 
 The user repeats a request or keeps correcting the same failure. This skill measures
-it, explains it, and says which fix it earns. **It builds nothing**: the report is the
-deliverable, and the verdict ends the job. The fix is built only when the user says so
-afterwards.
+it, explains it, and says which fix it earns. **The verdict comes first and builds
+nothing.** Step 8 then asks whether to build the fix, and builds it only on a yes.
+
+**When the user points at one instance** ("fix it at its source", "fix your rule") the
+cause is in this session: skip the count (steps 2-3), keep step 5's coverage search and
+step 6's "why did it not fire", then give the verdict.
 
 ## 1. Say which kind of pattern
 
@@ -116,7 +119,25 @@ pick, a way to read the result). It does not when each instance needs different
 judgment. Name what the fix would hold, and for a trigger row or hook, the check that
 detects the moment. Give the command lines used so the count can be repeated.
 
-Do not offer to build it.
+## 8. Offer the build, then build on a yes
+
+After the verdict is in the reply, ask with AskUserQuestion whether to build it: build as
+recommended first, then a change to the design, then stop. The question names the
+fix's absolute path and holds the verdict's facts, since it is read alone. Where the
+user's prompt was an order ("fix your rule"), the question still comes once, for the
+wording.
+
+On a yes:
+
+1. **Show the exact wording before writing it**, in a code block in a visible reply: the
+   new or changed lines of the rule, trigger row, hook or skill. A rule says what to do;
+   it does not list what is fine or narrate the incident. The Provenance line carries the
+   incident, with the user's quote.
+2. Write it in the repo that owns it, under that repo's `CLAUDE.md` and tests
+   (`project-lifecycle test` in agents-shared), commit it atomically and push.
+3. A change that replaces or overlaps an existing piece edits, merges or deletes that
+   piece. It does not add a second one beside it.
+4. Report one line: what tripped, what now prevents it.
 
 ## Report
 
