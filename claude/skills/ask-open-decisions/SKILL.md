@@ -43,7 +43,10 @@ accurate it is.
 
 3. **Write one question per decision.**
    - `question` — the full context from the section above, ending in a question mark.
-     Two to four sentences is normal. Length is fine; missing context is not.
+     Two to four sentences is normal. Length is fine; missing context is not. Lay it out
+     in lines with `\n`, never one paragraph: the topic on line 1, a blank line, one fact
+     per line (numbered when they are items), a blank line, the question alone on the last
+     line.
    - `header` — at most 12 characters, naming the subject (`Deploy`, `Cache TTL`,
      `Tailscale`), not the question type.
    - `options` — two to four, mutually exclusive. **Your recommendation is first, with
@@ -51,8 +54,9 @@ accurate it is.
      picked. Include "leave it as is" / "drop it" when that is a real choice. Never add an
      "Other" option; the tool provides one.
    - `multiSelect` — only when the choices genuinely combine.
-   - `preview` — when options are concrete artifacts to compare side by side (a layout,
-     a snippet, a config), put each one in its option's preview.
+   - `preview` — when options are concrete artifacts to compare side by side (exact
+     wording, a diff, a layout, a snippet, a config), put each one in its option's preview.
+     Single-choice questions only: a multi-select shows the artifact in the question text.
 
 4. **Ask in rounds of at most four questions** (the tool's limit), most consequential
    first: decisions that block other work, then irreversible or outward-facing ones,

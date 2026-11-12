@@ -20,6 +20,14 @@ has not been communicated.
 
 - **Explain each option inside the option**, briefly — what it means and what
   follows from picking it. Not "A or B?" but one line of substance per choice.
+- **Lay the question text out in lines.** The topic on line 1, a blank line, one fact per
+  line (numbered when they are items), a blank line, then the question alone on the last
+  line. Line breaks render in the terminal, and a long paragraph with (1), (2), (3) inline is
+  the hard-to-read shape this replaces (the user, Nov 2026, after seeing a break-up question:
+  "IT IS MUCH MORE BEAUTIFUL").
+- **Put exact wording, diffs and layouts in `preview`.** Each option carries its artifact in a
+  side-by-side panel the user compares at a glance; it works for single-choice questions
+  only, so a multi-select shows the artifact in the text above the question instead.
 - **Name things, never their session labels.** A letter given on a form or in
   earlier prose ("pair A", "B or C", "option B") means nothing in the prompt. Say
   "the bear and bunny pair", or define the label where it is used ("B (bear and
