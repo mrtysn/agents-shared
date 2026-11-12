@@ -59,3 +59,12 @@ with no tool call, and needs no proceed question until the next turn. `hooks/ref
 lets such a turn end, so it does not fight the rule, and `hooks/refuse-requested-content-before-tool-call.sh`
 refuses, once per turn, the content written ahead of a question, skill, agent or session-message call.
 Both read one pattern, `hooks/show-request-pattern.txt`.
+
+2026-11-12: a user queued `/pattern-discovery-agent-fix` a few seconds into a long task. Claude Code folds a
+queued plain-text message into the running turn but holds a queued slash command until the turn ends, and the
+agent never sees it. The agent worked for 12 minutes, then closed with the AskUserQuestion this rule asked for,
+twice, and the command waited 18 minutes. The user: "IT STILL IS QUEUED ... WHY". The Stop hook already let
+such a turn end (since 2026-11-01, a `/be-literal` that sat 20 minutes), but nothing covered the question that
+kept the turn open. The rule's exceptions now name a queued slash command, and
+`hooks/end-turn-for-queued-slash-command.py` says so after a tool call and refuses the question, and a hand-run
+of the same skill, which ran it twice more here before the queue ran it a third time.

@@ -32,12 +32,15 @@ no edits ([question handling](question-handling.md)); offering the work as an op
 is what replaces stopping. A wish ends the same way: the proposal, then the question
 ([stated desires](stated-desires.md)).
 
-Exceptions: the user said stop, an `/away` stretch (decide, never ask), or a
-background job you are waiting on with nothing else to do.
+Exceptions: the user said stop, an `/away` stretch (decide, never ask), a background job you
+are waiting on with nothing else to do, or a slash command the user queued (a hook says so):
+Claude Code runs it only once the turn ends, so finish the current step and end in text,
+never asking and never invoking it yourself.
 
 `hooks/refuse-idle-end-of-turn.sh` (Stop) refuses, once, a turn that ends otherwise, and lets
 a text-only turn through when the user asked to see content;
 `hooks/refuse-requested-content-before-tool-call.sh` (PreToolUse) refuses, once, that content
-written ahead of a question, skill or agent call.
+written ahead of a question, skill or agent call; `hooks/end-turn-for-queued-slash-command.py`
+says when a slash command is queued and refuses the question or the skill call meanwhile.
 
 Provenance: [docs/provenance/end-every-turn-with-a-next-step.md](../../docs/provenance/end-every-turn-with-a-next-step.md).

@@ -208,6 +208,41 @@ def items(path, project="", session=None, want=None):
                 yield item("empty", "EMPTY", "")
 
 
+def pending_queued_commands(path):
+    """The slash commands the user queued that Claude Code has not delivered yet.
+
+    Claude Code folds a queued plain-text message into the running turn (a `remove` record follows
+    its `enqueue` within seconds), but holds a queued slash command until the turn ends (`dequeue`).
+    The queue is replayed whole: `enqueue` appends, `remove` drops the entry with its content, `dequeue`
+    (which carries no content) takes the head, and `popAll` (the user pulled the queue back into the
+    prompt) empties it. Returns the slash commands left, [{"time", "content"}], oldest first.
+    """
+    queue = []
+    with open(path, encoding="utf-8") as fh:
+        for raw in fh:
+            if '"queue-operation"' not in raw:
+                continue
+            try:
+                d = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            if d.get("type") != "queue-operation":
+                continue
+            op, content = d.get("operation"), d.get("content") or ""
+            if op == "enqueue":
+                queue.append({"time": d.get("timestamp", ""), "content": content.strip()})
+            elif op == "popAll":
+                queue = []
+            elif op == "dequeue":
+                queue = queue[1:]
+            elif op == "remove":
+                for i, p in enumerate(queue):
+                    if p["content"] == content.strip():
+                        del queue[i]
+                        break
+    return [p for p in queue if p["content"].startswith("/")]
+
+
 def is_typed_prompt(it):
     """True for an item that is something a person typed: not injected, not a tool result."""
     return (it["group"] == "user" and it["label"] in ("USER", "USER(queued)") and not it["sidechain"]
