@@ -1,5 +1,5 @@
 #!/bin/zsh
-# DESC: Run fetch-anything get/record/status with the agents' own token, which leaves from the home address
+# DESC: Run fetch-anything get/record/status with the agents' own token, which leaves from the home address; shops lists the known shops
 #
 # Agents fetch third-party pages, feeds and API responses through the owner's fetch-anything
 # gateway so its per-site budget, cool-down and archive apply. This wrapper passes the `agents`
@@ -13,8 +13,10 @@ usage() {
 usage: fetch-anything-agent get URL [--max-age SECONDS] [--wait SECONDS] [--egress home] [--output FILE]
        fetch-anything-agent record KIND KEY
        fetch-anything-agent status
+       fetch-anything-agent shops [--category C] [--kind K] [--json]
 
 Runs the fetch-anything command of the same name with the agents' token. Any other command is refused.
+`shops` reads the committed site rules on this machine and sends nothing.
 The token file is $FA_AGENT_TOKEN_FILE, else ${XDG_CONFIG_HOME:-~/.config}/fetch-anything/agent-token,
 and must be readable by its owner only. A fetch is served by the Mac's runner, so one that is not
 running leaves the answer queued (202).
@@ -23,8 +25,8 @@ EOF
 
 case "${1:-}" in
     -h|--help|"") usage; [[ -n "${1:-}" ]] && exit 0; exit 2 ;;
-    get|record|status) ;;
-    *) print -u2 "fetch-anything-agent: '${1}' is not allowed; use get, record or status"; usage >&2; exit 2 ;;
+    get|record|status|shops) ;;
+    *) print -u2 "fetch-anything-agent: '${1}' is not allowed; use get, record, status or shops"; usage >&2; exit 2 ;;
 esac
 
 if [[ -z "${DEV_ROOT:-}" && -r "$HOME/.config/agents-shared/env.zsh" ]]; then
