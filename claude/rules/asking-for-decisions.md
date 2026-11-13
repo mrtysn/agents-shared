@@ -27,6 +27,11 @@ user types into a question's answer box that asks something is answered inside t
 question ("You asked: …", the answer one fact per line, then the decision), with no text
 before the call.
 
+**An agent adds no timer of its own to a prompt, dialog or wait it opens** (`giving up after N`,
+`--timeout`): the user answers when they return. A prompt that needs something from them (a
+pasted token, a device Allow) opens only after they said they have it ready. Timers a device
+or Claude Code sets are not the agent's to remove.
+
 **An answer that names the user's own candidates is not a pick.** "A? or B." leaves the
 choice open: ask again with exactly those candidates as the options, and never choose
 among them yourself or announce "I'm taking X". Only the user's explicit selection settles it.
