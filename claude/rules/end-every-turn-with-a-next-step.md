@@ -54,7 +54,7 @@ it again, reworded or not, even when a Stop hook refuses the turn; say in one li
 `hooks/refuse-idle-end-of-turn.sh` (Stop) refuses, once, a turn that ends otherwise, and lets
 a text-only turn through when the user asked to see content;
 `hooks/refuse-requested-content-before-tool-call.sh` (PreToolUse) refuses, once, that content
-written ahead of a question, skill or agent call, and a copy-ready draft (a fenced block) written ahead of any tool call; `hooks/end-turn-for-queued-slash-command.py`
+written ahead of a question, skill or agent call, and a copy-ready draft (a fenced block) written ahead of any tool call; it also refuses, once, the first Edit, Write or state-changing Bash call of a turn whose prompt asked to see content that is not delivered yet (a one-line announcement is not delivery; reads that gather the data are fine); `hooks/end-turn-for-queued-slash-command.py`
 says when a slash command is queued and refuses the question or the skill call meanwhile.
 
 Provenance: [docs/provenance/end-every-turn-with-a-next-step.md](../../docs/provenance/end-every-turn-with-a-next-step.md).

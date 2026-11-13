@@ -45,17 +45,18 @@ failed=0
 
 mk() { local f="$TMP/$1.jsonl"; shift; { for line in "$@"; do printf '%s\n' "$line"; done; } > "$f"; printf '%s' "$f"; }
 
-# check NAME WANT TOOL TRANSCRIPT [SESSION] [KIND]: each case gets its own session id so markers never collide.
-# KIND (show or draft) says which refusal message a refusal must carry.
+# check NAME WANT TOOL TRANSCRIPT [SESSION] [KIND] [COMMAND]: each case gets its own session id so markers never collide.
+# KIND (show, draft or work) says which refusal message a refusal must carry; COMMAND is a Bash call's command.
 check() {
-    local name=$1 want=$2 tool=$3 file=$4 session=${5:-case-$total} kind=${6:-show} payload got=0 err remedy
-    payload=$(jq -cn --arg t "$tool" --arg f "$file" --arg s "$session" '{tool_name:$t, session_id:$s, transcript_path:$f, tool_input:{}}')
+    local name=$1 want=$2 tool=$3 file=$4 session=${5:-case-$total} kind=${6:-show} cmd=${7:-} payload got=0 err remedy
+    payload=$(jq -cn --arg t "$tool" --arg f "$file" --arg s "$session" --arg c "$cmd" '{tool_name:$t, session_id:$s, transcript_path:$f, tool_input:(if $c == "" then {} else {command:$c} end)}')
     err=$(printf '%s' "$payload" | "$HOOK" 2>&1 >/dev/null) || got=$?
     total=$((total + 1))
     if [ "$got" = "$want" ]; then
         [ "$VERBOSE" = 1 ] && printf 'ok    %s\n' "$name"
         remedy='End this turn with the content as plain text and no tool call'
         [ "$kind" = draft ] && remedy='End this turn with the draft as the last text and no tool call'
+        [ "$kind" = work ] && remedy='Deliver the requested content as text first'
         if [ "$want" = 2 ] && ! printf '%s' "$err" | grep -q "$remedy"; then
             failed=$((failed + 1)); printf 'FAIL  %s: refusal gives no remedy\n' "$name"
         fi
@@ -139,6 +140,36 @@ f=$(mk draft-answered "$(prompt 'not a good way to put it i think')" "$(say "$DR
 check 'a later Bash after an answered call allows' 0 Bash "$f" s-draft-answered
 f=$(mk draft-after-answer "$(prompt 'not a good way to put it i think')" "$(call t1 Bash '{"command":"ls"}')" "$(result t1 'ok')" "$(say "$DRAFT")" "$(call t2 Bash '{"command":"git commit"}')")
 check 'a draft written after an answered call refuses' 2 Bash "$f" s-draft-after-answer draft
+
+# Work before content (trigger 3): the incident shape. "list me X and continue", then state-changing calls and a short
+# announcement, with the list not yet written.
+ANNOUNCE='Finishing the repo sync first, then the list.'
+LONGLIST=$'Outstanding items:\n- Rebuild the index\n- Push the docs\n- Rotate the key'
+f=$(mk work-incident-bash "$(prompt 'ok, list me /outstanding and continue')" "$(say "$ANNOUNCE")" "$(call t1 Bash '{"command":"git commit -m x"}')")
+check 'show request + short announcement + git commit refuses' 2 Bash "$f" s-work-bash work 'git commit -m x'
+check 'second state-changing call in the same turn allows' 0 Bash "$f" s-work-bash work 'git commit -m x'
+f=$(mk work-incident-edit "$(prompt 'ok, list me /outstanding and continue')" "$(say "$ANNOUNCE")" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'show request + short announcement + Edit refuses' 2 Edit "$f" s-work-edit work
+f=$(mk work-write "$(prompt 'show me the plan')" "$(call t1 Write '{"file_path":"/x"}')")
+check 'show request + no text + Write refuses' 2 Write "$f" s-work-write work
+f=$(mk work-readonly "$(prompt 'ok, list me /outstanding and continue')" "$(say "$ANNOUNCE")" "$(call t1 Bash '{"command":"git status"}')")
+check 'show request + read-only Bash (git status) allows' 0 Bash "$f" s-work-ro1 work 'git status --short'
+check 'read-only pipeline (git log | head, grep with a quoted pipe) allows' 0 Bash "$f" s-work-ro2 work "cd /tmp/x && git log --oneline | head -5; grep -n 'a|b' notes.md"
+check 'sed without -i, 2>/dev/null and 2>&1 allow' 0 Bash "$f" s-work-ro3 work 'sed -n 1,5p f.md 2>/dev/null | cat 2>&1'
+check 'redirection to a file refuses' 2 Bash "$f" s-work-redir work 'ls > out.txt'
+check 'unknown command refuses' 2 Bash "$f" s-work-unk work 'project-lifecycle install'
+check 'chained git write refuses' 2 Bash "$f" s-work-push work 'git status && git add -A'
+check 'sed -i refuses' 2 Bash "$f" s-work-sedi work 'sed -i s/a/b/ f.md'
+f=$(mk work-delivered "$(prompt 'ok, list me /outstanding and continue')" "$(say "$LONGLIST")" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'content delivered first (a list), then Edit allows' 0 Edit "$f" s-work-delivered work
+f=$(mk work-delivered-long "$(prompt 'show me the plan')" "$(say "$CONTENT$CONTENT$CONTENT")" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'content delivered first (long text), then Edit allows' 0 Edit "$f" s-work-delivered2 work
+f=$(mk work-no-show "$(prompt 'fix the build and continue')" "$(say "$ANNOUNCE")" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'continue alone (no show request) + Edit allows' 0 Edit "$f" s-work-noshow work
+f=$(mk work-plain "$(prompt 'fix the build')" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'plain work prompt + Edit allows' 0 Edit "$f" s-work-plain work
+f=$(mk work-earlier "$(prompt 'list me all the names' 2026-11-10T09:00:00.000Z)" "$(prompt 'fix the build' 2026-11-10T10:00:00.000Z)" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'show request from an earlier turn does not count' 0 Edit "$f" s-work-earlier work
 
 # A sub-agent's call (agent_id in the input) is never refused, whoever wrote the draft in the parent's turn.
 f=$(mk draft-subagent "$(prompt 'tidy that')" "$(say "$DRAFT")" "$(call t1 Agent '{"description":"d","prompt":"p"}')")

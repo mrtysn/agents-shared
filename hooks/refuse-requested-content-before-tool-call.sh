@@ -25,6 +25,17 @@
 #      - no end of turn follows that text: a Stop-hook feedback row, a task notification or an agent message after it
 #        means the reply was finished and shown, and the draft does not count.
 #      For Bash, Edit and Write the hook exits at once when the transcript holds no fence, and reads the transcript once.
+#   3. work before content: the call is Edit, Write, or a Bash call that is not obviously read-only, and
+#      - the user's last typed prompt asks to see content (the same pattern as trigger 1);
+#      - the turn holds no delivered content since that prompt: no assistant text of 200+ characters and no two list or
+#        table lines. A short announcement ("Finishing the repo sync first, then the list.") is not content.
+#      Incident (2026-11-13, session 4218922c-be05-4fef-8b66-67738a973da4): "ok, list me /outstanding and continue" was
+#      followed by many Bash and Edit calls and a 45-character announcement before the list, because trigger 1 exempts
+#      Bash, Edit and Write and its 40-character text test passed the announcement. A read-only Bash call (ls, cat, grep,
+#      git status/log/diff/show, gh ... view/list, jq, sed without -i, no output redirection to a file) gathers the data
+#      for the answer and is never refused, which is why the test is the kind of call, not a count of calls: a count would
+#      refuse the reads that "list me X" needs, or let a few edits through. The reason says to deliver the content as
+#      text first and then continue with the work. Reads the transcript once.
 # Once per turn: a marker file keyed by session id and prompt time under
 # ${XDG_CACHE_HOME:-$HOME/.cache}/agents-shared/refuse-requested-content-before-tool-call/.
 # A call made by a sub-agent (the input carries agent_id) is never refused.
@@ -41,25 +52,59 @@ TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null) || exit 0
 # A sub-agent's input carries agent_id and the parent's transcript path: its calls are not the parent's turn, and no
 # one reads a sub-agent's text before them.
 [ -z "$(printf '%s' "$INPUT" | jq -r '.agent_id // empty' 2>/dev/null)" ] || exit 0
+# True when a Bash command is obviously read-only. Quoted strings are dropped, the rest is split into simple commands,
+# and each one's first word (after env assignments and cd) must be a known reader. Anything unknown counts as changing.
+bash_is_readonly() {
+    local cmd=$1 stripped seg w sub
+    [ -n "$cmd" ] || return 0
+    stripped=$(printf '%s' "$cmd" | sed -E "s/'[^']*'//g; s/\"[^\"]*\"//g")
+    # output redirection to a file (not /dev/null or an fd copy) changes state
+    stripped=$(printf '%s' "$stripped" | sed -E 's#[0-9]*>&[0-9-]+##g; s#&>>?[[:space:]]*/dev/null##g; s#[0-9]*>>?[[:space:]]*/dev/null##g')
+    case "$stripped" in *\>*) return 1 ;; esac
+    while IFS= read -r seg; do
+        seg=$(printf '%s' "$seg" | sed -E 's/^[[:space:]]+//; s/^(\(|\{)[[:space:]]*//; s/^([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)+//')
+        [ -n "$seg" ] || continue
+        set -f; set -- $seg; set +f
+        w=${1##*/}; sub=${2:-}
+        case "$w" in
+            cd|ls|cat|head|tail|grep|egrep|rg|wc|jq|pwd|stat|which|file|tree|du|df|ps|date|echo|printf|sort|uniq|cut|tr|awk|basename|dirname|realpath|readlink|test|\[|true|false|nl|column|lsof|pgrep|uptime|whoami|hostname|uname|env|type|command|fi|then|else|done|do|for|if|while|\)|\}) ;;
+            sed) case " $* " in *" -i"*|*" --in-place"*) return 1 ;; esac ;;
+            find) case " $* " in *" -delete"*|*" -exec"*|*" -ok"*) return 1 ;; esac ;;
+            git) case "$sub" in status|log|diff|show|rev-parse|ls-files|blame|describe|remote|shortlog|ls-remote|cat-file|grep|rev-list|reflog|name-rev|merge-base) ;; *) return 1 ;; esac ;;
+            gh) case "${3:-}" in view|list|status|checks|diff) ;; *) return 1 ;; esac ;;
+            *) return 1 ;;
+        esac
+    done <<EOT
+$(printf '%s' "$stripped" | tr '&|;' '\n\n\n')
+EOT
+    return 0
+}
+
 SHOW=false
+WORK=false
 case "$TOOL" in
     AskUserQuestion|Skill|Agent|SendMessage) SHOW=true ;;
-    Bash|Edit|Write) ;;
+    Edit|Write) WORK=true ;;
+    Bash)
+        CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
+        bash_is_readonly "$CMD" || WORK=true ;;
     *) exit 0 ;;
 esac
 SESSION=$(printf '%s' "$INPUT" | jq -r '.session_id // empty' 2>/dev/null)
 TRANSCRIPT=$(printf '%s' "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
 [ -n "$TRANSCRIPT" ] && [ -r "$TRANSCRIPT" ] || exit 0
-# Bash, Edit and Write only matter when a fenced block is in the transcript at all: skip the reader otherwise.
-if [ "$SHOW" = false ]; then grep -q '```' "$TRANSCRIPT" 2>/dev/null || exit 0; fi
+# A read-only Bash call only matters when a fenced block is in the transcript at all: skip the reader otherwise.
+if [ "$SHOW" = false ] && [ "$WORK" = false ]; then grep -q '```' "$TRANSCRIPT" 2>/dev/null || exit 0; fi
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 READER=${TRANSCRIPT_READER:-$HERE/../scripts/extract-session-text.py}
 PATTERN_FILE="$HERE/show-request-pattern.txt"
 [ -r "$READER" ] || exit 0
 PATTERN=""
-if [ "$SHOW" = true ] && [ -r "$PATTERN_FILE" ]; then PATTERN=$(head -n1 "$PATTERN_FILE"); fi
-if [ "$SHOW" = true ] && [ -z "$PATTERN" ]; then SHOW=false; fi
+if { [ "$SHOW" = true ] || [ "$WORK" = true ]; } && [ -r "$PATTERN_FILE" ]; then PATTERN=$(head -n1 "$PATTERN_FILE"); fi
+if [ -z "$PATTERN" ]; then SHOW=false; WORK=false; fi
+# A state-changing Bash, Edit or Write call with no pattern to test still runs the draft check, which needs the fence.
+if [ "$SHOW" = false ] && [ "$WORK" = false ]; then grep -q '```' "$TRANSCRIPT" 2>/dev/null || exit 0; fi
 
 # Prints "skip" when the call is allowed whatever is read next, "show<TAB><prompt time>" when the turn holds requested
 # content ahead of this call, "draft<TAB><prompt time>" when it holds a fenced draft, "retry" when the prompt asks for
@@ -67,7 +112,7 @@ if [ "$SHOW" = true ] && [ -z "$PATTERN" ]; then SHOW=false; fi
 verdict() {
     local rows
     rows=$(python3 "$READER" "$TRANSCRIPT" --kinds user,assistant,agents,calls,tools --json --max-chars 400 2>/dev/null) || return 3
-    printf '%s' "$rows" | jq -rs --arg pat "$PATTERN" --argjson show "$SHOW" '
+    printf '%s' "$rows" | jq -rs --arg pat "$PATTERN" --argjson show "$SHOW" --argjson work "$WORK" '
       def answered($turn; $from; $pred):
         [ range($from; $turn | length) as $i | $turn[$i]
           | select(.label | test($pred))
@@ -82,7 +127,12 @@ verdict() {
         ($rows[$p].text // "" | (capture("<command-args>(?<a>[\\s\\S]*)</command-args>").a // .)) as $prompt
         | ($rows[$p].time // "x") as $time
         | $rows[$p + 1:] as $turn
-        | (if ($show | not) or ($prompt | test($pat) | not) then "skip" else
+        | (if $work and ($prompt | test($pat)) then
+            (if ([ $turn[] | select(.group == "assistant") ]
+                 | any(((.text // "") | length) >= 200
+                       or (((.text // "") | [ scan("(?m)^\\s*([-*•]|[0-9]+[.)])\\s+\\S|^\\s*\\|.*\\|") ] | length) >= 2)))
+             then "skip" else "work\t" + $time end)
+          elif ($show | not) or ($prompt | test($pat) | not) then "skip" else
             ([ range(0; $turn | length) as $i | $turn[$i]
                | select(.group == "assistant"
                         and (((.text // "") | length) >= 40
@@ -91,7 +141,7 @@ verdict() {
               if answered($turn; $t + 1; "^(ASK|CALL Skill|SENDMSG|AGENT-SPAWN)$") > 0 then "skip" else "show\t" + $time end
               end
           end) as $s
-        | if ($s | startswith("show")) then $s else
+        | if ($s | startswith("show") or ($s | startswith("work"))) then $s else
           ([ range(0; $turn | length) as $i | $turn[$i]
              | select(.group == "user" and .origin != "human"
                       and (.label == "NOTIFY" or ((.text // "") | test("^\\s*(Stop hook feedback:|<task-notification|<agent-message)")))) | $i ] | max // -1) as $c
@@ -107,7 +157,7 @@ OUT=""
 for attempt in 0 1 2 3; do
     OUT=$(verdict); rc=$?
     [ "$rc" = 3 ] && exit 0
-    case "$OUT" in show*|draft*) break ;; esac
+    case "$OUT" in show*|draft*|work*) break ;; esac
     # Only the four tools wait for text still being written, and only when the prompt asked for content.
     [ "$OUT" = retry ] && [ "$attempt" != 3 ] || exit 0
     sleep 1
@@ -121,7 +171,11 @@ KEY=$(printf '%s_%s' "${SESSION:-nosession}" "$STAMP" | tr -c 'A-Za-z0-9._-' '_'
 [ -e "$DIR/$KEY" ] && exit 0
 mkdir -p "$DIR" 2>/dev/null && : > "$DIR/$KEY" 2>/dev/null || exit 0
 
-if [ "$KIND" = draft ]; then
+if [ "$KIND" = work ]; then
+cat >&2 <<MSG
+BLOCKED: you were asked to show content and have not delivered it: this call changes state before the content is in the turn. Deliver the requested content as text first (the list, table or answer itself; a short announcement does not count), then continue with the work. Reading calls (ls, cat, grep, git status or log) that gather the data for the answer are fine.
+MSG
+elif [ "$KIND" = draft ]; then
 cat >&2 <<MSG
 BLOCKED: you wrote a copy-ready draft (a fenced code block) in the same turn as a tool call. Text before a tool call can be collapsed on the user's screen to one line, so the draft may never be seen. End this turn with the draft as the last text and no tool call; do the tool work in the next turn.
 MSG

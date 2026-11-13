@@ -114,3 +114,11 @@ Nov 13 2026 (clo-remote): the same incident's first question, asked after the an
 had two options that both did nothing ("Leave it until you say go", "Stop here"). The user, asked whether the
 line "An answer that points at work still ends with the question" should change, chose an exception clause: a
 question whose every option does nothing is not asked; the turn ends in text with one line on what is unfinished.
+
+Nov 13 2026 (session 4218922c-be05-4fef-8b66-67738a973da4): the user typed "ok, list me /outstanding and continue". The agent ran
+many Bash and Edit calls, with a 45-character announcement ("Finishing the repo sync first, then the list."), before
+showing the list. `hooks/refuse-requested-content-before-tool-call.sh` exempted Bash, Edit and Write from the show
+trigger, and its 40-character text test passed the announcement. It now also refuses, once, the first Edit, Write or
+state-changing Bash call of a turn whose prompt asks to see content that is not delivered yet (delivered means 200+
+characters of text or two list or table lines). Read-only Bash is exempt, so the data gathering for the answer still
+runs; the test is the kind of call and not a count, because a count would refuse the reads or let a few edits through.
