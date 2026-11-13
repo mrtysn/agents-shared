@@ -40,7 +40,8 @@ turn needs no proceed question, which comes in the next turn.
 **An answer that points at work still ends with the question.** Answering authorizes
 no edits ([question handling](question-handling.md)); offering the work as an option
 is what replaces stopping. A wish ends the same way: the proposal, then the question
-([stated desires](stated-desires.md)).
+([stated desires](stated-desires.md)). A question whose every option does nothing (a "wait" and a "stop")
+is not asked: end the turn in text, saying in one line what is unfinished.
 
 Exceptions: the user said stop, an `/away` stretch (decide, never ask), a background job you
 are waiting on with nothing else to do, or a slash command the user queued (a hook says so):

@@ -109,3 +109,8 @@ closed, and the rule bans re-asking an answered question as well as a rejected o
 still block, because they can hide a new choice. The line "An answer that points at work still ends with the
 question", which drove the first needless question (both options did nothing), is left as it was, pending the
 user's decision.
+
+Nov 13 2026 (clo-remote): the same incident's first question, asked after the answer "it has to be all at once",
+had two options that both did nothing ("Leave it until you say go", "Stop here"). The user, asked whether the
+line "An answer that points at work still ends with the question" should change, chose an exception clause: a
+question whose every option does nothing is not asked; the turn ends in text with one line on what is unfinished.
