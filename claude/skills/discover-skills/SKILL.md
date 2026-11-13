@@ -26,9 +26,13 @@ or grep the body of a skill whose state is not `active`.** Name it in the report
 installed but off here.
 
 - `active` — installed and live in this folder. If it covers the need, say so and stop.
-- `not-enabled-here (group off)` — installed, but its group is off for this folder. Report it as
-  the answer: the fix is to switch the group on for this folder in Skill Tree, not to look
-  elsewhere. Stop.
+- `not-enabled-here (group off)` — installed, but its group is off for this folder. That is the
+  answer; do not look elsewhere. When the task in hand needs it, switch the group on yourself
+  for this repo, without reading any of its skills first:
+  `claude plugin enable <group>@skills-dir --scope local` run in the repo root (writes the
+  gitignored `.claude/settings.local.json`, as Skill Tree's switch does). Then ask the user to
+  type `/reload-plugins`, the only step that makes it live in the open session; load the skill
+  after that. Otherwise report it and stop.
 - `off-in-group`, `off (override)` — installed and switched off everywhere (or by a skill
   override). Same: report it and stop.
 - `slash-only`, `name-only` — installed; Claude does not auto-invoke it, the user can type it.

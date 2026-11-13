@@ -24,7 +24,11 @@ One table, a row per group or standalone skill set, at most 3 short columns:
 | Group | State here | Skills |
 |---|---|---|
 
-- A group (`name/skill` lines) is one row: its state, and its skill names comma-separated. A group whose state is `not-enabled-here (group off)` says "off here; switch on in Skill Tree".
+- A group (`name/skill` lines) is one row: its state, and its skill names comma-separated. A group whose state is `not-enabled-here (group off)` says "off here".
+- After the table, for a group off here that the session's task needs: it is switched on for the
+  repo by `claude plugin enable <group>@skills-dir --scope local` run in the repo root (gitignored
+  `.claude/settings.local.json`, what Skill Tree's switch runs), then the user types
+  `/reload-plugins`. Say that; the calling session runs the command, not this fork.
 - Standalone skills (lines with no `/`) go in one row, "no group", with their names. Mark `name-only` and `slash-only` ones inline.
 - `off-in-group` and `off (override)` skills are listed under a single "switched off everywhere" row.
 
