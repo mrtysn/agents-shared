@@ -28,6 +28,10 @@ Say which one applies rather than defaulting to bash out of habit.
   on every core for three hours that way: `kill $pids 2>/dev/null; echo killed` hid the failure and
   reported success. A cleanup step never sends its errors to /dev/null, and says "stopped" only after
   checking the pids are gone.
+- A wait on another process is a wait on its pid (`while kill -0 $pid; do sleep 10; done`), never
+  `until ! pgrep -f "<its command>"`: the waiting shell's own command line contains that text, so
+  pgrep always finds the waiter and the loop never ends. On 2026-11-13 three such waiters ran for
+  almost three hours after the pull they watched had finished.
 
 ## Long commands go in a file, not the chat
 
