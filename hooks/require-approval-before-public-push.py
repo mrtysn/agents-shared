@@ -85,12 +85,15 @@ def repo_dir(command, start, git_opts, cwd):
     if m:
         return os.path.expanduser(m[-1].strip("'\""))
     cds = re.findall(r"(?:^|[;&|]\s*)cd\s+(\"[^\"]+\"|'[^']+'|\S+)\s*(?:&&|;)", command[:start])
-    if cds:
+    # Each cd moves from where the one before it left the shell, so a relative cd after an
+    # absolute one resolves against that, not against the session's cwd.
+    d = cwd
+    for target in cds:
         # The shell expands $VAR in a cd target unless it is single-quoted (cd "$AGENTS_SHARED").
-        d = cds[-1] if cds[-1].startswith("'") else os.path.expandvars(cds[-1])
-        d = os.path.expanduser(d.strip("'\""))
-        return d if os.path.isabs(d) else os.path.join(cwd, d)
-    return cwd
+        t = target if target.startswith("'") else os.path.expandvars(target)
+        t = os.path.expanduser(t.strip("'\""))
+        d = os.path.normpath(t if os.path.isabs(t) else os.path.join(d, t))
+    return d
 
 
 def github_slug(url):
