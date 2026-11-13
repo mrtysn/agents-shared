@@ -52,7 +52,7 @@ ask for it through AskUserQuestion, whose answer arrives first. The user rejecte
 it again, reworded or not, even when a Stop hook refuses the turn; say in one line what is unfinished and end in text (the hook passes such a turn).
 
 `hooks/refuse-idle-end-of-turn.sh` (Stop) refuses, once, a turn that ends otherwise, and lets
-a text-only turn through when the user asked to see content;
+a text-only turn through when the user asked to see content, unless the prompt said "and continue" ("show X and continue"): then the turn must also arm a ScheduleWakeup or start the remaining work in the background, so the work resumes;
 `hooks/refuse-requested-content-before-tool-call.sh` (PreToolUse) refuses, once, that content
 written ahead of a question, skill or agent call, and a copy-ready draft (a fenced block) written ahead of any tool call; it also refuses, once, the first Edit, Write or state-changing Bash call of a turn whose prompt asked to see content that is not delivered yet (a one-line announcement is not delivery; reads that gather the data are fine); `hooks/end-turn-for-queued-slash-command.py`
 says when a slash command is queued and refuses the question or the skill call meanwhile.

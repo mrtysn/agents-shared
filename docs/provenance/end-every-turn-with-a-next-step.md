@@ -122,3 +122,10 @@ trigger, and its 40-character text test passed the announcement. It now also ref
 state-changing Bash call of a turn whose prompt asks to see content that is not delivered yet (delivered means 200+
 characters of text or two list or table lines). Read-only Bash is exempt, so the data gathering for the answer still
 runs; the test is the kind of call and not a count, because a count would refuse the reads or let a few edits through.
+
+Nov 13 2026 (session 4218922c-be05-4fef-8b66-67738a973da4, same incident): after the list was finally delivered, the turn
+ended on text alone and the work the user had said to continue ("and continue") never resumed.
+`hooks/refuse-idle-end-of-turn.sh` passed any text-only end when the prompt asked to see content and never read
+the rest of the prompt. It now reads `hooks/continue-request-pattern.txt` (beside `show-request-pattern.txt`): when
+both match, the text-only end passes only if the turn armed a ScheduleWakeup, a Monitor or background work (a
+background Agent or Bash call), or an earlier launch is still unreported; otherwise it is refused once.

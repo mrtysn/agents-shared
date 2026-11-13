@@ -23,6 +23,10 @@ skipped=0
 print -r -- $'#!/bin/zsh\nprint \'{"open": false}\'' > $work/away-closed; chmod +x $work/away-closed
 print -r -- $'#!/bin/zsh\nprint \'{"open": true}\'' > $work/away-open; chmod +x $work/away-open
 export AWAY_OBLIGATION=$work/away-closed
+# No live background shell unless a case says so: the real lister matches by session id, so a shell of the machine's own
+# sessions (a session id that contains "s") would turn every idle case into a pass.
+print -r -- $'#!/bin/zsh\nexit 0' > $work/no-shell && chmod +x $work/no-shell
+export SESSION_SHELLS_LISTER=$work/no-shell
 
 row() {  # type json-content [origin-kind]
   jq -cn --arg t $1 --argjson c "$2" --arg o "${3:-human}" '{parentUuid: null, isSidechain: false, uuid: "u",
@@ -124,7 +128,6 @@ check "agent from an earlier turn, relayed with no tool" pass false "$(prompt 'v
 check "agent resumed in an earlier turn, running"    pass  false "$(prompt 'vet the plan')" "$(spawn 1)" "$(handback 1)" "$(resume 1)" "$(say 'Critique round sent.')" "$(prompt 'ok')" "$(say 'Waiting on its critique.')"
 # A watcher launched in an earlier turn is invisible in this turn's rows; the process table decides.
 print -r -- $'#!/bin/zsh\nprint "4242  10:00  until grep -q done log; do sleep 60; done"' > $work/live-shell && chmod +x $work/live-shell
-print -r -- $'#!/bin/zsh\nexit 0' > $work/no-shell && chmod +x $work/no-shell
 SESSION_SHELLS_LISTER=$work/live-shell check "earlier-turn shell still running"  pass  false "$(prompt 'how is it going?')" "$(say 'The rebuild is at 2 of 20; its watcher reports when done.')"
 SESSION_SHELLS_LISTER=$work/no-shell   check "no shell running, nothing asked"   block false "$(prompt 'how is it going?')" "$(bash_call 1)" "$(say 'The rebuild is at 2 of 20.')"
 check "one of two agents reported"                   pass  false "$(prompt 'fix both')" "$(spawn 1)" "$(spawn 2)" "$(handback 1)" "$(say 'One is back; waiting on the other.')"
@@ -167,6 +170,17 @@ check "asked to see content, slash args"              pass  false "$(prompt $'<c
 check "asked to see content, but a prose offer ends it" block false "$(prompt 'list me all the names')" "$(say "$NAMES"$'\n\nWant me to rename one?')"
 check "asked to see content, only a short line"       block false "$(prompt 'list me all the names')" "$(say 'Done.')"
 check "no request for content, same text after work"  block false "$(prompt 'rename the project')" "$(bash_call 1)" "$(say $NAMES)"
+
+# "Show X and continue": the content is delivered, but the work to continue needs something armed.
+SC=$'Outstanding items, oldest first: rebuild the index, push the docs, rotate the key, archive the notes.'
+check "show and continue, text only (incident shape)"  block false "$(prompt 'ok, list me /outstanding and continue')" "$(bash_call 1)" "$(say $SC)"
+check "show and continue, ScheduleWakeup armed"        pass  false "$(prompt 'ok, list me /outstanding and continue')" "$(say $SC)" "$(call toolu_w ScheduleWakeup '{"delaySeconds":60,"reason":"resume","prompt":"continue"}')"
+check "show and continue, background Bash started"     pass  false "$(prompt 'list me the names, then continue')" "$(say $SC)" "$(bash_call 1 bg)"
+check "show and continue, background Agent started"    pass  false "$(prompt 'show me the plan and proceed')" "$(say $SC)" "$(spawn 1)"
+check "show and continue, foreground Bash is not armed" block false "$(prompt 'show me the plan and continue')" "$(bash_call 1)" "$(say $SC)"
+check "show and continue, content reply also offers"   block false "$(prompt 'list me the names and continue')" "$(say "$SC"$'\n\nWant me to rename one?')"
+check "show request alone still passes"                pass  false "$(prompt 'ok, list me /outstanding')" "$(say $SC)"
+check "continue alone, text only, still idle"          block false "$(prompt 'ok, continue')" "$(bash_call 1)" "$(say $SC)"
 
 AWAY_OBLIGATION=$work/away-open check "away stretch open"  pass  false "$(prompt 'build it')" "$(say $REPORT)"
 

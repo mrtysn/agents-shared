@@ -1,0 +1,1 @@
+(?i)(\b(and|then|also)|,)\s+(then\s+)?(continue|proceed|carry on|keep going|go on|resume|go ahead)\b|\bafter that,?\s+(continue|proceed|carry on|keep going)\b

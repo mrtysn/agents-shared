@@ -37,7 +37,12 @@
 #   - the user's last prompt asked to see content (hooks/show-request-pattern.txt: "list me", "show me", "where is",
 #     "table") and the turn ends in 40+ characters of text with no prose offer: content is delivered as the last text
 #     of a turn with no tool call, and the proceed question comes in the next turn (hooks/refuse-requested-content-
-#     before-tool-call.sh refuses the same content written before a tool call),
+#     before-tool-call.sh refuses the same content written before a tool call). Unless the prompt also says to
+#     continue ("list me X and continue", hooks/continue-request-pattern.txt): then the text-only end passes only
+#     when the turn armed something that resumes the work (a ScheduleWakeup, a Monitor, a background Agent or Bash call
+#     since the prompt, or an earlier launch still unreported); otherwise it is refused once, with a message to arm a
+#     wakeup (2026-11-13, session 4218922c-be05-4fef-8b66-67738a973da4: the list was delivered, the turn ended idle,
+#     and the work the user said to continue never resumed),
 #   - the turn made no tool call and the reply has text and no prose offer: a conversational answer ends with the
 #     answer, even a one-word one the user asked for (survey 2026-11-12, scripts/survey-stop-hook-refusals.py: of 66 idle refusals on such turns,
 #     45 ended in a bare "Nothing left" or text only, 9 forced questions were rejected, 12 were useful),
@@ -76,10 +81,12 @@ fi
 
 SHOW_PATTERN=""
 [[ -r $HERE/show-request-pattern.txt ]] && SHOW_PATTERN=$(head -n1 $HERE/show-request-pattern.txt)
+CONTINUE_PATTERN=""
+[[ -r $HERE/continue-request-pattern.txt ]] && CONTINUE_PATTERN=$(head -n1 $HERE/continue-request-pattern.txt)
 
 ROWS=$(python3 "$READER" "$TRANSCRIPT" --kinds user,assistant,agents,calls,tools --launch-receipts --json --max-chars 400 2>/dev/null) || exit 0
 
-VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" --arg show "$SHOW_PATTERN" '
+VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" --arg show "$SHOW_PATTERN" --arg cont "$CONTINUE_PATTERN" '
   def offer: "say the word|say go ahead|(do you |would you )?want me to|would you like me to|shall i |should i (go|proceed|build|run|start|do|edit|add|make|commit|fix|wire|set)|let me know (if|when|whether|which)|(?<!will )(?<!ll )(?<!to )(?<!would )(?<!can )(?<!could )(?<!it )(?<!that )tell me (to|if|when|which)|if you.?d like|if you want|if you prefer|ready (to (go|proceed) )?when you are|your call|up to you|(waits?|waiting) (for|on) your (word|go|call|ok)|on your (word|go-ahead|say-so)|the (choice|decision|question)( that [a-z ]+)? (is|here is)|which (one|would you|do you)";
   [ .[] | select(type == "object" and (.sidechain | not)) ] as $rows
   | ([ range(0; $rows | length) as $i | $rows[$i]
@@ -145,7 +152,15 @@ VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" --arg show "$SHOW_PATT
       elif ($prompt | length) < 60 and ($prompt | test("^\\s*(stop|stop here|that.?s (all|it)|enough|nothing else|pause|hold on|wait|no more|done for (now|today))\\b"; "i")) then "pass"
       elif $rejected then "pass"
       elif $a >= 0 and $workAfterAsk == 0 then "pass"
-      elif $show != "" and ($prompt | test($show)) and ($text | length) >= 40 then "pass"
+      elif $show != "" and ($prompt | test($show)) and ($text | length) >= 40 then
+        # "list me X and continue": the content is delivered, but the work the user said to continue needs something
+        # armed that resumes it, or the session sits idle with authorized work left.
+        if $cont != "" and ($prompt | test($cont))
+           and ([ $turn[] | select((.group == "calls" and (.tool == "ScheduleWakeup" or .tool == "Monitor"
+                                                           or (.tool == "Bash" and (.input.run_in_background // false) == true)))
+                                   or (.label == "AGENT-SPAWN" and ((.input.run_in_background // true) != false))) ] | length) == 0
+           and $pending == 0 and $workflowsPending == 0
+        then "continue" else "pass" end
       elif $turnCalls == 0 and ($text | length) > 0 and ($show == "" or ($prompt | test($show) | not)) then "pass"
       elif $pending > 0 or $workflowsPending > 0 then "pass"
       elif ($lastLine | test("^[\\s*_>#-]*nothing (else |more )?(is )?left\\b"; "i")) then "pass"
@@ -159,7 +174,9 @@ if [[ $VERDICT == idle && -n $SESSION && -x $SHELLS ]]; then
 fi
 
 ASK="Call AskUserQuestion now: first any open decision, then the proceed question (multiSelect): one option per unfinished part of what the user asked for that you could do next, recommended first and marked (Recommended), and last \"Stop here\". A step only the user can take is an option only when your own remaining work waits on it (a login, a reboot before a test). What the user does with a finished deliverable (upload, paste, send, deploy) is never an option, and neither is work nobody asked for. A step of the user's with a later date is never an option: record it and name it on the Nothing left line. The ask-open-decisions skill, step 5, has the format. Answering a question still authorizes no edits: offering the follow-up in the question is what replaces stopping."
-if [[ $VERDICT == closed* ]]; then
+if [[ $VERDICT == continue ]]; then
+  REASON="The content is delivered, but the user also told you to continue, and nothing is armed that resumes that work (claude/rules/end-every-turn-with-a-next-step.md). Arm a ScheduleWakeup (or start the remaining work in the background: a background Agent or Bash call) so the work the user said to continue resumes; then end the turn."
+elif [[ $VERDICT == closed* ]]; then
   PHRASE=${VERDICT#closed$'\t'}
   REASON="The user just answered a question, and your reply poses another choice in prose (\"$PHRASE\"). That decision is closed: do not ask it again, reworded or not. Reword the line as a plain statement and end the turn in text, or, if something different is genuinely open, ask only that with AskUserQuestion (claude/rules/end-every-turn-with-a-next-step.md)."
 elif [[ $VERDICT == offer* ]]; then
