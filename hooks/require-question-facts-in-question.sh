@@ -36,7 +36,9 @@
 # 300 characters with no blank line, or an option description holds a line break (the terminal renders it as
 # a replacement character) or is over 240 characters, the agent gets a PreToolUse additionalContext with the
 # layout template (survey 2026-11-12: 51% of 4,572 questions had no blank line in a long text). It reads the
-# call alone, so it waits for nothing.
+# call alone, so it waits for nothing. To measure adoption, rerun the count over questions asked in sessions
+# started after 2026-11-12 (extract-session-text.py --all --kinds calls --json --grep AskUserQuestion) and
+# compare the share of long texts with no blank line against that 51%.
 #
 # Bash, not zsh, to match the hooks beside it.
 
