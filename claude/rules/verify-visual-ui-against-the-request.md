@@ -24,8 +24,11 @@ Mac apps and web pages.
 1. **Write the requirement down first**, in the user's words, one line per thing they
    asked for: "stack them side by side", "fit it, no scroll bars", "Last Seen after
    Directory", "merge into the 2nd row, not the 3rd". Quote, do not paraphrase.
-2. **Render it.** A web page: headless Chrome to a PNG in the project's gitignored
-   output folder, at a wide and a narrow width. A native Mac app: the repo's own capture
+2. **Render it.** A web page: `project-lifecycle page-check URL|FILE --shots DIR`, which
+   renders it at 375 and 1280 px in light and dark and fails on what a person sees at once
+   (a hover that moves things, sideways overflow, clipped text, headings out of scale, small
+   targets, low contrast); fix every finding. The rules it checks, and the ones only reading
+   catches, are web-shared's `DESIGN.md`. A native Mac app: the repo's own capture
    script if it has one, launched through `quiet-open`
    ([window focus](window-focus.md)); an app the user is iterating on is left running
    with plain `open -g`. Then read the image.

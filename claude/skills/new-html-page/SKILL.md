@@ -72,13 +72,12 @@ Pages are local files (see the artifacts rule): never publish to Anthropic.
    page may use any mode's components (`ws-callout`, `ws-facts`, `ws-stats--tiles`, tags with
    `data-tone="1"`…`"6"`); README of web-shared and `components.css` list them. Add `<h3>`
    inside a section freely; the contents column lists only the `<h2>` sections.
-5. **Look at it** before saying it is done: render at about 1300 and 600 px wide
-   (`"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new
-   --screenshot=OUT.png --window-size=1300,900 file://FILE`, OUT in the scratchpad) and read
-   the PNGs. The column sits left on wide, stacks on top when narrow. Headless Chrome clamps
-   `--window-size` to 500 px wide, so a "320 px" screenshot is a 500 px layout cropped: text
-   cut at the right edge there is the crop, not an overflow. A real 320 px check needs a
-   browser window resized to 320 (claude-in-chrome's `resize_window` on a local server).
+5. **Check it and look at it** before saying it is done: `project-lifecycle page-check FILE
+   --shots DIR` (DIR in the scratchpad) loads it at 375 and 1280 px in light and dark, fails on
+   hover that moves things, sideways overflow, clipped text, headings out of scale, small
+   targets and low contrast, and saves the renders. Fix every finding, then read the PNGs:
+   the column sits left on wide and stacks on top when narrow. The rules behind the check, and
+   the ones it cannot measure, are web-shared's `DESIGN.md`.
 6. **Hand over** the absolute path on its own line, then the finding in a line or two. The
    closing reply never says how the page was checked (widths, "rendered", "reads cleanly"),
    how it is built (contents column, `ws-` components, offline, light and dark), or where the
