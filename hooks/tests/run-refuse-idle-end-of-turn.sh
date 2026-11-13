@@ -102,6 +102,10 @@ check "ends asking the user to type a slash command" pass  false "$(prompt 'go')
 check "ended on an answered question"                pass  false "$(prompt 'what next?')" "$(say 'Two items remain.')" "$(ask)" "$(answered 'Stop here')" "$(say 'Stopping here.')"
 check "worked after the answer, then reported"       block false "$(prompt 'what next?')" "$(ask)" "$(answered)" "$(bash_call 1)" "$(say 'Built and committed.')"
 check "answered, then a prose offer"                 block false "$(prompt 'what next?')" "$(ask)" "$(answered 'Stop here')" "$(say 'Stopping. Want me to clean up the branch?')"
+check "answered, then a line that only waits on the user" pass  false "$(prompt 'what next?')" "$(ask)" "$(answered 'Leave it until you say go')" "$(say $'Nothing left: the takeover waits for your go.')"
+check "answered, then waiting on the user's word"     pass  false "$(prompt 'what next?')" "$(ask)" "$(answered 'Leave it until you say go')" "$(say 'Nothing left: the switch is on your word.')"
+check "answered, then a different item left to them"  block false "$(prompt 'what next?')" "$(ask)" "$(answered 'Stop here')" "$(say 'Stopping. The cleanup is your call.')"
+check "waits for your go, no question answered"       block false "$(prompt 'what next?')" "$(bash_call 1)" "$(say 'The takeover waits for your go.')"
 REJECTED="The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed."
 INTERRUPT='[Request interrupted by user for tool use]'
 check "question rejected, interrupt marker, then text" pass  false "$(prompt 'fix it')" "$(ask)" "$(result toolu_q $REJECTED)" "$(prompt $INTERRUPT)" "$(say 'Understood.')"

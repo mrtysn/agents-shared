@@ -47,8 +47,8 @@ are waiting on with nothing else to do, or a slash command the user queued (a ho
 Claude Code runs it only once the turn ends, so finish the current step and end in text,
 never asking and never invoking it yourself. When your next step needs a slash command only
 the user can type, end the turn in text naming it and continue once its output appears; never
-ask for it through AskUserQuestion, whose answer arrives first. The user rejected your last question: do not ask
-it again; say in one line what is unfinished and end in text (the hook passes such a turn).
+ask for it through AskUserQuestion, whose answer arrives first. The user rejected or answered your last question: do not ask
+it again, reworded or not, even when a Stop hook refuses the turn; say in one line what is unfinished and end in text (the hook passes such a turn).
 
 `hooks/refuse-idle-end-of-turn.sh` (Stop) refuses, once, a turn that ends otherwise, and lets
 a text-only turn through when the user asked to see content;

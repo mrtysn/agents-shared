@@ -25,6 +25,10 @@
 #   - the reply ends asking the user to type a slash command ("type `/reload-plugins`"): it runs only once the turn
 #     ends, so the turn must end in text (2026-11-13, inventory: an agent asked for /reload-plugins in a question,
 #     acted on the answer, and the command sat queued behind its turn),
+#   - the question the user just answered is followed only by a line that says the turn waits on them ("waits for
+#     your go", "on your word"): it restates their answer, and a refusal would make the agent ask the same decision
+#     again (2026-11-13, clo-remote: "Leave it until you say go", then "waits for your go" was refused and the
+#     question came back; any other prose choice after an answer still blocks, with feedback saying it is closed),
 #   - the user rejected an AskUserQuestion between their previous prompt and this one ("doesn't want to proceed"):
 #     asking again repeats what they refused. A "[Request interrupted" marker is not a prompt,
 #   - stop_hook_active is true (the session already continued once because of a Stop hook),
@@ -131,7 +135,13 @@ VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" --arg show "$SHOW_PATT
     | ([ $turn[] | select(.label == "USER(queued)" and ((.text // "") | test("^\\s*/[A-Za-z]"))) ] | length > 0) as $slashQueued
     | if $slashQueued then "pass"
       elif ($text | .[(length - 600 | if . < 0 then 0 else . end):] | test("\\b(type|run|enter)s?\\s+`?/[a-z]"; "i")) then "pass"
-      elif $phrase != "" then "offer\t\($phrase)"
+      elif $phrase != "" then
+        # An answered question with no work after it: a line that only says the turn waits on the user ("waits for
+        # your go") restates the answer and passes; any other prose choice reopens a decision the user just made.
+        if $a >= 0 and $workAfterAsk == 0 then
+          if ($phrase | test("^(waits?|waiting) (for|on) your|^on your (word|go-ahead|say-so)"; "i")) then "pass"
+          else "closed\t\($phrase)" end
+        else "offer\t\($phrase)" end
       elif ($prompt | length) < 60 and ($prompt | test("^\\s*(stop|stop here|that.?s (all|it)|enough|nothing else|pause|hold on|wait|no more|done for (now|today))\\b"; "i")) then "pass"
       elif $rejected then "pass"
       elif $a >= 0 and $workAfterAsk == 0 then "pass"
@@ -149,7 +159,10 @@ if [[ $VERDICT == idle && -n $SESSION && -x $SHELLS ]]; then
 fi
 
 ASK="Call AskUserQuestion now: first any open decision, then the proceed question (multiSelect): one option per unfinished part of what the user asked for that you could do next, recommended first and marked (Recommended), and last \"Stop here\". A step only the user can take is an option only when your own remaining work waits on it (a login, a reboot before a test). What the user does with a finished deliverable (upload, paste, send, deploy) is never an option, and neither is work nobody asked for. A step of the user's with a later date is never an option: record it and name it on the Nothing left line. The ask-open-decisions skill, step 5, has the format. Answering a question still authorizes no edits: offering the follow-up in the question is what replaces stopping."
-if [[ $VERDICT == offer* ]]; then
+if [[ $VERDICT == closed* ]]; then
+  PHRASE=${VERDICT#closed$'\t'}
+  REASON="The user just answered a question, and your reply poses another choice in prose (\"$PHRASE\"). That decision is closed: do not ask it again, reworded or not. Reword the line as a plain statement and end the turn in text, or, if something different is genuinely open, ask only that with AskUserQuestion (claude/rules/end-every-turn-with-a-next-step.md)."
+elif [[ $VERDICT == offer* ]]; then
   PHRASE=${VERDICT#offer$'\t'}
   REASON="Your reply ends by offering work or posing a choice in prose (\"$PHRASE\"), which leaves the user to re-type it (claude/rules/end-every-turn-with-a-next-step.md). If it is work already authorized or plainly in scope, do it now instead of asking. Otherwise: $ASK"
 else

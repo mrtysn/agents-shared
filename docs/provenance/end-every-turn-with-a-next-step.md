@@ -95,3 +95,17 @@ freaking allow me to run the command i typed, instead of keeping it queued while
 why wouldnt you wait for me first?" `hooks/end-turn-for-queued-slash-command.py` now refuses a question
 that asks the user to type a slash command, `hooks/refuse-idle-end-of-turn.sh` lets a turn end in text
 asking for one, and the rule says to end the turn in text instead.
+
+Nov 13 2026 (clo-remote): the user answered a question with "Leave it until you say go (Recommended)". The agent's
+reply "Nothing left: the tmux takeover waits for your go" was refused by `hooks/refuse-idle-end-of-turn.sh`,
+whose offer check ran before the answered-question check and whose feedback had one exit, "Call AskUserQuestion
+now". The agent obeyed and asked the same decision again as a multiSelect; the user rejected it: "why did you
+ask me the same question twice in a row". A survey agent and a Fable review agreed on the cause; the Fable
+review turned down matching the phrase's last word against the chosen label (it passed "left until you say go"
+and blocked "waits for your go" by accident of wording). After an answered question with no work after it, the
+hook now passes a line that only waits on the user ("waits for your", "waiting on your", "on your word",
+"on your go-ahead", "on your say-so"), blocks any other prose choice with feedback saying the decision is
+closed, and the rule bans re-asking an answered question as well as a rejected one. `your call` and `up to you`
+still block, because they can hide a new choice. The line "An answer that points at work still ends with the
+question", which drove the first needless question (both options did nothing), is left as it was, pending the
+user's decision.
