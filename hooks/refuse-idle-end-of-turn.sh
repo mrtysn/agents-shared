@@ -22,6 +22,9 @@
 #     such a message until the turn ends, while plain text is folded in mid-turn, so a refused stop keeps the
 #     user waiting on their own command (2026-11-01: a /be-literal question sat queued 20+ minutes, and a refusal
 #     here turned the turn's end into another question),
+#   - the reply ends asking the user to type a slash command ("type `/reload-plugins`"): it runs only once the turn
+#     ends, so the turn must end in text (2026-11-13, inventory: an agent asked for /reload-plugins in a question,
+#     acted on the answer, and the command sat queued behind its turn),
 #   - the user rejected an AskUserQuestion between their previous prompt and this one ("doesn't want to proceed"):
 #     asking again repeats what they refused. A "[Request interrupted" marker is not a prompt,
 #   - stop_hook_active is true (the session already continued once because of a Stop hook),
@@ -127,6 +130,7 @@ VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" --arg show "$SHOW_PATT
     | ([ $text | split("\n")[] | select(test("\\S")) ] | last // "") as $lastLine
     | ([ $turn[] | select(.label == "USER(queued)" and ((.text // "") | test("^\\s*/[A-Za-z]"))) ] | length > 0) as $slashQueued
     | if $slashQueued then "pass"
+      elif ($text | .[(length - 600 | if . < 0 then 0 else . end):] | test("\\b(type|run|enter)s?\\s+`?/[a-z]"; "i")) then "pass"
       elif $phrase != "" then "offer\t\($phrase)"
       elif ($prompt | length) < 60 and ($prompt | test("^\\s*(stop|stop here|that.?s (all|it)|enough|nothing else|pause|hold on|wait|no more|done for (now|today))\\b"; "i")) then "pass"
       elif $rejected then "pass"

@@ -30,9 +30,10 @@ installed but off here.
   answer; do not look elsewhere. When the task in hand needs it, switch the group on yourself
   for this repo, without reading any of its skills first:
   `claude plugin enable <group>@skills-dir --scope local` run in the repo root (writes the
-  gitignored `.claude/settings.local.json`, as Skill Tree's switch does). Then ask the user to
-  type `/reload-plugins`, the only step that makes it live in the open session; load the skill
-  after that. Otherwise report it and stop.
+  gitignored `.claude/settings.local.json`, as Skill Tree's switch does). Then end the turn in
+  text asking the user to type `/reload-plugins`, the only step that makes it live in the open
+  session; never through AskUserQuestion, whose answer arrives before the command runs. Load the
+  skill once its output is in the conversation. Otherwise report it and stop.
 - `off-in-group`, `off (override)` — installed and switched off everywhere (or by a skill
   override). Same: report it and stop.
 - `slash-only`, `name-only` — installed; Claude does not auto-invoke it, the user can type it.

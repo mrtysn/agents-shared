@@ -10,6 +10,8 @@ keeps the user waiting on their own command.
   PostToolUse, any tool   once per queued command, a note: finish this step, end the turn in text
   PreToolUse AskUserQuestion   refused while a command is queued: a question keeps the turn open
   PreToolUse Skill for the queued command   refused: the queue runs it at turn end, so it would run twice
+  PreToolUse AskUserQuestion asking the user to type a slash command   refused, queued or not: the answer
+                              arrives before the command runs, so the agent acts on a step not yet taken
 
 Queue state comes from scripts/transcript_items.py (pending_queued_commands), never parsed here.
 The once-per-command marker lives under ${XDG_CACHE_HOME:-~/.cache}/agents-shared/end-turn-for-queued-slash-command/.
@@ -18,11 +20,26 @@ Fails open: any error lets the call through with no note.
 
 import json
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
 from transcript_items import pending_queued_commands  # noqa: E402
+
+
+ASKS_TO_TYPE_SLASH = re.compile(r"\b(?:type|run|enter)s?\s+`?(/[a-z][\w:-]*)", re.I)
+
+
+def slash_asked_for(tool_input):
+    """The slash command an AskUserQuestion asks the user to type, or None."""
+    texts = []
+    for q in (tool_input or {}).get("questions") or []:
+        texts.append(str(q.get("question", "")))
+        for o in q.get("options") or []:
+            texts += [str(o.get("label", "")), str(o.get("description", ""))]
+    m = ASKS_TO_TYPE_SLASH.search("\n".join(texts))
+    return m.group(1) if m else None
 
 
 def command_name(content):
@@ -44,6 +61,17 @@ def marker_dir():
 def main():
     data = json.load(sys.stdin)
     path = data.get("transcript_path") or ""
+    if data.get("hook_event_name") == "PreToolUse" and data.get("tool_name") == "AskUserQuestion":
+        cmd = slash_asked_for(data.get("tool_input"))
+        if cmd:
+            reason = (f"Not as a question: this asks the user to type `{cmd}`. Their answer reaches you before "
+                      f"the command runs, because Claude Code runs a typed slash command only once your turn ends. "
+                      f"End the turn in text asking them to type `{cmd}`, and continue when its output appears "
+                      f"in the conversation.")
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse",
+                                                     "permissionDecision": "deny",
+                                                     "permissionDecisionReason": reason}}))
+            return
     if not os.path.isfile(path):
         return
     pending = pending_queued_commands(path)

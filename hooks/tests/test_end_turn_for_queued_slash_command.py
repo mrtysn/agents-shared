@@ -65,6 +65,17 @@ check("a plain-text queued message is not a command",
       run([q("enqueue", "also, how do I detach?")], "PreToolUse", "AskUserQuestion") is None)
 check("a queue pulled back into the prompt is not pending",
       run(queued + [q("popAll", "/pattern-discovery-agent-fix")], "PreToolUse", "AskUserQuestion") is None)
+ask_reload = {"questions": [{"question": "This session can't load them until you type /reload-plugins.\n\nGo on?",
+                             "options": [{"label": "I'll reload, then go", "description": ""}]}]}
+r = run([], "PreToolUse", "AskUserQuestion", ask_reload)
+check("a question asking the user to type a slash command is refused with nothing queued",
+      r and r["permissionDecision"] == "deny" and "/reload-plugins" in r["permissionDecisionReason"])
+r = run([], "PreToolUse", "AskUserQuestion",
+        {"questions": [{"question": "Pick one", "options": [{"label": "A", "description": "then you run `/compact`"}]}]})
+check("an option asking for a slash command is refused too", r and r["permissionDecision"] == "deny")
+check("a question that only names a path is let through",
+      run([], "PreToolUse", "AskUserQuestion",
+          {"questions": [{"question": "Edit /etc/hosts or run the tests?", "options": []}]}) is None)
 check("an unreadable transcript fails open",
       subprocess.run([sys.executable, "-I", HOOK], input="{", text=True, capture_output=True).returncode == 0)
 

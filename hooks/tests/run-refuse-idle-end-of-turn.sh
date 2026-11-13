@@ -98,6 +98,7 @@ check "permission asked in prose for settled work"   block false "$(prompt 'impr
 check "user-steps list, no tool call"                pass  false "$(prompt 'apply for her')" "$(say $STEPS)"
 check "user-steps list after work"                   block false "$(prompt 'apply for her')" "$(bash_call 1)" "$(say $STEPS)"
 check "slash-command answer, no tool call"           pass  false "$(prompt $'<command-message>be-literal</command-message>\n<command-name>/be-literal</command-name>\n<command-args>why had you stopped?</command-args>')" "$(say 'I stopped because the answer was the whole task as I read it.')"
+check "ends asking the user to type a slash command" pass  false "$(prompt 'go')" "$(bash_call 1)" "$(say $'The skills are on for this repo.\n\nType `/reload-plugins`, and I will load them once its output is here.')"
 check "ended on an answered question"                pass  false "$(prompt 'what next?')" "$(say 'Two items remain.')" "$(ask)" "$(answered 'Stop here')" "$(say 'Stopping here.')"
 check "worked after the answer, then reported"       block false "$(prompt 'what next?')" "$(ask)" "$(answered)" "$(bash_call 1)" "$(say 'Built and committed.')"
 check "answered, then a prose offer"                 block false "$(prompt 'what next?')" "$(ask)" "$(answered 'Stop here')" "$(say 'Stopping. Want me to clean up the branch?')"

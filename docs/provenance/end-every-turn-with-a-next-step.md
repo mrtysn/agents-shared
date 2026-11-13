@@ -86,3 +86,12 @@ user: "ok but thats not this sessions outstanding?", then "then why list it?". N
 to another session unless this session's remaining work waits on it, and /outstanding records it under Set
 aside as Handed off, saying whether it has landed. A Fable review turned down filing it under Done, which
 would have claimed an unchecked change as finished.
+
+Nov 13 2026 (inventory): an agent needed `/reload-plugins` and asked for it as an AskUserQuestion option
+("I'll reload, then go"). The user picked it and typed the command, which Claude Code queued behind the
+turn; the agent acted on the answer, called the Skill tool twice ("Unknown skill") and ended blaming the
+reload. The queued-command hook never fired: a Skill call the tool rejects as unknown appears to reach no hook. User: "if you
+freaking allow me to run the command i typed, instead of keeping it queued while you are trying to load.
+why wouldnt you wait for me first?" `hooks/end-turn-for-queued-slash-command.py` now refuses a question
+that asks the user to type a slash command, `hooks/refuse-idle-end-of-turn.sh` lets a turn end in text
+asking for one, and the rule says to end the turn in text instead.

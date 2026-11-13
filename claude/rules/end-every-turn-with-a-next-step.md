@@ -45,7 +45,9 @@ is what replaces stopping. A wish ends the same way: the proposal, then the ques
 Exceptions: the user said stop, an `/away` stretch (decide, never ask), a background job you
 are waiting on with nothing else to do, or a slash command the user queued (a hook says so):
 Claude Code runs it only once the turn ends, so finish the current step and end in text,
-never asking and never invoking it yourself. The user rejected your last question: do not ask
+never asking and never invoking it yourself. When your next step needs a slash command only
+the user can type, end the turn in text naming it and continue once its output appears; never
+ask for it through AskUserQuestion, whose answer arrives first. The user rejected your last question: do not ask
 it again; say in one line what is unfinished and end in text (the hook passes such a turn).
 
 `hooks/refuse-idle-end-of-turn.sh` (Stop) refuses, once, a turn that ends otherwise, and lets
