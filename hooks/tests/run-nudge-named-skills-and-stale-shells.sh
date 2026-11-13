@@ -33,6 +33,10 @@ for s in stg-msg-cmt search-history new-repo archify humanizer outstanding; do
     : > "$CLAUDE_CONFIG_DIR/skills/$s/SKILL.md"
 done
 
+mkdir -p "$CLAUDE_CONFIG_DIR/commands"
+printf -- '---\ndescription: x\ndisable-model-invocation: true\n---\nbody\n' > "$CLAUDE_CONFIG_DIR/commands/refocus.md"
+printf -- '---\ndescription: x\n---\ndisable-model-invocation: true\n' > "$CLAUDE_CONFIG_DIR/commands/bodyonly.md"
+
 cat > "$WORK/lister-shell" <<'STUB'
 #!/bin/bash
 echo "bash 4242 elapsed 90m: sleep 9999"
@@ -74,6 +78,27 @@ while IFS=$'\t' read -r expected prompt; do
     fi
     check "$expected <- $prompt" "$ok"
 done < "$CASES"
+
+# User-only commands, ordinary-match clause, and names the roster lacks.
+hook_out() { run "$WORK/lister-none" "x-$n" "$1" | context; }
+out=$(hook_out "please run /refocus on this thing")
+case "$out" in *"/refocus, a user-only command ("*"commands/refocus.md, disable-model-invocation)"*"never call it uninstalled."*) check "user-only command line" 1 ;; *) check "user-only command line" 0 ;; esac
+case "$out" in *"invoke it with the Skill tool"*) check "user-only command is not told to use the Skill tool" 0 ;; *) check "user-only command is not told to use the Skill tool" 1 ;; esac
+out=$(hook_out "please run /bodyonly on this thing")
+case "$out" in *"a user-only command"*) check "marker in the body is not frontmatter" 0 ;; *) check "marker in the body is not frontmatter" 1 ;; esac
+out=$(hook_out "please use search-history to find that")
+case "$out" in *"absence from your skill list does not mean it is missing"*) check "ordinary match carries the absence clause" 1 ;; *) check "ordinary match carries the absence clause" 0 ;; esac
+out=$(hook_out "please run /nosuchthing on this now")
+case "$out" in *"/nosuchthing, which the hook's roster does not hold"*) check "unknown /name line" 1 ;; *) check "unknown /name line" 0 ;; esac
+for p in "look in /usr/bin for the binary" "see https://example.com/foo/bar for the docs" "check /usr please and /tmp too" "open /Users/x/dev/repo now please" "use and/or whichever works"; do
+    out=$(hook_out "$p")
+    [ -z "$out" ] && check "no unknown-name line for: $p" 1 || check "no unknown-name line for: $p" 0
+done
+# A roster cache from before the mark existed (bare names) is not read.
+mkdir -p "$CLAUDE_CONFIG_DIR/nudge-named-skills"
+printf 'refocus\n' > "$CLAUDE_CONFIG_DIR/nudge-named-skills/roster.cache"
+out=$(hook_out "please run /refocus on this thing")
+case "$out" in *"a user-only command"*) check "old roster cache is rebuilt" 1 ;; *) check "old roster cache is rebuilt" 0 ;; esac
 
 # The shells line is refreshed in a detached process, so a session's first prompt carries none: prime
 # the session with one prompt, wait for its cache, and the next prompt carries the line.

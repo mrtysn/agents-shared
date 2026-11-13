@@ -17,3 +17,5 @@ skill:outstanding	please run /outstanding at the end now
 skill:archify	can you archify this flow for me
 skill:humanizer	rewrite this paragraph with humanizer please
 skill:new-repo,search-history	use new-repo then search-history on it
+none	look in /usr/bin for the binary
+none	see https://example.com/foo/bar for the docs

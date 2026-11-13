@@ -20,6 +20,10 @@
 # Both lines were part of the system-one prompt hook until 2026-10-15 and never used its model. They leave
 # in one additionalContext, newline-joined, skill line first. Never blocks; fails open and silent on any
 # missing directory or tool. The roster is cached for 10 minutes in $CLAUDE_CONFIG_DIR/nudge-named-skills/.
+# Its lines carry a kind read from each file's frontmatter: disable-model-invocation: true marks a user-only
+# name, which the Skill tool refuses and the agent's skill list omits (2026-11-13: /refocus was called
+# "not installed" after a nudge said to invoke it). A typed /name the roster lacks gets a "look before you
+# say it is missing" line; paths (/usr/bin) and system directory names are not reported.
 #
 # Bash 3.2, like the hooks beside it. Cases: hooks/tests/nudge-named-skills-and-stale-shells-cases.tsv, run by
 # hooks/tests/run-nudge-named-skills-and-stale-shells.sh.
@@ -29,6 +33,8 @@ set -u
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # Single words that would collide with ordinary English if matched bare, but are skills worth routing to.
 ALLOW_BARE="archify humanizer homelab-connect"
+# Top-level directories that a typed /name is a path to, not a command (never reported as missing).
+NOT_COMMANDS="usr bin sbin etc tmp var opt home dev lib users private volumes system library applications proc mnt srv root"
 ROSTER_TTL=600
 SKIP_MARKERS='Another Claude session sent a message
 [Subagent hand-back]
@@ -102,7 +108,9 @@ WORDCOUNT=$(printf '%s' "$PROMPT" | wc -w | tr -d ' ')
 [ "${WORDCOUNT:-0}" -ge 3 ] 2>/dev/null || emit ""
 
 # --- roster, cached ---
-ROSTER_CACHE="$STATE_DIR/roster.cache"
+# roster.v2.cache: lines are name<TAB>kind<TAB>path (kind user = disable-model-invocation: true). The v1 file
+# held bare names and is never read, so an old cache cannot be mistaken for a roster without the mark.
+ROSTER_CACHE="$STATE_DIR/roster.v2.cache"
 NOW_EPOCH=$(date +%s 2>/dev/null)
 ROSTER=""
 if [ -n "$NOW_EPOCH" ] && [ -r "$ROSTER_CACHE" ]; then
@@ -113,20 +121,28 @@ if [ -n "$NOW_EPOCH" ] && [ -r "$ROSTER_CACHE" ]; then
     fi
 fi
 if [ -z "$ROSTER" ]; then
+    TAB=$(printf '\t')
     RNAMES=""
+    # kind_of FILE: "user" when its frontmatter says disable-model-invocation: true, else "ok"
+    kind_of() {
+        awk 'NR == 1 { if ($0 !~ /^---[ \t\r]*$/) exit; next }
+             /^---[ \t\r]*$/ { exit }
+             tolower($0) ~ /^disable-model-invocation:[ \t]*["\x27]?true["\x27]?[ \t\r]*$/ { f = 1; exit }
+             END { print (f ? "user" : "ok") }' "$1" 2>/dev/null
+    }
     for f in "$CONFIG_DIR"/skills/*/SKILL.md; do
         [ -e "$f" ] || continue
         d="${f%/SKILL.md}"
-        RNAMES="$RNAMES${d##*/}
+        RNAMES="$RNAMES${d##*/}$TAB$(kind_of "$f")$TAB$f
 "
     done
     for f in "$CONFIG_DIR"/commands/*.md; do
         [ -e "$f" ] || continue
         b="${f##*/}"
-        RNAMES="$RNAMES${b%.md}
+        RNAMES="$RNAMES${b%.md}$TAB$(kind_of "$f")$TAB$f
 "
     done
-    ROSTER=$(printf '%s' "$RNAMES" | tr 'A-Z' 'a-z' | sort -u 2>/dev/null)
+    ROSTER=$(printf '%s' "$RNAMES" | sort -u -t "$TAB" -k1,1f 2>/dev/null)
     if [ -n "$ROSTER" ]; then
         mkdir -p "$STATE_DIR" 2>/dev/null
         printf '%s\n' "$ROSTER" >"$ROSTER_CACHE.tmp.$$" 2>/dev/null \
@@ -139,14 +155,16 @@ fi
 # Newlines flattened to spaces before -v: this platform's awk (BWK "one true awk") errors on a raw newline
 # inside a -v value, and the matcher splits on whitespace anyway.
 PROMPT_FLAT=$(printf '%s' "$PROMPT" | tr '\n\t' '  ')
-MATCHED=$(printf '%s\n' "$ROSTER" | awk -v prompt="$PROMPT_FLAT" -v allow="$ALLOW_BARE" '
+MATCHED=$(printf '%s\n' "$ROSTER" | awk -F '\t' -v prompt="$PROMPT_FLAT" -v allow="$ALLOW_BARE" -v notcmd="$NOT_COMMANDS" '
     BEGIN {
         lp = tolower(prompt)
         n = split(lp, toks, /[ \t]+/)
         nallow = split(allow, allowarr, " ")
         for (i = 1; i <= nallow; i++) if (allowarr[i] != "") allowset[allowarr[i]] = 1
+        nnot = split(notcmd, notarr, " ")
+        for (i = 1; i <= nnot; i++) if (notarr[i] != "") notset[notarr[i]] = 1
     }
-    { name = tolower($0); if (name != "") roster[name] = 1 }
+    { name = tolower($1); if (name != "") { roster[name] = 1; kind[name] = $2; path[name] = $3 } }
     END {
         for (i = 1; i <= n; i++) {
             tok = toks[i]
@@ -157,24 +175,57 @@ MATCHED=$(printf '%s\n' "$ROSTER" | awk -v prompt="$PROMPT_FLAT" -v allow="$ALLO
             name = tok
             is_slash = 0
             if (substr(tok, 1, 1) == "/") { name = substr(tok, 2); is_slash = 1 }
-            if (!(name in roster)) continue
+            if (!(name in roster)) {
+                # A /name typed at the start of a word that the roster lacks. A second slash (a path),
+                # a known system directory or a non-command shape is not a command name.
+                if (is_slash && name ~ /^[a-z][a-z0-9-]*$/ && !(name in notset)) unknown[name] = 1
+                continue
+            }
             if (is_slash) { matched[name] = 1; continue }
             if (index(name, "-") > 0 || (name in allowset)) matched[name] = 1
         }
         out = ""
-        for (m in matched) out = out (out == "" ? "" : "\n") m
+        for (m in matched) out = out (out == "" ? "" : "\n") m "\t" kind[m] "\t" path[m]
+        for (m in unknown) out = out (out == "" ? "" : "\n") m "\tunknown\t"
         print out
     }' 2>/dev/null)
 [ -n "$MATCHED" ] || emit ""
 
 LIST=""
 NCOUNT=0
-while IFS= read -r nm; do
+USERLINES=""
+UNKLINES=""
+TAB=$(printf '\t')
+while IFS="$TAB" read -r nm kind path; do
     [ -n "$nm" ] || continue
-    NCOUNT=$((NCOUNT + 1))
-    LIST="${LIST:+$LIST, }/$nm"
+    case "$kind" in
+        user)
+            shown="$path"
+            case "$path" in "$HOME"/*) shown="~${path#"$HOME"}" ;; esac
+            USERLINES="${USERLINES:+$USERLINES
+}This prompt names /$nm, a user-only command ($shown, disable-model-invocation): it is installed, but the Skill tool refuses it and the skill list leaves it out. Ask the user to type /$nm themselves; never call it uninstalled."
+            ;;
+        unknown)
+            UNKLINES="${UNKLINES:+$UNKLINES
+}This prompt names /$nm, which the hook's roster does not hold. Before saying it is not installed, look in ~/.claude/commands, ~/.claude/skills and installed plugins, then call the Skill tool."
+            ;;
+        *)
+            NCOUNT=$((NCOUNT + 1))
+            LIST="${LIST:+$LIST, }/$nm"
+            ;;
+    esac
 done <<<"$MATCHED"
+OUT=""
 if [ "$NCOUNT" -eq 1 ]; then
-    emit "This prompt names the skill $LIST; invoke it with the Skill tool instead of doing the work by hand."
+    OUT="This prompt names the skill $LIST; invoke it with the Skill tool instead of doing the work by hand."
+elif [ "$NCOUNT" -gt 1 ]; then
+    OUT="This prompt names the skills $LIST; invoke them with the Skill tool instead of doing the work by hand."
 fi
-emit "This prompt names the skills $LIST; invoke them with the Skill tool instead of doing the work by hand."
+if [ -n "$OUT" ]; then
+    OUT="$OUT Its absence from your skill list does not mean it is missing: the list leaves out on-demand and user-only entries. Call the Skill tool, and if it refuses, ask the user to type it."
+fi
+for part in "$USERLINES" "$UNKLINES"; do
+    [ -n "$part" ] && OUT="${OUT:+$OUT
+}$part"
+done
+emit "$OUT"
