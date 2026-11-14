@@ -139,7 +139,7 @@ nudge() {
     printf '%s' "$out" | grep -q additionalContext && got=1
     total=$((total + 1))
     if [ "$got" = "$want" ] && [ "$code" = 0 ]; then
-        [ "$VERBOSE" = 1 ] && printf 'ok    %s\n' "$name"
+        if [ "$VERBOSE" = 1 ]; then printf 'ok    %s\n' "$name"; fi
     else
         failed=$((failed + 1)); printf 'FAIL  %s: want nudge %s, got %s (exit %s)\n' "$name" "$want" "$got" "$code"
     fi
