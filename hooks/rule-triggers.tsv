@@ -31,3 +31,4 @@ external-drive-mount-points	Bash	command	(^|[;&|(`])[[:space:]]*(ls|diskutil|df)
 drive-mac-ui-through-agent-ui-clicker	Bash	command	osascript.*System Events|(^|[;&|(`])[[:space:]]*(cliclick|screencapture)[[:space:]]	agent-ui-clicker	note-once
 sign-a-script-app-for-permission-grants	Bash	command	(^|[;&|(`])[[:space:]]*osacompile[[:space:]]|codesign[^;&|]*[[:space:]]-s[[:space:]]+-([[:space:]]|$)	-	note-once
 sign-a-script-app-for-permission-grants	Bash	command	x-apple\.systempreferences:[^ "']*Privacy_	-	note-once
+sign-a-script-app-for-permission-grants	Bash	command	Library/(Safari|Messages|Mail)([/ '"]|$)|com\.apple\.TCC	-	note-once
