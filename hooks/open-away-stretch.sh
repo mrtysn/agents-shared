@@ -11,6 +11,8 @@
 #   /away off                  closes the stretch
 #   /away                      an error that names the usage; the prompt is not sent
 #
+# Sentence punctuation after the verb or the value ("/away until 23:00. go", "/away off.") is ignored.
+#
 # A stretch always ends, at most 12 hours out. Only a prompt that starts with `/away` touches it: any other
 # typed prompt, a task notification or a wakeup prompt leaves it as it is. State is kept by
 # scripts/away-obligation (see its header); no network, no model call. Fails open and silent when the state
@@ -18,6 +20,7 @@
 #
 # Cases: hooks/tests/away-prompt-cases.tsv, run by hooks/tests/run-away-stretch.sh.
 
+setopt extended_glob
 HERE=${0:A:h}
 OBLIGATION=${AWAY_OBLIGATION:-$HERE/../scripts/away-obligation}
 
@@ -42,6 +45,9 @@ refuse() {  # error shown to the user; the prompt is dropped
 FIRST_LINE=${TRIMMED%%$'\n'*}
 WORDS=(${=FIRST_LINE})   # WORDS[1] is /away
 VERB=${WORDS[2]:-}
+VERB=${VERB%%[.,;:!?]##}
+VALUE=${WORDS[3]:-}
+VALUE=${VALUE%%[.,;:!?]##}
 
 case $VERB in
   off)
@@ -54,9 +60,9 @@ case $VERB in
     exit 0
     ;;
   until|for)
-    [[ -n ${WORDS[3]:-} ]] || refuse "/away $VERB needs a value. $USAGE_TEXT"
+    [[ -n $VALUE ]] || refuse "/away $VERB needs a value. $USAGE_TEXT"
     QUOTE=${FIRST_LINE[1,300]}
-    if ! OUT=$("$OBLIGATION" open --session "$SESSION" --quote "$QUOTE" "$VERB" "${WORDS[3]}" 2>&1); then
+    if ! OUT=$("$OBLIGATION" open --session "$SESSION" --quote "$QUOTE" "$VERB" "$VALUE" 2>&1); then
       refuse "${OUT#away-obligation: }. $USAGE_TEXT"
     fi
     CONTEXT="The user opened an away stretch ($OUT). They are not at the machine, and nobody will answer questions: decide and report. Before ending any turn during the stretch, arm a waiter on the next thing you owe: ScheduleWakeup at its due time, or Bash run_in_background with an until-loop that exits on every end state of the job you filed (ok, failed, cancelled), and read its result when it fires. A Stop hook refuses the end of turn while nothing is armed. If the work is truly finished: away-obligation close --reason '<why>'."

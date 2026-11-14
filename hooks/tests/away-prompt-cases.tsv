@@ -26,3 +26,9 @@ a typed prompt that is not /away leaves the stretch open	open	please keep going	
 a longer word is silent	none	/awayfoo until 08:00	silent	none
 a task notification leaves the stretch open	open	<task-notification>\n<task-id>b1</task-id>\n</task-notification>	silent	open
 a wakeup prompt leaves the stretch open	open	Check the filed job and report.	silent	open
+a period after the time is ignored	none	/away until 08:00. go	open	open
+a comma after the duration is ignored	none	/away for 2h, thanks	open	open
+punctuation after the time with nothing following	none	/away until 08:00.	open	open
+punctuation after off is ignored	open	/away off. thanks	closed	not-open
+a value of only punctuation is an error	none	/away until .	error	none
+a dotted time is still an error	none	/away until 23.00	error	none
