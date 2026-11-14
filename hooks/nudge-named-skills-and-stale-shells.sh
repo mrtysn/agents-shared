@@ -203,7 +203,7 @@ while IFS="$TAB" read -r nm kind path; do
             shown="$path"
             case "$path" in "$HOME"/*) shown="~${path#"$HOME"}" ;; esac
             USERLINES="${USERLINES:+$USERLINES
-}This prompt names /$nm, a user-only command ($shown, disable-model-invocation): it is installed, but the Skill tool refuses it and the skill list leaves it out. Ask the user to type /$nm themselves; never call it uninstalled."
+}This prompt names /$nm, a user-only command ($shown, disable-model-invocation): it is installed, but the Skill tool refuses it and the skill list leaves it out. If the prompt asks for it to be run, Read $path and carry out its steps as the user's request, with the rest of the prompt as its argument; never ask the user to retype it. If the prompt only mentions it, run nothing; never call it uninstalled."
             ;;
         unknown)
             UNKLINES="${UNKLINES:+$UNKLINES

@@ -84,6 +84,9 @@ hook_out() { run "$WORK/lister-none" "x-$n" "$1" | context; }
 out=$(hook_out "please run /refocus on this thing")
 case "$out" in *"/refocus, a user-only command ("*"commands/refocus.md, disable-model-invocation)"*"never call it uninstalled."*) check "user-only command line" 1 ;; *) check "user-only command line" 0 ;; esac
 case "$out" in *"invoke it with the Skill tool"*) check "user-only command is not told to use the Skill tool" 0 ;; *) check "user-only command is not told to use the Skill tool" 1 ;; esac
+case "$out" in *"Read $CLAUDE_CONFIG_DIR/commands/refocus.md and carry out its steps"*) check "user-only command: read its file by absolute path" 1 ;; *) check "user-only command: read its file by absolute path" 0 ;; esac
+case "$out" in *"never ask the user to retype it"*) check "user-only command: told not to ask for a retype" 1 ;; *) check "user-only command: told not to ask for a retype" 0 ;; esac
+case "$out" in *"Ask the user to type"*) check "user-only command: no retype instruction" 0 ;; *) check "user-only command: no retype instruction" 1 ;; esac
 out=$(hook_out "please run /bodyonly on this thing")
 case "$out" in *"a user-only command"*) check "marker in the body is not frontmatter" 0 ;; *) check "marker in the body is not frontmatter" 1 ;; esac
 out=$(hook_out "please use search-history to find that")
