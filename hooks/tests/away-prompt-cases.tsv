@@ -2,7 +2,7 @@
 #   name  pre  prompt  want  stretch_after
 #
 # pre:           none | open   (a stretch the runner opens, until 09:00, before the prompt)
-# want:          open (stretch opened: systemMessage + additionalContext) | closed | no-stretch | error (decision block) | silent
+# want:          open (stretch opened: systemMessage + additionalContext) | closed | no-stretch | ask (span unreadable: the agent is ordered to ask) | silent
 # stretch_after: open | not-open | none   (what `away-obligation status` says for the session afterwards)
 # The runner sets the clock to 2026-10-20 03:00 local; \n in a prompt is decoded.
 until a time opens a stretch	none	/away until 08:00	open	open
@@ -13,12 +13,12 @@ for hours and minutes	none	/away for 1h30m ok	open	open
 more than 12 hours is capped, not refused	none	/away for 30h	open	open
 a time already past today means tomorrow	none	/away until 02:00	open	open
 a second /away replaces the first	open	/away for 1h	open	open
-bare /away is an error	none	/away	error	none
-bare /away leaves an open stretch alone	open	/away	error	open
-until with no value is an error	none	/away until	error	none
-unknown word is an error	none	/away tomorrow	error	none
-a bad time is an error	none	/away until 8am	error	none
-a bad duration is an error	none	/away for soon	error	none
+bare /away is an error	none	/away	ask	none
+bare /away leaves an open stretch alone	open	/away	ask	open
+until with no value is an error	none	/away until	ask	none
+unknown word is an error	none	/away tomorrow	ask	none
+a word that is not a time is asked about	none	/away until soon	ask	none
+a bad duration is an error	none	/away for soon	ask	none
 off closes an open stretch	open	/away off	closed	not-open
 off with no stretch open	none	/away off	no-stretch	none
 a typed prompt that is not /away leaves the stretch open	open	please keep going	silent	open
@@ -30,5 +30,17 @@ a period after the time is ignored	none	/away until 08:00. go	open	open
 a comma after the duration is ignored	none	/away for 2h, thanks	open	open
 punctuation after the time with nothing following	none	/away until 08:00.	open	open
 punctuation after off is ignored	open	/away off. thanks	closed	not-open
-a value of only punctuation is an error	none	/away until .	error	none
-a dotted time is still an error	none	/away until 23.00	error	none
+a value of only punctuation is an error	none	/away until .	ask	none
+a dotted time is still an error	none	/away until 23.00	ask	none
+the verb is case-insensitive	none	/away Until 08:00	open	open
+off in capitals	open	/away OFF	closed	not-open
+a 12-hour time in the evening	none	/away until 11pm	open	open
+a 12-hour time with minutes and a space	none	/away until 8:30 am	open	open
+twelve am is midnight	none	/away until 12am	open	open
+13pm is not a time	none	/away until 13pm	ask	none
+a duration in hours spelled out	none	/away for 2 hours	open	open
+a duration in hrs	none	/away for 2hrs	open	open
+hours and minutes with a space	none	/away for 1h 30m	open	open
+minutes spelled out	none	/away for 90 min keep going	open	open
+a bare hour is not read	none	/away until 23	ask	none
+a four-digit time is not read	none	/away until 2300	ask	none

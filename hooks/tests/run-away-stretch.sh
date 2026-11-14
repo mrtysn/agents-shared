@@ -68,12 +68,13 @@ while IFS=$'\t' read -r name pre prompt want after; do
   got=silent
   if [[ -n $out ]]; then
     if [[ $(print -r -- "$out" | jq -r '.decision // empty') == block ]]; then
-      got=error
+      got="blocked"
     else
       ctx=$(print -r -- "$out" | jq -r '.hookSpecificOutput.additionalContext // empty')
       sysmsg=$(print -r -- "$out" | jq -r '.systemMessage // empty')
       case $ctx in
         *"opened an away stretch"*) got=open; [[ $sysmsg == "Away stretch open until "* ]] || got="open without a systemMessage" ;;
+        *"span could not be read"*) got=ask; [[ $ctx == *"AskUserQuestion"* && $ctx == *" --session $session "* ]] || got="ask without the order" ;;
         *"closed by the user"*) got=closed ;;
         *"No away stretch"*) got=no-stretch ;;
         *) got="other: $ctx" ;;
