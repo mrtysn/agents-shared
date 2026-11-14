@@ -51,6 +51,13 @@
       ]
     },
     {
+      "name": "why-question survey tests",
+      "run": [
+        "python3",
+        "scripts/tests/test_find_why_question_answers.py"
+      ]
+    },
+    {
       "name": "usage survey index tests",
       "run": [
         "python3",

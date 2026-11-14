@@ -28,10 +28,12 @@ says why.
 | How one session fared | `extract-session-text.py <id> --kinds user,assistant,calls --chunk-chars 60000 --out <scratch>/s`, then read the chunks |
 | Their own typed prompts matching a phrase, counted | `find-repeated-user-prompts.py` (see `pattern-discovery-agent-fix`) |
 
-Three surveys already exist; when the question is one of them, run it first:
+Four surveys already exist; when the question is one of them, run it first:
 `find-interrupted-responses.py` (dropped connections and what was typed next),
 `find-listed-unasked-decisions.py` (decisions listed in prose instead of asked),
 `find-invisible-output-claims.py` ("as shown above" about output the user never saw).
+`find-why-question-answers.py` pairs each "why did you…" prompt with the agent's reply, for
+classifying whether agents named the cause (communication-style.md's "Honest in error, by cause").
 
 ## 2. State the window
 
