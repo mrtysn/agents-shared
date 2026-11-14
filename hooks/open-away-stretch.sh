@@ -96,6 +96,6 @@ case $VERB in
     exit 0
     ;;
   *)
-    ask_span "${WORDS[2]:+'${WORDS[2]}' is not until, for or off}${WORDS[2]:-no span given}"
+    if [[ -n ${WORDS[2]:-} ]]; then ask_span "'${WORDS[2]}' is not until, for or off"; else ask_span "no span given"; fi
     ;;
 esac
