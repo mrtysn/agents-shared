@@ -20,6 +20,22 @@ disabled, and clicking a disabled item does nothing and raises no error, so the 
 cleanly having done nothing. Press Escape when the item is still disabled after the menu is
 open.
 
+## No test grants, and take back what a task needed
+
+Never send the user to add a program to Full Disk Access, Accessibility or any privacy pane
+to test something. Test from a program that already holds the grant (the terminal), or on a
+copy of the data. A grant a task really needs goes to one program with a stable identity: signed
+with the local certificate under its own bundle id (`clo-tmux-host` is one), never a
+version-named binary (`~/.local/share/claude/versions/<n>`), an `applet`, or `sqlite3`, which
+leave a dead row on every update or rebuild.
+
+When the task ends, remove what it added: `tccutil reset <Service> <bundle id>` for a signed
+app; for a bare binary, name the row in the closing line so the user can delete it. A task
+is not done while a grant it added for testing is still there.
+
 Provenance: Nov 12 2026, the Merge Finder Windows applet. It was signed ad-hoc as `applet`,
 and the user was sent to the Accessibility pane three times. The user: "claude we fucking
 did this step already". See also the memory `adhoc-signing-voids-tcc-grants`.
+Nov 14 2026, clo-remote: the Full Disk Access list held two `2.1`, three `applet` and one
+`sqlite3` row, all off or unused. The user: "the agent is adding random entries on my computer for
+its testing purposes ... why are they kept after we are done with it".
