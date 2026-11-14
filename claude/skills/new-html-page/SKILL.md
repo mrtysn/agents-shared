@@ -126,7 +126,16 @@ When a decision turns on something seen, or on more context than a terminal prom
    if yes, `true`. A long list the user prunes (items scored keep, to untick) gets `"checked": true`
    on each option that starts ticked; a "Recommended" badge alone leaves the box empty.
    `allow_other` and `skippable` default to true. Full format: `project_lifecycle/decision.py`. Screenshots go
-   in the same folder.
+   in the same folder. The scaffold also refuses a question with under 80 characters of context, an option
+   with no `consequence`, and a question with no recommended option.
+
+   **Write each question from the files and the user's own messages, never from a session summary
+   or an earlier spec.** After a compaction, read the current source and the user's words on that
+   item again: a summary can invert what they said, and an earlier form's wording goes stale as the
+   work moves. A question about text on a page quotes that text, names where it sits, carries a
+   screenshot of it, says who wrote it (the user, or an agent draft), and quotes what the user
+   already said about it. Check a fact the question rests on (is it deployed, what page holds it)
+   before asking. Pre-tick a box only when unticking is the task, and say so in the question.
 2. **Scaffold**:
 
        project-lifecycle page-new --mode decision-form --spec <SPEC>.json --title "<what is decided>" \
