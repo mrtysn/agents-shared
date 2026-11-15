@@ -129,3 +129,12 @@ ended on text alone and the work the user had said to continue ("and continue") 
 the rest of the prompt. It now reads `hooks/continue-request-pattern.txt` (beside `show-request-pattern.txt`): when
 both match, the text-only end passes only if the turn armed a ScheduleWakeup, a Monitor or background work (a
 background Agent or Bash call), or an earlier launch is still unreported; otherwise it is refused once.
+
+2026-11-15, a small web page. The user said "lets try both 1 and 2 ... you can duplicate all and print the whole page twice in the html to demonstrate".
+The agent built a frozen scratch file, never opened it, and ended each turn asking which style to keep. The Stop hook
+told it to ask (its offer branch ran before its rejected-question check), the user rejected the question three times,
+and "Nothing left: ... only the opening of the browser is undone" passed because the hook never judges that line. The user:
+"I ASKED YOU TO MAKE A COMPARISON MODE TO BUILD IT AND I CANT EVEN GET TO THAT MODE AND YOU ARE ASKING ME ABOUT MY VERDICT."
+The rule now says a comparison is delivered when it is open on the user's screen; the hook has a rejected-question message and
+refuses a "Nothing left" line that names something undone. `hooks/refuse-requested-content-before-tool-call.sh` also
+re-reads the transcript before refusing a call after a question, and treats GET-only curl as read-only.

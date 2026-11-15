@@ -82,6 +82,7 @@ bash_is_readonly() {
         w=${1##*/}; sub=${2:-}
         case "$w" in
             cd|ls|cat|head|tail|grep|egrep|rg|wc|jq|pwd|stat|which|file|tree|du|df|ps|date|echo|printf|sort|uniq|cut|tr|awk|basename|dirname|realpath|readlink|test|\[|true|false|nl|column|lsof|pgrep|uptime|whoami|hostname|uname|env|type|command|fi|then|else|done|do|for|if|while|\)|\}) ;;
+            curl) case " $* " in *" -X"*|*" -d"*|*" --data"*|*" -F"*|*" --form"*|*" -T"*|*" --upload"*|*" -o"*|*" -O"*|*" --output"*|*" --remote-name"*) return 1 ;; esac ;;
             sed) case " $* " in *" -i"*|*" --in-place"*) return 1 ;; esac ;;
             find) case " $* " in *" -delete"*|*" -exec"*|*" -ok"*) return 1 ;; esac ;;
             git) case "$sub" in status|log|diff|show|rev-parse|ls-files|blame|describe|remote|shortlog|ls-remote|cat-file|grep|rev-list|reflog|name-rev|merge-base) ;; *) return 1 ;; esac ;;
@@ -119,8 +120,10 @@ PATTERN_FILE="$HERE/show-request-pattern.txt"
 QUESTION_FILE="$HERE/question-prompt-pattern.txt"
 if [ "$WORK" = true ] && [ -r "$QUESTION_FILE" ] && [ -n "$(head -n1 "$QUESTION_FILE")" ]; then
     QPAT=$(head -n1 "$QUESTION_FILE")
+    q4_unanswered() {
+    local QROWS
     QROWS=$(python3 "$READER" "$TRANSCRIPT" --kinds user,assistant --json --max-chars 400 2>/dev/null) || QROWS=""
-    if [ -n "$QROWS" ] && [ "$(printf '%s' "$QROWS" | jq -rs --arg pat "$QPAT" '
+    [ -n "$QROWS" ] && [ "$(printf '%s' "$QROWS" | jq -rs --arg pat "$QPAT" '
         [ .[] | select(type == "object" and (.sidechain | not)) ] as $rows
         | ([ range(0; $rows | length) as $i | $rows[$i]
              | select(.group == "user" and (.label == "USER" or .label == "USER(queued)") and (.meta | not)
@@ -130,9 +133,19 @@ if [ "$WORK" = true ] && [ -r "$QUESTION_FILE" ] && [ -n "$(head -n1 "$QUESTION_
             | if ($prompt | test($pat) | not) then "no"
               elif ([ $rows[$p + 1:][] | select(.group == "assistant" and ((.text // "") | length) >= 80) ] | length) > 0 then "no"
               else "yes" end
-          end' 2>/dev/null)" = yes ]; then
+          end' 2>/dev/null)" = yes ]
+    }
+    # The transcript lags the conversation: answer text written in the same message as this call may not be in it yet,
+    # so the read is repeated, 1 second apart, before the call is refused (2026-11-15: a call made right after
+    # 930 characters of answer was refused three times).
+    Q4_BLOCK=true
+    for attempt in 1 2 3; do
+        q4_unanswered || { Q4_BLOCK=false; break; }
+        [ "$attempt" = 3 ] || sleep 1
+    done
+    if [ "$Q4_BLOCK" = true ]; then
         cat >&2 <<MSG
-BLOCKED: the user's latest message is a question or a statement of confusion, and no answer text has been written since it. A question gets an answer, not an action (claude/rules/question-handling.md). Write the answer as text now (reading calls such as ls, cat, grep, git log and read-only python are fine); if the same message also gives an order, say in the answer what you will change, then do it.
+BLOCKED: the user's latest message is a question or a statement of confusion, and no answer text has been written since it. A question gets an answer, not an action (claude/rules/question-handling.md). Write the answer as text now (reading calls such as ls, cat, grep, git log and GET-only curl are fine; python is not); if the same message also gives an order, or an earlier message of the user ordered work that is still unfinished, say in the answer what you will change, then do it.
 MSG
         exit 2
     fi

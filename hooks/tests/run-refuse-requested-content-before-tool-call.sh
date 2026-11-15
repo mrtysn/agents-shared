@@ -208,6 +208,10 @@ f=$(mk q-mixed "$(prompt 'every entry says ask the salary. this whole page is li
 check 'a message with a mid-text "?" and an order refuses until answered' 2 Edit "$f" s-q-mixed question
 f=$(mk q-read "$(prompt 'why is the page empty?')" "$(call t1 Bash '{"command":"grep -n title page.html"}')")
 check 'a question then a read-only Bash allows' 0 Bash "$f" s-q-read question "grep -n title page.html"
+f=$(mk q-curl "$(prompt 'why is the page empty?')" "$(call t1 Bash '{"command":"curl -sI https://example.com/"}')")
+check 'a question then a GET-only curl allows' 0 Bash "$f" s-q-curl question "curl -sI https://example.com/"
+f=$(mk q-curlpost "$(prompt 'why is the page empty?')" "$(call t1 Bash '{"command":"curl -X POST https://example.com/"}')")
+check 'a question then a curl POST refuses' 2 Bash "$f" s-q-curlpost question "curl -X POST https://example.com/"
 f=$(mk q-readtool "$(prompt 'why is the page empty?')" "$(call t1 Read '{"file_path":"/x"}')")
 check 'a question then Read allows' 0 Read "$f" s-q-readtool
 f=$(mk q-agentmsg "$(prompt 'tidy that')" "$(queued $'<agent-message from="a1">\nDid it work?\n</agent-message>')" "$(call t1 Edit '{"file_path":"/x"}')")

@@ -158,6 +158,7 @@ VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" --arg show "$SHOW_PATT
         if $a >= 0 and $workAfterAsk == 0 then
           if ($phrase | test("^(waits?|waiting) (for|on) your|^on your (word|go-ahead|say-so)"; "i")) then "pass"
           else "closed\t\($phrase)" end
+        elif $rejected then "offerRejected\t\($phrase)"
         else "offer\t\($phrase)" end
       elif ($prompt | length) < 60 and ($prompt | test("^\\s*(stop|stop here|that.?s (all|it)|enough|nothing else|pause|hold on|wait|no more|done for (now|today))\\b"; "i")) then "pass"
       elif $rejected then "pass"
@@ -173,7 +174,10 @@ VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" --arg show "$SHOW_PATT
         then "continue" else "pass" end
       elif $turnCalls == 0 and ($text | length) > 0 and ($show == "" or ($prompt | test($show) | not)) then "pass"
       elif $pending > 0 or $workflowsPending > 0 then "pass"
-      elif ($lastLine | test("^[\\s*_>#-]*nothing (else |more )?(is )?left\\b"; "i")) then "pass"
+      elif ($lastLine | test("^[\\s*_>#-]*nothing (else |more )?(is )?left\\b"; "i")) then
+        # A "Nothing left" line that itself says something is undone, blocked or refused is not that: 2026-11-15,
+        # "Nothing left ... Only the opening of the browser is undone" passed while the link the user asked for was never opened.
+        if ($lastLine | test("\\b(undone|not (yet )?(done|opened|deployed|built|delivered|shown)|blocked|refused|could not|couldn.t)\\b"; "i")) then "undone" else "pass" end
       else "idle" end
     end' 2>/dev/null) || exit 0
 [[ -n $VERDICT && $VERDICT != pass ]] || exit 0
@@ -189,6 +193,11 @@ if [[ $VERDICT == continue ]]; then
 elif [[ $VERDICT == closed* ]]; then
   PHRASE=${VERDICT#closed$'\t'}
   REASON="The user just answered a question, and your reply poses another choice in prose (\"$PHRASE\"). That decision is closed: do not ask it again, reworded or not. Reword the line as a plain statement and end the turn in text, or, if something different is genuinely open, ask only that with AskUserQuestion (claude/rules/end-every-turn-with-a-next-step.md)."
+elif [[ $VERDICT == undone ]]; then
+  REASON="Your closing 'Nothing left' line itself names something undone, blocked or refused, so it is not a closing line (claude/rules/end-every-turn-with-a-next-step.md). Do the undone part now if you can; if a hook or the user's own step blocks it, say that in one plain line without 'Nothing left', and ask with AskUserQuestion only if a decision is open."
+elif [[ $VERDICT == offerRejected* ]]; then
+  PHRASE=${VERDICT#offerRejected$'\t'}
+  REASON="The user rejected your last question, so do not ask it again, reworded or not, and do not offer it in prose (\"$PHRASE\") (claude/rules/end-every-turn-with-a-next-step.md). Do the authorized work now; otherwise say in one line what is unfinished, with no offer and no question, and end the turn in text: that turn passes."
 elif [[ $VERDICT == offer* ]]; then
   PHRASE=${VERDICT#offer$'\t'}
   REASON="Your reply ends by offering work or posing a choice in prose (\"$PHRASE\"), which leaves the user to re-type it (claude/rules/end-every-turn-with-a-next-step.md). A question promised for a later message never arrives: you write only after the user does. If it is work already authorized or plainly in scope, do it now instead of asking. Otherwise: $ASK"
