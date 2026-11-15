@@ -5,7 +5,7 @@ transcript format is parsed in one place. `transcripts()` finds the files across
 every config dir; `items()` turns one file into a flat stream of dicts, one per
 content block, in transcript order:
 
-  group       user | assistant | agents | tools | calls | attachments
+  group       user | assistant | agents | tools | calls | attachments | thinking
   label       USER, ASSISTANT, AGENT-SPAWN, CALL Bash, TOOL-RESULT Read, ...
   text        the block's text (a tool call's text is its command or path)
   tool        tool name, on calls and results
@@ -28,6 +28,12 @@ Pass want without "empty" to leave markers out.
 text a path match loaded (label RULE-LOADED <file>, with path and globs) and the context
 a hook added (label HOOK-CONTEXT <hook>, with hook, hook_event and tool_use_id). A caller
 gets attachments only by naming the group in want; want=None leaves them out.
+
+`thinking` holds the assistant's thinking blocks that carry words (label THINKING), and is
+built only when want names it. Claude Code can store a reply written ahead of a tool call
+as such a block, holding a paraphrase of the reply and no text block; a caller that asks
+"did the assistant write anything since X" names this group to see it. An entry whose only
+block is thinking still yields its EMPTY marker when the group is not named.
 """
 
 import glob
@@ -100,7 +106,7 @@ def transcripts(project=None, days=None, mention=None, subagents=False, exclude=
                 yield path, name, session
 
 
-def blocks(d, t, c, tool_names, keep):
+def blocks(d, t, c, tool_names, keep, thinking=False):
     """The content blocks of one user or assistant entry as (group, label, text, extra).
 
     text is None for a block that exists but whose group is not wanted, so the caller
@@ -130,6 +136,8 @@ def blocks(d, t, c, tool_names, keep):
     for x in c:
         if x.get("type") == "text":
             yield "assistant", "ASSISTANT", x["text"] if keep("assistant") else None, {}
+        elif x.get("type") == "thinking" and thinking and (x.get("thinking") or "").strip():
+            yield "thinking", "THINKING", x["thinking"], {}
         elif x.get("type") == "tool_use":
             tool_names[x["id"]] = x["name"]
             inp = x.get("input", {})
@@ -200,7 +208,7 @@ def items(path, project="", session=None, want=None):
             base["entry_type"] = t
             base["content_kind"] = "str" if isinstance(c, str) else "list"
             seen = False
-            for group, label, text, extra in blocks(d, t, c, tool_names, keep):
+            for group, label, text, extra in blocks(d, t, c, tool_names, keep, want is not None and "thinking" in want):
                 seen = True
                 if text is not None and keep(group):
                     yield item(group, label, text, **extra)

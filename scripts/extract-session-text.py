@@ -25,6 +25,10 @@ other config dir claude_dirs.py knows). Many sessions: --all, narrowed by
              hook added (HOOK-CONTEXT <hook>); off by default. Use it to see whether a
              rule or hook note reached a session, and where, instead of grepping the file.
 
+  thinking   the assistant's thinking blocks that carry words (THINKING); off by default.
+             A reply written ahead of a tool call can be stored as one, as a paraphrase with
+             no text block, so a check for "any reply since the prompt" names this kind too.
+
 Sidechain (sub-agent internal) entries are left out unless --subagents.
 
 --json prints one JSON object per line instead of text. A row has: session,
@@ -57,7 +61,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from claude_dirs import find_transcript  # noqa: E402
 from transcript_items import add_next_user, clip_input, items, since_last_user, transcripts  # noqa: E402
 
-KINDS = ("user", "assistant", "agents", "calls", "tools", "attachments")
+KINDS = ("user", "assistant", "agents", "calls", "tools", "attachments", "thinking")
 UUID_ONLY = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 JSON_MAX_CHARS = 2000
 

@@ -109,6 +109,22 @@ class ItemsTest(unittest.TestCase):
         self.assertEqual((rows[1]["hook"], rows[1]["hook_event"], rows[1]["tool_use_id"]),
                          ("PreToolUse:Bash", "PreToolUse", "t9"))
 
+    def test_thinking_is_opt_in_and_only_blocks_with_words(self):
+        path = Path(self.tmp.name) / "think.jsonl"
+        path.write_text("\n".join(json.dumps(x) for x in [
+            user("2026-11-15T06:00:00Z", "why?"),
+            assistant("2026-11-15T06:00:01Z", [{"type": "thinking", "thinking": ""}]),
+            assistant("2026-11-15T06:00:02Z", [{"type": "thinking", "thinking": "Two causes are visible."}]),
+            assistant("2026-11-15T06:00:03Z", [text("Done.")]),
+        ]) + "\n")
+        rows = list(ti.items(str(path), want={"assistant", "thinking"}))
+        self.assertEqual([(r["group"], r["label"], r["text"]) for r in rows],
+                         [("thinking", "THINKING", "Two causes are visible."), ("assistant", "ASSISTANT", "Done.")])
+        self.assertEqual([r["group"] for r in ti.items(str(path))], ["user", "empty", "empty", "assistant"])
+        out = subprocess.run([sys.executable, str(EXTRACT), str(path), "--kinds", "thinking", "--json"],
+                             capture_output=True, text=True, check=True).stdout
+        self.assertEqual([json.loads(x)["label"] for x in out.splitlines() if x.startswith("{")], ["THINKING"])
+
     def test_flags_survive_for_callers_own_predicates(self):
         rows = list(ti.items(str(self.path)))
         self.assertTrue(any(r["sidechain"] for r in rows))
