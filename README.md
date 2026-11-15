@@ -185,6 +185,14 @@ A disabled group costs nothing; an enabled one loads its skill descriptions like
 any other skill. Skills the machine's owner wrote stay flat under
 `claude/skills/<name>/` and keep their bare `/<name>`.
 
+**Sizing a group.** A group is one toolchain or task and holds about 20 skills or fewer: a
+repo that enables it loads every description in it, so a pack mixing several toolchains
+(`motion` was graphics, web animation and GSAP) is split. A router skill is enabled together
+with the groups it routes to. A flat skill that is rarely used is set to name-only in Skill
+Tree rather than moved into a group, because a move renames it and rules and repos name it
+bare. When a group is split, the repos that enable it and use the moved skills enable the
+new groups too (`claude plugin enable <group>@skills-dir --scope local`).
+
 Skill Tree draws all of this as one page, and lives in the `dev-repos-skills` repo (its `skills`
 skin): every group with its skills, the description cost, and the switches: a group per scope for
 the project you pick, a skill inside a group as auto or slash-only (a fenced frontmatter edit in
