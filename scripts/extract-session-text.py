@@ -25,9 +25,10 @@ other config dir claude_dirs.py knows). Many sessions: --all, narrowed by
              hook added (HOOK-CONTEXT <hook>); off by default. Use it to see whether a
              rule or hook note reached a session, and where, instead of grepping the file.
 
-  thinking   the assistant's thinking blocks that carry words (THINKING); off by default.
-             A reply written ahead of a tool call can be stored as one, as a paraphrase with
-             no text block, so a check for "any reply since the prompt" names this kind too.
+  thinking   the assistant's thinking blocks that carry words; off by default. NARRATION
+             is the server's summary of reply text written between tool calls, stored with
+             no text block, so a check for "any reply since the prompt" selects it too.
+             THINKING is reasoning.
 
 Sidechain (sub-agent internal) entries are left out unless --subagents.
 

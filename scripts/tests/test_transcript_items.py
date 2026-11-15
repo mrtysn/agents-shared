@@ -114,16 +114,25 @@ class ItemsTest(unittest.TestCase):
         path.write_text("\n".join(json.dumps(x) for x in [
             user("2026-11-15T06:00:00Z", "why?"),
             assistant("2026-11-15T06:00:01Z", [{"type": "thinking", "thinking": ""}]),
-            assistant("2026-11-15T06:00:02Z", [{"type": "thinking", "thinking": "Two causes are visible."}]),
-            assistant("2026-11-15T06:00:03Z", [text("Done.")]),
+            assistant("2026-11-15T06:00:02Z", [{"type": "thinking", "thinking": "Two causes are visible.",
+                                                "signature": "CAQS8xMKEQgTGAI4AUIJbmFycmF0aW9uEgxhRS89"}]),
+            assistant("2026-11-15T06:00:03Z", [{"type": "thinking", "thinking": "Weighing the two branches.",
+                                                "signature": "CAQSzAkKEAgTGAI4AUIIdGhpbmtpbmcSDJ7Uli9e"}]),
+            assistant("2026-11-15T06:00:04Z", [{"type": "thinking", "thinking": "No signature here."}]),
+            assistant("2026-11-15T06:00:05Z", [text("Done.")]),
         ]) + "\n")
         rows = list(ti.items(str(path), want={"assistant", "thinking"}))
         self.assertEqual([(r["group"], r["label"], r["text"]) for r in rows],
-                         [("thinking", "THINKING", "Two causes are visible."), ("assistant", "ASSISTANT", "Done.")])
-        self.assertEqual([r["group"] for r in ti.items(str(path))], ["user", "empty", "empty", "assistant"])
+                         [("thinking", "NARRATION", "Two causes are visible."),
+                          ("thinking", "THINKING", "Weighing the two branches."),
+                          ("thinking", "THINKING", "No signature here."), ("assistant", "ASSISTANT", "Done.")])
+        self.assertEqual(ti.thinking_label("not base64 !!"), "THINKING")
+        self.assertEqual([r["group"] for r in ti.items(str(path))],
+                         ["user", "empty", "empty", "empty", "empty", "assistant"])
         out = subprocess.run([sys.executable, str(EXTRACT), str(path), "--kinds", "thinking", "--json"],
                              capture_output=True, text=True, check=True).stdout
-        self.assertEqual([json.loads(x)["label"] for x in out.splitlines() if x.startswith("{")], ["THINKING"])
+        self.assertEqual([json.loads(x)["label"] for x in out.splitlines() if x.startswith("{")],
+                         ["NARRATION", "THINKING", "THINKING"])
 
     def test_flags_survive_for_callers_own_predicates(self):
         rows = list(ti.items(str(self.path)))

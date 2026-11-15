@@ -33,7 +33,8 @@ row() {  # type json-content [origin-kind] [time]
 }
 prompt() { row user "$(jq -cn --arg x "$1" '[{type: "text", text: $x}]')" human "${2:-2026-11-10T10:00:00.000Z}"; }
 say()    { row assistant "$(jq -cn --arg x "$1" '[{type: "text", text: $x}]')"; }
-think()  { row assistant "$(jq -cn --arg x "$1" '[{type: "thinking", thinking: $x}]')"; }
+think()  { row assistant "$(jq -cn --arg x "$1" '[{type: "thinking", thinking: $x, signature: "CAQS8xMKEQgTGAI4AUIJbmFycmF0aW9uEgxhRS89"}]')"; }
+reason() { row assistant "$(jq -cn --arg x "$1" '[{type: "thinking", thinking: $x, signature: "CAQSzAkKEAgTGAI4AUIIdGhpbmtpbmcSDJ7Uli9e"}]')"; }
 call()   { row assistant "$(jq -cn --arg i "$1" --arg n "$2" --argjson in "$3" '[{type: "tool_use", id: $i, name: $n, input: $in}]')"; }
 result() { row user "$(jq -cn --arg i "$1" --arg x "$2" '[{type: "tool_result", tool_use_id: $i, content: $x}]')"; }
 ask()    { call "$1" AskUserQuestion '{"questions":[{"question":"Next?","header":"Next","options":[{"label":"Go"},{"label":"Stop here"}]}]}'; }
@@ -199,6 +200,10 @@ f=$(mk q-bash "$(prompt 'tidy that')" "$(say 'Tidying now.')" "$(queued 'what do
 check 'a queued question then a commit refuses' 2 Bash "$f" s-q-bash question "git commit -m x"
 f=$(mk q-think "$(prompt 'tidy that')" "$(queued 'what do you mean?')" "$(think 'The tidy step only renames the two helper files; nothing is deleted.')" "$(call t1 Bash '{"command":"git commit -m x"}')")
 check 'a queued question, a reply stored as thinking, then a commit allows' 0 Bash "$f" s-q-think question "git commit -m x"
+f=$(mk q-reason "$(prompt 'tidy that')" "$(queued 'what do you mean?')" "$(reason 'The user seems confused about the tidy step; I will just commit.')" "$(call t1 Bash '{"command":"git commit -m x"}')")
+check 'a queued question, reasoning only, then a commit refuses' 2 Bash "$f" s-q-reason question "git commit -m x"
+f=$(mk show-reason "$(prompt 'list me all the names')" "$(reason 'I should gather the names first, then decide how to present them in order.')" "$(ask q1)")
+check 'list prompt + reasoning only + AskUserQuestion allows' 0 AskUserQuestion "$f" s-show-reason
 f=$(mk show-think "$(prompt 'list me all the names')" "$(think 'Here are the five names I suggested, in order: alpha, beta, gamma, delta, epsilon.')" "$(ask q1)")
 check 'list prompt + reply stored as thinking + AskUserQuestion refuses' 2 AskUserQuestion "$f" s-show-think
 f=$(mk show-think-work "$(prompt 'list me all the names')" "$(think 'Here are the five names I suggested, in order: alpha, beta, gamma, delta, epsilon. Each one was proposed for the folder tool, and the list is chronological, oldest first, with the reason given beside every name in the table.')" "$(call t1 Edit '{"file_path":"/x"}')")

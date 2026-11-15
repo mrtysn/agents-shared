@@ -29,13 +29,15 @@ text a path match loaded (label RULE-LOADED <file>, with path and globs) and the
 a hook added (label HOOK-CONTEXT <hook>, with hook, hook_event and tool_use_id). A caller
 gets attachments only by naming the group in want; want=None leaves them out.
 
-`thinking` holds the assistant's thinking blocks that carry words (label THINKING), and is
-built only when want names it. Claude Code can store a reply written ahead of a tool call
-as such a block, holding a paraphrase of the reply and no text block; a caller that asks
-"did the assistant write anything since X" names this group to see it. An entry whose only
+`thinking` holds the assistant's thinking blocks that carry words, and is built only when
+want names it. Label NARRATION is a block the API server made from reply text written
+between tool calls: a short summary of that text, stored with no text block. Label THINKING
+is reasoning. A caller that asks "did the assistant write anything since X" selects
+NARRATION; reasoning was never addressed to the user. An entry whose only
 block is thinking still yields its EMPTY marker when the group is not named.
 """
 
+import base64
 import glob
 import json
 import os
@@ -106,6 +108,17 @@ def transcripts(project=None, days=None, mention=None, subagents=False, exclude=
                 yield path, name, session
 
 
+def thinking_label(signature):
+    """NARRATION for a thinking block the server made from reply text written between tool
+    calls, THINKING for reasoning. The kind is a word in the first 30 bytes of the base64
+    signature; a signature that is missing or does not decode is THINKING."""
+    try:
+        head = base64.b64decode((signature or "")[:40])
+    except (ValueError, TypeError):
+        return "THINKING"
+    return "NARRATION" if b"narration" in head else "THINKING"
+
+
 def blocks(d, t, c, tool_names, keep, thinking=False):
     """The content blocks of one user or assistant entry as (group, label, text, extra).
 
@@ -137,7 +150,7 @@ def blocks(d, t, c, tool_names, keep, thinking=False):
         if x.get("type") == "text":
             yield "assistant", "ASSISTANT", x["text"] if keep("assistant") else None, {}
         elif x.get("type") == "thinking" and thinking and (x.get("thinking") or "").strip():
-            yield "thinking", "THINKING", x["thinking"], {}
+            yield "thinking", thinking_label(x.get("signature")), x["thinking"], {}
         elif x.get("type") == "tool_use":
             tool_names[x["id"]] = x["name"]
             inp = x.get("input", {})
