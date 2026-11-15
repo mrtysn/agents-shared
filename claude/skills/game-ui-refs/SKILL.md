@@ -32,13 +32,18 @@ anyway, return the brief in the format of `record.py render`, and end with
 "$REC" find <the subject and platform words>
 ```
 
-- A **100% match** answers the question already. Unless the request says `fresh` (or
+`find` lists every live brief, ordered by shared words. The order is only a hint: judge for
+yourself which brief, if any, answers the request. One does when it covers the same subject
+under any name ("stage select" is "level select"), and its platform, genre and look are the
+same as asked or broader.
+
+- A brief that answers the request answers it already. Unless the request says `fresh` (or
   "again", "re-run", "update"), return `"$REC" render <id>` verbatim, followed by
   `Earlier brief from <date> — ask for a fresh run to browse again.` and stop.
-- On a fresh run over a match, set `"supersedes": "<that id>"` in the new record. The
+- On a fresh run over such a brief, set `"supersedes": "<that id>"` in the new record. The
   viewer then shows the new brief in its place.
-- Weaker matches do not stop the run. Name them under **More to browse** as earlier
-  briefs, by id.
+- Briefs that are related but do not answer it do not stop the run. Name them under
+  **More to browse** as earlier briefs, by id.
 
 ## 2. Frame the question
 
@@ -77,10 +82,18 @@ column is binding:
 - `fetch` — WebFetch, falling back to `mcp__exa__web_fetch_exa` (`urls` is an array)
 - `links` — compose deep links for the brief; **never load the pages**
 
-For Game UI Database, take every `scrn=`, `tag=` and `plat=` value from
-`references/guidb-ids.md`. **Never guess an ID** — a wrong one silently shows a different
-category. When no category fits — on any site — use the nearest parent or filter, or the
-site's text search, and say which you used in the coverage note.
+For Game UI Database, take every `scrn=`, `tag=` and `plat=` value from the lookup, never
+from memory and never by reading `references/guidb-ids.md` whole (18 KB):
+
+```bash
+python3 "${AGENTS_SHARED:?run agents-shared/scripts/init-global.sh to set it}/claude/skills/game-ui-refs/scripts/guidb-ids.py" lookup level select
+```
+
+It prints the best-matching rows, rarest word first, then the other categories of the first
+match's group, so a different name for the same screen still lands. **Never guess an ID** — a
+wrong one silently shows a different category. When no category fits — on any site — use the
+nearest parent or filter, or the site's text search, and say which you used in the coverage
+note.
 
 ## 4. Read at human pace
 
@@ -92,11 +105,12 @@ This runs against small sites, one of them a free resource maintained by one per
 - **At most 25 screens opened in a site's viewer.** Open one only to read it closely or
   to get the link of an example you will cite.
 - **At most 100 screens per brief**, across all sites — every screen recorded is one
-  picture downloaded. Game UI Database listings arrive 50 at a time, sorted A–Z, so a
-  listing over 75 screens loses its tail and crowds out the second source: narrow the
-  filter first (platform, genre, a sub-category) until it fits in 75, leaving room for
-  the second source. When a listing still exceeds the cap, say in coverage which games
-  were cut.
+  picture downloaded. Game UI Database listings arrive 50 at a time, sorted A–Z, so cutting
+  one at the cap keeps only the games that start with early letters. Load the whole listing
+  (scrolling is not a navigation), then pick the screens from it before looking at any:
+  at most two per game, spread across the alphabet, at most 75 so a second source has room.
+  The `pick` snippet below does it; say in coverage how many screens the listing held and how
+  many games and screens were kept.
 - **Never download or save an image yourself**, and never pass one to an image
   generator. Record each screen's image URL as `source`; `record.py` fetches every one
   exactly once, a second apart, into the private ledger.
@@ -123,8 +137,8 @@ coverage. On `allow`:
 6. Close the tab when done.
 
 **Every screen you look at becomes a `screens` entry**, in viewing order — including
-the ones you only saw in a grid. `record.py` rejects a brief whose pattern totals (`m`)
-differ from the number of screens recorded.
+the ones you only saw in a grid. Pattern counts are derived from the screens' tags, so a
+screen you looked at but did not record is a screen no pattern can count.
 
 **Game UI Database — read the listing, don't click through it.** Every grid link carries
 the screen's id, game and image. After the listing loads:
@@ -134,21 +148,36 @@ const rows = [...document.querySelectorAll('a[data-imageid][href*="uploads/"]')]
   const d = document.createElement("div"); d.innerHTML = a.dataset.title || "";
   return [a.dataset.imageid, d.textContent.trim(), new URL(a.href).pathname].join("|");
 });
-window.__rows = rows; rows.length
+window.__all = rows; rows.length
 ```
 
 - Listings load 50 screens at a time. Scroll to the bottom and wait about 10 seconds for
-  the next 50 — the URL gains `&scroll=<n>`, which is not a navigation. Stop at the
-  screen cap or the page's "<n> SCREENS" total, whichever comes first.
+  the next 50 — the URL gains `&scroll=<n>`, which is not a navigation. Stop at the page's
+  "<n> SCREENS" total, or after 400 screens.
+- Then pick at most two screens per game, spread across the listing, and cap the lot at 75.
+  Game names have no `|`, and the rows keep the page's own order:
+
+```js
+const byGame = new Map();
+for (const row of window.__all) {
+  const game = row.split("|")[1];
+  if (!byGame.has(game)) byGame.set(game, []);
+  byGame.get(game).push(row);
+}
+let picked = [...byGame.values()].flatMap((g) => g.length > 2 ? [g[0], g[Math.floor(g.length / 2)]] : g);
+if (picked.length > 75) picked = picked.filter((_, i) => Math.floor(i * 75 / picked.length) !== Math.floor((i - 1) * 75 / picked.length));
+window.__rows = picked; `${window.__all.length} screens, ${byGame.size} games, ${picked.length} picked`
+```
+
 - Read the rows back in chunks: `window.__rows.slice(0, 12).join("\n")`, then the next
   12. A result over ~1,000 characters is cut off, and one containing HTML or a query
-  string is blocked outright.
-- Each row gives `url` = the listing URL plus `&autoload=<id>`, and `source` =
-  `https://www.gameuidatabase.com<path>`.
+  string is blocked outright. Keep every row exactly as read: they go into the record
+  as they are, and `record.py` builds each screen's `url` and `source` from them.
 - **To look at the screens**, the grid is too small — three cards a row. Each link's
-  `data-thumb` is a 500 px thumbnail: replace the page body with a grid of those images
-  (12 to a screen, each captioned with its row number and game) and take a screenshot per
-  screenful. That is how patterns get counted; it loads nothing the grid had not already.
+  `data-thumb` is a 500 px thumbnail: replace the page body with a grid of the thumbnails of
+  the picked rows only (find each link by its `data-imageid`; 12 to a screen, each captioned
+  with its row number in `window.__rows` and its game) and take a screenshot per screenful.
+  The row number is the screen's index in the record. It loads nothing the grid had not already.
 - A `/uploads/video/….mp4` path is a video. The site refuses direct downloads of video
   files, so record that screen without `source` and link it.
 
@@ -164,26 +193,43 @@ If the extension is not connected or a tool errors twice, stop using Chrome, tre
 
 ## 5. Record the brief
 
-Cite only screens actually seen. A pattern needs at least three examples behind it;
-fewer is a variation. In a pattern's `n of m`, **m is the number of screens viewed** —
-the length of `screens`. Three to five examples. Point each example, and each variation
-that has one, at its screen with `"screen": <index into screens>`. Every link is one you composed from the tables or read off a
-page — never a URL reconstructed from memory.
+Cite only screens actually seen. While you look at the screens, note what each one does as
+short tags (`left-rail`, `side-by-side`, `dimmed-backdrop`): the same word for the same
+thing every time. `record.py` counts a pattern from the tags, so a count you did not tag is
+a count nobody can check, and it never takes a number from you.
 
-Write the record as JSON (field reference: the ledger repo's `README.md`):
+- A pattern is a `tag`: the screens carrying it show it. Add `"of": "<tag>"` when it only
+  applies to some screens ("when leave and resume sit side by side, resume is on the right":
+  `tag: resume-right`, `of: side-by-side`), so the denominator is the screens it applies to.
+- A pattern needs at least three games behind it; fewer is a variation, and `add` rejects it.
+- `why` on a pattern only when a source you read says why games do it. Never your own guess,
+  and leave it out when no source did.
+- Give a `note` (a few words) to every screen an example, variation or pattern points at.
+- Three to five examples. Point each example, and each variation that has one, at its screen
+  with `"screen": <index into screens>`. The index is the row number for a listing row.
+- Every link is one you composed from the tables or read off a page — never a URL
+  reconstructed from memory.
+
+Write the record as JSON (field reference: the ledger repo's `README.md`). Game UI Database
+screens go in as the `listing`: the rows you picked, copied as read, and the listing's URL.
+Screens from other sites go in `screens` and follow the listing's. `tagged` maps each tag to
+the screen indices carrying it, `"0,3,5-9"`:
 
 ```json
 {
   "query": "<$ARGUMENTS verbatim>",
   "subject": "<Subject>", "platform": "<or null>", "genre": null, "look": null,
   "supersedes": null,
-  "screens":    [{"game": "<game>", "site": "<site>", "url": "<the screen>", "source": "<its image URL>", "note": "<what it shows, a few words>"}],
-  "patterns":   [{"text": "<placement, hierarchy, what is always visible…>", "n": 9, "m": 18}],
+  "listing":    {"url": "<the listing page URL>", "rows": ["<id>|<game>|<path>", "…"]},
+  "screens":    [{"game": "<game>", "site": "<site>", "url": "<the screen>", "source": "<its image URL>"}],
+  "tagged":     {"<tag>": "0,3,5-9"},
+  "notes":      {"4": "<what screen 4 shows, a few words>"},
+  "patterns":   [{"text": "<placement, hierarchy, what is always visible…>", "tag": "<tag>", "of": "<tag, or omit>", "why": "<or omit>"}],
   "variations": [{"title": "<approach>", "text": "<what it does and what it buys; games named>", "screen": 4}],
   "examples":   [{"game": "<game>", "look_at": "<the one thing it shows best>", "url": "<link>", "screen": 0}],
   "more":       [{"url": "<filtered link or earlier brief>", "why": "<why it is worth a look>"}],
   "coverage": {
-    "read":        [{"site": "<site>", "pages": 1, "note": "<filters used, fallbacks, games cut by the cap>"}],
+    "read":        [{"site": "<site>", "pages": 1, "note": "<filters used, fallbacks, the listing's size and how many screens were kept>"}],
     "links_only":  ["<site>"],
     "unavailable": [{"site": "<site>", "reason": "<why>"}]
   }
@@ -198,11 +244,12 @@ Then:
 JSON
 ```
 
-`add` validates, saves the pictures, commits, pushes and publishes to the viewer,
-printing one line per step and the viewer link. A picture that fails to download is
-reported and skipped; the brief is kept. A `record rejected` message lists what to fix — fix the JSON
-and run `add` again. A failed push or publish leaves the record committed locally;
-report the line, do not retry.
+`add` expands the listing, derives every pattern's counts, saves the pictures, commits, pushes
+and publishes to the viewer, printing one line per step and the viewer link. A picture that
+fails to download is reported and skipped; the brief is kept. A `record rejected` message lists
+what to fix — fix the JSON and run `add` again. If git refuses the commit, `add` removes the
+ledger line and pictures it wrote, so running it again is safe. A failed push or publish leaves
+the record committed locally; report the line, do not retry.
 
 ## 6. Return
 
@@ -214,6 +261,7 @@ brief, and the pictures are in the viewer.
 
 - **Game UI Database adds a category** (its filter panel shows one `guidb-ids.md` lacks):
   run `scripts/guidb-ids.py > references/guidb-ids.md` from this skill directory. It reads
-  the Wayback Machine's newest capture, not the live site.
+  the Wayback Machine's newest capture, not the live site. `scripts/guidb-ids.py lookup <words>`
+  searches that table; it is how a run reads it.
 - **A site changes its terms, dies or starts blocking**: fix its row in
   `references/sites.md`. Access follows the rule in that file's header, not convenience.

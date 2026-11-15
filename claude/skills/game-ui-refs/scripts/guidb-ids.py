@@ -10,13 +10,20 @@ it nothing. Writes Markdown to stdout; redirect it over references/guidb-ids.md.
 
     guidb-ids.py > references/guidb-ids.md
     guidb-ids.py --html saved_homepage.html > references/guidb-ids.md
+    guidb-ids.py lookup level select        the matching IDs, with their neighbours in the same group
+
+`lookup` reads the generated table beside this script, so a run needs a few lines of it, never the
+whole 18 KB. It matches on word stems and near-spellings, and prints the whole group of a match, so
+"stage select" lands on "Mode & Screen Select" with its sibling categories to choose from.
 """
 
 import argparse
+import difflib
 import gzip
 import html
 import re
 import sys
+from pathlib import Path
 import urllib.request
 
 SITE = "https://www.gameuidatabase.com/"
@@ -108,7 +115,66 @@ def tag_groups(page):
     return groups
 
 
+TABLE = Path(__file__).resolve().parent.parent / "references" / "guidb-ids.md"
+
+
+def table_rows():
+    """(section, group, label, param, id) for every row of the generated Markdown."""
+    rows, section, param, screens = [], "", "", False
+    for line in TABLE.read_text().splitlines():
+        head = re.match(r"## (.+?) \(`(\w+)=`\)", line)
+        if head:
+            section, param = head[1], head[2]
+            screens = param == "scrn"
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if not line.startswith("|") or not cells[-1].isdigit():
+            continue
+        if screens and len(cells) == 3:
+            rows.append((section, cells[0], cells[1], param, cells[2]))
+        elif len(cells) == 2:
+            rows.append((section, section, cells[0], param, cells[1]))
+    return rows
+
+
+def stem(word):
+    return word[:-1] if len(word) > 3 and word.endswith("s") else word
+
+
+def lookup(words):
+    rows = table_rows()
+    if not rows:
+        sys.exit(f"guidb-ids: no rows read from {TABLE}; regenerate it with this script")
+    wanted = [stem(w) for w in re.findall(r"[a-z0-9]+", " ".join(words).lower())]
+    if not wanted:
+        sys.exit("guidb-ids: give some words to look up")
+
+    def matches(word, row):
+        tokens = [stem(t) for t in re.findall(r"[a-z0-9]+", row[2].lower())]
+        return any(t.startswith(word) or word.startswith(t) and len(t) > 3
+                   or len(word) > 3 and difflib.SequenceMatcher(None, word, t).ratio() >= 0.86 for t in tokens)
+
+    # A word that few rows carry says more than "menu", which dozens do: weight each by its rarity.
+    weight = {w: 1 / max(1, sum(matches(w, r) for r in rows)) for w in wanted}
+    scored = sorted(((sum(weight[w] for w in wanted if matches(w, r)), r) for r in rows),
+                    key=lambda x: -x[0])
+    chosen = [r for s, r in scored if s > 0][:8]
+    if not chosen:
+        print("no category matches; use the site's text search (text=<words>) and say so in coverage")
+        return
+    print("best matches first:")
+    for section, group, label, param, ident in chosen:
+        print(f"  {label} = {ident}   ({param}=, {group})")
+    first = chosen[0]
+    print(f"\nthe rest of the first match's group, {first[1]} ({first[3]}=):")
+    for r in rows:
+        if r[:2] == first[:2] and r != first:
+            print(f"    {r[2]} = {r[4]}")
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "lookup":
+        return lookup(sys.argv[2:])
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--html", help="parse a saved homepage instead of fetching the latest Wayback snapshot")
     args = ap.parse_args()

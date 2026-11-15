@@ -37,9 +37,10 @@ hierarchy, what stays on screen behind it.
 ## 2. Pick the brief
 
 - A brief id was given: use it.
-- Otherwise run `"$REC" find <the screen's name> <platform, if known>` and take the top
-  line at 100%.
-- No match at 100%: return `No brief on <screen> yet — run /game-ui-refs <screen> first.`
+- Otherwise run `"$REC" find <the screen's name> <platform, if known>`. It lists every brief,
+  ordered by shared words only; pick the one that covers this screen under any name ("stage
+  select" is "level select"), preferring the one whose platform and genre fit the game.
+- None covers it: return `No brief on <screen> yet — run /game-ui-refs <screen> first.`
   and stop. Do not compare against a brief about a different screen.
 
 Then read it and its history:
@@ -57,8 +58,8 @@ now fixed and which remain.
 Read the pictures, from the brief's `screens[].image` (paths relative to `$REF`):
 
 - every example's and every variation's screen (`screen` indexes into `screens`);
-- then, for any pattern the screenshot seems to break, one or two of the screens that
-  pattern names.
+- then, for any pattern the screenshot seems to break, one or two of the screens in that
+  pattern's own `screens` list (its indices into the brief's `screens`).
 
 At most 20 pictures. They are the evidence; the brief's words are the summary.
 
@@ -72,6 +73,12 @@ Go pattern by pattern through the brief:
   concrete fix: which element, where it moves, what it says, what changes colour or
   size. Point at the reference screen that shows the fix best.
 - **Idea** — a variation from the brief that would suit this game, with its screen.
+
+Weigh each pattern by how common it is: a pattern carries `n of m` screens and `games of
+of_games` games (older briefs: `n of m` only). A gap against a pattern most games share
+(over half) is a real gap; one against a rare pattern is at most an idea, and says so. A
+pattern's `why`, when it has one, is the reason to give in the fix. `compare-add` lists the
+gaps against the commonest patterns first.
 
 Be specific to what is in the picture. No generic advice ("improve hierarchy"), and no
 gap for something a still image cannot show — motion, sound, timing. A pattern that
