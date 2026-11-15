@@ -176,6 +176,8 @@ verdict() {
             (if ([ $turn[] | select(.group == "assistant") ]
                  | any(((.text // "") | length) >= 200
                        or (((.text // "") | [ scan("(?m)^\\s*([-*•]|[0-9]+[.)])\\s+\\S|^\\s*\\|.*\\|") ] | length) >= 2)))
+                # A question form the user answered is the newer instruction ("give me a toggle", then "Build it").
+                or ($turn | any(.label == "RESULT AskUserQuestion" and ((.text // "") | test("answered"))))
              then "skip" else "work\t" + $time end)
           elif ($show | not) or ($prompt | test($pat) | not) then "skip" else
             ([ range(0; $turn | length) as $i | $turn[$i]

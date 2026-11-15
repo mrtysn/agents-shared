@@ -1,1 +1,0 @@
-(?i)(^\s*(why|what|how|where|when|which|who|is|are|was|were|do|does|did|have|has|wasn.?t|isn.?t|aren.?t|didn.?t|doesn.?t|explain)\b)|\?|\b(i\s+don.?t\s+get|what\s+do\s+you\s+mean)\b|\bi\s+am\s+not\b

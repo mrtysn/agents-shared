@@ -57,7 +57,7 @@ check() {
         remedy='End this turn with the content as plain text and no tool call'
         [ "$kind" = draft ] && remedy='End this turn with the draft as the last text and no tool call'
         [ "$kind" = work ] && remedy='Deliver the requested content as text first'
-        [ "$kind" = question ] && remedy='Write the answer as text now'
+        [ "$kind" = question ] && remedy='Reply to it in text first'
         if [ "$want" = 2 ] && ! printf '%s' "$err" | grep -q "$remedy"; then
             failed=$((failed + 1)); printf 'FAIL  %s: refusal gives no remedy\n' "$name"
         fi
@@ -187,42 +187,48 @@ check 'draft, task notification, then Bash allows' 0 Bash "$f" s-draft-notify
 f=$(mk draft-stophook-newdraft "$(prompt 'tidy that')" "$(say "$DRAFT")" "$(meta 'Stop hook feedback: x')" "$(say "$DRAFT")" "$(call t1 Bash '{"command":"ls"}')")
 check 'a new draft after the Stop-hook feedback refuses' 2 Bash "$f" s-draft-stophook-new draft
 
-# Trigger 4: a question, or a statement of confusion, is answered before anything changes.
+f=$(mk work-askpick "$(prompt 'when I am on local, give me a toggle button')" "$(ask q1)" "$(result q1 'Your questions have been answered: "Next?"="Build it"')" "$(call t1 Write '{"file_path":"/x"}')")
+check 'a show-like order, then a question form the user answered, then Write allows' 0 Write "$f" s-work-askpick
+f=$(mk work-askno "$(prompt 'list me all the names')" "$(ask q1)" "$(result q1 "The user doesn't want to proceed with this tool use.")" "$(call t1 Write '{"file_path":"/x"}')")
+check 'a show request, then a dismissed question form, then Write refuses' 2 Write "$f" s-work-askno work
+
+# Trigger 4: a message the user sent mid-turn gets a reply before the next change.
 queued() { jq -cn --arg x "$1" --arg ts "${2:-2026-11-10T10:00:10.000Z}" '{type: "queue-operation", operation: "enqueue", content: $x, timestamp: $ts, sessionId: "00000000-0000-4000-8000-000000000009"}'; }
-ANSWER=$'It is empty because the page shows nobody yet: the front page lists no one until a profile exists for that person.'
-f=$(mk q-edit "$(prompt 'why are we partially finishing this?')" "$(call t1 Edit '{"file_path":"/x"}')")
-check 'a question then Edit with no answer refuses' 2 Edit "$f" s-q-edit question
-f=$(mk q-write "$(prompt 'I dont get it claude, I opened the link and its empty')" "$(call t1 Write '{"file_path":"/x"}')")
-check '"i dont get it" then Write with no answer refuses' 2 Write "$f" s-q-write question
 f=$(mk q-bash "$(prompt 'tidy that')" "$(say 'Tidying now.')" "$(queued 'what do you mean?')" "$(call t1 Bash '{"command":"git commit -m x"}')")
 check 'a queued question then a commit refuses' 2 Bash "$f" s-q-bash question "git commit -m x"
 f=$(mk q-iam "$(prompt 'tidy that')" "$(queued 'I am not alex claude.')" "$(call t1 Edit '{"file_path":"/x"}')")
-check 'a queued correction ("i am not") then Edit refuses' 2 Edit "$f" s-q-iam question
-f=$(mk q-answered "$(prompt 'why is the page empty?')" "$(say "$ANSWER")" "$(call t1 Edit '{"file_path":"/x"}')")
-check 'a question, an answer of 80+ characters, then Edit allows' 0 Edit "$f" s-q-answered
-f=$(mk q-short "$(prompt 'why is the page empty?')" "$(say 'Checking.')" "$(call t1 Edit '{"file_path":"/x"}')")
-check 'a question, a short note, then Edit still refuses' 2 Edit "$f" s-q-short question
-f=$(mk q-order "$(prompt 'fix the build')" "$(call t1 Edit '{"file_path":"/x"}')")
-check 'an order then Edit allows' 0 Edit "$f" s-q-order
-f=$(mk q-mixed "$(prompt 'every entry says ask the salary. this whole page is like that. why? can you please improve the ui here')" "$(call t1 Edit '{"file_path":"/x"}')")
-check 'a message with a mid-text "?" and an order refuses until answered' 2 Edit "$f" s-q-mixed question
-f=$(mk q-read "$(prompt 'why is the page empty?')" "$(call t1 Bash '{"command":"grep -n title page.html"}')")
-check 'a question then a read-only Bash allows' 0 Bash "$f" s-q-read question "grep -n title page.html"
-f=$(mk q-curl "$(prompt 'why is the page empty?')" "$(call t1 Bash '{"command":"curl -sI https://example.com/"}')")
-check 'a question then a GET-only curl allows' 0 Bash "$f" s-q-curl question "curl -sI https://example.com/"
-f=$(mk q-curlpost "$(prompt 'why is the page empty?')" "$(call t1 Bash '{"command":"curl -X POST https://example.com/"}')")
-check 'a question then a curl POST refuses' 2 Bash "$f" s-q-curlpost question "curl -X POST https://example.com/"
-f=$(mk q-readtool "$(prompt 'why is the page empty?')" "$(call t1 Read '{"file_path":"/x"}')")
-check 'a question then Read allows' 0 Read "$f" s-q-readtool
+check 'a queued correction then Edit refuses' 2 Edit "$f" s-q-iam question
+f=$(mk q-remark "$(prompt 'tidy that')" "$(queued 'the title is still at the left')" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'a queued remark with no "?" then Edit refuses' 2 Edit "$f" s-q-remark question
+f=$(mk q-replied "$(prompt 'tidy that')" "$(queued 'why is the page empty?')" "$(say 'Yes.')" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'a queued question, any reply, then Edit allows' 0 Edit "$f" s-q-replied
+f=$(mk q-askpick "$(prompt 'tidy that')" "$(queued 'which one is better?')" "$(ask q1)" "$(result q1 'Your questions have been answered: "Next?"="Go"')" "$(call t1 Write '{"file_path":"/x"}')")
+check 'a queued question, then a question form the user answered, then Write allows' 0 Write "$f" s-q-askpick
+f=$(mk q-askno "$(prompt 'tidy that')" "$(queued 'which one is better?')" "$(ask q1)" "$(result q1 "The user doesn't want to proceed with this tool use.")" "$(call t1 Write '{"file_path":"/x"}')")
+check 'a queued question, then a dismissed question form, then Write refuses' 2 Write "$f" s-q-askno question
+f=$(mk q-typed "$(prompt 'when I am on local, add a toggle. what do you think?')" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'a typed prompt, question or not, does not trigger' 0 Edit "$f" s-q-typed
+f=$(mk q-later "$(prompt 'tidy that')" "$(queued 'why is it empty?' 2026-11-10T10:00:10.000Z)" "$(say 'It is empty because nothing is listed yet.')" "$(queued 'and the title?' 2026-11-10T10:00:20.000Z)" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'a reply covers only the messages before it' 2 Edit "$f" s-q-later question
+f=$(mk q-read "$(prompt 'tidy that')" "$(queued 'why is the page empty?')" "$(call t1 Bash '{"command":"grep -n title page.html"}')")
+check 'a queued question then a read-only Bash allows' 0 Bash "$f" s-q-read question "grep -n title page.html"
+check 'a queued question then git submodule status allows' 0 Bash "$f" s-q-sub question "cd /x && git submodule status; cat .gitmodules"
+check 'a queued question then a transcript reader allows' 0 Bash "$f" s-q-reader question "python3 /a/scripts/extract-session-text.py S --json | jq ."
+check 'a queued question then the prompt counter allows' 0 Bash "$f" s-q-counter question "python3 scripts/find-repeated-user-prompts.py --days 60 | head"
+check 'a queued question then a reader writing a file refuses' 2 Bash "$f" s-q-readerout question "python3 scripts/extract-session-text.py S --out x.txt"
+check 'a queued question then another python script refuses' 2 Bash "$f" s-q-otherpy question "python3 scripts/other.py"
+check 'a queued question then a python heredoc refuses' 2 Bash "$f" s-q-heredoc question $'python3 - <<E\nprint(1)\nE'
+check 'a queued question then git submodule update refuses' 2 Bash "$f" s-q-subup question "git submodule update --remote"
+check 'a queued question then a GET-only curl allows' 0 Bash "$f" s-q-curl question "curl -sI https://example.com/"
+check 'a queued question then a curl POST refuses' 2 Bash "$f" s-q-curlpost question "curl -X POST https://example.com/"
+check 'a queued question then Read allows' 0 Read "$f" s-q-readtool
 f=$(mk q-agentmsg "$(prompt 'tidy that')" "$(queued $'<agent-message from="a1">\nDid it work?\n</agent-message>')" "$(call t1 Edit '{"file_path":"/x"}')")
-check 'a queued agent hand-back with a "?" is not a question from the user' 0 Edit "$f" s-q-agentmsg
+check 'a queued agent hand-back is not a message from the user' 0 Edit "$f" s-q-agentmsg
 f=$(mk q-notify "$(prompt 'tidy that')" "$(meta $'Stop hook feedback:\nwhy are you idle?')" "$(call t1 Edit '{"file_path":"/x"}')")
-check 'Stop-hook feedback with a "?" is not a question from the user' 0 Edit "$f" s-q-notify
-f=$(mk q-earlier "$(prompt 'why is the page empty?' 2026-11-10T09:00:00.000Z)" "$(prompt 'fix the page' 2026-11-10T10:00:00.000Z)" "$(call t1 Edit '{"file_path":"/x"}')")
-check 'an earlier question does not count once a later order arrives' 0 Edit "$f" s-q-earlier
-f=$(mk q-twice "$(prompt 'why is the page empty?')" "$(call t1 Bash '{"command":"python3 - <<E\nprint(1)\nE"}')")
-check 'a refused call does not use up the refusal (first attempt)' 2 Bash "$f" s-q-twice question $'python3 - <<E\nprint(1)\nE'
-check 'a refused call does not use up the refusal (second attempt)' 2 Bash "$f" s-q-twice question $'python3 - <<E\nprint(1)\nE'
+check 'Stop-hook feedback is not a message from the user' 0 Edit "$f" s-q-notify
+f=$(mk q-twice "$(prompt 'tidy that')" "$(queued 'why is the page empty?')" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'a refused call does not use up the refusal (first attempt)' 2 Edit "$f" s-q-twice question
+check 'a refused call does not use up the refusal (second attempt)' 2 Edit "$f" s-q-twice question
 
 # Fail open.
 check 'transcript missing allows' 0 AskUserQuestion "$TMP/nonexistent.jsonl"
