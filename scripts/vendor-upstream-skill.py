@@ -85,7 +85,11 @@ def vendor_repo(root, repo, entries, base):
             target = destination(root, dest, name)
             if os.path.exists(target):
                 raise ValueError("already exists: %s" % os.path.relpath(target, root))
-            listing = run(["git", "ls-tree", "-r", "HEAD", "--", sdir], cwd=d).strip().split("\n")
+            listing = [x for x in run(["git", "ls-tree", "-r", "HEAD", "--", sdir], cwd=d).split("\n") if x]
+            if not listing:
+                raise ValueError("%s is not in %s at upstream HEAD %s: the skill was moved, renamed or "
+                                 "folded into another one there (list the upstream skills/ folder to see)"
+                                 % (sdir, repo, sha[:7]))
             files, total, dropped = [], 0, 0
             for line in listing:
                 meta, rel = line.split("\t", 1)
