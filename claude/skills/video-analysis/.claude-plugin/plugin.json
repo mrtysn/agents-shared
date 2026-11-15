@@ -1,0 +1,8 @@
+{
+  "name": "video-analysis",
+  "description": "Break a finished video into a shot table, sync the table beside the footage, and clone a reference video's style.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Mert Yaşin"
+  }
+}

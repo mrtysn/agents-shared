@@ -1,0 +1,8 @@
+{
+  "name": "gamedev-genres",
+  "description": "Build a game of a given genre: platformer, roguelike, RPG, puzzle, card game, FPS, tower defense, survival-crafting, visual novel.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Mert Yaşin"
+  }
+}

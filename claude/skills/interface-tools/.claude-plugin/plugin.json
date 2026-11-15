@@ -1,0 +1,8 @@
+{
+  "name": "interface-tools",
+  "description": "Small interface workflow tools: stress-test a component under every scenario, build variants of a component, explain how a site or effect was built.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Mert Yaşin"
+  }
+}

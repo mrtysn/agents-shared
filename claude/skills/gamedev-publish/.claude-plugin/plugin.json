@@ -1,0 +1,8 @@
+{
+  "name": "gamedev-publish",
+  "description": "Publish and update a game on itch.io and Steam.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Mert Yaşin"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "gsap",
+  "description": "The official GSAP skills: core API, timelines, ScrollTrigger, plugins, utils, React and other frameworks, performance.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Mert Yaşin"
+  }
+}

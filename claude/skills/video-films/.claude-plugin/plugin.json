@@ -1,0 +1,8 @@
+{
+  "name": "video-films",
+  "description": "Short films and promos made entirely in code: launch films, title sequences, explainers, newsletter promos, model showdowns and shot-recipe product videos.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Mert Yaşin"
+  }
+}

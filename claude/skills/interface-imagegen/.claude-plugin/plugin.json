@@ -1,0 +1,8 @@
+{
+  "name": "interface-imagegen",
+  "description": "Generate website and mobile app design images first, then build the interface from them.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Mert Yaşin"
+  }
+}

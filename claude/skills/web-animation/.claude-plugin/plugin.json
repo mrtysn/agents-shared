@@ -1,0 +1,8 @@
+{
+  "name": "web-animation",
+  "description": "UI animation craft for code: deciding whether and how to animate, motion vocabulary, Apple-style fluid motion, and reviewing or improving animation code.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Mert Yaşin"
+  }
+}
