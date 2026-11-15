@@ -61,7 +61,7 @@ note	Edit	{"file_path":"/p/other-repo/CLAUDE.md","old_string":"a","new_string":"
 note	Edit	{"file_path":"/p/agents-shared/claude/rules/existing-rule.md","old_string":"a","new_string":"b"}
 pass	Edit	{"file_path":"/p/agents-shared/claude/skills/existing/SKILL.md","old_string":"a","new_string":"b"}
 pass	Edit	{"file_path":"/p/app/src/main.py","old_string":"a","new_string":"b"}
-pass	Write	{"file_path":"/p/app/Sources/App.swift","content":"x"}
+pass	Write	{"file_path":"/p/app/cmd/main.go","content":"x"}
 pass	Write	{"file_path":"/p/agents-shared/scripts/new-script.py","content":"x"}
 each-agent	Write	{"file_path":"/p/agents-shared/claude/rules/another-rule.md","content":"x"}
 note	Bash	{"command":"project-lifecycle page-new --mode report --title X --out x.html"}
@@ -83,3 +83,7 @@ pass	Write	{"file_path":"/x/config.py","content":"ROOT = Path.home() / 'dev'\n"}
 note	Bash	{"command":"python3 -c \"open(p, 'w').write(open(p).read().upper())\""}
 note	Write	{"file_path":"/x/fix.py","content":"open(path, \"w\").write(text)\n"}
 pass	Bash	{"command":"python3 -c \"print(open(p).read())\""}
+# --- verify-visual-ui-against-the-request: a UI file changed through Bash, Write or Edit
+note	Bash	{"command":"cd site && python3 edit.py src/styles/custom.css && pnpm run build"}
+note	Edit	{"file_path":"/x/src/home/Home.tsx","old_string":"a","new_string":"b"}
+pass	Bash	{"command":"cat notes.md"}
