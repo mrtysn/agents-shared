@@ -36,20 +36,20 @@
 #      for the answer and is never refused, which is why the test is the kind of call, not a count of calls: a count would
 #      refuse the reads that "list me X" needs, or let a few edits through. The reason says to deliver the content as
 #      text first and then continue with the work. Reads the transcript once.
-#   4. question before work: the call is Edit, Write, or a Bash call that is not obviously read-only, and
-#      - the user's latest message, typed or queued mid-turn (the reader's USER and USER(queued) rows; hand-backs from
-#        agents, task notifications, cross-session messages and Stop-hook feedback do not count), matches
-#        hooks/question-prompt-pattern.txt: a question word first, a "?" anywhere, "i dont get", "what do you mean",
-#        "i am not";
-#      - no assistant text of 80+ characters has been written since that message.
-#      A question is answered, not acted on (claude/rules/question-handling.md, which until this trigger had no check at
-#      the moment of action). Incident (2026-11-15, session e19f1208-233d-48c5-96aa-041940a58196): "I dont get it
-#      claude, I opened the link and its empty", then "what do you mean?" and "I am not alex claude" (both queued
-#      mid-turn), were each followed by a profile written, scripts edited, pages published and commits pushed with no text
-#      answer; triggers 1 to 3 read only human-origin prompts and only the show pattern, so none applied. The message a
-#      refusal gives says to answer in text first; an order inside the same message is carried out after that answer.
-#      Unlike triggers 1 to 3 this one has no once-per-turn marker: it ends when the answer text exists, so a refused
-#      read-like call (a python heredoc, which the allowlist below does not know) cannot spend the refusal.
+#   4. reply before work: the call is Edit, Write, or a Bash call that is not obviously read-only, and
+#      - the user's latest message was queued mid-turn (the reader's USER(queued) row; hand-backs from agents, task
+#        notifications, cross-session messages and Stop-hook feedback do not count, and a typed prompt does not trigger);
+#      - nothing has replied to it since: no assistant text, and no AskUserQuestion the user answered.
+#      The refusal quotes the message and says to reply, then repeat the call. Text written in the same message as the
+#      call reaches the transcript only with that call, so the reply is seen by the next call, not this one.
+#      Incident (2026-11-15, session e19f1208-233d-48c5-96aa-041940a58196): "what do you mean?" and "I am not alex
+#      claude", both queued mid-turn, were followed by a profile written, scripts edited, pages published and commits
+#      pushed with no reply; the typed prompt before them had been answered. The first version of this trigger matched
+#      questions by wording, in typed and queued messages, and took 80 characters of text as the answer: of its 21
+#      refusals that day 14 were false, mostly orders phrased as questions ("when I am on local, give me a toggle",
+#      "can you open the correct link") and read-only calls, and a note about other work passed as an answer. Whether a
+#      message is a question is judged by the agent under claude/rules/question-handling.md; this trigger checks only
+#      that a mid-turn message got a reply. No once-per-turn marker: it ends when the reply exists.
 # Once per turn: a marker file keyed by session id and prompt time under
 # ${XDG_CACHE_HOME:-$HOME/.cache}/agents-shared/refuse-requested-content-before-tool-call/.
 # A call made by a sub-agent (the input carries agent_id) is never refused.
@@ -85,7 +85,13 @@ bash_is_readonly() {
             curl) case " $* " in *" -X"*|*" -d"*|*" --data"*|*" -F"*|*" --form"*|*" -T"*|*" --upload"*|*" -o"*|*" -O"*|*" --output"*|*" --remote-name"*) return 1 ;; esac ;;
             sed) case " $* " in *" -i"*|*" --in-place"*) return 1 ;; esac ;;
             find) case " $* " in *" -delete"*|*" -exec"*|*" -ok"*) return 1 ;; esac ;;
-            git) case "$sub" in status|log|diff|show|rev-parse|ls-files|blame|describe|remote|shortlog|ls-remote|cat-file|grep|rev-list|reflog|name-rev|merge-base) ;; *) return 1 ;; esac ;;
+            git) case "$sub" in status|log|diff|show|rev-parse|ls-files|blame|describe|remote|shortlog|ls-remote|cat-file|grep|rev-list|reflog|name-rev|merge-base) ;;
+                     submodule) [ "${3:-}" = status ] || return 1 ;;
+                     *) return 1 ;; esac ;;
+            # The transcript readers in this repo's scripts/ only read, unless told to write a file with --out.
+            python|python3)
+                case "${sub##*/}" in extract-session-text.py|find-repeated-user-prompts.py) ;; *) return 1 ;; esac
+                case " $* " in *" --out"*) return 1 ;; esac ;;
             gh) case "${3:-}" in view|list|status|checks|diff) ;; *) return 1 ;; esac ;;
             *) return 1 ;;
         esac
@@ -116,36 +122,25 @@ READER=${TRANSCRIPT_READER:-$HERE/../scripts/extract-session-text.py}
 PATTERN_FILE="$HERE/show-request-pattern.txt"
 [ -r "$READER" ] || exit 0
 
-# Trigger 4: a question, or a statement of confusion, is answered before anything changes.
-QUESTION_FILE="$HERE/question-prompt-pattern.txt"
-if [ "$WORK" = true ] && [ -r "$QUESTION_FILE" ] && [ -n "$(head -n1 "$QUESTION_FILE")" ]; then
-    QPAT=$(head -n1 "$QUESTION_FILE")
-    q4_unanswered() {
-    local QROWS
-    QROWS=$(python3 "$READER" "$TRANSCRIPT" --kinds user,assistant --json --max-chars 400 2>/dev/null) || QROWS=""
-    [ -n "$QROWS" ] && [ "$(printf '%s' "$QROWS" | jq -rs --arg pat "$QPAT" '
+# Trigger 4: a message the user sent mid-turn gets a reply before the next change. Prints the message when it has none.
+if [ "$WORK" = true ]; then
+    Q4_MSG=$(python3 "$READER" "$TRANSCRIPT" --kinds user,assistant,agents --json --max-chars 400 2>/dev/null | jq -rs '
         [ .[] | select(type == "object" and (.sidechain | not)) ] as $rows
         | ([ range(0; $rows | length) as $i | $rows[$i]
              | select(.group == "user" and (.label == "USER" or .label == "USER(queued)") and (.meta | not)
                       and ((.text // "") | test("^\\s*(<(bash-|local-command|task-notification|agent-message|cross-session-message|system-reminder)|Stop hook feedback:|Base directory for this skill|\\[Request interrupted)") | not)) | $i ] | max // -1) as $p
-        | if $p < 0 then "no" else
-            ($rows[$p].text // "" | (capture("<command-args>(?<a>[\\s\\S]*)</command-args>").a // .)) as $prompt
-            | if ($prompt | test($pat) | not) then "no"
-              elif ([ $rows[$p + 1:][] | select(.group == "assistant" and ((.text // "") | length) >= 80) ] | length) > 0 then "no"
-              else "yes" end
-          end' 2>/dev/null)" = yes ]
-    }
-    # The transcript lags the conversation: answer text written in the same message as this call may not be in it yet,
-    # so the read is repeated, 1 second apart, before the call is refused (2026-11-15: a call made right after
-    # 930 characters of answer was refused three times).
-    Q4_BLOCK=true
-    for attempt in 1 2 3; do
-        q4_unanswered || { Q4_BLOCK=false; break; }
-        [ "$attempt" = 3 ] || sleep 1
-    done
-    if [ "$Q4_BLOCK" = true ]; then
+        | if $p < 0 or $rows[$p].label != "USER(queued)" then "" else
+            ($rows[$p + 1:] | any((.group == "assistant" and ((.text // "") | test("\\S")))
+                                   or (.label == "RESULT AskUserQuestion" and ((.text // "") | test("answered"))))) as $replied
+            | if $replied then "" else ($rows[$p].text // "") end
+          end' 2>/dev/null)
+    if [ -n "$Q4_MSG" ]; then
         cat >&2 <<MSG
-BLOCKED: the user's latest message is a question or a statement of confusion, and no answer text has been written since it. A question gets an answer, not an action (claude/rules/question-handling.md). Write the answer as text now (reading calls such as ls, cat, grep, git log and GET-only curl are fine; python is not); if the same message also gives an order, or an earlier message of the user ordered work that is still unfinished, say in the answer what you will change, then do it.
+BLOCKED: the user sent a message while you were working, and you have not replied to it:
+
+  ${Q4_MSG:0:300}
+
+Reply to it in text first. Text written in the same message as a tool call is not seen until that call is made, so write the reply, then repeat this call. A question in it gets an answer, not an action (claude/rules/question-handling.md); an order in it, and the work already ordered, carry on after the reply.
 MSG
         exit 2
     fi
