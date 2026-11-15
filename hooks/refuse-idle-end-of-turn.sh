@@ -11,7 +11,8 @@
 # It blocks ({"decision":"block"}) when the last assistant text
 #   - offers work or poses a choice in prose ("want me to", "say the word", "if you'd like", "the choice is"),
 #     whatever else holds (text inside quotation marks or backticks is not read: a reply that quotes a phrase to
-#     explain it is not making the offer); or
+#     explain it is not making the offer), or promises the question for later ("I'll ask all three in my next
+#     message": the agent writes only after the user does, so that message never comes by itself); or
 #   - ends the turn idle: no AskUserQuestion answered since the user's last typed prompt with no work after it,
 #     no background work launched since that prompt still unreported, no background shell of this session still
 #     running (scripts/list-session-background-shells.sh: a watcher launched turns ago is pending work too; the
@@ -89,7 +90,7 @@ CONTINUE_PATTERN=""
 ROWS=$(python3 "$READER" "$TRANSCRIPT" --kinds user,assistant,agents,calls,tools --launch-receipts --json --max-chars 400 2>/dev/null) || exit 0
 
 VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" --arg show "$SHOW_PATTERN" --arg cont "$CONTINUE_PATTERN" '
-  def offer: "say the word|say go ahead|(do you |would you )?want me to|would you like me to|shall i |should i (go|proceed|build|run|start|do|edit|add|make|commit|fix|wire|set)|let me know (if|when|whether|which)|(?<!will )(?<!ll )(?<!to )(?<!would )(?<!can )(?<!could )(?<!it )(?<!that )tell me (to|if|when|which)|if you.?d like|if you want|if you prefer|ready (to (go|proceed) )?when you are|your call|up to you|(waits?|waiting) (for|on) your (word|go|call|ok)|on your (word|go-ahead|say-so)|the (choice|decision|question)( that [a-z ]+)? (is|here is)|which (one|would you|do you)";
+  def offer: "say the word|say go ahead|(do you |would you )?want me to|would you like me to|shall i |should i (go|proceed|build|run|start|do|edit|add|make|commit|fix|wire|set)|let me know (if|when|whether|which)|(?<!will )(?<!ll )(?<!to )(?<!would )(?<!can )(?<!could )(?<!it )(?<!that )tell me (to|if|when|which)|if you.?d like|if you want|if you prefer|ready (to (go|proceed) )?when you are|your call|up to you|(waits?|waiting) (for|on) your (word|go|call|ok)|on your (word|go-ahead|say-so)|the (choice|decision|question)( that [a-z ]+)? (is|here is)|which (one|would you|do you)|(in|with|on) (my|the|your) next (message|reply|turn|response)";
   [ .[] | select(type == "object" and (.sidechain | not)) ] as $rows
   | ([ range(0; $rows | length) as $i | $rows[$i]
        | select(.group == "user" and .label == "USER" and .origin == "human" and (.meta | not)
@@ -190,7 +191,7 @@ elif [[ $VERDICT == closed* ]]; then
   REASON="The user just answered a question, and your reply poses another choice in prose (\"$PHRASE\"). That decision is closed: do not ask it again, reworded or not. Reword the line as a plain statement and end the turn in text, or, if something different is genuinely open, ask only that with AskUserQuestion (claude/rules/end-every-turn-with-a-next-step.md)."
 elif [[ $VERDICT == offer* ]]; then
   PHRASE=${VERDICT#offer$'\t'}
-  REASON="Your reply ends by offering work or posing a choice in prose (\"$PHRASE\"), which leaves the user to re-type it (claude/rules/end-every-turn-with-a-next-step.md). If it is work already authorized or plainly in scope, do it now instead of asking. Otherwise: $ASK"
+  REASON="Your reply ends by offering work or posing a choice in prose (\"$PHRASE\"), which leaves the user to re-type it (claude/rules/end-every-turn-with-a-next-step.md). A question promised for a later message never arrives: you write only after the user does. If it is work already authorized or plainly in scope, do it now instead of asking. Otherwise: $ASK"
 else
   REASON="You are ending the turn idle: nothing was asked since the user's last prompt (or work followed the answer), no background work is pending, and the reply does not end with a 'Nothing left' line (claude/rules/end-every-turn-with-a-next-step.md). The user does not want turns that stop for no reason. Do one of these: (1) if authorized work remains that you can do, including anything you said you would do next, do it now; (2) otherwise $ASK (3) if nothing of what the user asked for is left, end with one line: 'Nothing left: <what was delivered>.' Do not list the user's own use of the deliverable before it."
 fi

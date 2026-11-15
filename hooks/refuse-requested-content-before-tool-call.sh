@@ -218,7 +218,7 @@ BLOCKED: you wrote a copy-ready draft (a fenced code block) in the same turn as 
 MSG
 else
 cat >&2 <<MSG
-BLOCKED: you were asked to show content and wrote it in the same turn as a tool call. Text before a tool call can be collapsed on the user's screen to one line. End this turn with the content as plain text and no tool call (no proceed question needed). If a decision is also open, state it in that closing text and say the question follows on the user's next message.
+BLOCKED: you were asked to show content and wrote it in the same turn as a tool call. Text before a tool call can be collapsed on the user's screen to one line. End this turn with the content as plain text and no tool call (no proceed question needed). If a decision is also open, state it in that closing text as a plain statement. Do not promise a later message or question: you write only after the user does.
 MSG
 fi
 exit 2
