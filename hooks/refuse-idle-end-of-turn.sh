@@ -54,7 +54,9 @@
 # many turns, and its id is the "Task ID" of its launch result). Each launch is matched to its own report by id, never counted: a later hand-back or task notification
 # naming its tool_use_id, its agent id (from the launch receipt) or its background id. A finished agent reports twice
 # (hand-back and notification), so a count hides an unreported one; a resumed agent reports again under its old id,
-# so only reports after the launch count.
+# so only reports after the launch count. A call that a PreToolUse hook refused is not a launch (2026-11-15, session
+# febd9451-1577-4fe8-a9c6-0aac5065db7b: two Agent calls refused by require-subagent-sizing.sh counted as running
+# agents for five days, and every idle stop of the session passed).
 # No network, no model call.
 #
 # Covers claude/rules/end-every-turn-with-a-next-step.md. Cases: hooks/tests/run-refuse-idle-end-of-turn.sh.
@@ -115,13 +117,20 @@ VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" --arg show "$SHOW_PATT
     | ([ range(0; $rows | length) as $i | $rows[$i] | select(.group == "user") | .text // ""
          | { i: $i, ids: [ capture("<agent-message from=\"(?<id>[^\"]+)\"").id, capture("<task-id>(?<id>[^<]+)</task-id>").id,
                            capture("<tool-use-id>(?<id>[^<]+)</tool-use-id>").id ] } ]) as $reports
+    # A call a PreToolUse hook refused, or the user rejected, launched nothing and will never report: an Agent call
+    # counts only once its launch receipt (the result naming its agentId) is there, and the other kinds do not count
+    # when their result is a hook refusal.
+    | ([ $rows[] | select((.label // "") | test("RESULT")) | select((.text // "") | test("^\\s*PreToolUse:[A-Za-z_]+ hook error"))
+         | .tool_use_id ]) as $refused
     | ([ range(0; $rows | length) as $i | $rows[$i] as $r
          | if $r.label == "AGENT-SPAWN" and (($r.input.run_in_background // true) != false) then
-             { i: $i, keys: ([ $r.tool_use_id ] + [ $rows[] | select(.label == "RESULT Agent" and .tool_use_id == $r.tool_use_id)
-                                                    | .text // "" | capture("agentId: (?<id>[A-Za-z0-9]+)").id ]) }
+             ([ $rows[] | select(.label == "RESULT Agent" and .tool_use_id == $r.tool_use_id)
+                | .text // "" | capture("agentId: (?<id>[A-Za-z0-9]+)").id ]) as $receipt
+             | if ($receipt | length) == 0 then empty else { i: $i, keys: ([ $r.tool_use_id ] + $receipt) } end
            elif $r.label == "RESULT SendMessage" and (($r.text // "") | test("resumedAgentId")) then
              { i: $i, keys: ([ $r.tool_use_id ] + [ $r.text | capture("\"resumedAgentId\":\\s*\"(?<id>[^\"]+)\"").id ]) }
            elif $i <= $p then empty
+           elif $r.group == "calls" and ($r.tool_use_id as $id | any($refused[]; . == $id)) then empty
            elif $r.group == "calls" and $r.tool == "Bash" and ($r.input.run_in_background // false) == true then { i: $i, keys: [ $r.tool_use_id ] }
            elif $r.group == "calls" and ($r.tool == "Monitor" or $r.tool == "CronCreate") then { i: $i, keys: [ $r.tool_use_id ] }
            elif $r.group == "calls" and $r.tool == "ScheduleWakeup" and (($r.input.stop // false) | not) then { i: $i, keys: [] }

@@ -47,6 +47,7 @@ answered() { result toolu_q "Your questions have been answered: \"Next?\"=\"${1:
 bash_call() { call toolu_b$1 Bash "{\"command\":\"echo $1\"${2:+,\"run_in_background\":true}}"; }
 spawn() { print -r -- "$(call toolu_a$1 Agent '{"description":"do a thing","prompt":"do it","model":"sonnet"}')"$'\n'"$(result toolu_a$1 "Async agent launched successfully. (internal metadata)
 agentId: a$1 (internal ID)")"; }
+refused_spawn() { print -r -- "$(call toolu_a$1 Agent '{"description":"do a thing","prompt":"do it"}')"$'\n'"$(result toolu_a$1 'PreToolUse:Agent hook error: [require-subagent-sizing.sh]: BLOCKED: name a model')"; }
 agent_notify() { row user "$(jq -cn --arg x "<task-notification>\n<task-id>a$1</task-id>\n<tool-use-id>toolu_a$1</tool-use-id>\n<status>completed</status>\n<result>This agent's report was delivered to you as a message</result>\n</task-notification>" '$x')" task-notification; }
 handback() { jq -cn --arg x "<agent-message from=\"a$1\">\n[Subagent hand-back] done" '{type: "queue-operation", operation: "enqueue",
     timestamp: "2026-10-28T05:01:00.000Z", sessionId: "00000000-0000-4000-8000-000000000003", content: $x}'; }
@@ -121,6 +122,10 @@ check "a waiter will tell me when: not an offer"       pass  false "$(prompt 'ru
 check "tell me when: an offer"                         block false "$(prompt 'run the test')" "$(say 'The test is ready. Tell me when you want it run.')"
 check "plain message queued mid-turn, still idle"      block false "$(prompt 'build T14')" "$(queued 'also check the logs')" "$(bash_call 1)" "$(say $REPORT)"
 check "background agent still running"               pass  false "$(prompt 'fix the setup')" "$(spawn 1)" "$(say 'Findings come when it reports.')"
+check "Agent call refused by a hook, nothing asked"   block false "$(prompt 'fix the setup')" "$(refused_spawn 1)" "$(bash_call 1)" "$(say 'Fixed in three commits.')"
+check "Agent call refused in an earlier turn"        block false "$(prompt 'vet the plan')" "$(refused_spawn 1)" "$(say 'Nothing left: vetted by hand.')" "$(prompt 'now fix it')" "$(bash_call 1)" "$(say 'Fixed.')"
+check "refused Agent call, then one that launched"   pass  false "$(prompt 'vet the plan')" "$(refused_spawn 1)" "$(spawn 2)" "$(say 'The reviewer is out.')"
+check "background Bash refused by a hook"            block false "$(prompt 'serve it')" "$(call toolu_b9 Bash '{"command":"serve","run_in_background":true}')" "$(result toolu_b9 'PreToolUse:Bash hook error: [x]: BLOCKED: not this way')" "$(bash_call 1)" "$(say 'Served another way.')"
 check "background agent reported, nothing asked"     block false "$(prompt 'fix the setup')" "$(spawn 1)" "$(handback 1)" "$(say 'It fixed the setup in three commits.')"
 check "agent from an earlier turn still running"     pass  false "$(prompt 'vet the plan')" "$(spawn 1)" "$(say 'The reviewer is out.')" "$(prompt 'also search the web')" "$(say 'Both run; I relay them when they report.')"
 check "agent from an earlier turn, since reported"   block false "$(prompt 'vet the plan')" "$(spawn 1)" "$(say 'The reviewer is out.')" "$(prompt 'what did it say?')" "$(handback 1)" "$(bash_call 1)" "$(say 'It found two gaps.')"
