@@ -24,6 +24,9 @@ Mac apps and web pages.
 1. **Write the requirement down first**, in the user's words, one line per thing they
    asked for: "stack them side by side", "fit it, no scroll bars", "Last Seen after
    Directory", "merge into the 2nd row, not the 3rd". Quote, do not paraphrase.
+   A message that arrives later adds lines to the list; it replaces a line only when it
+   says so. A line that names a condition ("on narrow screens") is checked under that
+   condition, and its opposite case is left as it was unless the user said otherwise.
 2. **Render it.** A web page: `project-lifecycle page-check URL|FILE --shots DIR`, which
    renders it at 375 and 1280 px in light and dark and fails on what a person sees at once
    (a hover that moves things, sideways overflow, clipped text, headings out of scale, small
@@ -34,6 +37,8 @@ Mac apps and web pages.
    with plain `open -g`. Then read the image.
 3. **Check each line against the picture.** Say for each: shown, not shown, or wrong.
    Anything not shown or wrong is fixed and rendered again before reporting.
+   Check by looking at the picture: a measured number (an element's width, a computed
+   style) is not the result the user sees.
 4. **Report what the render showed**, including the lines you could not check. Do not
    report "fixed" on the strength of the code.
 5. **Do the unrequested part as little as possible.** Narrowing a window, rounding
