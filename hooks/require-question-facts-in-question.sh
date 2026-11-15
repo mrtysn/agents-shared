@@ -140,7 +140,7 @@ if [ -n "$PATHS" ]; then
                 WHY="the question names a relative path ($P); name the absolute path in the question text too, since a question stands alone" ;;
         esac
         cat >&2 <<MSG
-BLOCKED: the file this question rests on was never sent as an absolute path in visible text: $WHY. Text in thinking never reaches the user.
+BLOCKED: the file this question rests on was never sent as an absolute path in visible text: $WHY. Text in thinking never reaches the user, and a report written in the same message as this question can be stored as a thinking summary with no text block.
 
 What this hook checks: the absolute path appears in a visible assistant text block written since the user's last typed prompt or answered question (a question this hook refused does not count as an answer). Use the absolute path in the question as well (docs/on-demand/asking-for-decisions.md, absolute-paths-for-handoff). If refused twice, put the facts and the decision in a plain reply and let the user answer in text.
 MSG
@@ -156,7 +156,7 @@ printf '%s' "$VISIBLE" | grep -q '[^[:space:]]' && exit 0
 
 WORD=$(printf '%s' "$QUESTIONS" | grep -Eoi "$POINTER" | head -n1)
 cat >&2 <<MSG
-BLOCKED: this question points at "$WORD", but you have sent no visible text since the user last spoke. Text that exists only in thinking was never shown, so nothing it points at reached the user.
+BLOCKED: this question points at "$WORD", but you have sent no visible text since the user last spoke. Text that exists only in thinking was never shown, so nothing it points at reached the user. A report written in the same message as this question can be stored as a thinking summary with no text block.
 
 Each question stands alone (docs/on-demand/asking-for-decisions.md). Do one of:
   - put the facts inside the question text itself (the list, the table's rows, what is at stake), then re-issue the call
