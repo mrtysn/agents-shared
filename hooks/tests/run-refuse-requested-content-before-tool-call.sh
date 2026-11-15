@@ -57,6 +57,7 @@ check() {
         remedy='End this turn with the content as plain text and no tool call'
         [ "$kind" = draft ] && remedy='End this turn with the draft as the last text and no tool call'
         [ "$kind" = work ] && remedy='Deliver the requested content as text first'
+        [ "$kind" = question ] && remedy='Write the answer as text now'
         if [ "$want" = 2 ] && ! printf '%s' "$err" | grep -q "$remedy"; then
             failed=$((failed + 1)); printf 'FAIL  %s: refusal gives no remedy\n' "$name"
         fi
@@ -185,6 +186,39 @@ f=$(mk draft-notify "$(prompt 'not a good way to put it i think')" "$(say "$DRAF
 check 'draft, task notification, then Bash allows' 0 Bash "$f" s-draft-notify
 f=$(mk draft-stophook-newdraft "$(prompt 'tidy that')" "$(say "$DRAFT")" "$(meta 'Stop hook feedback: x')" "$(say "$DRAFT")" "$(call t1 Bash '{"command":"ls"}')")
 check 'a new draft after the Stop-hook feedback refuses' 2 Bash "$f" s-draft-stophook-new draft
+
+# Trigger 4: a question, or a statement of confusion, is answered before anything changes.
+queued() { jq -cn --arg x "$1" --arg ts "${2:-2026-11-10T10:00:10.000Z}" '{type: "queue-operation", operation: "enqueue", content: $x, timestamp: $ts, sessionId: "00000000-0000-4000-8000-000000000009"}'; }
+ANSWER=$'It is empty because the page shows nobody yet: the front page lists no one until a profile exists for that person.'
+f=$(mk q-edit "$(prompt 'why are we partially finishing this?')" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'a question then Edit with no answer refuses' 2 Edit "$f" s-q-edit question
+f=$(mk q-write "$(prompt 'I dont get it claude, I opened the link and its empty')" "$(call t1 Write '{"file_path":"/x"}')")
+check '"i dont get it" then Write with no answer refuses' 2 Write "$f" s-q-write question
+f=$(mk q-bash "$(prompt 'tidy that')" "$(say 'Tidying now.')" "$(queued 'what do you mean?')" "$(call t1 Bash '{"command":"git commit -m x"}')")
+check 'a queued question then a commit refuses' 2 Bash "$f" s-q-bash question "git commit -m x"
+f=$(mk q-iam "$(prompt 'tidy that')" "$(queued 'I am not alex claude.')" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'a queued correction ("i am not") then Edit refuses' 2 Edit "$f" s-q-iam question
+f=$(mk q-answered "$(prompt 'why is the page empty?')" "$(say "$ANSWER")" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'a question, an answer of 80+ characters, then Edit allows' 0 Edit "$f" s-q-answered
+f=$(mk q-short "$(prompt 'why is the page empty?')" "$(say 'Checking.')" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'a question, a short note, then Edit still refuses' 2 Edit "$f" s-q-short question
+f=$(mk q-order "$(prompt 'fix the build')" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'an order then Edit allows' 0 Edit "$f" s-q-order
+f=$(mk q-mixed "$(prompt 'every entry says ask the salary. this whole page is like that. why? can you please improve the ui here')" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'a message with a mid-text "?" and an order refuses until answered' 2 Edit "$f" s-q-mixed question
+f=$(mk q-read "$(prompt 'why is the page empty?')" "$(call t1 Bash '{"command":"grep -n title page.html"}')")
+check 'a question then a read-only Bash allows' 0 Bash "$f" s-q-read question "grep -n title page.html"
+f=$(mk q-readtool "$(prompt 'why is the page empty?')" "$(call t1 Read '{"file_path":"/x"}')")
+check 'a question then Read allows' 0 Read "$f" s-q-readtool
+f=$(mk q-agentmsg "$(prompt 'tidy that')" "$(queued $'<agent-message from="a1">\nDid it work?\n</agent-message>')" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'a queued agent hand-back with a "?" is not a question from the user' 0 Edit "$f" s-q-agentmsg
+f=$(mk q-notify "$(prompt 'tidy that')" "$(meta $'Stop hook feedback:\nwhy are you idle?')" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'Stop-hook feedback with a "?" is not a question from the user' 0 Edit "$f" s-q-notify
+f=$(mk q-earlier "$(prompt 'why is the page empty?' 2026-11-10T09:00:00.000Z)" "$(prompt 'fix the page' 2026-11-10T10:00:00.000Z)" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'an earlier question does not count once a later order arrives' 0 Edit "$f" s-q-earlier
+f=$(mk q-twice "$(prompt 'why is the page empty?')" "$(call t1 Bash '{"command":"python3 - <<E\nprint(1)\nE"}')")
+check 'a refused call does not use up the refusal (first attempt)' 2 Bash "$f" s-q-twice question $'python3 - <<E\nprint(1)\nE'
+check 'a refused call does not use up the refusal (second attempt)' 2 Bash "$f" s-q-twice question $'python3 - <<E\nprint(1)\nE'
 
 # Fail open.
 check 'transcript missing allows' 0 AskUserQuestion "$TMP/nonexistent.jsonl"
