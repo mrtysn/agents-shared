@@ -1,0 +1,21 @@
+{
+  "repo": "heygen-com/hyperframes",
+  "path": "skills/hyperframes-cli/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "references/beats.md",
+    "references/cloud.md",
+    "references/cloudrun.md",
+    "references/compare-and-batch.md",
+    "references/conventions.md",
+    "references/doctor-browser.md",
+    "references/feedback.md",
+    "references/init-and-scaffold.md",
+    "references/lambda.md",
+    "references/lint-validate-inspect.md",
+    "references/preview-render.md",
+    "references/upgrade-info-misc.md"
+  ],
+  "commit": "be740d0215f027f6987d69dfa75602279ab5af25",
+  "updated": "2026-11-15"
+}

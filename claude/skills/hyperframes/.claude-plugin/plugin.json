@@ -1,0 +1,8 @@
+{
+  "name": "hyperframes",
+  "description": "HeyGen HyperFrames: HTML-based video compositions. Composition contract, animation and keyframes, audio, creative direction, CLI, registry blocks and the studio.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Mert Yaşin"
+  }
+}

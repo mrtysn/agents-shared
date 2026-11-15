@@ -1,0 +1,21 @@
+{
+  "repo": "heygen-com/hyperframes",
+  "path": "skills/hyperframes-registry/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "examples/add-block.md",
+    "examples/add-component.md",
+    "references/component-quality-bar.md",
+    "references/contributing.md",
+    "references/demo-html-pattern.md",
+    "references/discovery.md",
+    "references/install-locations.md",
+    "references/placeholder-material.md",
+    "references/search.md",
+    "references/templates.md",
+    "references/wiring-blocks.md",
+    "references/wiring-components.md"
+  ],
+  "commit": "be740d0215f027f6987d69dfa75602279ab5af25",
+  "updated": "2026-11-15"
+}
