@@ -50,6 +50,10 @@
 #      "can you open the correct link") and read-only calls, and a note about other work passed as an answer. Whether a
 #      message is a question is judged by the agent under claude/rules/question-handling.md; this trigger checks only
 #      that a mid-turn message got a reply. No once-per-turn marker: it ends when the reply exists.
+# A reply written ahead of a tool call can be stored in the transcript as a thinking block holding a paraphrase, with no
+# text block (2026-11-15, session 75b44d1f-4c1d-4a8f-ad27-84c543a389e5: five of ten replies; the reader's `thinking`
+# kind). Trigger 1 counts such a block as text written ahead of the call, and trigger 4 as a reply to a mid-turn
+# message. Trigger 3 does not count it as delivered content: the user may have seen a summary only.
 # Once per turn: a marker file keyed by session id and prompt time under
 # ${XDG_CACHE_HOME:-$HOME/.cache}/agents-shared/refuse-requested-content-before-tool-call/.
 # A call made by a sub-agent (the input carries agent_id) is never refused.
@@ -124,13 +128,13 @@ PATTERN_FILE="$HERE/show-request-pattern.txt"
 
 # Trigger 4: a message the user sent mid-turn gets a reply before the next change. Prints the message when it has none.
 if [ "$WORK" = true ]; then
-    Q4_MSG=$(python3 "$READER" "$TRANSCRIPT" --kinds user,assistant,agents --json --max-chars 400 2>/dev/null | jq -rs '
+    Q4_MSG=$(python3 "$READER" "$TRANSCRIPT" --kinds user,assistant,agents,thinking --json --max-chars 400 2>/dev/null | jq -rs '
         [ .[] | select(type == "object" and (.sidechain | not)) ] as $rows
         | ([ range(0; $rows | length) as $i | $rows[$i]
              | select(.group == "user" and (.label == "USER" or .label == "USER(queued)") and (.meta | not)
                       and ((.text // "") | test("^\\s*(<(bash-|local-command|task-notification|agent-message|cross-session-message|system-reminder)|Stop hook feedback:|Base directory for this skill|\\[Request interrupted)") | not)) | $i ] | max // -1) as $p
         | if $p < 0 or $rows[$p].label != "USER(queued)" then "" else
-            ($rows[$p + 1:] | any((.group == "assistant" and ((.text // "") | test("\\S")))
+            ($rows[$p + 1:] | any(((.group == "assistant" or .group == "thinking") and ((.text // "") | test("\\S")))
                                    or (.label == "RESULT AskUserQuestion" and ((.text // "") | test("answered"))))) as $replied
             | if $replied then "" else ($rows[$p].text // "") end
           end' 2>/dev/null)
@@ -156,7 +160,7 @@ if [ "$SHOW" = false ] && [ "$WORK" = false ]; then grep -q '```' "$TRANSCRIPT" 
 # content that is not seen (yet). Return 3 when the transcript could not be read.
 verdict() {
     local rows
-    rows=$(python3 "$READER" "$TRANSCRIPT" --kinds user,assistant,agents,calls,tools --json --max-chars 400 2>/dev/null) || return 3
+    rows=$(python3 "$READER" "$TRANSCRIPT" --kinds user,assistant,agents,calls,tools,thinking --json --max-chars 400 2>/dev/null) || return 3
     printf '%s' "$rows" | jq -rs --arg pat "$PATTERN" --argjson show "$SHOW" --argjson work "$WORK" '
       def answered($turn; $from; $pred):
         [ range($from; $turn | length) as $i | $turn[$i]
@@ -181,7 +185,7 @@ verdict() {
              then "skip" else "work\t" + $time end)
           elif ($show | not) or ($prompt | test($pat) | not) then "skip" else
             ([ range(0; $turn | length) as $i | $turn[$i]
-               | select(.group == "assistant"
+               | select((.group == "assistant" or .group == "thinking")
                         and (((.text // "") | length) >= 40
                              or ((.text // "") | test("(?m)^\\s*([-*•]|[0-9]+[.)])\\s+\\S|^\\s*\\|.*\\|")))) | $i ] | first // -1) as $t
             | if $t < 0 then "retry" else
@@ -220,7 +224,7 @@ mkdir -p "$DIR" 2>/dev/null && : > "$DIR/$KEY" 2>/dev/null || exit 0
 
 if [ "$KIND" = work ]; then
 cat >&2 <<MSG
-BLOCKED: you were asked to show content and have not delivered it: this call changes state before the content is in the turn. Deliver the requested content as text first (the list, table or answer itself; a short announcement does not count), then continue with the work. Reading calls (ls, cat, grep, git status or log) that gather the data for the answer are fine.
+BLOCKED: you were asked to show content and have not delivered it: this call changes state before the content is in the turn. Deliver the requested content as text first (the list, table or answer itself; a short announcement does not count), then continue with the work. Content written in the same message as a tool call can be stored, and shown, as a short summary, and then it is not counted as delivered. Reading calls (ls, cat, grep, git status or log) that gather the data for the answer are fine.
 MSG
 elif [ "$KIND" = draft ]; then
 cat >&2 <<MSG
