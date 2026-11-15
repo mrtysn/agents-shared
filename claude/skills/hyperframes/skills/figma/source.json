@@ -1,0 +1,11 @@
+{
+  "repo": "heygen-com/hyperframes",
+  "path": "skills/figma/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "scripts/lib/windows-exe-search.mjs",
+    "scripts/verify-motion.mjs"
+  ],
+  "commit": "04202e8a4c2e7f334636bf1e3b07dd38c77e5b43",
+  "updated": "2026-11-15"
+}
