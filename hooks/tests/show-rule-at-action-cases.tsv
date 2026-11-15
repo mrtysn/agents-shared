@@ -87,3 +87,8 @@ pass	Bash	{"command":"python3 -c \"print(open(p).read())\""}
 note	Bash	{"command":"cd site && python3 edit.py src/styles/custom.css && pnpm run build"}
 note	Edit	{"file_path":"/x/src/home/Home.tsx","old_string":"a","new_string":"b"}
 pass	Bash	{"command":"cat notes.md"}
+# --- run-tests-before-the-commit-command: a commit chained after a piped test run
+block	Bash	{"command":"hooks/tests/run-x.sh 2>&1 | tail -1 && git commit -q -m \"x\" -- hooks/x.sh && git push -q"}
+block	Bash	{"command":"npm test | grep -c passed && git -C /p/app commit -m x -- src/a.ts"}
+pass	Bash	{"command":"hooks/tests/run-x.sh 2>&1 | tail -1"}
+pass	Bash	{"command":"git log --oneline | head -3 && git status --short"}
