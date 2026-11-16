@@ -86,7 +86,7 @@ def dump_tabs():
     tabs, cur = [], None
     for line in res.stdout.splitlines():
         if line.startswith("===TAB==="):
-            m = re.match(r"===TAB=== (\S+) tty=(\S+) name=(.*)", line)
+            m = re.match(r"===TAB=== (\S+) tty=(.*?) name=(.*)", line)
             cur = {"tab": m.group(1), "tty": m.group(2).replace("/dev/", ""), "name": m.group(3).strip(), "lines": []}
             tabs.append(cur)
         elif cur is not None:
