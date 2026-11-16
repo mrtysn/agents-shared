@@ -4,7 +4,13 @@
 asked.** This overrides Claude Code's built-in "commit or push only when the user
 asks" and its "if on the default branch, branch first".
 
-These repos are personal and all tracked in git; any commit can be reverted. Work
+**It holds only in the user's own repos**: those whose `origin` is under
+`github.com/mrtysn`, or that have no remote. Check with `git remote get-url origin`
+before the first commit in a repo. In any other repo (an employer's, a client's, an
+open-source project), Claude Code's defaults apply: branch first, commit when asked,
+and never push to a branch others share without asking.
+
+The user's own repos are all tracked in git; any commit can be reverted. Work
 left uncommitted is what costs something: it tangles with the next change, it is
 lost when a session dies, and it has to be asked for by hand — across many repos
 and many parallel sessions, that ask is repeated all day.
