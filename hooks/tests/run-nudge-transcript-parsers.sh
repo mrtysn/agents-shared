@@ -80,6 +80,17 @@ total=$((total + 3))
 [ "$again" = pass ] || { fail=$((fail + 1)); echo "FAIL  repeat in the same session: got $again"; }
 [ "$other" = nudge ] || { fail=$((fail + 1)); echo "FAIL  a different session: got $other"; }
 
+# a reader that exists only on the personal profile counts as a shared reader there, and not elsewhere
+PR='python3 -c "import json" ~/.claude/projects && iterm-revive'
+printf 'AGENT_PROFILE=work\n' > "$CLAUDE_CONFIG_DIR/paths.local.sh"
+workv=$(verdict "$(payload prof-work Bash "$PR" | "$HOOK")")
+printf 'AGENT_PROFILE=personal\n' > "$CLAUDE_CONFIG_DIR/paths.local.sh"
+persv=$(verdict "$(payload prof-personal Bash "$PR" | "$HOOK")")
+rm -f "$CLAUDE_CONFIG_DIR/paths.local.sh"
+total=$((total + 2))
+[ "$workv" = nudge ] || { fail=$((fail + 1)); echo "FAIL  personal-only reader on the work profile: got $workv"; }
+[ "$persv" = pass ] || { fail=$((fail + 1)); echo "FAIL  personal-only reader on the personal profile: got $persv"; }
+
 if [ "$fail" -ne 0 ]; then
     echo "$fail of $total cases failed"
     exit 1

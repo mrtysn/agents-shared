@@ -34,7 +34,7 @@ SESSION_ID=$(printf '%s' "$INPUT" | jq -r '.session_id // empty')
 PATH_RE='claude[A-Za-z0-9_.*-]*/projects|CLAUDE_CONFIG_DIR[^[:space:]]*/projects'
 RUN_RE='(^|[^[:alnum:]_.-])(python[0-9.]*|jq|node|deno|bun|ruby|perl)([^[:alnum:]_.-]|$)|json\.loads|JSON\.parse'
 JSON_RE='json\.loads|json\.load\(|import json|JSON\.parse|(^|[^[:alnum:]_.-])jq([^[:alnum:]_.-]|$)'
-SHARED_RE='extract-session-text|search-history|find-repeated-user-prompts|find-interrupted-responses|find-listed-unasked|find-invisible-output|recent-sessions|blame-session|iterm-revive|report-subagent-token-use|review-ssh-guard-asks|usage-survey|command-moments-survey|count-manual-commit|survey-remote-commands|memory-audit|transcript_items'
+SHARED_RE='extract-session-text|search-history|find-repeated-user-prompts|find-interrupted-responses|find-listed-unasked|find-invisible-output|recent-sessions|blame-session|report-subagent-token-use|review-ssh-guard-asks|usage-survey|command-moments-survey|count-manual-commit|survey-remote-commands|memory-audit|transcript_items'
 
 case "$TOOL" in
     Bash)
@@ -43,6 +43,13 @@ case "$TOOL" in
         printf '%s' "$TEXT" | grep -Eq "$PATH_RE" || exit 0
         printf '%s' "$TEXT" | grep -Eq "$RUN_RE" || exit 0
         printf '%s' "$TEXT" | grep -Eq "$SHARED_RE" && exit 0
+        # Readers that exist only on the personal profile are listed in hooks/personal/.
+        HERE=$(cd "$(dirname "$(readlink "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")")" && pwd)
+        EXTRA_FILE="$HERE/personal/shared-transcript-readers.txt"
+        if [ -r "$EXTRA_FILE" ] && [ "$("$HERE/../scripts/agent-profile" 2>/dev/null)" = personal ]; then
+            EXTRA_RE=$(grep -vE '^[[:space:]]*(#|$)' "$EXTRA_FILE" | paste -sd'|' -)
+            [ -n "$EXTRA_RE" ] && printf '%s' "$TEXT" | grep -Eq "$EXTRA_RE" && exit 0
+        fi
         ;;
     Write)
         TEXT=$(printf '%s' "$INPUT" | jq -r '.tool_input.content // empty')

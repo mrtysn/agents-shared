@@ -66,7 +66,10 @@ in `claude/rules/` and moves the personal paragraphs to `claude/rules/personal/<
 its on-demand text splits the same way into `docs/on-demand/personal/<name>-personal.md`, with
 trigger rows of its own (`show-rule-at-action.sh` reads that folder only on the personal profile).
 `project-lifecycle test` fails when a token from `scripts/personal-only-tokens.txt` appears
-outside the `personal/` folders; add a token there when a new personal tool appears.
+outside the `personal/` folders, in `hooks/` as well as the loaded text (not `hooks/tests/`); add a token
+there when a new personal tool appears. A hook that prints personal wording reads it from a file in
+`hooks/personal/` when `scripts/agent-profile` says personal, and a wholly personal hook lives in
+`hooks/personal/` (a stub in `hooks/` keeps the name a shared settings.json calls).
 
 ## Setting up a cloud environment
 

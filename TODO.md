@@ -32,8 +32,7 @@ repo, so the synced entry is valid wherever the repo is checked out.
 
 ### Status
 
-Step 1 is done: `scripts/init-global.sh` links every executable script in `hooks/` (and, on the
-personal profile, `hooks/personal/`) into `$CLAUDE_DIR/hooks/`, repairs wrong targets, prunes
+Step 1 is done: `scripts/init-global.sh` links every executable script in `hooks/` into `$CLAUDE_DIR/hooks/`, repairs wrong targets, prunes
 dangling links, leaves another repo's links alone (cc-statusline's event hook), and the hooks
 resolve their own folder through the symlink. A fresh config folder therefore has
 `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/subagent-guard.sh`, the one entry that already names

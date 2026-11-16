@@ -1,0 +1,3 @@
+# Scripts that read Claude transcripts and are personal-profile only: nudge-transcript-parsers.sh
+# adds each line (an ERE fragment) to its list of shared readers on the personal profile.
+iterm-revive

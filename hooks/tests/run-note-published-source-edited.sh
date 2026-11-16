@@ -6,7 +6,7 @@
 set -euo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-HOOK="$HERE/../note-published-source-edited.sh"
+HOOK="$HERE/../personal/note-published-source-edited.sh"
 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT

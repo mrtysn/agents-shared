@@ -2,10 +2,11 @@
 # PreToolUse hook: code that can reach the network, run on a remote host over ssh, needs the user's yes
 #
 # The failure this exists to prevent: testing a scraper by running it on a server. Every request it
-# makes leaves from that server's IP — outside this machine's agent-request-limiter, uncounted — and
-# a rate limit or ban lands on a production box. On 2026-09-22 an agent sent ~45 requests to Google
-# from node01 this way, via `ssh node01 'docker exec funds-poller python …'`, while debugging code
-# that could have been tested locally against one saved response.
+# makes leaves from that server's IP — uncounted by anything on this machine — and a rate limit or
+# ban lands on a production box. On 2026-09-22 an agent sent ~45 requests to a search engine from a
+# production server this way, via `ssh <host> 'docker exec <container> python …'`, while debugging
+# code that could have been tested locally against one saved response. On the personal profile the
+# asks also name the owner's own request limiter (hooks/personal/ssh-request-guard-note.txt).
 #
 # For every ssh, autossh or mosh command (also by path, e.g. /usr/bin/ssh), asks (never blocks) when:
 #   - the remote command mentions a network-capable program anywhere in its text: curl, wget, nc,
@@ -103,7 +104,18 @@ clear_hint() {
     printf ' To stop these asks for this host in this session, the user runs: allow-ssh-host-for-session %s %s' "${1##*@}" "$SESSION_ID"
 }
 
-NET_REASON="Whatever it fetches leaves from that host's IP, outside this machine's agent-request-limiter and uncounted, and a rate limit or ban lands on that server. To test code that makes requests: fetch once locally, save the response, and test against the saved copy. Run network code on a server only when the user asked for exactly that."
+# The owner's own request limiter is named only on the personal profile: its wording lives in
+# hooks/personal/ssh-request-guard-note.txt, read through scripts/agent-profile.
+HOOK_DIR=$(cd "$(dirname "$(readlink "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")")" && pwd)
+limiter_note() {
+    local f="$HOOK_DIR/personal/ssh-request-guard-note.txt"
+    [ -r "$f" ] && [ "$("$HOOK_DIR/../scripts/agent-profile" 2>/dev/null)" = personal ] && cat "$f"
+    return 0
+}
+
+net_reason() {
+    printf "Whatever it fetches leaves from that host's IP, not this machine's, uncounted by anything here%s, and a rate limit or ban lands on that server. To test code that makes requests: fetch once locally, save the response, and test against the saved copy. Run network code on a server only when the user asked for exactly that." "$(limiter_note)"
+}
 
 # The first network-capable word in a text, or nothing.
 net_hit() {
@@ -355,13 +367,13 @@ check_segment() {
 
     ASK_HOST=${host##*@}
     if [ $dyn = 1 ]; then
-        ask "This opens a SOCKS tunnel through ${host:-the remote host} (ssh -D / DynamicForward). Anything sent through it leaves from that host's IP, outside this machine's agent-request-limiter. Ask the user before tunnelling through a server." tunnel
+        ask "This opens a SOCKS tunnel through ${host:-the remote host} (ssh -D / DynamicForward). Anything sent through it leaves from that host's IP, not this machine's$(limiter_note). Ask the user before tunnelling through a server." tunnel
     fi
     local f fh
     for f in "${fwd[@]}"; do
         fh=$(printf '%s' "$f" | awk -F: '{ if (NF >= 3) print $(NF-1) }' | tr -d '[]')
         case "$fh" in ""|localhost|127.0.0.1|::1) ;; *)
-            ask "This forwards a local port to $fh through ${host:-the remote host} (ssh -L). Those connections leave from that host's IP, outside this machine's agent-request-limiter. Ask the user before tunnelling through a server." tunnel ;;
+            ask "This forwards a local port to $fh through ${host:-the remote host} (ssh -L). Those connections leave from that host's IP, not this machine's$(limiter_note). Ask the user before tunnelling through a server." tunnel ;;
         esac
     done
 
@@ -372,7 +384,7 @@ check_segment() {
     if [ -n "$hit" ] && [ $stdin_file = 0 ] && [ "$sep" != "|" ] && safe_remote "$heredoc" "$rtext"; then
         hit=""                                     # inspection inside a container, read in full
     fi
-    [ -n "$hit" ] && ask "This runs '$hit' on ${host:-a remote host} over ssh. $NET_REASON$(clear_hint "$host")"
+    [ -n "$hit" ] && ask "This runs '$hit' on ${host:-a remote host} over ssh. $(net_reason)$(clear_hint "$host")"
 
     # a remote shell with no -c reads its script from stdin. ssh joins its arguments with spaces and the
     # remote shell splits them again, so 'bash -s' as one argument is still bash with -s.
@@ -389,9 +401,9 @@ check_segment() {
     if [ $bare = 1 ]; then
         if [ $heredoc = 1 ] && [ -n "$BODY" ]; then
             hit=$(net_hit "$BODY")
-            [ -n "$hit" ] && ask "This feeds ${host:-a remote host} a script over ssh that runs '$hit'. $NET_REASON$(clear_hint "$host")"
+            [ -n "$hit" ] && ask "This feeds ${host:-a remote host} a script over ssh that runs '$hit'. $(net_reason)$(clear_hint "$host")"
         elif [ $stdin_file = 1 ] || [ "$sep" = "|" ]; then
-            ask "This feeds a shell on ${host:-a remote host} a script through stdin, which this hook cannot read. If that script makes requests, they leave from that host's IP, outside this machine's agent-request-limiter. Check what it runs before approving."
+            ask "This feeds a shell on ${host:-a remote host} a script through stdin, which this hook cannot read. If that script makes requests, they leave from that host's IP, not this machine's$(limiter_note). Check what it runs before approving."
         fi
     fi
     return 0

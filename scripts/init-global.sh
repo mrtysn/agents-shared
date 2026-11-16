@@ -3,7 +3,7 @@
 # init-global.sh — Make agents-shared commands, skills and rules available in EVERY
 # project on this machine by symlinking them into the user-level Claude dirs
 # (~/.claude/commands, ~/.claude/skills, ~/.claude/rules) instead of each repo's .claude/.
-# Hook scripts (hooks/*.sh, *.py, *.zsh) are linked into ~/.claude/hooks/ the same way, so
+# Hook scripts (hooks/*.sh, *.py, *.zsh, top level only) are linked into ~/.claude/hooks/ the same way, so
 # the shared settings.json names them as ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/<name>
 # and no repo location.
 #
@@ -17,8 +17,9 @@
 #
 # Profiles. The target config folder declares AGENT_PROFILE=personal or work in its
 # paths.local.sh (read by scripts/agent-profile). claude/rules/personal/ and
-# claude/skills/personal/ (and hooks/personal/) are linked only when it is personal; on any
-# other profile, or none, links into them are removed. Run once per config folder, with
+# claude/skills/personal/ are linked only when it is personal; on any other profile, or none,
+# links into them are removed. Hooks under hooks/personal/ are reached through stubs in hooks/.
+# Run once per config folder, with
 # CLAUDE_CONFIG_DIR set for any folder other than ~/.claude.
 #
 # Usage:
@@ -187,17 +188,13 @@ done
 # settings.json names a hook as ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/<name>, so a fresh
 # config folder needs the links. Data files beside the scripts (.tsv, .txt) and tests/ are
 # not linked: scripts reach them from their own, symlink-resolved, folder. hooks/personal/
-# is linked on the personal profile only. A link another repo made (cc-statusline's event
-# hook) is a foreign symlink and stays.
+# is not linked either: a stub in hooks/ forwards to a personal hook there on the personal
+# profile only. A link another repo made (cc-statusline's event hook) is a foreign symlink
+# and stays.
 hook_srcs=()
 for src in "$SRC_HOOKS"/*.sh "$SRC_HOOKS"/*.py "$SRC_HOOKS"/*.zsh; do
     [ -f "$src" ] && [ -x "$src" ] && hook_srcs+=("$src")
 done
-if [ "$IN_PROFILE" = 1 ]; then
-    for src in "$SRC_HOOKS"/personal/*.sh "$SRC_HOOKS"/personal/*.py "$SRC_HOOKS"/personal/*.zsh; do
-        [ -f "$src" ] && [ -x "$src" ] && hook_srcs+=("$src")
-    done
-fi
 hook_total=0
 for src in "${hook_srcs[@]}"; do
     link_one "$src" "$DST_HOOKS/$(basename "$src")"
