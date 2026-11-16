@@ -65,6 +65,19 @@ re-sign cannot carry (keychain, sandbox, camera) — becomes an ask: **one
 AskUserQuestion per batch, stating the process count**, before the first
 launch. A subagent never launches an activating window without that ask.
 
+**An app whose privacy grant is tied to its signature cannot go through
+`quiet-open` either.** Accessibility, Screen Recording and Automation grants
+follow the code signature, so the ad-hoc copy starts without them: a menu bar
+manager comes up seeing no items, and the test proves nothing. Test such an app
+through its own non-activating path: a test flag that orders the window front
+with `orderFrontRegardless()` on the non-main display, no `activate`, no
+`makeKey`. Drive its controls with accessibility actions (`AXPress`, setting
+`AXValue`), never synthetic clicks or keys: a click on a window activates its
+app. Whatever needs real mouse or key events (drag and drop, a shortcut) is left
+for the user. Nov 2026: a subagent opened such an app's window with an
+activating launch flag and clicked through it, taking the user's focus at every
+step; the user: "why not use quiet-open?"
+
 ## Why both halves are required
 
 Two different things bring a launched app to the front, and each half of
