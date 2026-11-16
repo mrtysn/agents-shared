@@ -81,7 +81,11 @@ said = [(i, r.get("text") or "") for i, r in turn if r.get("group") == "assistan
 feedback = [(i, r.get("text") or "") for i, r in turn
             if r.get("group") == "user" and (r.get("text") or "").lstrip().startswith("Stop hook feedback:")]
 calls = [i for i, r in turn if r.get("group") == "calls"]
-draft = next((i for i, t in said if drafted(t)), None)
+# A message the user typed mid-turn (USER(queued), not an agent hand-back) means they read the screen up to there,
+# so only a draft after the latest such message can be buried; and only the latest draft matters.
+seen = max([i for i, r in turn if r.get("label") == "USER(queued)"
+            and not (r.get("text") or "").lstrip().startswith("<agent-message")], default=last)
+draft = next((i for i, t in reversed(said) if i > seen and drafted(t)), None)
 if draft is not None:
     fed = next((i for i, _ in feedback if i > draft), None)
     called = next((i for i in calls if fed is not None and i > fed), None)

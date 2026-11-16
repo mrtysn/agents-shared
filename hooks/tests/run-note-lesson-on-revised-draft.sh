@@ -72,6 +72,8 @@ check "draft repeated as the last text"                  pass  true  "$(prompt '
 check "buried draft already refused once this turn"      pass  true  "$(prompt 'finish it')" "$(say $EMAIL)" "$(feedback $LESSON)" "$(call t1 Edit)" "$(feedback $BURIED)" "$(say 'Lesson recorded.')"
 check "feedback with no tool call after it"              pass  true  "$(prompt 'finish it')" "$(say $EMAIL)" "$(feedback $LESSON)" "$(say 'Nothing left: sent.')"
 check "calls before the draft, no feedback"              pass  false "$(prompt 'draft it')" "$(call t1 Bash)" "$(say $EMAIL)"
+QUEUED=$(row user "$(jq -cn '[{type: "text", text: "still waiting for the message"}]')" | jq -c 'del(.origin)')
+check "a typed mid-turn message, then the draft delivered last"  pass true "$(prompt 'finish it')" "$(say $EMAIL)" "$(feedback $LESSON)" "$(call t1 Edit)" "$QUEUED" "$(say $EMAIL)" "$(call t2 Bash)" "$(say 'Built.')"
 check "code block buried is not a message"               pass  true  "$(prompt 'fix')" "$(say $CODE)" "$(feedback $LESSON)" "$(call t1 Edit)" "$(say 'Done.')"
 
 reason_has() {  # name phrase transcript-lines...
