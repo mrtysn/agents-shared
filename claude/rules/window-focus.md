@@ -4,7 +4,9 @@
 `quiet-open`, is an app launched for the user to use, or the user said yes to that
 batch.** An app launched for the user goes through plain `open -g`, never
 `quiet-open`, which leaves it with no Dock icon and no way to bring it forward.
-Reach for a headless mode first; almost nothing an agent runs needs pixels.
+Reach for a headless mode first; almost nothing an agent runs needs pixels. Where `quiet-open`
+is not installed, open a window only with `open -g` (it does not activate the app), on the
+non-main display, and only for an app the user is meant to use or after the batch is approved.
 
 **A subagent's brief carries this rule.** A subagent sees no hook line and no
 memory of the parent's: a brief for any run that opens, clicks or screenshots a

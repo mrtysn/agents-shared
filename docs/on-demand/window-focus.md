@@ -46,7 +46,8 @@ you were misguided".
 
 A windowed launch of a program that only the agent looks at goes through `quiet-open <App.app> [args…]`
 (the owner's `tools` repo, symlinked into `~/bin`; the hook line says whether it
-is installed). It launches through `open -g` with an AppKit shim injected into
+is installed; where it is not, use plain `open -g` on the non-main display and ask per batch, as
+for an app `quiet-open` cannot quiet). It launches through `open -g` with an AppKit shim injected into
 an ad-hoc re-signed copy of the app, so the app never becomes active. Read the
 result, not the feeling:
 

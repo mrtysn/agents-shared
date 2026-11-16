@@ -13,6 +13,11 @@ the grid it prints:
   that matters survive truncation, is anything cut, misplaced or mostly empty?
 - **Fix and re-render** until it reads well; report what the screen showed.
 
+If `render-terminal-screen` is not installed, run the program in a detached tmux pane at each
+width (`tmux new-session -d -x 120 -y 40 -s check '<command>'`, then `tmux capture-pane -p -t
+check`) and read the capture the same way; with no tmux either, say the render check is missing
+rather than reporting the UI as verified.
+
 ## Grepping output does not count
 
 A program's raw output is cursor moves and redraws. Finding the expected words

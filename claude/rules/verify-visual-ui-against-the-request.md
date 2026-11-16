@@ -34,7 +34,9 @@ Mac apps and web pages.
    catches, are web-shared's `DESIGN.md`. A native Mac app: the repo's own capture
    script if it has one, launched through `quiet-open`
    ([window focus](window-focus.md)); an app the user is iterating on is left running
-   with plain `open -g`. Then read the image.
+   with plain `open -g`. Then read the image. Without `project-lifecycle`, open the page in a
+   headless browser and screenshot it at those two widths; without `quiet-open`, see
+   [window focus](window-focus.md); where nothing can render it, say the check is missing.
 3. **Check each line against the picture.** Say for each: shown, not shown, or wrong.
    Anything not shown or wrong is fixed and rendered again before reporting.
    Check by looking at the picture: a measured number (an element's width, a computed

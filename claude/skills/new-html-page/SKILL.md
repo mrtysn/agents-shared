@@ -12,6 +12,10 @@ The user has asked for that column by hand many times; it is the default, not an
 
 Pages are local files (see the artifacts rule): never publish to Anthropic.
 
+Where `project-lifecycle` is not installed (`command -v project-lifecycle` finds nothing), skip
+the steps below that run it and write the page as one plain semantic HTML file: inline CSS, no
+network imports, headings for sections, a contents list of anchor links at the top.
+
 ## Steps
 
 1. **Pick the mode from the content.** What the page presents decides its shape:
