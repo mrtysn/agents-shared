@@ -1,5 +1,5 @@
 #!/bin/zsh
-# DESC: Test githooks/pre-push against throwaway repos: missing, empty and filled denylists
+# DESC: Test githooks/pre-push and its chained hooks against throwaway repos: denylists, repo visibility, the repo's own hooks
 set -uo pipefail
 
 hook=${0:A:h:h:h}/githooks/pre-push
@@ -167,6 +167,135 @@ expect ok "short entry inside binary noise is not a hit"
 printf '\0\1 author Qxz Corp \0' > $work/repo/noise.bin
 git -C $work/repo add -A && git -C $work/repo commit -qm 'name in binary text'
 expect refused "short entry inside a printable run of a binary is a hit"
+
+# ---- repo visibility: a private github.com remote is not scanned, public and unknown are ----
+# `gh` is a stub on PATH: no network. GH_STUB_ANSWER is true (private), false (public) or fail.
+mkdir -p $work/bin
+cat > $work/bin/gh <<'STUB'
+#!/bin/zsh
+print -r -- "$*" >> $GH_STUB_LOG
+[[ $GH_STUB_ANSWER == (true|false) ]] || exit 1
+print $GH_STUB_ANSWER
+STUB
+chmod +x $work/bin/gh
+export GH_STUB_LOG=$work/gh.log XDG_CACHE_HOME=$work/cache
+export PATH=$work/bin:$PATH
+cache=$work/cache/agents-shared/repo-visibility
+
+export AGENTS_PUSH_DENYLIST=$work/vis.txt; print -r -- 'Acme' > $AGENTS_PUSH_DENYLIST
+reset_to_remote
+commit v.txt 'built for acme' 'add v'
+
+# direct <url> : run the hook as git would for this push, from the repo, stdin as git sends it
+direct() {
+  local old=$(git -C $work/repo rev-parse origin/main 2>/dev/null || print -r -- $zero)
+  print -r -- "refs/heads/main $(git -C $work/repo rev-parse HEAD) refs/heads/main $old" |
+    (cd $work/repo && $hook origin $1 2>$work/err)
+}
+# check <ok|refused> <label> <url>
+check() {
+  local want=$1 label=$2 got
+  if direct $3; then got=ok; else got=refused; fi
+  if [[ $got == $want ]]; then pass=$((pass+1)); else
+    fail=$((fail+1)); print -r -- "FAIL $label: wanted $want, got $got"; cat $work/err
+  fi
+}
+gh_calls() { [[ -f $GH_STUB_LOG ]] && wc -l < $GH_STUB_LOG | tr -d ' ' || print 0; }
+
+: > $GH_STUB_LOG
+export GH_STUB_ANSWER=true
+check ok "private remote passes a commit that names an entry" https://github.com/some-owner/Some-Repo.git
+grep -q 'repos/some-owner/Some-Repo' $GH_STUB_LOG || { fail=$((fail+1)); print "FAIL gh was not asked about OWNER/NAME"; }
+grep -q 'unknown' $work/err && { fail=$((fail+1)); print "FAIL private remote printed an unknown line"; }
+export AGENTS_PUSH_DENYLIST=$work/absent.txt
+check ok "private remote passes with the denylist missing" git@github.com:some-owner/Some-Repo.git
+[[ $(gh_calls) == 1 ]] && pass=$((pass+1)) || { fail=$((fail+1)); print "FAIL private answer was not cached across URL forms (calls: $(gh_calls))"; }
+export GH_STUB_ANSWER=false
+check refused "missing denylist refuses a push that is scanned" https://github.com/other-owner/new-repo
+rm -rf -- $cache
+export AGENTS_PUSH_DENYLIST=$work/vis.txt
+
+check refused "public remote is scanned" https://github.com/pub-owner/pub-repo.git
+grep -q 'unknown' $work/err && { fail=$((fail+1)); print "FAIL public remote printed an unknown line"; }
+export GH_STUB_ANSWER=fail   # the cached answer must stand without asking again
+before=$(gh_calls)
+check refused "public answer is cached" https://github.com/pub-owner/pub-repo.git
+[[ $(gh_calls) == $before ]] && pass=$((pass+1)) || { fail=$((fail+1)); print "FAIL cached answer asked gh again"; }
+
+# A cached answer older than 7 days is asked again.
+export GH_STUB_ANSWER=true
+touch -t 202001010000 $cache/pub-owner__pub-repo
+check ok "answer older than 7 days is refreshed" https://github.com/pub-owner/pub-repo.git
+[[ $(gh_calls) == $((before+1)) ]] && pass=$((pass+1)) || { fail=$((fail+1)); print "FAIL stale cache was not refreshed"; }
+
+export GH_STUB_ANSWER=fail
+check refused "gh failing means unknown, which is scanned" https://github.com/new-owner/new-repo.git
+grep -q 'visibility .* is unknown' $work/err || { fail=$((fail+1)); print "FAIL unknown visibility printed no line"; cat $work/err; }
+check refused "non-GitHub remote is unknown, which is scanned" ssh://git@example.invalid/o/r.git
+grep -q 'visibility .* is unknown' $work/err || { fail=$((fail+1)); print "FAIL non-GitHub remote printed no unknown line"; }
+PATH=/usr/bin:/bin check refused "gh missing means unknown, which is scanned" https://github.com/gone-owner/gone-repo.git
+grep -q 'visibility .* is unknown' $work/err || { fail=$((fail+1)); print "FAIL missing gh printed no unknown line"; }
+[[ -e $cache/new-owner__new-repo ]] && { fail=$((fail+1)); print "FAIL an unknown answer was cached"; }
+reset_to_remote
+
+# ---- the repo's own hooks: a global core.hooksPath must not hide .git/hooks ----
+own=$work/repo/.git/hooks
+export AGENTS_PUSH_DENYLIST=$work/own-list.txt; print -r -- 'Acme' > $AGENTS_PUSH_DENYLIST
+export OWN_LOG=$work/own.log
+cat > $own/pre-push <<'HOOK'
+#!/bin/sh
+echo "args: $*" > "$OWN_LOG"
+cat >> "$OWN_LOG"
+[ -f "$OWN_LOG.refuse" ] && { echo "own hook refuses" >&2; exit 1; }
+exit 0
+HOOK
+chmod +x $own/pre-push
+rm -f -- $OWN_LOG $OWN_LOG.refuse
+commit w.txt 'clean' 'add w'
+expect ok "the repo's own pre-push runs and can pass"
+grep -q "^args: origin " $OWN_LOG && grep -q "^HEAD [0-9a-f]\{40\} refs/heads/main " $OWN_LOG &&
+  pass=$((pass+1)) || { fail=$((fail+1)); print "FAIL own pre-push got no args or stdin"; cat $OWN_LOG; }
+commit x.txt 'clean' 'add x'
+touch $OWN_LOG.refuse
+expect refused "the repo's own pre-push can refuse"
+grep -q 'own hook refuses' $work/err || { fail=$((fail+1)); print "FAIL own hook's refusal not shown"; }
+rm -f -- $OWN_LOG
+commit y.txt 'built for acme' 'add y'
+expect refused "the scan refuses before the repo's own hook runs"
+[[ -e $OWN_LOG ]] && { fail=$((fail+1)); print "FAIL own hook ran after a refused scan"; }
+export GH_STUB_ANSWER=true
+rm -f -- $OWN_LOG
+if direct https://github.com/priv-owner/priv-repo.git; then fail=$((fail+1)); print "FAIL own hook's refusal ignored on a private remote"; else pass=$((pass+1)); fi
+[[ -e $OWN_LOG ]] || { fail=$((fail+1)); print "FAIL own hook did not run on a private remote"; }
+rm -f -- $OWN_LOG.refuse
+reset_to_remote
+
+# Other client-side hooks chain through symlinks to chain-hook, with their arguments.
+cat > $own/post-commit <<'HOOK'
+#!/bin/sh
+echo "post-commit ran" > "$OWN_LOG.pc"
+HOOK
+cat > $own/post-checkout <<'HOOK'
+#!/bin/sh
+echo "$#" > "$OWN_LOG.co"
+HOOK
+chmod +x $own/post-commit $own/post-checkout
+commit z.txt 'clean' 'add z'
+grep -q 'post-commit ran' $OWN_LOG.pc 2>/dev/null && pass=$((pass+1)) || { fail=$((fail+1)); print "FAIL post-commit did not chain to the repo's own hook"; }
+git -C $work/repo switch -q -c chained
+[[ $(<$OWN_LOG.co) == 3 ]] 2>/dev/null && pass=$((pass+1)) || { fail=$((fail+1)); print "FAIL post-checkout got the wrong arguments"; }
+git -C $work/repo switch -q main
+# A failing own hook fails the command that ran it.
+print '#!/bin/sh\nexit 1' > $own/commit-msg; chmod +x $own/commit-msg
+print x > $work/repo/fail.txt; git -C $work/repo add -A
+git -C $work/repo commit -qm 'add fail' 2>/dev/null && { fail=$((fail+1)); print "FAIL a failing own commit-msg hook did not stop the commit"; } || pass=$((pass+1))
+rm -f -- $own/commit-msg
+git -C $work/repo commit -qm 'add fail' && pass=$((pass+1)) || { fail=$((fail+1)); print "FAIL commit failed with no own commit-msg hook"; }
+# Every hook name the dispatcher serves is a symlink to it; pre-push is its own script.
+for n in pre-commit commit-msg post-merge post-checkout post-commit prepare-commit-msg; do
+  [[ -L ${hook:h}/$n && $(readlink ${hook:h}/$n) == chain-hook ]] || { fail=$((fail+1)); print "FAIL githooks/$n is not a symlink to chain-hook"; }
+done
+[[ ! -L $hook ]] && pass=$((pass+1)) || { fail=$((fail+1)); print "FAIL pre-push must be its own script"; }
 
 print "pre-push denylist: $pass passed, $fail failed"
 (( fail == 0 ))

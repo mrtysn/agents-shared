@@ -1,6 +1,6 @@
 # Push denylist for githooks/pre-push. Copy to
 #     ${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/push-denylist.txt
-# and keep it there, untracked. It must exist: a missing file refuses every push; a file
+# and keep it there, untracked. It must exist: a missing file refuses every push that is scanned (a private repo's is not); a file
 # with no entries lets pushes through, with a loud warning each time, since it guards nothing.
 #
 # One entry per line. Blank lines and lines starting with # are skipped.

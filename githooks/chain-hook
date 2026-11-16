@@ -1,0 +1,21 @@
+#!/bin/zsh
+# DESC: git hook dispatcher — run the repo's own hook of the same name, so a global core.hooksPath breaks nothing
+#
+# A core.hooksPath (global or per repo) makes git ignore <repo>/.git/hooks/, where tools
+# such as git-lfs install pre-push, post-checkout, post-commit and post-merge. This script
+# is symlinked here once per client-side hook name git runs; invoked as one of them it runs
+# the repo's own $(git rev-parse --git-common-dir)/hooks/<name>, when executable, with the
+# same arguments and stdin, and exits with its status. A repo with no such hook passes.
+#
+# githooks/pre-push is not one of these symlinks: it is its own script (the name guard) and
+# calls the repo's own hook itself, after the scan.
+set -uo pipefail
+
+name=${0:t}
+[[ $name == chain-hook ]] && { print -u2 -r -- "chain-hook: run it through one of its hook-name symlinks."; exit 2; }
+
+common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || exit 0
+own=$common/hooks/$name
+[[ -f $own && -x $own ]] || exit 0
+[[ ${own:A} == ${0:A} ]] && exit 0   # the repo's hook is this script: never call ourselves
+exec $own "$@"
