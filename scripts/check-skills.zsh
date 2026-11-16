@@ -113,7 +113,7 @@ check_links skills ${skill_dirs:#$ROOT/claude/skills/personal/*}
 check_links rules $ROOT/claude/rules/*.md(N)
 check_links commands $ROOT/claude/commands/*.md(N)
 # personal/ entries: linked exactly when the profile is personal, never shadowing a shared name
-local p
+local p k l
 for p in $ROOT/claude/skills/personal/*(N/) $ROOT/claude/rules/personal/*.md(N); do
   k=${${p:h:h}:t}
   [[ -e $ROOT/claude/$k/${p:t} ]] && fail $p "a shared $k entry has the same name"
@@ -123,7 +123,6 @@ for p in $ROOT/claude/skills/personal/*(N/) $ROOT/claude/rules/personal/*.md(N);
     [[ $(readlink $CFG/$k/${p:t} 2>/dev/null) == $p ]] && fail $CFG/$k/${p:t} "linked, but the profile is ${PROFILE:-unset}"
   fi
 done
-local k l
 for k in skills rules commands; do
   for l in $CFG/$k/*(N@); do
     [[ $(readlink $l) == $ROOT/* && ! -e $l ]] && fail $l "dangling link into this checkout"

@@ -82,11 +82,9 @@ Pages are local files (see the artifacts rule): never publish to Anthropic.
    closing reply never says how the page was checked (widths, "rendered", "reads cleanly"),
    how it is built (contents column, `ws-` components, offline, light and dark), or where the
    file lives ("stays local", "nothing to commit"), and never lists its sections. Two things
-   are said: a problem a render found, with its fix, and a check that could not run. Mention once that `notes-publish` can
-   serve it, never run it unprompted. Publishing from a session leaves the page private:
-   `--audience` is refused in an agent session, and a `!` command at the prompt runs inside
-   it, so it is refused too. To make a page public, give the user the `cd <folder> &&
-   notes-publish --audience public FILE` line in a code block for a separate terminal window.
+   are said: a problem a render found, with its fix, and a check that could not run. Where a rule names a publishing
+   tool for this machine, mention once that it can serve the page, as that rule says; never
+   run it unprompted.
 
 ## Progress page: long work shown live
 

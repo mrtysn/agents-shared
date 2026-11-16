@@ -1,6 +1,6 @@
 ---
 description: Put the open items of this session on one HTML form that is enough on its own to decide the action points: a question per open decision, a do/defer/drop question per item that needs an action, the rest listed in the intro, and a free text box at the end. Runs only when the user asks for it. Use when the user invokes /open-decisions-form, or says "walk me through the outstanding items one by one", "make a form page for the open items", "put the decisions on a form", or "give me a document I can decide from". Not for a plain recap or a quick ask: /outstanding and /ask-open-decisions stay the default.
-argument-hint: [optional scope hint, e.g. "just the node01 ones"]
+argument-hint: [optional scope hint, e.g. "just the server ones"]
 user-invocable: true
 allowed-tools: Bash, Read, Glob, Grep, Write, Skill
 ---

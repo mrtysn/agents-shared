@@ -8,6 +8,9 @@ window-focus	Bash	command	(^|[;&|(`])[[:space:]]*(open|quiet-open|osascript|fire
 no-unprompted-account-traffic	Bash	command	(^|[;&|(`])[[:space:]]*(curl|wget|ssh|scp|rsync|nc)[[:space:]]	localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0	deny-once
 no-unprompted-account-traffic	Bash	command	(^|[;&|(`])[[:space:]]*(python[0-9.]*|node|deno|bun|ruby|perl)[[:space:]].*(requests\.(get|post|put|delete|head|Session)|urllib|httpx|aiohttp|urlopen|fetch\(|http\.client|XMLHttpRequest)	localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0	deny-once
 no-unprompted-account-traffic	WebFetch|WebSearch|mcp__exa__.*	none	.	-	note-once
+no-unprompted-account-traffic-personal	Bash	command	(^|[;&|(`])[[:space:]]*(curl|wget|ssh|scp|rsync|nc)[[:space:]]	localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0	deny-once
+no-unprompted-account-traffic-personal	Bash	command	(^|[;&|(`])[[:space:]]*(python[0-9.]*|node|deno|bun|ruby|perl)[[:space:]].*(requests\.(get|post|put|delete|head|Session)|urllib|httpx|aiohttp|urlopen|fetch\(|http\.client|XMLHttpRequest)	localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0	deny-once
+no-unprompted-account-traffic-personal	WebFetch|WebSearch|mcp__exa__.*	none	.	-	note-once
 messages-between-sessions	SendMessage	to	.	^main$	deny-once	main
 asking-for-decisions	AskUserQuestion	none	.	-	note-once
 absolute-paths-for-deletion	Bash	command	(^|[;&|(`])[[:space:]]*(rm|rmdir|unlink|trash)[[:space:]]	git[[:space:]]+rm	note-once

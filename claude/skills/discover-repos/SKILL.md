@@ -1,7 +1,7 @@
 ---
 description: Find interesting repositories on GitHub, GitLab, Codeberg and SourceHut for a topic or need. Use when user asks "find a cool repo for X", "what's a good project for X", "is there a library that does X", wants to browse what is new or rising in a topic, or invokes /discover-repos. For Claude Code skills use discover-skills instead.
 context: fork
-allowed-tools: WebSearch, Bash(gh search:*), Bash(gh api:*), Bash(fetch-anything-agent get:*), Bash(jq:*), Bash(tail:*), Bash(sed:*)
+allowed-tools: WebSearch, Bash(gh search:*), Bash(gh api:*), Bash(curl -sS:*), Bash(jq:*), Bash(tail:*), Bash(sed:*)
 argument-hint: <topic or need> [rising|established]
 ---
 
@@ -23,11 +23,11 @@ Run all of these in parallel in one turn. Every command asks for 15 results or f
 | GitHub by keyword | `gh search repos "<keywords>" --stars ">50" --sort stars --limit 15 --json fullName,description,stargazersCount,pushedAt,language,url` |
 | GitHub rising | same as keyword, with `--created ">=<today minus 90d>" --stars ">20"` replacing `--stars ">50"`. Always run it when the argument says `rising`; otherwise run it too, it is cheap |
 | GitHub awesome lists | `gh search repos "awesome <topic>" --sort stars --limit 5 --json fullName,description,stargazersCount,url` — an awesome list is often the best single hit; open its README (`gh api repos/<owner>/<repo>/readme -H "Accept: application/vnd.github.raw"`) only if the repos above are thin |
-| GitLab | `fetch-anything-agent get 'https://gitlab.com/api/v4/projects?search=<q>&order_by=star_count&sort=desc&per_page=15&simple=true'` |
-| Codeberg | `fetch-anything-agent get 'https://codeberg.org/api/v1/repos/search?q=<q>&sort=stars&order=desc&limit=15'` |
-| SourceHut | `fetch-anything-agent get 'https://sr.ht/projects?search=<q>'` — HTML only, no stars. Each project is an `<a href="/~owner/name/">` followed by a `<p>` description |
+| GitLab | `curl -sS 'https://gitlab.com/api/v4/projects?search=<q>&order_by=star_count&sort=desc&per_page=15&simple=true'` |
+| Codeberg | `curl -sS 'https://codeberg.org/api/v1/repos/search?q=<q>&sort=stars&order=desc&limit=15'` |
+| SourceHut | `curl -sS 'https://sr.ht/projects?search=<q>'` — HTML only, no stars. Each project is an `<a href="/~owner/name/">` followed by a `<p>` description |
 
-`fetch-anything-agent get` prints a two-line `[fresh, fetched …]` header before the body; drop it with `tail -n +3` before piping to `jq`. GitLab returns a bare JSON array (use `name_with_namespace`, `description`, `star_count`, `last_activity_at`, `web_url`). Codeberg wraps it as `{"ok":…,"data":[…]}` (use `full_name`, `description`, `stars_count`, `updated_at`, `html_url`).
+Where a rule routes plain HTTP through a fetch gateway, send these through it instead of curl, dropping any header it prints before the body before piping to `jq`. GitLab returns a bare JSON array (use `name_with_namespace`, `description`, `star_count`, `last_activity_at`, `web_url`). Codeberg wraps it as `{"ok":…,"data":[…]}` (use `full_name`, `description`, `stars_count`, `updated_at`, `html_url`).
 
 Bitbucket has no usable public repository search any more (its API answers "no API hosted at this URL"); do not try it.
 

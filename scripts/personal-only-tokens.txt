@@ -1,0 +1,16 @@
+# Names of personal-only tools, hosts and domains: scripts/check-personal-split.zsh fails
+# when any loaded text outside the personal/ folders names one. One token per line,
+# matched case-insensitively at word boundaries (letters, digits and _ end a word; - and .
+# do not, so `homelab` also catches `homelab-connect`). Blank lines and # lines are skipped.
+mertyas.in
+node01
+homelab
+authelia
+notes-publish
+notes-shared
+fetch-anything-agent
+agent-auth
+agent-request-limiter
+iterm-revive
+finance-import
+search-turkish-shops

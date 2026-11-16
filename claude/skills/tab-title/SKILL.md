@@ -18,7 +18,7 @@ Eighteen characters is what survives the tab strip; the status glyph and its spa
 cost two of them. Everything below serves that budget.
 
 - **Lowercase throughout**, first word included. Keep capitals only where the thing
-  is genuinely cased — `node01`, `iOS`, `Caddy`.
+  is genuinely cased — `iOS`, `macOS`, `Caddy`.
 - **Name the subject, not the activity or the state.** `watchface compiler`, never
   `building the watchface compiler` or `watchface done`.
 - **Most distinguishing word first.** Truncation eats the right end.

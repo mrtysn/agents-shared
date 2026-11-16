@@ -55,22 +55,22 @@ These follow from the user's `no-unprompted-account-traffic` rule and are not op
 7. **`solve_cloudflare=True` stays off** unless the user explicitly asks — it drives
    repeated challenge traffic at the site under the user's IP.
 
-## The machine's HTTPS proxy (agent-request-limiter)
+## The machine's HTTPS proxy (a request-budget proxy, where one runs)
 
-The session exports `HTTPS_PROXY`, `SSL_CERT_FILE` and `REQUESTS_CA_BUNDLE`.
+Where the machine runs a request-budget proxy, the session exports `HTTPS_PROXY`, `SSL_CERT_FILE` and `REQUESTS_CA_BUNDLE`.
 
 - `Fetcher` (curl_cffi) honours both automatically. Verified: requests appeared in the
-  limiter's per-site counts, no certificate errors.
+  proxy's per-site counts, no certificate errors.
 - **Browser fetchers ignore `HTTPS_PROXY`.** Chromium reads system proxy settings, not
   env vars, and Scrapling only passes a proxy to Playwright when given one. A
   `DynamicFetcher.fetch(url)` with no `proxy=` went straight out, uncounted. Always pass
   `proxy=os.environ["HTTPS_PROXY"]`. Verified: with it, the stealth fetch was counted.
-- `StealthyFetcher` sets `ignore_https_errors=True` on its context, so the limiter's
+- `StealthyFetcher` sets `ignore_https_errors=True` on its context, so the proxy's
   MITM certificate is accepted. `DynamicFetcher` does not; if it raises a certificate
   error through the proxy, pass `additional_args={"ignore_https_errors": True}` once.
-  If that also fails, report it. Never install the limiter's CA into Chromium or the
+  If that also fails, report it. Never install the proxy's CA into Chromium or the
   system store, and never route around the proxy to make a fetch succeed.
-- A 429 carrying an `X-Agent-Request-Limiter` header is the limiter refusing, not the
+- A 429 carrying the proxy's own refusal header is the proxy refusing, not the
   site: stop, tell the user which site and how many requests the task needed.
 
 ## Install

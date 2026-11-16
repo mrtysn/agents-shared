@@ -80,5 +80,23 @@ while IFS=$'\t' read -r verdict tool input agent; do
     fi
 done < "$CASES"
 
+# A doc under docs/on-demand/personal/ shows only on the personal profile.
+profile_case() {  # profile_case <paths.local.sh line> <want: shown|hidden> <session>
+    total=$((total + 1))
+    printf '%s\n' "$1" > "$STATE_ROOT/paths.local.sh"
+    # deny-once rows write their text to stderr; take both streams
+    OUT=$(jq -cn --arg s "$3" '{tool_name: "Bash", session_id: $s, tool_input: {command: "curl -s https://example.com"}}' \
+        | "$HOOK" 2>&1) || true
+    got=hidden
+    printf '%s' "$OUT" | grep -q 'on the personal machine' && got=shown
+    if [ "$got" != "$2" ]; then
+        failed=$((failed + 1)); printf 'FAIL  personal doc with "%s": want %s, got %s\n' "$1" "$2" "$got"
+    fi
+}
+profile_case 'AGENT_PROFILE=personal' shown profile-personal
+profile_case 'AGENT_PROFILE=work' hidden profile-work
+profile_case '# no profile' hidden profile-none
+rm -f "$STATE_ROOT/paths.local.sh"
+
 printf '\n%s cases, %s failed\n' "$total" "$failed"
 [ "$failed" = 0 ]

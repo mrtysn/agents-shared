@@ -16,7 +16,12 @@ are self-describing and a hand-kept list drifts. Use `ls`.
 - `claude/rules/` — behavioural rules, loaded at launch in **every** session. A rule
   that applies only at a particular tool call keeps a short core here and its full
   text in `docs/on-demand/<id>.md`; a row in `hooks/rule-triggers.tsv` brings the text
-  up the first time a session makes that call, with no settings edit
+  up the first time a session makes that call, with no settings edit.
+  `claude/rules/personal/` (and `claude/skills/personal/`, `docs/on-demand/personal/`) hold
+  what only the personal profile gets: the owner's own hosts, gateways and tools. A partly
+  personal rule keeps its generic core here and a `<name>-personal.md` companion there.
+  `scripts/check-personal-split.zsh` fails on a token from `scripts/personal-only-tokens.txt`
+  anywhere else; see README, *Profiles*
 - `claude/skills/` — one directory per skill; `SKILL.md` frontmatter is the
   authoritative description. External skills additionally carry `source.json`,
   `.upstream/`, and (if locally adapted) `override.patch` — see *External

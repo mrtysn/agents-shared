@@ -10,11 +10,17 @@
       },
       {
         "from": "claude/skills/*",
-        "to": "~/.claude/skills/"
+        "to": "~/.claude/skills/",
+        "exclude": [
+          "claude/skills/personal"
+        ]
       },
       {
         "from": "claude/rules/*",
-        "to": "~/.claude/rules/"
+        "to": "~/.claude/rules/",
+        "exclude": [
+          "claude/rules/personal"
+        ]
       }
     ],
     "install_command": [
@@ -68,6 +74,18 @@
       "name": "clo launch tests",
       "run": [
         "scripts/tests/test-clo-launch.zsh"
+      ]
+    },
+    {
+      "name": "personal split",
+      "run": [
+        "scripts/check-personal-split.zsh"
+      ]
+    },
+    {
+      "name": "init-global profiles",
+      "run": [
+        "scripts/tests/test-init-global-profiles.zsh"
       ]
     },
     {

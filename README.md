@@ -26,6 +26,24 @@ sources are linked, wrong-target links repaired, orphaned links (renamed/deleted
 upstream) pruned, and real local override files left untouched. Honors
 `CLAUDE_CONFIG_DIR` if set.
 
+### Profiles: personal and work
+
+Each Claude config folder declares its profile in its own `paths.local.sh`, which is
+never synced:
+
+```bash
+AGENT_PROFILE=personal     # or AGENT_PROFILE=work; unset means shared content only
+```
+
+`init-global.sh` reads it through `scripts/agent-profile` and links
+`claude/rules/personal/` and `claude/skills/personal/` only on the personal profile; on
+any other it removes links of its own into them. A machine with several config folders
+runs the installer once per folder: `CLAUDE_CONFIG_DIR=~/.claude-<name> bash
+scripts/init-global.sh`. `hooks/show-rule-at-action.sh` shows a doc from
+`docs/on-demand/personal/` only on the personal profile. `scripts/check-personal-split.zsh`
+(run by `project-lifecycle test`) fails when anything outside the `personal/` folders
+names a token from `scripts/personal-only-tokens.txt`.
+
 ### Install local-only (per project, no repo footprint)
 
 Symlink chosen skills from a standalone clone and hide them via

@@ -6,7 +6,7 @@
 - Make it work offline: no CDN, API or font host at runtime. A page in a repo links that repo's `ws/`
   folder (CSS and JS, fonts inside) by a relative path; a page written outside a repo, or `--inline`,
   carries them inline. A page that leaves its repo (mail, a Finder drag, a server) goes through
-  `project-lifecycle page-bundle` first, which `notes-publish` and game-venture's publish already do.
+  `project-lifecycle page-bundle` first; a publishing tool may already do it.
 - A page the user opens from disk (`file://`) must not depend on a third-party tile, API or
   font host at runtime: such hosts block or watermark a request with no Referer (OpenStreetMap
   answers 403, CARTO's free URL stamps "API KEY REQUIRED"). Use data bundled in the page, or
@@ -20,7 +20,7 @@
 
 ## Every page starts from `page-new`
 
-A page an agent writes (a report in the notebook, a diagram, a document for notes-shared)
+A page an agent writes (a report in the notebook, a diagram, a document to share)
 starts from the `/new-html-page` skill, never from CSS written for the occasion:
 
     project-lifecycle page-new --title "<two to four words>" --section "<Heading>" … --repo <the repo it describes> --session <this session's id> --out FILE.html
@@ -42,7 +42,5 @@ answers go into the main page.
 
 ## Publishing is a separate, deliberate step
 
-A page is local by default. When it is meant for someone else, it goes out with
-`notes-publish FILE.html` (private until an audience is set with `--audience`), which
-serves it on the notes site behind the portal. Say in one line that the page can be
-published that way; never publish on your own initiative.
+A page is local by default. It leaves the machine only when the user asks, through the
+publishing tool a rule names for this machine; never publish on your own initiative.

@@ -49,6 +49,25 @@ scripts does not matter, but a skill invoked before `import.sh` has run will fai
 
 Verify with `/context` in a session — every rule should appear under **Memory files**.
 
+## Profiles: what a config folder takes
+
+Each Claude config folder declares `AGENT_PROFILE=personal` or `AGENT_PROFILE=work` in its own
+`paths.local.sh` (never synced); unset means shared content only. `init-global.sh` links the
+`personal/` folders under `claude/rules/` and `claude/skills/` only on the personal profile,
+and removes its own links into them otherwise; agents-personal's `install.sh` links nothing
+unless the profile is personal. A machine with several config folders runs both installers
+once per folder, with `CLAUDE_CONFIG_DIR` set. Which folder belongs to which Claude account is
+listed in `${XDG_CONFIG_HOME:-~/.config}/agents-shared/claude-accounts` (shape in
+`scripts/claude-accounts.example`), read by `clo -a NAME`.
+
+Where a new rule goes: anything that names the owner's own hosts, domains, gateways or
+private tools goes under `claude/rules/personal/`. A rule that is mostly generic keeps its core
+in `claude/rules/` and moves the personal paragraphs to `claude/rules/personal/<name>-personal.md`;
+its on-demand text splits the same way into `docs/on-demand/personal/<name>-personal.md`, with
+trigger rows of its own (`show-rule-at-action.sh` reads that folder only on the personal profile).
+`project-lifecycle test` fails when a token from `scripts/personal-only-tokens.txt` appears
+outside the `personal/` folders; add a token there when a new personal tool appears.
+
 ## Setting up a cloud environment
 
 Claude Code cloud sessions (claude.ai/code) read no user `settings.json`, so hooks never
