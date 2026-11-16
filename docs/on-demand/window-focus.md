@@ -71,12 +71,24 @@ follow the code signature, so the ad-hoc copy starts without them: a menu bar
 manager comes up seeing no items, and the test proves nothing. Test such an app
 through its own non-activating path: a test flag that orders the window front
 with `orderFrontRegardless()` on the non-main display, no `activate`, no
-`makeKey`. Drive its controls with accessibility actions (`AXPress`, setting
-`AXValue`), never synthetic clicks or keys: a click on a window activates its
-app. Whatever needs real mouse or key events (drag and drop, a shortcut) is left
-for the user. Nov 2026: a subagent opened such an app's window with an
-activating launch flag and clicked through it, taking the user's focus at every
-step; the user: "why not use quiet-open?"
+`makeKey`. Never synthetic clicks or keys: a click on a window activates its
+app. Better still, test the controls headlessly: build the window in memory with
+the activation policy `.prohibited`, never show it, and fire each control's action
+in code; nothing reaches the screen.
+
+**Opening a menu takes the keyboard without activating anything.** A popup button
+pressed or a menu shown through accessibility (`AXPress` on a popup, `AXShowMenu`)
+runs menu tracking, and every key the user types goes to that menu until it
+closes. A frontmost-app check reads the user's app the whole time and misses it.
+An agent never opens a menu or popup on a machine where the user is working.
+`orderFrontRegardless()` also lays the window over whatever is on that screen.
+
+Nov 2026: a subagent opened such an app's window with an activating launch flag
+and clicked through it, taking the user's focus at every step; the user: "why not
+use quiet-open?" The rerun kept the app inactive at every step but opened the
+window's popup menus through accessibility; the user: "YOU KEEP CLASHING WITH MY
+TYPNG". A headless test of the same window then ran with the user's focus
+untouched.
 
 ## Why both halves are required
 

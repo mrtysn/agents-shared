@@ -9,8 +9,10 @@ Reach for a headless mode first; almost nothing an agent runs needs pixels.
 **A subagent's brief carries this rule.** A subagent sees no hook line and no
 memory of the parent's: a brief for any run that opens, clicks or screenshots a
 window says, in the brief itself, that no app may be activated, that windows go on
-the non-main display, and that controls are driven by accessibility actions,
-never synthetic clicks. "The window will move on your screen" is not that.
+the non-main display, that no synthetic click or key is sent, and that no menu or
+popup is opened (an open menu takes the user's typing without activating anything).
+Controls are best tested headlessly, with the window never shown. "The window will
+move on your screen" is not that.
 
 The session's focus policy (ALLOW or DENY) is injected at start. The full rule
 appears the first time a session launches a window, and covers apps `quiet-open`
