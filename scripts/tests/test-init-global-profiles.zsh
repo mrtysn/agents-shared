@@ -26,6 +26,15 @@ check "unset: personal rule not linked" test ! -e $CLAUDE_CONFIG_DIR/rules/$one_
 check "unset: personal/ folder itself not linked" test ! -e $CLAUDE_CONFIG_DIR/skills/personal
 check "unset: shared rule linked" test -L $CLAUDE_CONFIG_DIR/rules/question-handling.md
 
+check "missing denylist is reported" grep -q 'Push denylist missing' $work/out
+mkdir -p $XDG_CONFIG_HOME/agents-shared
+print $'# only a comment\n\n' > $XDG_CONFIG_HOME/agents-shared/push-denylist.txt
+check "no-entry denylist installs" install
+check "no-entry denylist warns loudly" grep -q 'PUSH DENYLIST HAS NO ENTRIES' $work/out
+print 'somename' >> $XDG_CONFIG_HOME/agents-shared/push-denylist.txt
+check "filled denylist installs" install
+check "filled denylist does not warn" eval '! grep -qi "denylist" $work/out'
+
 print 'AGENT_PROFILE=personal' > $CLAUDE_CONFIG_DIR/paths.local.sh
 check "personal installs" install
 check "personal: skill linked" test -L $CLAUDE_CONFIG_DIR/skills/$one_skill

@@ -181,12 +181,14 @@ warning that used to ride on its prompt hook are `hooks/nudge-named-skills-and-s
 ### githooks/pre-push: the name guard for public repos
 
 A git hook, not a Claude Code hook, so it covers every push from the clone, an agent's or one
-typed in a terminal. It reads every commit being pushed (message, touched paths, added lines)
+typed in a terminal. It reads every commit being pushed (message, author and committer, touched
+paths, added lines, binary files), annotated tag messages, and the full tree at each pushed tip,
 and refuses the push when a line matches an entry of the untracked denylist at
 `${XDG_CONFIG_HOME:-~/.config}/agents-shared/push-denylist.txt` (`$AGENTS_PUSH_DENYLIST`
 overrides): one entry per line, a whole word matched case-insensitively, or `re:<ERE>`. The
-shape is `githooks/push-denylist.txt.example`. A missing list refuses every push; an empty one
-blocks nothing. `init-global.sh` sets `core.hooksPath` to `githooks` for this repo (leaving any
+shape is `githooks/push-denylist.txt.example`. A missing list refuses every push; a list with no entries
+lets the push through but prints a loud warning (the hook on each push, `init-global.sh` on each
+run), since it checks nothing. When git cannot list the commits, the push is refused. `init-global.sh` sets `core.hooksPath` to `githooks` for this repo (leaving any
 other value alone, and saying so). Another repo opts in with
 
 ```bash

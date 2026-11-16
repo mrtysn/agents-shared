@@ -247,6 +247,10 @@ printf '  Git hooks: %s\n'                      "$HOOKS_NOTE"
 if [ ! -r "$DENYLIST" ]; then
     printf '  Push denylist missing: %s\n' "$DENYLIST"
     printf '    every push from this clone is refused until it exists (shape: githooks/push-denylist.txt.example)\n'
+elif ! grep -qE '^[[:space:]]*[^[:space:]#]' "$DENYLIST"; then
+    printf '\n  !! WARNING: THE PUSH DENYLIST HAS NO ENTRIES: %s\n' "$DENYLIST"
+    printf '  !! Pushes from this clone are checked against nothing. Add one name per line\n'
+    printf '  !! (shape: githooks/push-denylist.txt.example); the hook warns on every push until you do.\n\n'
 fi
 printf '  Changes:  +%d new, ~%d repaired, -%d pruned, -%d out of profile\n' "$linked" "$fixed" "$pruned" "$out_of_profile"
 if [ ${#skipped_local[@]} -gt 0 ]; then
