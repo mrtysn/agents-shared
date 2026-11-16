@@ -53,8 +53,8 @@
 # Reply text written between tool calls can be stored in the transcript as a thinking block holding the server's short
 # summary of it, with no text block (2026-11-15, session 75b44d1f-4c1d-4a8f-ad27-84c543a389e5: five of ten replies;
 # the reader's NARRATION rows, told from reasoning by the block's signature). Trigger 1 counts a NARRATION row as text
-# written ahead of the call, and trigger 4 as a reply to a mid-turn message, which holds only where the terminal shows
-# narration at all. Trigger 3 does not count it as delivered content: the user saw a summary at most. A THINKING row
+# written ahead of the call, and trigger 4 as a reply to a mid-turn message, since a resumed session draws the
+# summary as an ordinary reply line (Claude Code 2.1.325, read from rendered screens). Trigger 3 does not count it as delivered content: the user saw a summary at most. A THINKING row
 # is reasoning and counts for nothing.
 # Once per turn: a marker file keyed by session id and prompt time under
 # ${XDG_CACHE_HOME:-$HOME/.cache}/agents-shared/refuse-requested-content-before-tool-call/.
