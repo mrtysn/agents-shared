@@ -5,7 +5,8 @@
 set -euo pipefail
 here=${0:A:h}
 lines=("${(@f)$(python3 $here/iterm-revive.py resume)}")
-(( ${#lines} )) && [[ -n ${lines[1]} ]] || { echo "no ended sessions to reopen"; exit 0; }
+lines=(${(M)lines:#*claude --resume *})
+(( ${#lines} )) || { echo "no ended sessions to reopen"; exit 0; }
 script='tell application "iTerm2"
 create window with default profile'
 first=1
