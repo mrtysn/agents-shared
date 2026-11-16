@@ -133,7 +133,7 @@ opened fresh) to read the answer back. The user: "WHY DID YOU SEND A MESSAGE TO 
 FRESH SESSION AND POLLUTE IT", then "THIS IS A MAJOR PROBLEM".
 
 Oct 20 2026, job-search: asked to tell the session that had pushed about 55 commits
-with failing CI to `ai-job-search`, the agent listed ten peers and sent to
+with failing CI to a private repo, the agent listed ten peers and sent to
 `job-search-8d` because its name resembled the repo. It checked nothing, then told
 the user it had not confirmed that was the session that made the commits. This doc
 was shown before the send and said nothing about choosing a recipient; the agent

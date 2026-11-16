@@ -25,7 +25,7 @@ Read `~/dev/adb-reconnect/CLAUDE.md` for the full rules.
 
 ## Provenance
 
-2026-11-10, elifer: asked to install three APKs on the phone, a session ran raw `adb install` and,
+2026-11-10, an Android app project: asked to install three APKs on the phone, a session ran raw `adb install` and,
 when the phone dropped, `adb reconnect offline` against the shared server. It never read the
 adb-reconnect CLAUDE.md, because the session was launched in another repo and no rule fired. The
 owner: "adb is also like a singleton on this machine thats why".
