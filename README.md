@@ -72,7 +72,10 @@ references and templates; new extensions go in `claude/skills/`.
 ## Hooks
 
 Not skills — shell scripts wired by hand into the `settings.json` of the Claude
-config dir (`$CLAUDE_CONFIG_DIR`, else `~/.claude`).
+config dir (`$CLAUDE_CONFIG_DIR`, else `~/.claude`). `init-global.sh` links every executable
+script in `hooks/` into `<config dir>/hooks/` (and `hooks/personal/` on the personal profile),
+so a settings entry can name `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/<name>` and no repo
+location; a script finds its siblings from its own folder, symlink resolved.
 
 | Hook | Event | Description |
 |------|-------|-------------|

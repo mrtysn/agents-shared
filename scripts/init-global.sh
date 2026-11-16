@@ -3,6 +3,9 @@
 # init-global.sh — Make agents-shared commands, skills and rules available in EVERY
 # project on this machine by symlinking them into the user-level Claude dirs
 # (~/.claude/commands, ~/.claude/skills, ~/.claude/rules) instead of each repo's .claude/.
+# Hook scripts (hooks/*.sh, *.py, *.zsh) are linked into ~/.claude/hooks/ the same way, so
+# the shared settings.json names them as ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/<name>
+# and no repo location.
 #
 # Idempotent. Re-run after adding, renaming, or removing commands/skills:
 #   • new sources are linked
@@ -14,8 +17,8 @@
 #
 # Profiles. The target config folder declares AGENT_PROFILE=personal or work in its
 # paths.local.sh (read by scripts/agent-profile). claude/rules/personal/ and
-# claude/skills/personal/ are linked only when it is personal; on any other profile,
-# or none, links into them are removed. Run once per config folder, with
+# claude/skills/personal/ (and hooks/personal/) are linked only when it is personal; on any
+# other profile, or none, links into them are removed. Run once per config folder, with
 # CLAUDE_CONFIG_DIR set for any folder other than ~/.claude.
 #
 # Usage:
@@ -31,11 +34,13 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SRC_COMMANDS="$REPO_DIR/claude/commands"
 SRC_SKILLS="$REPO_DIR/claude/skills"
 SRC_RULES="$REPO_DIR/claude/rules"
+SRC_HOOKS="$REPO_DIR/hooks"
 
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 DST_COMMANDS="$CLAUDE_DIR/commands"
 DST_SKILLS="$CLAUDE_DIR/skills"
 DST_RULES="$CLAUDE_DIR/rules"
+DST_HOOKS="$CLAUDE_DIR/hooks"
 
 # Where this checkout lives, published to the shell as $AGENTS_SHARED so skills can
 # invoke scripts/ by name instead of carrying a baked-in path. Rewritten on every
@@ -58,7 +63,7 @@ skipped_local=()
 skipped_foreign=()
 RESULT=""
 
-mkdir -p "$DST_COMMANDS" "$DST_SKILLS" "$DST_RULES"
+mkdir -p "$DST_COMMANDS" "$DST_SKILLS" "$DST_RULES" "$DST_HOOKS"
 
 # link_one <src> <dst> — point dst at src, reporting the outcome in $RESULT:
 #   linked   a new symlink was created
@@ -112,6 +117,7 @@ if [ "$UNLINK" = 1 ]; then
     prune_dir "$DST_COMMANDS" "$SRC_COMMANDS"
     prune_dir "$DST_SKILLS"   "$SRC_SKILLS"
     prune_dir "$DST_RULES"    "$SRC_RULES"
+    prune_dir "$DST_HOOKS"    "$SRC_HOOKS"
     [ -f "$ENV_FILE" ] && rm "$ENV_FILE"
     [ "$(git -C "$REPO_DIR" config --local --get core.hooksPath 2>/dev/null)" = githooks ] &&
         git -C "$REPO_DIR" config --local --unset core.hooksPath
@@ -177,11 +183,39 @@ for src in "${rule_srcs[@]}"; do
     rule_total=$((rule_total + 1))
 done
 
+# ── Hooks: one symlink per executable script ────────────────────────────────
+# settings.json names a hook as ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/<name>, so a fresh
+# config folder needs the links. Data files beside the scripts (.tsv, .txt) and tests/ are
+# not linked: scripts reach them from their own, symlink-resolved, folder. hooks/personal/
+# is linked on the personal profile only. A link another repo made (cc-statusline's event
+# hook) is a foreign symlink and stays.
+hook_srcs=()
+for src in "$SRC_HOOKS"/*.sh "$SRC_HOOKS"/*.py "$SRC_HOOKS"/*.zsh; do
+    [ -f "$src" ] && [ -x "$src" ] && hook_srcs+=("$src")
+done
+if [ "$IN_PROFILE" = 1 ]; then
+    for src in "$SRC_HOOKS"/personal/*.sh "$SRC_HOOKS"/personal/*.py "$SRC_HOOKS"/personal/*.zsh; do
+        [ -f "$src" ] && [ -x "$src" ] && hook_srcs+=("$src")
+    done
+fi
+hook_total=0
+for src in "${hook_srcs[@]}"; do
+    link_one "$src" "$DST_HOOKS/$(basename "$src")"
+    case "$RESULT" in
+        linked) linked=$((linked + 1)) ;;
+        fixed)  fixed=$((fixed + 1)) ;;
+        skipped) skipped_local+=("hooks/$(basename "$src")"); continue ;;
+        foreign) skipped_foreign+=("hooks/$(basename "$src") -> $(readlink "$dst_last")"); continue ;;
+    esac
+    hook_total=$((hook_total + 1))
+done
+
 # Drop links whose source vanished (e.g. a skill renamed rewind → go-back), and
 # links into personal/ that the profile does not take.
 prune_dir "$DST_COMMANDS" "$SRC_COMMANDS"
 prune_dir "$DST_SKILLS"   "$SRC_SKILLS"
 prune_dir "$DST_RULES"    "$SRC_RULES"
+prune_dir "$DST_HOOKS"    "$SRC_HOOKS"
 
 # ── Shell env: publish this checkout's location ──────────────────────────────
 # Written rather than committed: the path differs per machine, so the repo holds
@@ -243,6 +277,7 @@ printf '  Env file: %s\n'                       "$ENV_FILE"
 printf '  Commands: %d linked\n'                "$cmd_total"
 printf '  Skills:   %d linked\n'                "$skill_total"
 printf '  Rules:    %d linked\n'                "$rule_total"
+printf '  Hooks:    %d linked\n'                "$hook_total"
 printf '  Git hooks: %s\n'                      "$HOOKS_NOTE"
 if [ ! -r "$DENYLIST" ]; then
     printf '  Push denylist missing: %s\n' "$DENYLIST"

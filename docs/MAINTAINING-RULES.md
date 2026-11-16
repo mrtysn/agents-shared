@@ -30,7 +30,7 @@ git clone git@github.com:mrtysn/agents-shared.git ~/dev/agents-shared
 bash ~/dev/agents-shared/scripts/init-global.sh
 ```
 
-That creates `~/.claude/{rules,skills,commands}/` and symlinks every file in. It is
+That creates `~/.claude/{rules,skills,commands,hooks}/` and symlinks every file in (hooks: the executable scripts of `hooks/`, so settings name `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/<name>`). It is
 idempotent: re-running repairs wrong targets, links new files, and prunes symlinks whose
 source disappeared. Real (non-symlink) files in those directories are treated as local
 overrides and never touched.

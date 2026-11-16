@@ -20,7 +20,13 @@ check() {  # check <label> <condition...>
 }
 install() { bash $repo/scripts/init-global.sh > $work/out 2>&1 || { cat $work/out; return 1; } }
 
+mkdir -p $CLAUDE_CONFIG_DIR/hooks
+ln -s /bin/ls $CLAUDE_CONFIG_DIR/hooks/cc-statusline-event.zsh      # another repo's hook link
 check "unset profile installs" install
+check "hooks: subagent-guard linked" test -L $CLAUDE_CONFIG_DIR/hooks/subagent-guard.sh -a -x $CLAUDE_CONFIG_DIR/hooks/subagent-guard.sh
+check "hooks: data files and tests/ not linked" test ! -e $CLAUDE_CONFIG_DIR/hooks/rule-triggers.tsv -a ! -e $CLAUDE_CONFIG_DIR/hooks/tests
+check "hooks: another repo's link left alone" test "$(readlink $CLAUDE_CONFIG_DIR/hooks/cc-statusline-event.zsh)" = /bin/ls
+check "hooks: a linked hook finds its repo folder" eval "print '{}' | $CLAUDE_CONFIG_DIR/hooks/show-rule-at-action.sh"
 check "unset: personal skill not linked" test ! -e $CLAUDE_CONFIG_DIR/skills/$one_skill
 check "unset: personal rule not linked" test ! -e $CLAUDE_CONFIG_DIR/rules/$one_rule
 check "unset: personal/ folder itself not linked" test ! -e $CLAUDE_CONFIG_DIR/skills/personal

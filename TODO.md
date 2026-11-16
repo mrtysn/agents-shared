@@ -30,12 +30,22 @@ registered as `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/cc-statusline-event.zsh
 a symlink that cc-statusline's `scripts/install-event-hook.zsh` creates into the
 repo, so the synced entry is valid wherever the repo is checked out.
 
+### Status
+
+Step 1 is done: `scripts/init-global.sh` links every executable script in `hooks/` (and, on the
+personal profile, `hooks/personal/`) into `$CLAUDE_DIR/hooks/`, repairs wrong targets, prunes
+dangling links, leaves another repo's links alone (cc-statusline's event hook), and the hooks
+resolve their own folder through the symlink. A fresh config folder therefore has
+`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/subagent-guard.sh`, the one entry that already names
+that path. Steps 2 and 3 remain: the settings.json entries live in the dev-env repo, and each
+config folder (`~/.claude`, `~/.claude-<name>`) needs `init-global.sh` run once.
+
 ### What to do
 
 Move the hook scripts into the Claude config dir as symlinks, and reference them
 the way the cc-statusline event hook is referenced.
 
-1. Add a third source pair to `scripts/init-global.sh`: `hooks/` →
+1. (Done.) Add a third source pair to `scripts/init-global.sh`: `hooks/` →
    `$CLAUDE_DIR/hooks/`, alongside the existing commands and skills pairs. The
    script already resolves the repo root from `${BASH_SOURCE[0]}`, honors
    `CLAUDE_CONFIG_DIR`, repairs wrong-target symlinks, and prunes orphans, so
