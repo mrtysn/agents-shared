@@ -126,7 +126,7 @@ TRANSCRIPT=$(printf '%s' "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/nul
 # A read-only Bash call only matters when a fenced block is in the transcript at all: skip the reader otherwise.
 if [ "$SHOW" = false ] && [ "$WORK" = false ]; then grep -q '```' "$TRANSCRIPT" 2>/dev/null || exit 0; fi
 
-HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+HERE=$(cd "$(dirname "$(readlink "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")")" && pwd)   # through a symlink in the config folder too
 READER=${TRANSCRIPT_READER:-$HERE/../scripts/extract-session-text.py}
 PATTERN_FILE="$HERE/show-request-pattern.txt"
 [ -r "$READER" ] || exit 0

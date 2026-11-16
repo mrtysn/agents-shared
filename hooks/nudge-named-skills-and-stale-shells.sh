@@ -30,7 +30,7 @@
 
 set -u
 
-HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+HERE=$(cd "$(dirname "$(readlink "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")")" && pwd)   # through a symlink in the config folder too
 # Single words that would collide with ordinary English if matched bare, but are skills worth routing to.
 ALLOW_BARE="archify humanizer homelab-connect"
 # Top-level directories that a typed /name is a path to, not a command (never reported as missing).

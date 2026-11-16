@@ -91,7 +91,7 @@ printf '%s' "$QUESTIONS" | grep -Eqi "$POINTER" && HAS_POINTER=1
 PATHS=$(printf '%s' "$QUESTIONS" | grep -Eoi "$PATHRE" | grep -v -e '://' -e '[*?]')
 [ "$HAS_POINTER" = 1 ] || [ -n "$PATHS" ] || exit 0
 
-HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+HERE=$(cd "$(dirname "$(readlink "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")")" && pwd)   # through a symlink in the config folder too
 READER="$HERE/../scripts/extract-session-text.py"
 [ -r "$READER" ] || exit 0
 

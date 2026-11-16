@@ -23,7 +23,7 @@ import os
 import re
 import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
 from transcript_items import pending_queued_commands  # noqa: E402
 

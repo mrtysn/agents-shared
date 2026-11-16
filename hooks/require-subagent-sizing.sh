@@ -41,7 +41,7 @@ EFFORT=$(printf '%s' "$INPUT" | jq -r '.tool_input.effort // empty')
 
 [ "$TYPE" = "fork" ] && exit 0
 
-HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+HERE=$(cd "$(dirname "$(readlink "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")")" && pwd)   # through a symlink in the config folder too
 GUIDE="$HERE/../docs/size-subagents-to-the-task.md"
 
 guide_table() {

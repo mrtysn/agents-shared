@@ -41,7 +41,7 @@ SESSION=$(printf '%s' "$INPUT" | jq -r '.session_id // empty')
 AGENT=$(printf '%s' "$INPUT" | jq -r '.agent_id // empty')
 [ -n "$TOOL" ] || exit 0
 
-HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+HERE=$(cd "$(dirname "$(readlink "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")")" && pwd)   # through a symlink in the config folder too
 TRIGGERS=${RULE_TRIGGERS:-$HERE/rule-triggers.tsv}
 DOCS="$HERE/../docs/on-demand"
 STATE=${CLAUDE_CONFIG_DIR:-$HOME/.claude}/rule-injection

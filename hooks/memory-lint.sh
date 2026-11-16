@@ -103,7 +103,7 @@ fi
 
 [ -e "$path" ] && exit 0            # editing an existing memory is not a new duplicate
 
-HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+HERE=$(cd "$(dirname "$(readlink "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")")" && pwd)   # through a symlink in the config folder too
 on_demand_dir="$HERE/../docs/on-demand"
 
 normalize() {
