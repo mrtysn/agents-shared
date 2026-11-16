@@ -70,7 +70,7 @@ JSON_MAX_CHARS = 2000
 def resolve(arg):
     p = Path(arg).expanduser()
     if p.is_file():
-        return p
+        return p.resolve()  # a background task's .output is a symlink into the session's subagents/
     if UUID_ONLY.match(arg):
         cfg = os.environ.get("CLAUDE_CONFIG_DIR") or str(Path.home() / ".claude")
         for m in sorted(Path(cfg).glob(f"projects/*/{arg}.jsonl")):
