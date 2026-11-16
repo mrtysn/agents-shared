@@ -50,7 +50,10 @@ and many parallel sessions, that ask is repeated all day.
 **Pushing to a public repo publishes, and a force-push does not take it back.** New
 personal information goes to one only after the user approves each item: names of
 people or companies, contact addresses, clients, business terms or prices, unreleased
-projects, private repos described, pictures of private work. Commit it locally, show
+projects, private repos described, pictures of private work. A private tool repo's bare
+name is fine. A name that is itself a company, client, person or unreleased project is
+never pushed to a public repo: the local denylist read by agents-shared's `githooks/pre-push`
+refuses it. Commit it locally, show
 the user the list, ask with AskUserQuestion, and push only what they approve; the rest
 waits on a branch with no upstream. `hooks/require-approval-before-public-push.py`
 refuses a push to a public GitHub repo whose command carries neither
