@@ -23,7 +23,10 @@
 #      - the turn holds assistant text with a fenced code block (a line starting with three backticks) since the last typed prompt;
 #      - no earlier call of any tool, answered, follows that text: this is the first call after it;
 #      - no end of turn follows that text: a Stop-hook feedback row, a task notification or an agent message after it
-#        means the reply was finished and shown, and the draft does not count.
+#        means the reply ended there, and the draft does not count. Ended is not read: a Stop hook that sends the
+#        turn on to do tool work leaves the draft above those calls, collapsed. This trigger does not refuse those
+#        calls, since the Stop hook asked for them; note-lesson-on-revised-draft.sh refuses the end of such a turn
+#        until the draft is repeated as the last text.
 #      For Bash, Edit and Write the hook exits at once when the transcript holds no fence, and reads the transcript once.
 #   3. work before content: the call is Edit, Write, or a Bash call that is not obviously read-only, and
 #      - the user's last typed prompt asks to see content (the same pattern as trigger 1);

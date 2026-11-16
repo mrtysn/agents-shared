@@ -23,6 +23,12 @@ row() {  # type json-content
 }
 prompt() { row user "$(jq -cn --arg x "$1" '[{type: "text", text: $x}]')"; }
 say() { row assistant "$(jq -cn --arg x "$1" '[{type: "text", text: $x}]')"; }
+feedback() {  # text: a Stop hook's feedback row, as Claude Code writes it
+  row user "$(jq -cn --arg x "Stop hook feedback:"$'\n'"$1" '[{type: "text", text: $x}]')" | jq -c 'del(.origin) + {isMeta: true}'
+}
+call() {  # id tool
+  row assistant "$(jq -cn --arg i $1 --arg n $2 '[{type: "tool_use", id: $i, name: $n, input: {}}]')"
+}
 
 check() {  # name want active transcript-lines...
   local name=$1 want=$2 active=$3; shift 3
@@ -57,6 +63,27 @@ check "java annotation is not a message"            pass  false "$(prompt 'fix')
 check "ordinary code is not a message"              pass  false "$(prompt 'fix')" "$(say $CODE)" "$(prompt 'again')" "$(say $CODE)"
 check "already continuing (stop_hook_active)"       pass  true  "$(prompt 'reply')" "$(say $DISCORD)" "$(prompt 'shorter')" "$(say $DISCORD2)"
 check "missing transcript"                          pass  false
+
+LESSON='This reply revises a message the user sends. Record the lesson.'
+BURIED='A message draft you wrote earlier in this turn now sits above tool calls, where the user does not read it.'
+check "draft buried under calls a stop hook asked for"   block true  "$(prompt 'finish it')" "$(say $EMAIL)" "$(feedback $LESSON)" "$(call t1 Edit)" "$(say 'Lesson recorded.')"
+check "buried draft, no text after the calls"            block true  "$(prompt 'finish it')" "$(say $EMAIL)" "$(feedback $LESSON)" "$(call t1 Edit)"
+check "draft repeated as the last text"                  pass  true  "$(prompt 'finish it')" "$(say $EMAIL)" "$(feedback $LESSON)" "$(call t1 Edit)" "$(say $EMAIL)"
+check "buried draft already refused once this turn"      pass  true  "$(prompt 'finish it')" "$(say $EMAIL)" "$(feedback $LESSON)" "$(call t1 Edit)" "$(feedback $BURIED)" "$(say 'Lesson recorded.')"
+check "feedback with no tool call after it"              pass  true  "$(prompt 'finish it')" "$(say $EMAIL)" "$(feedback $LESSON)" "$(say 'Nothing left: sent.')"
+check "calls before the draft, no feedback"              pass  false "$(prompt 'draft it')" "$(call t1 Bash)" "$(say $EMAIL)"
+check "code block buried is not a message"               pass  true  "$(prompt 'fix')" "$(say $CODE)" "$(feedback $LESSON)" "$(call t1 Edit)" "$(say 'Done.')"
+
+reason_has() {  # name phrase transcript-lines...
+  local name=$1 phrase=$2; shift 2
+  local t=$work/$total.jsonl
+  print -rl -- "$@" > $t
+  total=$(( total + 1 ))
+  if jq -cn --arg p $t '{transcript_path: $p, stop_hook_active: false}' | $HOOK | jq -r '.reason // empty' | grep -qF -- "$phrase"
+  then (( verbose )) && print "ok    $name"
+  else fail=$(( fail + 1 )); print "FAIL  $name: reason lacks \"$phrase\""; fi
+}
+reason_has "lesson reason says to repeat the draft last"  "repeating the revised draft in full" "$(prompt 'draft it')" "$(say $EMAIL)" "$(prompt 'shorter')" "$(say $EMAIL)"
 
 (( verbose || fail )) && print
 print "$(( total - fail ))/$total passed"
