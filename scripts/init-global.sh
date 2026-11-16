@@ -254,6 +254,8 @@ fi
 # The hook refuses a push whose diffs or messages name an entry of the untracked
 # denylist (see its header); another repo opts in with
 #   git -C <repo> config core.hooksPath "$AGENTS_SHARED/githooks"
+# Setting it globally is the owner's step on a personal machine, never this script's: it
+# only prints the line below.
 HOOKS_NOTE=""
 current_hooks="$(git -C "$REPO_DIR" config --local --get core.hooksPath 2>/dev/null || true)"
 if [ -z "$current_hooks" ]; then
@@ -265,6 +267,7 @@ else
     HOOKS_NOTE="left at $current_hooks (not githooks): the push guard is off for this clone"
 fi
 DENYLIST="${AGENTS_PUSH_DENYLIST:-${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/push-denylist.txt}"
+GLOBAL_HOOKS="$(git config --global --get core.hooksPath 2>/dev/null || true)"
 
 # ── Summary ─────────────────────────────────────────────────────────────────
 printf '\n=== agents-shared global setup complete ===\n'
@@ -276,6 +279,13 @@ printf '  Skills:   %d linked\n'                "$skill_total"
 printf '  Rules:    %d linked\n'                "$rule_total"
 printf '  Hooks:    %d linked\n'                "$hook_total"
 printf '  Git hooks: %s\n'                      "$HOOKS_NOTE"
+if [ -z "$GLOBAL_HOOKS" ]; then
+    printf '  Global git hooks: not set. On a personal machine the name guard is safe to enable for every repo (it skips private\n'
+    printf '    repos and runs each repo'"'"'s own hooks); on a work machine do not, it would run on the employer'"'"'s repos:\n'
+    printf '      git config --global core.hooksPath "%s/githooks"\n' "$REPO_DIR"
+else
+    printf '  Global git hooks: %s\n' "$GLOBAL_HOOKS"
+fi
 if [ ! -r "$DENYLIST" ]; then
     printf '  Push denylist missing: %s\n' "$DENYLIST"
     printf '    every push from this clone is refused until it exists (shape: githooks/push-denylist.txt.example)\n'

@@ -185,23 +185,51 @@ warning that used to ride on its prompt hook are `hooks/nudge-named-skills-and-s
 ### githooks/pre-push: the name guard for public repos
 
 A git hook, not a Claude Code hook, so it covers every push from the clone, an agent's or one
-typed in a terminal. It reads every commit being pushed (message, author and committer, touched
+typed in a terminal. `githooks/pre-push` first asks whether the repo is private: for a github.com
+remote it runs `gh api repos/OWNER/NAME --jq .private` and caches the answer per repo for 7 days
+under `${XDG_CACHE_HOME:-~/.cache}/agents-shared/repo-visibility/` (delete a repo's file there to
+force a fresh look; a repo made public stays "private" in the cache until then or until 7 days pass).
+A private repo passes unscanned. A public one is scanned by `githooks/scan-push-names`. When the
+visibility is unknown (gh missing, offline, an API error, a remote that is not github.com) it
+scans and prints one line saying so: unknown never passes silently.
+
+The scan reads every commit being pushed (message, author and committer, touched
 paths, added lines, binary files), annotated tag messages, and the full tree at each pushed tip,
 and refuses the push when a line matches an entry of the untracked denylist at
 `${XDG_CONFIG_HOME:-~/.config}/agents-shared/push-denylist.txt` (`$AGENTS_PUSH_DENYLIST`
 overrides): one entry per line, a whole word matched case-insensitively, or `re:<ERE>`. The
-shape is `githooks/push-denylist.txt.example`. A missing list refuses every push; a list with no entries
+shape is `githooks/push-denylist.txt.example`. A missing list refuses every push that is scanned
+(a private repo's push never reaches that check); a list with no entries
 lets the push through but prints a loud warning (the hook on each push, `init-global.sh` on each
-run), since it checks nothing. When git cannot list the commits, the push is refused. `init-global.sh` sets `core.hooksPath` to `githooks` for this repo (leaving any
+run), since it checks nothing. When git cannot list the commits, the push is refused.
+
+**The repo's own hooks still run.** A `core.hooksPath` makes git ignore `.git/hooks/`, where git-lfs
+installs `pre-push`, `post-checkout`, `post-commit` and `post-merge`. After a passing scan,
+`githooks/pre-push` runs the repo's own `<git-common-dir>/hooks/pre-push` (if executable) with the same
+arguments and stdin, and fails when it does. Every other client-side hook name in `githooks/` is a
+symlink to `chain-hook`, which runs the repo's own hook of that name the same way. A repo with no hook
+of its own is unaffected.
+
+That makes it safe to set globally, which is the recommended setup on a **personal** machine, so every
+public repo is covered without opting each in:
+
+```bash
+git config --global core.hooksPath "$AGENTS_SHARED/githooks"
+```
+
+`init-global.sh` prints this line when it is not set and never sets it itself. A repo's own
+`core.hooksPath` still wins over the global one. On a **work** machine do not set it globally: it
+would run on the employer's repos. Opt in per repo (below), and write that machine's denylist by
+hand with only the employer's own names and internal terms, never a copy of the personal machine's list.
+
+`init-global.sh` sets `core.hooksPath` to `githooks` for this repo (leaving any
 other value alone, and saying so). Another repo opts in with
 
 ```bash
 git -C <repo> config core.hooksPath "$AGENTS_SHARED/githooks"
 ```
 
-or, when it keeps hooks of its own, with a `.git/hooks/pre-push` that runs
-`"$AGENTS_SHARED/githooks/pre-push" "$@"`, stdin passed through.
-`scripts/tests/test-pre-push-denylist.zsh` tests it against throwaway repos.
+`scripts/tests/test-pre-push-denylist.zsh` tests it against throwaway repos, with `gh` stubbed on PATH.
 
 ## Updating
 
