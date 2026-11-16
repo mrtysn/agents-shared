@@ -15,6 +15,8 @@ Hard failures (exit 1), printed as `!! <path>: <what>`:
   - claude/rules link `](x.md)` that does not resolve, or a [[wiki]] link
   - skill, rule or command not linked into ~/.claude (honours $CLAUDE_CONFIG_DIR),
     or a link there into this checkout that dangles
+  - claude/{rules,skills}/personal/ entries not linked when the config folder's
+    profile is personal, linked when it is not, or sharing a name with a shared entry
 Warnings (`-- <path>: <what>`): own skills (no source.json) lacking
 argument-hint, allowed-tools, or "Use when" in the description.
 USAGE
@@ -23,6 +25,7 @@ fi
 
 ROOT=${0:A:h:h}
 CFG=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
+PROFILE=$($ROOT/scripts/agent-profile $CFG)
 problems=0 warnings=0 nskills=0 nrules=0 t=""
 local -a subs
 
@@ -70,7 +73,11 @@ check_skill() {
 }
 
 # --- skills ---
-for d in $ROOT/claude/skills/*(N/); do
+# claude/skills/personal/ holds skills for the personal profile only; it is not a skill.
+local -a skill_dirs
+skill_dirs=(${ROOT}/claude/skills/*(N/) ${ROOT}/claude/skills/personal/*(N/))
+skill_dirs=(${skill_dirs:#$ROOT/claude/skills/personal})
+for d in $skill_dirs; do
   if [[ -f $d/SKILL.md ]]; then
     check_skill $d
   elif [[ -f $d/.claude-plugin/plugin.json ]]; then
@@ -85,11 +92,11 @@ for d in $ROOT/claude/skills/*(N/); do
 done
 
 # --- rule links ---
-for r in $ROOT/claude/rules/*.md(N); do
+for r in $ROOT/claude/rules/*.md(N) $ROOT/claude/rules/personal/*.md(N); do
   nrules=$((nrules+1))
   for t in ${(f)"$(grep -oE '\]\([^)#[:space:]]+\.md(#[^)]*)?\)' $r | sed -E 's/^\]\(//; s/(#[^)]*)?\)$//' || true)"}; do
     [[ $t == *://* ]] && continue
-    [[ -f $ROOT/claude/rules/$t ]] || fail $r "link to $t does not resolve"
+    [[ -f ${r:h}/$t ]] || fail $r "link to $t does not resolve"
   done
   grep -qE '\[\[[^]]+\]\]' $r && fail $r "contains a [[wiki]] link"
 done
@@ -102,9 +109,20 @@ check_links() {  # <kind> <entries...>
     [[ -L $CFG/$kind/${e:t} ]] || fail $e "not linked in $CFG/$kind"
   done
 }
-check_links skills $ROOT/claude/skills/*(N/)
+check_links skills ${skill_dirs:#$ROOT/claude/skills/personal/*}
 check_links rules $ROOT/claude/rules/*.md(N)
 check_links commands $ROOT/claude/commands/*.md(N)
+# personal/ entries: linked exactly when the profile is personal, never shadowing a shared name
+local p
+for p in $ROOT/claude/skills/personal/*(N/) $ROOT/claude/rules/personal/*.md(N); do
+  k=${${p:h:h}:t}
+  [[ -e $ROOT/claude/$k/${p:t} ]] && fail $p "a shared $k entry has the same name"
+  if [[ $PROFILE == personal ]]; then
+    [[ -L $CFG/$k/${p:t} ]] || fail $p "not linked in $CFG/$k (profile personal)"
+  else
+    [[ $(readlink $CFG/$k/${p:t} 2>/dev/null) == $p ]] && fail $CFG/$k/${p:t} "linked, but the profile is ${PROFILE:-unset}"
+  fi
+done
 local k l
 for k in skills rules commands; do
   for l in $CFG/$k/*(N@); do

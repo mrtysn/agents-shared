@@ -8,7 +8,8 @@
 # never another settings edit.
 #
 # Row columns, tab-separated (blank lines and # lines are skipped):
-#   id       the doc is docs/on-demand/<id>.md, and the id names the once-per-session marker
+#   id       the doc is docs/on-demand/<id>.md, and the id names the once-per-session marker;
+#            failing that, docs/on-demand/personal/<id>.md, used only on the personal profile
 #   tools    ERE matched against the whole tool name: Bash, Write|Edit, SendMessage ...
 #   field    what the pattern is matched against: command, file_path, content, url, to
 #            (a SendMessage recipient), or none (every call of the tool matches; pattern
@@ -59,6 +60,8 @@ field_value() {
 
 DENY_TEXT=
 NOTE_TEXT=
+PROFILE_READ=
+SHOW_PROFILE=
 
 while IFS=$'\t' read -r id tools field pattern exclude mode scope; do
     case "${id-}" in ''|'#'*) continue ;; esac
@@ -74,7 +77,15 @@ while IFS=$'\t' read -r id tools field pattern exclude mode scope; do
         fi
     fi
 
+    # A personal-only doc lives in docs/on-demand/personal/ and is shown only when this
+    # config folder's profile is personal (scripts/agent-profile, read at most once a call).
     doc="$DOCS/$id.md"
+    if [ ! -r "$doc" ] && [ -r "$DOCS/personal/$id.md" ]; then
+        if [ -z "${PROFILE_READ-}" ]; then
+            SHOW_PROFILE=$("$HERE/../scripts/agent-profile" 2>/dev/null || true); PROFILE_READ=1
+        fi
+        [ "$SHOW_PROFILE" = personal ] && doc="$DOCS/personal/$id.md"
+    fi
     [ -r "$doc" ] || continue
 
     mark="$STATE/${SESSION:-no-session}${AGENT:+-$AGENT}-$id"

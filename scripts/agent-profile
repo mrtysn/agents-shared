@@ -1,0 +1,35 @@
+#!/bin/zsh
+# DESC: Print the agent profile a Claude config folder declares: personal, work, or nothing
+#
+# A Claude config folder (${CLAUDE_CONFIG_DIR:-$HOME/.claude}) declares which profile it
+# serves in its own paths.local.sh, which is never synced:
+#
+#     AGENT_PROFILE=personal      # or: AGENT_PROFILE=work
+#
+# init-global.sh, agents-personal's install.sh and show-rule-at-action.sh read it through
+# this script. Content under claude/rules/personal/ and claude/skills/personal/ is linked
+# only when the profile is personal. Unset means only shared content.
+#
+# The file is read, not sourced: the last AGENT_PROFILE= line wins, quotes and a trailing
+# comment are dropped. A value other than personal or work exits 1 with a message, so a
+# typo never silently installs the wrong set.
+#
+# usage: agent-profile [CONFIG_DIR]
+set -euo pipefail
+
+dir=${1:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}}
+file=$dir/paths.local.sh
+[[ -r $file ]] || exit 0
+
+line=$(grep -E '^[[:space:]]*(export[[:space:]]+)?AGENT_PROFILE=' $file | tail -n 1 || true)
+[[ -n $line ]] || exit 0
+value=${line#*AGENT_PROFILE=}
+value=${value%%\#*}
+value=${value//[\"\' 	]/}
+
+case $value in
+  personal|work) print -r -- $value ;;
+  '') ;;
+  *) print -u2 -r -- "agent-profile: AGENT_PROFILE=$value in $file; expected personal or work"
+     exit 1 ;;
+esac
