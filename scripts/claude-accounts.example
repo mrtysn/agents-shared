@@ -3,14 +3,15 @@
 # and keep it there, untracked.
 #
 # One line per account: a name, then its Claude config folder (~ allowed). The first
-# line is the default account. Blank lines and # comments are skipped.
+# line is the default account, and its folder is ~/.claude, whatever profile that
+# account has. Blank lines and # comments are skipped.
 #
-# Naming: the default account keeps ~/.claude; every other account gets
-# ~/.claude-<name>, so 1 to 20 accounts sort together and each folder says whose it is.
-# Each folder declares its profile in its own paths.local.sh (AGENT_PROFILE=personal or
-# work) and is installed separately:
+# Naming: every other account gets ~/.claude-<name>, so 1 to 20 accounts sort together
+# and each folder says whose it is. Each folder declares its own profile in its own
+# paths.local.sh (AGENT_PROFILE=personal or AGENT_PROFILE=work), which says nothing
+# about the order here, and is installed separately:
 #     CLAUDE_CONFIG_DIR=~/.claude-<name> bash "$AGENTS_SHARED/scripts/init-global.sh"
 #
 # name        config folder
-personal      ~/.claude
-work          ~/.claude-work
+main          ~/.claude
+second        ~/.claude-second
