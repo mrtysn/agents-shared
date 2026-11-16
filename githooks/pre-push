@@ -1,0 +1,99 @@
+#!/bin/zsh
+# DESC: git pre-push hook — refuse a push whose diffs or commit messages name anything on a private denylist
+#
+# Guards public repos against names that must never reach them (an employer, a client,
+# a private project). Every commit about to leave is read: its message, the paths it
+# touches, and every line it adds. A line matching a denylist entry refuses the whole
+# push and says which commit, file and line. Lines a commit removes are not checked, so
+# a push that deletes a name goes through.
+#
+# Being a git hook, it runs for every push from this clone: an agent's, or the user's own
+# from a terminal. `git push --no-verify` skips it, as it skips every git hook.
+#
+# The denylist is an untracked local file, never committed:
+#     ${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/push-denylist.txt
+# (override with $AGENTS_PUSH_DENYLIST). One entry per line; blank lines and lines
+# starting with # are skipped. An entry is matched case-insensitively as a whole word
+# (`acme` matches "Acme Corp" and "acme.io", not "acmes"); an entry starting with `re:`
+# is an extended regular expression, also case-insensitive. The shape is in
+# githooks/push-denylist.txt.example. **When the file is missing, every push is
+# refused**: a guard that silently passes when unconfigured guards nothing. An empty
+# file is allowed and blocks nothing.
+#
+# Wiring: init-global.sh sets core.hooksPath for agents-shared itself. Another repo opts
+# in with
+#     git -C <repo> config core.hooksPath "$AGENTS_SHARED/githooks"
+# or, when it keeps hooks of its own, with a .git/hooks/pre-push that runs
+#     "$AGENTS_SHARED/githooks/pre-push" "$@"
+# passing stdin through.
+#
+# usage (by git): pre-push <remote-name> <remote-url>, refs on stdin as
+#     <local-ref> <local-sha> <remote-ref> <remote-sha>
+set -uo pipefail
+
+remote=${1:-origin}
+list=${AGENTS_PUSH_DENYLIST:-${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/push-denylist.txt}
+zero=0000000000000000000000000000000000000000
+
+if [[ ! -r $list ]]; then
+  print -u2 -r -- "pre-push: refused. The push denylist $list does not exist."
+  print -u2 -r -- "  Create it (copy githooks/push-denylist.txt.example from agents-shared and add one name per line)."
+  print -u2 -r -- "  An empty file is allowed; a missing one refuses every push."
+  exit 1
+fi
+
+# Build one grep pattern file each for whole-word fixed strings and for regexes.
+tmp=$(mktemp -d) || exit 1
+trap 'rm -rf -- "$tmp"' EXIT
+: > $tmp/words; : > $tmp/regexes
+local entry
+while IFS= read -r entry || [[ -n $entry ]]; do
+  entry=${entry%$'\r'}
+  entry=${${entry##[[:space:]]#}%%[[:space:]]#}
+  [[ -z $entry || $entry == \#* ]] && continue
+  if [[ $entry == re:* ]]; then print -r -- ${entry#re:} >> $tmp/regexes
+  else print -r -- $entry >> $tmp/words; fi
+done < $list
+[[ -s $tmp/words || -s $tmp/regexes ]] || exit 0
+
+# matches <file>: print the lines of <file> that hit any entry, with line numbers
+matches() {
+  { [[ -s $tmp/words ]] && grep -inwF -f $tmp/words -- $1
+    [[ -s $tmp/regexes ]] && grep -inE -f $tmp/regexes -- $1
+  } | sort -t: -k1,1n -u
+}
+
+found=0
+local lref lsha rref rsha range c
+while read -r lref lsha rref rsha; do
+  [[ $lsha == $zero ]] && continue                      # deleting a remote ref adds nothing
+  if [[ $rsha == $zero ]]; then
+    range=($lsha --not --remotes=$remote)               # new branch: what the remote lacks
+  else
+    range=($rsha..$lsha)
+  fi
+  for c in ${(f)"$(git rev-list ${range[@]} 2>/dev/null)"}; do
+    [[ -n $c ]] || continue
+    git log -1 --format=%B $c > $tmp/msg
+    # Added lines and touched paths, each prefixed with its path so a hit can be placed.
+    git show --format= --no-color --unified=0 --no-ext-diff $c | awk '
+      /^diff --git / { path = $NF; sub(/^b\//, "", path); print path ": (path) " path; next }
+      /^\+\+\+ / || /^--- / { next }
+      /^\+/ { print path ": " substr($0, 2) }
+    ' > $tmp/added
+    hits=$( { matches $tmp/msg | sed 's/^[0-9]*:/  message: /'
+              matches $tmp/added | sed 's/^[0-9]*:/  /'; } )
+    if [[ -n $hits ]]; then
+      found=1
+      print -u2 -r -- "pre-push: commit ${c[1,12]} ($(git log -1 --format=%s $c)) names a denylisted entry:"
+      print -u2 -r -- $hits
+    fi
+  done
+done
+
+if (( found )); then
+  print -u2 -r -- "pre-push: refused. Remove those names (amend or rewrite the commits above), then push again."
+  print -u2 -r -- "  Denylist: $list"
+  exit 1
+fi
+exit 0

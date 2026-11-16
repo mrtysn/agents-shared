@@ -89,6 +89,12 @@
       ]
     },
     {
+      "name": "pre-push denylist",
+      "run": [
+        "scripts/tests/test-pre-push-denylist.zsh"
+      ]
+    },
+    {
       "name": "external skill links",
       "run": [
         "bash",

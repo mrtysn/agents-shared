@@ -178,6 +178,25 @@ the private `system-one` repo (`SYSTEM_ONE_DIR` in `paths.local.sh` is its check
 documentation. It has no hooks beyond the session-start one. The skill-name nudge and the stale-shells
 warning that used to ride on its prompt hook are `hooks/nudge-named-skills-and-stale-shells.sh` here.
 
+### githooks/pre-push: the name guard for public repos
+
+A git hook, not a Claude Code hook, so it covers every push from the clone, an agent's or one
+typed in a terminal. It reads every commit being pushed (message, touched paths, added lines)
+and refuses the push when a line matches an entry of the untracked denylist at
+`${XDG_CONFIG_HOME:-~/.config}/agents-shared/push-denylist.txt` (`$AGENTS_PUSH_DENYLIST`
+overrides): one entry per line, a whole word matched case-insensitively, or `re:<ERE>`. The
+shape is `githooks/push-denylist.txt.example`. A missing list refuses every push; an empty one
+blocks nothing. `init-global.sh` sets `core.hooksPath` to `githooks` for this repo (leaving any
+other value alone, and saying so). Another repo opts in with
+
+```bash
+git -C <repo> config core.hooksPath "$AGENTS_SHARED/githooks"
+```
+
+or, when it keeps hooks of its own, with a `.git/hooks/pre-push` that runs
+`"$AGENTS_SHARED/githooks/pre-push" "$@"`, stdin passed through.
+`scripts/tests/test-pre-push-denylist.zsh` tests it against throwaway repos.
+
 ## Updating
 
 `git pull` in the clone. Edits to existing files take effect immediately — the

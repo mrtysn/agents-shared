@@ -1,0 +1,14 @@
+# Push denylist for githooks/pre-push. Copy to
+#     ${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/push-denylist.txt
+# and keep it there, untracked. It must exist: a missing file refuses every push;
+# an empty one blocks nothing.
+#
+# One entry per line. Blank lines and lines starting with # are skipped.
+#   name          matched case-insensitively as a whole word, anywhere in an added
+#                 line, a touched path or a commit message
+#   re:<ERE>      an extended regular expression, also case-insensitive
+#
+# Examples (placeholders, not real names):
+# Example Employer
+# example-employer.com
+# re:example[-_ ]?client

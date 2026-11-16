@@ -113,6 +113,8 @@ if [ "$UNLINK" = 1 ]; then
     prune_dir "$DST_SKILLS"   "$SRC_SKILLS"
     prune_dir "$DST_RULES"    "$SRC_RULES"
     [ -f "$ENV_FILE" ] && rm "$ENV_FILE"
+    [ "$(git -C "$REPO_DIR" config --local --get core.hooksPath 2>/dev/null)" = githooks ] &&
+        git -C "$REPO_DIR" config --local --unset core.hooksPath
     printf '\n=== agents-shared global teardown ===\n'
     printf '  Target:           %s\n'   "$CLAUDE_DIR"
     printf '  Symlinks removed: %d\n\n' "$pruned"
@@ -217,6 +219,22 @@ if env.get("AGENTS_SHARED") != repo:
 PY
 fi
 
+# ── Push guard: this public repo's pushes go through githooks/pre-push ────────
+# The hook refuses a push whose diffs or messages name an entry of the untracked
+# denylist (see its header); another repo opts in with
+#   git -C <repo> config core.hooksPath "$AGENTS_SHARED/githooks"
+HOOKS_NOTE=""
+current_hooks="$(git -C "$REPO_DIR" config --local --get core.hooksPath 2>/dev/null || true)"
+if [ -z "$current_hooks" ]; then
+    git -C "$REPO_DIR" config --local core.hooksPath githooks
+    HOOKS_NOTE="set to githooks"
+elif [ "$current_hooks" = githooks ]; then
+    HOOKS_NOTE="githooks"
+else
+    HOOKS_NOTE="left at $current_hooks (not githooks): the push guard is off for this clone"
+fi
+DENYLIST="${AGENTS_PUSH_DENYLIST:-${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/push-denylist.txt}"
+
 # ── Summary ─────────────────────────────────────────────────────────────────
 printf '\n=== agents-shared global setup complete ===\n'
 printf '  Target:   %s\n'                       "$CLAUDE_DIR"
@@ -225,6 +243,11 @@ printf '  Env file: %s\n'                       "$ENV_FILE"
 printf '  Commands: %d linked\n'                "$cmd_total"
 printf '  Skills:   %d linked\n'                "$skill_total"
 printf '  Rules:    %d linked\n'                "$rule_total"
+printf '  Git hooks: %s\n'                      "$HOOKS_NOTE"
+if [ ! -r "$DENYLIST" ]; then
+    printf '  Push denylist missing: %s\n' "$DENYLIST"
+    printf '    every push from this clone is refused until it exists (shape: githooks/push-denylist.txt.example)\n'
+fi
 printf '  Changes:  +%d new, ~%d repaired, -%d pruned, -%d out of profile\n' "$linked" "$fixed" "$pruned" "$out_of_profile"
 if [ ${#skipped_local[@]} -gt 0 ]; then
     printf '  Local overrides preserved: %s\n' "${skipped_local[*]}"
