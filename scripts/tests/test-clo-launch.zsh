@@ -131,5 +131,18 @@ check "no close marker outside tmux mode" 0 \
     "tmux new-session*" -- TERM_PROGRAM=Apple_Terminal CLO_CD_FILE="$stub/cd" -- --run-claude
 [[ ! -e "$stub/cd.close" ]] || { (( fails++ )); print "FAIL close marker outside tmux mode"; }
 
+# -a NAME: the accounts file maps a name to a config folder.
+mkdir -p "$stub/xdg/agents-shared" "$stub/cfg-alt" "$stub/.claude"
+print -r -- $'# name folder\nhome ~/.claude\nalt ~/cfg-alt  # the second account' > "$stub/xdg/agents-shared/claude-accounts"
+check "-a NAME hands that account's folder to the tmux session" 0 \
+    "tmux new-session * -e CLAUDE_CONFIG_DIR=${stub:A}/cfg-alt claude" -- \
+    TERM_PROGRAM=Apple_Terminal XDG_CONFIG_HOME="$stub/xdg" -- -a alt --run-claude
+check "an account at ~/.claude launches with CLAUDE_CONFIG_DIR unset" 0 \
+    "tmux new-session * claude" -- \
+    TERM_PROGRAM=Apple_Terminal XDG_CONFIG_HOME="$stub/xdg" -- --account home --run-claude
+[[ "$(<"$calls")" != *CLAUDE_CONFIG_DIR* ]] || { (( fails++ )); print "FAIL ~/.claude account set CLAUDE_CONFIG_DIR"; }
+check "an unknown account exits 2" 2 -- XDG_CONFIG_HOME="$stub/xdg" -- -a nope --run-claude
+check "no accounts file exits 2" 2 -- XDG_CONFIG_HOME="$stub/none" -- -a alt --run-claude
+
 print "clo launch tests: $n cases, $fails failed"
 (( fails == 0 ))

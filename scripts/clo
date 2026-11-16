@@ -7,6 +7,11 @@ usage() {
 clo — pick a folder, Claude model and effort level, then launch Claude Code.
 
 Usage:
+  clo -a NAME | --account NAME [any form below]
+                          Launch with that Claude account: its config folder, from the
+                          accounts file, becomes CLAUDE_CONFIG_DIR for the session. Must
+                          come first. Without it nothing changes: the shell's
+                          CLAUDE_CONFIG_DIR (or ~/.claude) is used, as always.
   clo [--prompt text] [claude args...]
                           Open the picker; extra flags go to `claude` (e.g. clo --chrome);
                           --prompt, anywhere among them, is sent as the first message.
@@ -92,11 +97,64 @@ Every session clo reopens goes through recent-sessions.py (beside clo): in the
 session's own folder and Claude config, asking first when it looks live in
 another tab.
 
+Accounts live in ${XDG_CONFIG_HOME:-~/.config}/agents-shared/claude-accounts, untracked: one
+line per account, a name and its config folder (~ allowed), the first line the default
+account; blank and # lines are skipped. Shape: scripts/claude-accounts.example. An account
+whose folder is ~/.claude launches with CLAUDE_CONFIG_DIR unset, which is how Claude Code
+reads that folder by default. `clo --account-names` prints the names (tab completion uses it).
+
 The model menu is the stable aliases (always the latest of each family) plus any
 extra models your account is offered, read from Claude Code's own cache in
 .claude.json. Claude Code has no command that prints the picker's list.
 EOF
 }
+
+# ── Accounts: -a NAME / --account NAME picks the config folder ────────────────
+accounts_file="${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/claude-accounts"
+accounts_example="${0:A:h}/claude-accounts.example"
+
+# account_lines: "NAME<TAB>FOLDER" per account, in file order, ~ expanded
+account_lines() {
+    [[ -r "$accounts_file" ]] || return 0
+    local line name dir rest
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%%\#*}"
+        read -r name dir rest <<< "$line" || true
+        [[ -n "$name" ]] || continue
+        dir="${dir/#\~/$HOME}"; dir="${dir/#\$HOME/$HOME}"
+        print -r -- "$name"$'\t'"$dir"
+    done < "$accounts_file"
+}
+
+use_account() {  # use_account NAME: export its folder as CLAUDE_CONFIG_DIR, or exit 2
+    local want="$1" entry dir=""
+    if [[ ! -r "$accounts_file" ]]; then
+        print -u2 "clo: no accounts file at $accounts_file"
+        print -u2 "     one line per account, a name and its config folder; shape: $accounts_example"
+        exit 2
+    fi
+    for entry in "${(@f)$(account_lines)}"; do
+        [[ "${entry%%$'\t'*}" == "$want" ]] && { dir="${entry#*$'\t'}"; break; }
+    done
+    if [[ -z "$dir" ]]; then
+        print -u2 "clo: no account '$want' in $accounts_file; known: ${(j:, :)${(@f)$(account_lines | cut -f1)}}"
+        exit 2
+    fi
+    [[ -d "$dir" ]] || { print -u2 "clo: account '$want' names $dir, which is not a folder"; exit 2; }
+    if [[ "${dir:A}" == "${HOME:A}/.claude" ]]; then
+        unset CLAUDE_CONFIG_DIR
+    else
+        export CLAUDE_CONFIG_DIR="${dir:A}"
+    fi
+}
+
+case "${1:-}" in
+    -a|--account)
+        [[ -n "${2:-}" ]] || { print -u2 "clo: $1 needs an account name"; exit 2; }
+        use_account "$2"; shift 2 ;;
+    --account=*) use_account "${1#--account=}"; shift ;;
+    --account-names) account_lines | cut -f1; exit 0 ;;
+esac
 
 self="${0:A}"
 state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/clo"
@@ -319,9 +377,14 @@ clo() {
 }
 _clo() {
     local -a names
-    if (( CURRENT == 2 )); then
+    local first=2
+    [[ ${words[2]:-} == (-a|--account) ]] && first=4
+    if [[ ${words[2]:-} == (-a|--account) ]] && (( CURRENT == 3 )); then
+        compadd -- ${(f)"$(command clo --account-names 2>/dev/null)"}
+    elif (( CURRENT == first )); then
         names=(f here launch ${(f)"$(command clo --repo-names 2>/dev/null)"})
         compadd -- $names 1 2 3 4
+        (( first == 2 )) && compadd -- -a --account
     else
         compadd -- 1 2 3 4 --prompt
     fi
