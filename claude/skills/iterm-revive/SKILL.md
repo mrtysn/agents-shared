@@ -28,6 +28,15 @@ python3 "${AGENTS_SHARED:?run agents-shared/scripts/init-global.sh to set it}/sc
 
 Emits one `cd <cwd> && claude --resume <uuid>` line per ended session, cwd taken from the session's own transcript. Sessions from a non-default config dir get a `CLAUDE_CONFIG_DIR=<dir>` prefix. Print them verbatim in a code block — complete and copy-pasteable, never abbreviated.
 
+## open
+
+Revived sessions go in the user's hotkey window, never a window of their own. Run
+`$AGENTS_SHARED/scripts/iterm-revive-open.zsh`: it opens each `resume` line in a scratch
+window, then `iterm-move-tabs-to-hotkey.py` moves the tabs into the hotkey window (the one
+holding a tmux tab). To open sessions known only from a screenshot's ids, resolve each to its
+uuid and cwd, open them the same way, then run the mover. Needs iTerm's Python API enabled.
+CC Sessions' Session → Resume Closed Sessions… does the same from the app, also into the hotkey window.
+
 ## summarize
 
 Run the script with `json`, then for each `ended` session spawn parallel subagents (one per session, single message, multiple Agent calls). Each subagent reads the tail of that session's `transcript` path (last ~200 lines of the jsonl) and returns: one-line goal, completion state (finished / awaiting user decision / died mid-turn), and the outstanding next step if any. Render one table row per session: tab, project, one-liner, state, outstanding.
