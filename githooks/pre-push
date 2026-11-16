@@ -1,11 +1,22 @@
 #!/bin/zsh
-# DESC: git pre-push hook — refuse a push whose diffs or commit messages name anything on a private denylist
+# DESC: git pre-push hook — refuse a push whose commits, tags or tree name anything on a private denylist
 #
 # Guards public repos against names that must never reach them (an employer, a client,
-# a private project). Every commit about to leave is read: its message, the paths it
-# touches, and every line it adds. A line matching a denylist entry refuses the whole
-# push and says which commit, file and line. Lines a commit removes are not checked, so
-# a push that deletes a name goes through.
+# a private project). For every ref pushed it reads:
+#   - each commit leaving: message, author and committer name and email, the paths it
+#     touches, every line it adds, and every binary file it adds or changes (its printable
+#     runs of 6+ characters, so random bytes cannot spell a short entry);
+#   - an annotated tag's message and tagger;
+#   - the full tree at the pushed tip (every text file, every binary by its printable runs,
+#     and every path), so a name already in the tree is caught whatever the diffs say.
+# A match refuses the whole push and says which commit, file and line. Lines a commit
+# removes are not checked, so a push that deletes a name goes through once the tip is clean.
+#
+# Which commits leave: when the remote's old sha is known locally, `<old>..<new>`; when it
+# is unknown here (another clone pushed) or the branch is new, every commit reachable from
+# the new tip that no remote-tracking ref of this remote holds
+# (`git rev-list <new> --not --remotes=<remote>`). It never passes a push it could not
+# read: if the commits cannot be listed, the push is refused.
 #
 # Being a git hook, it runs for every push from this clone: an agent's, or the user's own
 # from a terminal. `git push --no-verify` skips it, as it skips every git hook.
@@ -17,8 +28,10 @@
 # (`acme` matches "Acme Corp" and "acme.io", not "acmes"); an entry starting with `re:`
 # is an extended regular expression, also case-insensitive. The shape is in
 # githooks/push-denylist.txt.example. **When the file is missing, every push is
-# refused**: a guard that silently passes when unconfigured guards nothing. An empty
-# file is allowed and blocks nothing.
+# refused**: a guard that silently passes when unconfigured guards nothing. A file with
+# no entries (only comments or blank lines) lets the push through, since it is the
+# owner's file to fill, but the hook prints a loud warning each time: that push was
+# checked against nothing.
 #
 # Wiring: init-global.sh sets core.hooksPath for agents-shared itself. Another repo opts
 # in with
@@ -30,6 +43,7 @@
 # usage (by git): pre-push <remote-name> <remote-url>, refs on stdin as
 #     <local-ref> <local-sha> <remote-ref> <remote-sha>
 set -uo pipefail
+setopt extendedglob   # the [[:space:]]# trims below mean zero-or-more only with it
 
 remote=${1:-origin}
 list=${AGENTS_PUSH_DENYLIST:-${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/push-denylist.txt}
@@ -38,7 +52,7 @@ zero=0000000000000000000000000000000000000000
 if [[ ! -r $list ]]; then
   print -u2 -r -- "pre-push: refused. The push denylist $list does not exist."
   print -u2 -r -- "  Create it (copy githooks/push-denylist.txt.example from agents-shared and add one name per line)."
-  print -u2 -r -- "  An empty file is allowed; a missing one refuses every push."
+  print -u2 -r -- "  A file with no entries is allowed (with a warning); a missing one refuses every push."
   exit 1
 fi
 
@@ -54,41 +68,144 @@ while IFS= read -r entry || [[ -n $entry ]]; do
   if [[ $entry == re:* ]]; then print -r -- ${entry#re:} >> $tmp/regexes
   else print -r -- $entry >> $tmp/words; fi
 done < $list
-[[ -s $tmp/words || -s $tmp/regexes ]] || exit 0
+if [[ ! -s $tmp/words && ! -s $tmp/regexes ]]; then
+  print -u2 -r -- "pre-push: WARNING: THIS PUSH WAS CHECKED AGAINST NOTHING."
+  print -u2 -r -- "  The push denylist $list has no entries (only comments or blank lines)."
+  print -u2 -r -- "  Add one name per line (shape: githooks/push-denylist.txt.example), or nothing is guarded."
+  exit 0
+fi
 
-# matches <file>: print the lines of <file> that hit any entry, with line numbers
+# matches <file>: print the lines of <file> that hit any entry, with line numbers.
 matches() {
   { [[ -s $tmp/words ]] && grep -inwF -f $tmp/words -- $1
     [[ -s $tmp/regexes ]] && grep -inE -f $tmp/regexes -- $1
   } | sort -t: -k1,1n -u
 }
 
+# binary_matches <file>: the same for a binary file, read as bytes. Only its printable runs
+# of 6 or more characters are matched: random bytes would otherwise spell a short entry
+# between two non-word bytes (a font file did, for a 3-letter entry), and a hook that
+# refuses a push over noise gets bypassed. A name in metadata or embedded text is a run.
+binary_matches() {
+  LC_ALL=C tr -c '[:print:]' '\n' < $1 | awk 'length($0) >= 6' > $tmp/runs
+  matches $tmp/runs
+}
+
+# tree_hits <tree-ish>: print `path:line:text` for every text line in the tree that hits an
+# entry, `path: (binary)` for every binary file whose bytes do, then every path that does.
+# Returns 2 when git could not read the tree: the caller refuses.
+tree_hits() {
+  local rc cand file
+  : > $tmp/gout; : > $tmp/gall; : > $tmp/gtext
+  if [[ -s $tmp/words ]]; then
+    git grep -I -n -i -w -F -f $tmp/words $1 -- >> $tmp/gout 2>$tmp/gerr; (( $? > 1 )) && return 2
+    git grep -a -l -i -w -F -f $tmp/words $1 -- >> $tmp/gall 2>$tmp/gerr; (( $? > 1 )) && return 2
+    git grep -I -l -i -w -F -f $tmp/words $1 -- >> $tmp/gtext 2>$tmp/gerr; (( $? > 1 )) && return 2
+  fi
+  if [[ -s $tmp/regexes ]]; then
+    git grep -I -n -i -E -f $tmp/regexes $1 -- >> $tmp/gout 2>$tmp/gerr; (( $? > 1 )) && return 2
+    git grep -a -l -i -E -f $tmp/regexes $1 -- >> $tmp/gall 2>$tmp/gerr; (( $? > 1 )) && return 2
+    git grep -I -l -i -E -f $tmp/regexes $1 -- >> $tmp/gtext 2>$tmp/gerr; (( $? > 1 )) && return 2
+  fi
+  sed -E 's/^[0-9a-f]{40}://' $tmp/gout | sort -u
+  # Files that match only as bytes (git's -a minus -I) are binaries: confirm on their printable runs.
+  for cand in ${(f)"$(sort -u $tmp/gall | comm -23 - <(sort -u $tmp/gtext))"}; do
+    file=${cand#$1:}
+    git cat-file blob "$1:$file" > $tmp/blob 2>/dev/null || continue
+    [[ -n $(binary_matches $tmp/blob) ]] && print -r -- "$file: (binary) names an entry"
+  done
+  git ls-tree -r --name-only $1 > $tmp/paths 2>$tmp/gerr || return 2
+  matches $tmp/paths | sed 's/^[0-9]*:/(path) /'
+  return 0
+}
+
+# binary_hits <commit>: print each binary file the commit adds or changes whose bytes hit
+# an entry. A diff shows only "Binary files differ" for these, so the blob is read.
+binary_hits() {
+  local rec file   # not `path`: in zsh a local of that name empties $PATH
+  local -a recs
+  git diff-tree --root -r --no-renames --no-commit-id -z --numstat $1 > $tmp/numstat 2>$tmp/gerr || return 2
+  recs=(${(0)"$(<$tmp/numstat)"})
+  for rec in $recs; do
+    [[ $rec == $'-\t-\t'* ]] || continue
+    file=${rec#$'-\t-\t'}
+    git cat-file blob "$1:$file" > $tmp/blob 2>/dev/null || continue   # deleted file: nothing added
+    binary_matches $tmp/blob | sed "s|^[0-9]*:|  $file: (binary) |"
+  done
+  return 0
+}
+
 found=0
-local lref lsha rref rsha range c
+refuse() {  # refuse <reason>: the push cannot be shown clean
+  found=1
+  print -u2 -r -- "pre-push: $1"
+}
+report() {  # report <heading> <hits>
+  [[ -n $2 ]] || return 0
+  found=1
+  print -u2 -r -- "pre-push: $1 names a denylisted entry:"
+  print -u2 -r -- $2
+}
+
+local lref lsha rref rsha o t tip c hits rc
+local -a range revs
 while read -r lref lsha rref rsha; do
   [[ $lsha == $zero ]] && continue                      # deleting a remote ref adds nothing
-  if [[ $rsha == $zero ]]; then
-    range=($lsha --not --remotes=$remote)               # new branch: what the remote lacks
-  else
-    range=($rsha..$lsha)
-  fi
-  for c in ${(f)"$(git rev-list ${range[@]} 2>/dev/null)"}; do
-    [[ -n $c ]] || continue
-    git log -1 --format=%B $c > $tmp/msg
-    # Added lines and touched paths, each prefixed with its path so a hit can be placed.
-    git show --format= --no-color --unified=0 --no-ext-diff $c | awk '
-      /^diff --git / { path = $NF; sub(/^b\//, "", path); print path ": (path) " path; next }
-      /^\+\+\+ / || /^--- / { next }
-      /^\+/ { print path ": " substr($0, 2) }
-    ' > $tmp/added
-    hits=$( { matches $tmp/msg | sed 's/^[0-9]*:/  message: /'
-              matches $tmp/added | sed 's/^[0-9]*:/  /'; } )
-    if [[ -n $hits ]]; then
-      found=1
-      print -u2 -r -- "pre-push: commit ${c[1,12]} ($(git log -1 --format=%s $c)) names a denylisted entry:"
-      print -u2 -r -- $hits
+
+  # Annotated tags: read each tag object's message and tagger, then follow it to its target.
+  o=$lsha; tip=
+  for _ in {1..20}; do
+    t=$(git cat-file -t $o 2>/dev/null) || { refuse "cannot read object ${o[1,12]} of $lref; refusing a push it cannot check."; break; }
+    if [[ $t == tag ]]; then
+      git cat-file tag $o > $tmp/tag 2>/dev/null
+      report "tag ${lref} (${o[1,12]})" "$(matches $tmp/tag | sed 's/^[0-9]*:/  /')"
+      o=$(sed -n '1s/^object //p' $tmp/tag)
+      [[ -n $o ]] || { refuse "tag $lref has no readable target; refusing a push it cannot check."; break; }
+    else
+      tip=$o; break
     fi
   done
+  [[ -n $tip ]] || { [[ $found == 1 ]] || refuse "tag chain of $lref is too deep to read; refusing."; continue; }
+
+  if [[ $t == commit ]]; then
+    if [[ $rsha != $zero ]] && git cat-file -e "$rsha^{commit}" 2>/dev/null; then
+      range=($rsha..$tip)                               # the remote's old tip is known here
+    else
+      range=($tip --not --remotes=$remote)              # new branch, or old tip unknown here
+    fi
+    git rev-list ${range[@]} > $tmp/revlist 2>$tmp/rlerr; rc=$?
+    if (( rc != 0 )); then
+      refuse "git rev-list ${range[*]} failed ($(<$tmp/rlerr)); refusing a push it cannot check."
+      continue
+    fi
+    revs=(${(f)"$(<$tmp/revlist)"})
+    for c in $revs; do
+      { git log -1 --format=%B $c
+        git log -1 --format='author: %an <%ae>%ncommitter: %cn <%ce>' $c
+      } > $tmp/msg
+      # Added lines and touched paths, each prefixed with its path so a hit can be placed.
+      git show --format= --no-color --unified=0 --no-ext-diff $c | awk '
+        /^diff --git / { path = $NF; sub(/^b\//, "", path); print path ": (path) " path; next }
+        /^\+\+\+ / || /^--- / { next }
+        /^\+/ { print path ": " substr($0, 2) }
+      ' > $tmp/added
+      hits=$( { matches $tmp/msg | sed 's/^[0-9]*:/  message or identity: /'
+                matches $tmp/added | sed 's/^[0-9]*:/  /'
+                binary_hits $c; } )
+      report "commit ${c[1,12]} ($(git log -1 --format=%s $c))" "$hits"
+    done
+  fi
+
+  # The whole tree at the tip, whatever the diffs showed.
+  case $t in
+    commit|tree)
+      hits=$(tree_hits $tip); rc=$?
+      if (( rc != 0 )); then refuse "git could not read the tree of ${tip[1,12]} ($(<$tmp/gerr)); refusing a push it cannot check."
+      elif [[ -n $hits ]]; then report "the tree at ${tip[1,12]} ($lref)" "$(print -r -- $hits | head -n 30 | sed 's/^/  /')"; fi ;;
+    blob)
+      git cat-file blob $tip > $tmp/blob
+      report "blob ${tip[1,12]} ($lref)" "$(binary_matches $tmp/blob | sed 's/^[0-9]*:/  /')" ;;
+  esac
 done
 
 if (( found )); then
