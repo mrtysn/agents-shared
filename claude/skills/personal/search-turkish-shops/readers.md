@@ -74,4 +74,45 @@ search page's brand filter shows which audio brands it stocks.
 
 Cards are `[data-component-type="s-search-result"]`: the title is in `h2`, the price in
 `.a-price .a-offscreen` and the ASIN in `data-asin`. A card with no price ("Normalden yüksek
-fiyat") has its offers at `/dp/<ASIN>?aod=1`, in `#aod-offer`.
+fiyat") has its offers at `/dp/<ASIN>?aod=1`, in `#aod-offer`. A generic query ("tv stick")
+returns remote controls, books and retro-game sticks among the real products: search the model
+name, and drop titles with kumanda, kablo, kılıf, uyumlu, Guide.
+
+## Hepsiburada
+
+Search HTML is about 2.5 MB. Product links match `-pm-`; read each card with the `price` and
+`page` helpers above, climbing from the link to the first ancestor that holds a price. The
+cards after the real results are unrelated recommended products (phones): drop any card whose
+name misses the query's brand or model. A card href is sometimes absolute, so test for `http`
+before prefixing `https://www.hepsiburada.com`. Marketplace resellers fill a generic query
+(unbranded "Mx Box S" boxes, remote controls), so search the model name and keep the brand's
+own listings.
+
+## n11
+
+Product links match `/urun/`; titles start with "ÜCRETSİZ KARGO". Card text carries a list
+price and a basket price (`SÜPER 15.784 TL SEPETTE 13.416,40 TL`), and the climb to the first
+ancestor with a price can land on a container shared by two cards, giving both the same price.
+Take a price from the card only when the card's own text holds it; read the product page for one
+that matters, and mark a card with no price "no price on card".
+
+## Trendyol
+
+The cut-out `"products"` array is the whole result list. A product URL carries `boutiqueId` and
+`merchantId`; the merchant sets the price, so a Xiaomi-branded listing may be a reseller's (its
+title says "Xiaomi Türkiye garantili" when the warranty is the importer's). Drop satellite
+receivers and Android boxes by name.
+
+## Xiaomi's own store (mi.com/tr)
+
+Open it in Chrome; WebFetch gets 403. Product pages are `/tr/product/<slug>/` (for example
+`xiaomi-tv-stick-4k-2nd-gen`) and answer 200, but the prices load in the browser, so they are
+not in the fetched HTML. Its search is built in the browser too, and a `product-list` URL
+redirects to another domain. Take a store price from a screenshot the owner gives, and link the
+product page.
+
+## Reading saved results
+
+`localStorage` belongs to the origin, not the tab: a result saved from a `fetch` loop is read
+back from any tab on that shop, so navigate one tab to the shop's home page before reading it.
+Close the tabs you opened when the survey is done.
