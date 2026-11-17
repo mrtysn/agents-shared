@@ -11,6 +11,8 @@ content block, in transcript order:
   tool        tool name, on calls and results
   tool_use_id links a call to its result
   input       the call's input dict, on calls and on sub-agent/question calls
+  delivered   on USER(queued) rows: True once Claude Code has folded the message into the turn
+              (or run it at the turn's end), False while it still waits in the queue
 
 plus entry-level fields every item carries: session, project, time, cwd, line,
 sidechain, meta, origin, api_error, and for user/assistant entries entry_type
@@ -189,6 +191,7 @@ def items(path, project="", session=None, want=None):
     want limits the groups built (a set of group names); None builds all."""
     session = session or os.path.basename(path)[:-6]
     tool_names = {}  # tool_use_id -> tool name
+    queue = None  # enqueue line -> state, replayed on the first queued message
 
     def keep(group):
         return want is None or group in want
@@ -212,7 +215,13 @@ def items(path, project="", session=None, want=None):
             if t == "system" and d.get("subtype") == "away_summary" and keep("user"):
                 yield item("user", "RECAP", d.get("content", ""))
             if t == "queue-operation" and d.get("operation") == "enqueue" and keep("user"):
-                yield item("user", "USER(queued)", d.get("content", ""))
+                if queue is None:
+                    queue = {e["line"]: e["state"] for e in replay_queue(path)}
+                # delivered: Claude Code has put this message in front of the model (folded into the
+                # running turn, or run at the turn's end). A queued plain message that is not delivered yet
+                # has not been seen, so nothing the model did before it can be a failure to answer it.
+                yield item("user", "USER(queued)", d.get("content", ""),
+                           delivered=queue.get(line_no) in ("removed", "dequeued"))
             if t == "attachment" and want is not None and "attachments" in want:
                 yield from attachments(d.get("attachment") or {}, item)
             if t not in ("user", "assistant"):
@@ -229,24 +238,27 @@ def items(path, project="", session=None, want=None):
                 yield item("empty", "EMPTY", "")
 
 
-def pending_queued_commands(path):
-    """The slash commands the user queued that Claude Code has not delivered yet.
+def _queue_key(content):
+    # A cross-session message is enqueued with a hop-chain="…" attribute that its remove record
+    # leaves out; matched exactly, the message stayed queued and a later dequeue popped it instead
+    # of the slash command behind it.
+    return re.sub(r' hop-chain="[^"]*"', "", content.strip())
+
+
+def replay_queue(path):
+    """Replay the transcript's queue records into one entry per message the user queued.
 
     Claude Code folds a queued plain-text message into the running turn (a `remove` record follows
     its `enqueue` within seconds), but holds a queued slash command until the turn ends (`dequeue`).
-    The queue is replayed whole: `enqueue` appends, `remove` drops the entry with its content, `dequeue`
-    (which carries no content) takes the head, and `popAll` (the user pulled the queue back into the
-    prompt) empties it. Returns the slash commands left, [{"time", "content"}], oldest first.
+    `enqueue` appends, `remove` drops the entry with its content, `dequeue` (which carries no content)
+    takes the head, and `popAll` (the user pulled the queue back into the prompt) empties it.
+    Returns [{"line", "time", "content", "state"}] in enqueue order; line is the 0-based line of the
+    enqueue record (the `line` of the reader's USER(queued) row) and state is "queued" (still
+    waiting), "removed" (folded into the turn), "dequeued" (run at the turn's end) or "popped".
     """
-    def key(content):
-        # A cross-session message is enqueued with a hop-chain="…" attribute that its remove record
-        # leaves out; matched exactly, the message stayed queued and a later dequeue popped it instead
-        # of the slash command behind it.
-        return re.sub(r' hop-chain="[^"]*"', "", content.strip())
-
-    queue = []
+    entries, waiting = [], []
     with open(path, encoding="utf-8") as fh:
-        for raw in fh:
+        for line_no, raw in enumerate(fh):
             if '"queue-operation"' not in raw:
                 continue
             try:
@@ -257,17 +269,31 @@ def pending_queued_commands(path):
                 continue
             op, content = d.get("operation"), d.get("content") or ""
             if op == "enqueue":
-                queue.append({"time": d.get("timestamp", ""), "content": content.strip()})
+                entry = {"line": line_no, "time": d.get("timestamp", ""), "content": content.strip(), "state": "queued"}
+                entries.append(entry)
+                waiting.append(entry)
             elif op == "popAll":
-                queue = []
+                for e in waiting:
+                    e["state"] = "popped"
+                waiting = []
             elif op == "dequeue":
-                queue = queue[1:]
+                if waiting:
+                    waiting.pop(0)["state"] = "dequeued"
             elif op == "remove":
-                for i, p in enumerate(queue):
-                    if key(p["content"]) == key(content):
-                        del queue[i]
+                for i, e in enumerate(waiting):
+                    if _queue_key(e["content"]) == _queue_key(content):
+                        waiting.pop(i)["state"] = "removed"
                         break
-    return [p for p in queue if p["content"].startswith("/")]
+    return entries
+
+
+def pending_queued_commands(path):
+    """The slash commands the user queued that Claude Code has not delivered yet.
+
+    Returns [{"time", "content"}], oldest first (see replay_queue for how the queue is replayed).
+    """
+    return [{"time": e["time"], "content": e["content"]} for e in replay_queue(path)
+            if e["state"] == "queued" and e["content"].startswith("/")]
 
 
 def is_typed_prompt(it):

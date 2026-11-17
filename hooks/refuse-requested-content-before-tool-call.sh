@@ -40,11 +40,19 @@
 #      refuse the reads that "list me X" needs, or let a few edits through. The reason says to deliver the content as
 #      text first and then continue with the work. Reads the transcript once.
 #   4. reply before work: the call is Edit, Write, or a Bash call that is not obviously read-only, and
-#      - the user's latest message was queued mid-turn (the reader's USER(queued) row; hand-backs from agents, task
-#        notifications, cross-session messages and Stop-hook feedback do not count, and a typed prompt does not trigger);
-#      - nothing has replied to it since: no assistant text, and no AskUserQuestion the user answered.
-#      The refusal quotes the message and says to reply, then repeat the call. Text written in the same message as the
-#      call reaches the transcript only with that call, so the reply is seen by the next call, not this one.
+#      - a message queued mid-turn (the reader's USER(queued) row; hand-backs from agents, task notifications,
+#        cross-session messages and Stop-hook feedback do not count) came after the last typed prompt and after the
+#        last reply: no assistant text, and no AskUserQuestion the user answered, follows it;
+#      - the model has been shown one of those messages: a plain message is shown once Claude Code folds it into the
+#        turn (the reader's delivered flag, from the queue's `remove` record), so a call written before that moment
+#        is not refused; a slash command is held until the turn ends and reaches the model only through this refusal.
+#      The refusal quotes every unreplied queued message and says to reply, then repeat the call. Text written in the
+#      same message as the call reaches the transcript only with that call, so the reply is seen by the next call, not
+#      this one.
+#      Incident (2026-11-17, session febd9451-1577-4fe8-a9c6-0aac5065db7b): a question and a slash command were queued
+#      two seconds apart; six Edits written before the question was delivered were refused, and every refusal quoted
+#      only the slash command, the latest message, so the question was never named. `git -C <dir> log` was also read as
+#      a change.
 #      Incident (2026-11-15, session e19f1208-233d-48c5-96aa-041940a58196): "what do you mean?" and "I am not alex
 #      claude", both queued mid-turn, were followed by a profile written, scripts edited, pages published and commits
 #      pushed with no reply; the typed prompt before them had been answered. The first version of this trigger matched
@@ -94,8 +102,15 @@ bash_is_readonly() {
             curl) case " $* " in *" -X"*|*" -d"*|*" --data"*|*" -F"*|*" --form"*|*" -T"*|*" --upload"*|*" -o"*|*" -O"*|*" --output"*|*" --remote-name"*) return 1 ;; esac ;;
             sed) case " $* " in *" -i"*|*" --in-place"*) return 1 ;; esac ;;
             find) case " $* " in *" -delete"*|*" -exec"*|*" -ok"*) return 1 ;; esac ;;
-            git) case "$sub" in status|log|diff|show|rev-parse|ls-files|blame|describe|remote|shortlog|ls-remote|cat-file|grep|rev-list|reflog|name-rev|merge-base) ;;
-                     submodule) [ "${3:-}" = status ] || return 1 ;;
+            # `git -C <dir>` and --no-pager only pick the folder and the pager. `-c key=value` can name a program
+            # to run, so it is not skipped and the call counts as changing.
+            git) shift
+                 while [ "${1:-}" = -C ] || [ "${1:-}" = --no-pager ] || [ "${1:-}" = --no-optional-locks ]; do
+                     [ "$1" = -C ] && shift
+                     shift
+                 done
+                 case "${1:-}" in status|log|diff|show|rev-parse|ls-files|blame|describe|remote|shortlog|ls-remote|cat-file|grep|rev-list|reflog|name-rev|merge-base) ;;
+                     submodule) [ "${2:-}" = status ] || return 1 ;;
                      *) return 1 ;; esac ;;
             # The transcript readers in this repo's scripts/ only read, unless told to write a file with --out.
             python|python3)
@@ -133,23 +148,26 @@ PATTERN_FILE="$HERE/show-request-pattern.txt"
 
 # Trigger 4: a message the user sent mid-turn gets a reply before the next change. Prints the message when it has none.
 if [ "$WORK" = true ]; then
+    # The messages queued since the last typed prompt or reply, one per line (cut to 300 characters), or nothing when
+    # none is owed a reply yet: a plain message counts once it is delivered, a slash command always.
     Q4_MSG=$(python3 "$READER" "$TRANSCRIPT" --kinds user,assistant,agents,thinking --json --max-chars 400 2>/dev/null | jq -rs '
+        def system_row: ((.text // "") | test("^\\s*(<(bash-|local-command|task-notification|agent-message|cross-session-message|system-reminder)|Stop hook feedback:|Base directory for this skill|\\[Request interrupted)"));
         [ .[] | select(type == "object" and (.sidechain | not)) ] as $rows
         | ([ range(0; $rows | length) as $i | $rows[$i]
-             | select(.group == "user" and (.label == "USER" or .label == "USER(queued)") and (.meta | not)
-                      and ((.text // "") | test("^\\s*(<(bash-|local-command|task-notification|agent-message|cross-session-message|system-reminder)|Stop hook feedback:|Base directory for this skill|\\[Request interrupted)") | not)) | $i ] | max // -1) as $p
-        | if $p < 0 or $rows[$p].label != "USER(queued)" then "" else
-            ($rows[$p + 1:] | any(((.group == "assistant" or .label == "NARRATION") and ((.text // "") | test("\\S")))
-                                   or (.label == "RESULT AskUserQuestion" and ((.text // "") | test("answered"))))) as $replied
-            | if $replied then "" else ($rows[$p].text // "") end
-          end' 2>/dev/null)
+             | select((.group == "user" and .label == "USER" and (.meta | not) and (system_row | not))
+                      or ((.group == "assistant" or .label == "NARRATION") and ((.text // "") | test("\\S")))
+                      or (.label == "RESULT AskUserQuestion" and ((.text // "") | test("answered")))) | $i ] | max // -1) as $b
+        | [ $rows[$b + 1:][] | select(.group == "user" and .label == "USER(queued)" and (.meta | not) and (system_row | not)) ] as $owed
+        | if (($owed | any((.text // "") | test("^\\s*/"))) or ($owed | any(.delivered == true))) then
+            ($owed | map((.text // "")[0:300]) | join("\n\n  "))
+          else "" end' 2>/dev/null)
     if [ -n "$Q4_MSG" ]; then
         cat >&2 <<MSG
 BLOCKED: the user sent a message while you were working, and you have not replied to it:
 
-  ${Q4_MSG:0:300}
+  ${Q4_MSG}
 
-Reply to it in text first. Text written in the same message as a tool call is not seen until that call is made, so write the reply, then repeat this call. A question in it gets an answer, not an action (claude/rules/question-handling.md); an order in it, and the work already ordered, carry on after the reply.
+Reply to it in text first. Text written in the same message as a tool call is not seen until that call is made, so write the reply, then repeat this call. A question in it gets an answer, not an action (claude/rules/question-handling.md); an order in it, and the work already ordered, carry on after the reply. A line above that starts with / is a slash command: Claude Code runs it only when this turn ends, so say you have seen it, finish the current step, and end the turn in text.
 MSG
         exit 2
     fi

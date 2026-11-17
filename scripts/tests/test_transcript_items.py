@@ -76,6 +76,26 @@ class ItemsTest(unittest.TestCase):
         self.assertIn(("user", "USER(queued)"), got)
         self.assertIn(("user", "RECAP"), got)
 
+    def test_queued_rows_say_whether_claude_code_delivered_them(self):
+        def op(operation, content=None):
+            e = {"type": "queue-operation", "operation": operation, "timestamp": "2026-10-01T10:00:00Z"}
+            if content is not None:
+                e["content"] = content
+            return e
+        plain = write_session(self.tmp.name, "-q", "s2", [
+            op("enqueue", "why is it empty?"), op("remove", "why is it empty?"),   # folded into the turn
+            op("enqueue", "and the title?"),                                        # still waiting
+        ])
+        rows = [(i["text"], i["delivered"]) for i in ti.items(str(plain)) if i["label"] == "USER(queued)"]
+        self.assertEqual(rows, [("why is it empty?", True), ("and the title?", False)])
+        slash = write_session(self.tmp.name, "-q", "s3", [
+            op("enqueue", "/fix-it"), op("enqueue", "/other"), op("dequeue"),     # the first command ran
+        ])
+        rows = [(i["text"], i["delivered"]) for i in ti.items(str(slash)) if i["label"] == "USER(queued)"]
+        self.assertEqual(rows, [("/fix-it", True), ("/other", False)])
+        self.assertEqual([e["state"] for e in ti.replay_queue(str(slash))], ["dequeued", "queued"])
+        self.assertEqual([c["content"] for c in ti.pending_queued_commands(str(slash))], ["/other"])
+
     def test_call_carries_input_and_text_is_its_command(self):
         c = next(i for i in ti.items(str(self.path)) if i["group"] == "calls")
         self.assertEqual(c["text"], "ls ~/.claude/projects")

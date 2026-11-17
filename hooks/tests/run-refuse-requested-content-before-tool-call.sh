@@ -195,7 +195,24 @@ f=$(mk work-askno "$(prompt 'list me all the names')" "$(ask q1)" "$(result q1 "
 check 'a show request, then a dismissed question form, then Write refuses' 2 Write "$f" s-work-askno work
 
 # Trigger 4: a message the user sent mid-turn gets a reply before the next change.
-queued() { jq -cn --arg x "$1" --arg ts "${2:-2026-11-10T10:00:10.000Z}" '{type: "queue-operation", operation: "enqueue", content: $x, timestamp: $ts, sessionId: "00000000-0000-4000-8000-000000000009"}'; }
+# waiting: the message is queued and Claude Code has not shown it to the model yet. queued: it was folded into the turn
+# (an enqueue record, then the remove record that follows it within seconds), which is when the model has seen it.
+waiting() { jq -cn --arg x "$1" --arg ts "${2:-2026-11-10T10:00:10.000Z}" '{type: "queue-operation", operation: "enqueue", content: $x, timestamp: $ts, sessionId: "00000000-0000-4000-8000-000000000009"}'; }
+folded()  { jq -cn --arg x "$1" --arg ts "${2:-2026-11-10T10:00:11.000Z}" '{type: "queue-operation", operation: "remove", content: $x, timestamp: $ts, sessionId: "00000000-0000-4000-8000-000000000009"}'; }
+queued()  { waiting "$@"; folded "$1" "${2:-2026-11-10T10:00:10.000Z}"; }
+# says NAME WANT TOOL TRANSCRIPT SESSION TEXT: the refusal message must (WANT=has) or must not (WANT=lacks) contain TEXT.
+says() {
+    local name=$1 want=$2 tool=$3 file=$4 session=$5 text=$6 payload err found=no
+    payload=$(jq -cn --arg t "$tool" --arg f "$file" --arg s "$session" '{tool_name:$t, session_id:$s, transcript_path:$f, tool_input:{}}')
+    err=$(printf '%s' "$payload" | "$HOOK" 2>&1 >/dev/null) || true
+    total=$((total + 1))
+    printf '%s' "$err" | grep -qF -- "$text" && found=yes
+    if { [ "$want" = has ] && [ "$found" = yes ]; } || { [ "$want" = lacks ] && [ "$found" = no ]; }; then
+        [ "$VERBOSE" = 1 ] && printf 'ok    %s\n' "$name"
+    else
+        failed=$((failed + 1)); printf 'FAIL  %s: refusal %s %s\n' "$name" "$([ "$found" = yes ] && echo has || echo lacks)" "$text"
+    fi
+}
 f=$(mk q-bash "$(prompt 'tidy that')" "$(say 'Tidying now.')" "$(queued 'what do you mean?')" "$(call t1 Bash '{"command":"git commit -m x"}')")
 check 'a queued question then a commit refuses' 2 Bash "$f" s-q-bash question "git commit -m x"
 f=$(mk q-think "$(prompt 'tidy that')" "$(queued 'what do you mean?')" "$(think 'The tidy step only renames the two helper files; nothing is deleted.')" "$(call t1 Bash '{"command":"git commit -m x"}')")
@@ -241,6 +258,36 @@ check 'Stop-hook feedback is not a message from the user' 0 Edit "$f" s-q-notify
 f=$(mk q-twice "$(prompt 'tidy that')" "$(queued 'why is the page empty?')" "$(call t1 Edit '{"file_path":"/x"}')")
 check 'a refused call does not use up the refusal (first attempt)' 2 Edit "$f" s-q-twice question
 check 'a refused call does not use up the refusal (second attempt)' 2 Edit "$f" s-q-twice question
+
+# A plain message that Claude Code has not delivered yet has not been seen, so a call written before it is not refused.
+f=$(mk q-wait "$(prompt 'tidy that')" "$(waiting 'why is the page empty?')" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'a queued question not yet delivered, then Edit allows' 0 Edit "$f" s-q-wait
+f=$(mk q-batch "$(prompt 'tidy that')" "$(waiting 'why is the page empty?')" "$(call t1 Edit '{"file_path":"/x"}')" "$(call t2 Edit '{"file_path":"/x"}')" "$(folded 'why is the page empty?' 2026-11-10T10:00:12.000Z)" "$(call t3 Edit '{"file_path":"/x"}')")
+check 'a batch of Edits written before the delivery, then one after it, refuses' 2 Edit "$f" s-q-batch question
+# A queued slash command is held until the turn ends: only this refusal tells the model about it.
+f=$(mk q-slash "$(prompt 'tidy that')" "$(waiting '/fix-it-at-its-source' 2026-11-10T10:00:12.000Z)" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'a queued slash command then Edit refuses' 2 Edit "$f" s-q-slash question
+says 'the slash refusal says to end the turn' has Edit "$f" s-q-slash-says 'end the turn in text'
+says 'the slash refusal quotes the command' has Edit "$f" s-q-slash-quote '/fix-it-at-its-source'
+f=$(mk q-slash-replied "$(prompt 'tidy that')" "$(waiting '/fix-it-at-its-source')" "$(say 'Seen /fix-it-at-its-source; it runs when this turn ends.')" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'a queued slash command, a reply, then Edit allows' 0 Edit "$f" s-q-slash-replied
+# Two messages queued together: every one that is owed a reply is quoted, not only the latest.
+f=$(mk q-two "$(prompt 'tidy that')" "$(queued 'which one is correct?' 2026-11-10T10:00:10.000Z)" "$(waiting '/fix-it-at-its-source' 2026-11-10T10:00:12.000Z)" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'a question and a slash command queued together refuse' 2 Edit "$f" s-q-two question
+says 'the refusal quotes the question queued before the slash command' has Edit "$f" s-q-two-q 'which one is correct?'
+says 'the refusal also quotes the slash command' has Edit "$f" s-q-two-s '/fix-it-at-its-source'
+f=$(mk q-two-wait "$(prompt 'tidy that')" "$(waiting 'which one is correct?' 2026-11-10T10:00:10.000Z)" "$(waiting '/fix-it-at-its-source' 2026-11-10T10:00:12.000Z)" "$(call t1 Edit '{"file_path":"/x"}')")
+says 'an undelivered question is quoted too once a slash command makes the call refuse' has Edit "$f" s-q-two-wait 'which one is correct?'
+f=$(mk q-two-old "$(prompt 'tidy that')" "$(queued 'why is it empty?' 2026-11-10T10:00:10.000Z)" "$(say 'It is empty because nothing is listed yet.')" "$(queued 'and the title?' 2026-11-10T10:00:20.000Z)" "$(call t1 Edit '{"file_path":"/x"}')")
+says 'a message already answered is not quoted again' lacks Edit "$f" s-q-two-old 'why is it empty?'
+
+# git -C <dir> and --no-pager only pick the folder and the pager: the call still reads.
+f=$(mk q-gitc "$(prompt 'tidy that')" "$(queued 'why is the page empty?')" "$(call t1 Bash '{"command":"x"}')")
+check 'a queued question then git -C <dir> log allows' 0 Bash "$f" s-q-gitc question "git -C vendored log --oneline -1"
+check 'a queued question then git --no-pager -C <dir> diff allows' 0 Bash "$f" s-q-gitnp question "git --no-pager -C /x diff"
+check 'a queued question then git -C <dir> submodule status allows' 0 Bash "$f" s-q-gitcsub question "git -C /x submodule status"
+check 'a queued question then git -C <dir> commit refuses' 2 Bash "$f" s-q-gitccommit question "git -C /x commit -m x"
+check 'a queued question then git -c <key=value> log refuses' 2 Bash "$f" s-q-gitcc question "git -c core.pager=x log"
 
 # Fail open.
 check 'transcript missing allows' 0 AskUserQuestion "$TMP/nonexistent.jsonl"
