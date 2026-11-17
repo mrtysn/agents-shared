@@ -67,3 +67,20 @@ rule format; `tests/test_retail_rules.py` checks it). When a shop answers differ
   under Pro) is dropped, not reported as the model.
 - Installment lines (`9 x 303,22 TL`) are not prices.
 - List the facts, not a pick, unless the user asks for a recommendation.
+- **A model name is a link too**: the first cell of a row links to that model's cheapest listing.
+  Only a missing-listing cell (`—`, `not listed`) or an unread shop (`not checked`) is plain text,
+  and no cell is empty. A price the user supplied (a screenshot) says so and links to the shop's
+  product page.
+- **Say what stock was checked.** "In stock only" holds where the shop's own data states stock
+  (MediaMarkt's `isAvailableAndBuyable`) or the listing page was opened. Otherwise the opening
+  paragraph says stock was not opened per listing, and which shops it was read for.
+- **Order**: the verdict or read, then specs and performance, then prices, then notes, sources last.
+  Every spec claim comes from a page that was read, linked in the sources.
+- **Price tables stay narrow**: `Model | Cheapest | Other shops` with each price linked, not one
+  column per shop. A table of more than about five columns scrolls sideways and hides the right-hand
+  shops (the 2026-11-17 sticks page had nine).
+- **One topic, one page.** A later step on the same topic (a comparison, a review digest, a
+  correction) is a new section of the existing page, re-rendered from its Markdown source.
+  `page-new` never overwrites: render to a scratch file and copy it over the old page.
+- **Before reporting, check the HTML**: every first-column cell and every price cell holds an
+  `<a href`. A page that fails this has been sent back before.
