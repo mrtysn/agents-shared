@@ -70,6 +70,18 @@ costs a brief, a report and a context of its own.
   An Explore agent is read-only and refuses to write a file even through Bash, so its brief
   asks for findings in the report and the parent saves them (2026-11-10: two of three
   Explore surveys briefed to write a scratch file handed back unwritten).
+- **Shell commands that name their inputs**: every `grep` or `cat` gets a file operand or
+  `< /dev/null`, and a variable that may be unset is not used as one. A `grep` with no file
+  waits on stdin forever, the call passes the 2-minute limit and moves to the background, and
+  the harness holds the agent's handback while that command lives (2026-11-17: a survey
+  agent's report went undelivered for over an hour).
+
+**A completion notice that says the agent is "waiting on its own background work", with no
+report, means a stuck child.** The report is usually already in the agent's transcript: read it
+with `scripts/extract-session-text.py <session>/subagents/agent-<id>.jsonl --subagents`
+(the scratchpad's `tasks/<id>.output` links to that file), find the child with
+`ps -eo pid,ppid,etime,stat,command`, and stop its task with `TaskStop`; the held report is then
+delivered.
 
 ## Provenance
 
