@@ -46,9 +46,9 @@
 #      - the model has been shown one of those messages: a plain message is shown once Claude Code folds it into the
 #        turn (the reader's delivered flag, from the queue's `remove` record), so a call written before that moment
 #        is not refused; a slash command is held until the turn ends and reaches the model only through this refusal.
-#      The refusal quotes every unreplied queued message and says to reply, then repeat the call. Text written in the
-#      same message as the call reaches the transcript only with that call, so the reply is seen by the next call, not
-#      this one.
+#      The refusal quotes every unreplied queued message and says to reply, then repeat the call. The transcript lags
+#      the conversation, so a reply written in the same message as the call may not be in the file yet: the read is
+#      repeated up to 3 times, 1 second apart, before the call is refused (a read-only Bash call never reaches this).
 #      Incident (2026-11-17, session febd9451-1577-4fe8-a9c6-0aac5065db7b): a question and a slash command were queued
 #      two seconds apart; six Edits written before the question was delivered were refused, and every refusal quoted
 #      only the slash command, the latest message, so the question was never named. `git -C <dir> log` was also read as
@@ -150,7 +150,7 @@ PATTERN_FILE="$HERE/show-request-pattern.txt"
 if [ "$WORK" = true ]; then
     # The messages queued since the last typed prompt or reply, one per line (cut to 300 characters), or nothing when
     # none is owed a reply yet: a plain message counts once it is delivered, a slash command always.
-    Q4_MSG=$(python3 "$READER" "$TRANSCRIPT" --kinds user,assistant,agents,thinking --json --max-chars 400 2>/dev/null | jq -rs '
+    q4_owed() { python3 "$READER" "$TRANSCRIPT" --kinds user,assistant,agents,thinking --json --max-chars 400 2>/dev/null | jq -rs '
         def system_row: ((.text // "") | test("^\\s*(<(bash-|local-command|task-notification|agent-message|cross-session-message|system-reminder)|Stop hook feedback:|Base directory for this skill|\\[Request interrupted)"));
         [ .[] | select(type == "object" and (.sidechain | not)) ] as $rows
         | ([ range(0; $rows | length) as $i | $rows[$i]
@@ -160,7 +160,15 @@ if [ "$WORK" = true ]; then
         | [ $rows[$b + 1:][] | select(.group == "user" and .label == "USER(queued)" and (.meta | not) and (system_row | not)) ] as $owed
         | if (($owed | any((.text // "") | test("^\\s*/"))) or ($owed | any(.delivered == true))) then
             ($owed | map((.text // "")[0:300]) | join("\n\n  "))
-          else "" end' 2>/dev/null)
+          else "" end' 2>/dev/null; }
+    # The transcript lags the conversation: a reply written in the same assistant message as this call may not be
+    # in the file yet. Re-read up to 3 times, 1 second apart, before refusing (as require-question-facts-in-question.sh does; the tests shorten the pause with REFUSE_REREAD_SLEEP).
+    Q4_MSG=""
+    for attempt in 0 1 2 3; do
+        Q4_MSG=$(q4_owed)
+        [ -n "$Q4_MSG" ] && [ "$attempt" != 3 ] || break
+        sleep "${REFUSE_REREAD_SLEEP:-1}"
+    done
     if [ -n "$Q4_MSG" ]; then
         cat >&2 <<MSG
 BLOCKED: the user sent a message while you were working, and you have not replied to it:

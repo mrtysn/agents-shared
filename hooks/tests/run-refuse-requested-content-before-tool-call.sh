@@ -24,6 +24,7 @@ done
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 export XDG_CACHE_HOME="$TMP/cache"
+export REFUSE_REREAD_SLEEP=0.2   # the re-read pause before a refusal; 1 second in use
 
 row() {  # type json-content [origin-kind] [time]
     jq -cn --arg t "$1" --argjson c "$2" --arg o "${3:-human}" --arg ts "${4:-2026-11-10T10:00:00.000Z}" \
@@ -289,6 +290,18 @@ check 'a queued question then git -C <dir> submodule status allows' 0 Bash "$f" 
 check 'a queued question then git -C <dir> commit refuses' 2 Bash "$f" s-q-gitccommit question "git -C /x commit -m x"
 check 'a queued question then git -c <key=value> log refuses' 2 Bash "$f" s-q-gitcc question "git -c core.pager=x log"
 
+# The transcript lags the conversation: a reply written in the same message as the call reaches the file a moment after
+# the hook starts, and the call is allowed. A reply that never arrives still refuses.
+f=$(mk q-late "$(prompt 'tidy that')" "$(queued 'why is the page empty?')" "$(call t1 Edit '{"file_path":"/x"}')")
+( sleep 0.3; say 'It is empty because nothing is listed yet.' >> "$f" ) &
+check 'a reply that reaches the transcript a moment after the hook starts allows' 0 Edit "$f" s-q-late
+wait
+f=$(mk q-late-bash "$(prompt 'tidy that')" "$(queued 'why is the page empty?')" "$(call t1 Bash '{"command":"git commit -m x"}')")
+( sleep 0.3; say 'It is empty because nothing is listed yet.' >> "$f" ) &
+check 'the same for a state-changing Bash call' 0 Bash "$f" s-q-late-bash question "git commit -m x"
+wait
+f=$(mk q-never "$(prompt 'tidy that')" "$(queued 'why is the page empty?')" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'a reply that never arrives still refuses after the re-reads' 2 Edit "$f" s-q-never question
 # Fail open.
 check 'transcript missing allows' 0 AskUserQuestion "$TMP/nonexistent.jsonl"
 printf 'not json at all\n' > "$TMP/garbage.jsonl"
