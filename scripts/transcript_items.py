@@ -253,7 +253,8 @@ def replay_queue(path):
 
     Claude Code folds a queued plain-text message into the running turn (a `remove` record follows
     its `enqueue` within seconds), but holds a queued slash command until the turn ends (`dequeue`).
-    `enqueue` appends, `remove` drops the entry with its content, `dequeue` (which carries no content)
+    `enqueue` appends, `remove` drops the entry with its content (or, when none matches, the oldest
+    entry recorded without content), `dequeue` (which carries no content)
     takes the head, and `popAll` (the user pulled the queue back into the prompt) empties it.
     A `dequeue` carries no content, so one enqueue that never gets a `remove` or `dequeue` shifts
     every later dequeue onto the wrong entry. A user entry carrying `<command-name>/NAME</command-name>`
@@ -298,6 +299,13 @@ def replay_queue(path):
                     if _queue_key(e["content"]) == _queue_key(content):
                         waiting.pop(i)["state"] = "removed"
                         break
+                else:
+                    # An enqueue recorded without content can only be matched this way: its remove
+                    # carries the text. Left in place it would take a later dequeue meant for a command.
+                    for i, e in enumerate(waiting):
+                        if not e["content"]:
+                            waiting.pop(i)["state"] = "removed"
+                            break
     return entries
 
 

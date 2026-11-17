@@ -61,6 +61,17 @@ check("a removed cross-session message whose remove lacks its hop-chain leaves t
       run([q("enqueue", '<cross-session-message from="x" hop-chain="ab12" from-name="peer">\nhi'),
            q("remove", '<cross-session-message from="x" from-name="peer">\nhi')] + queued
           + [{"type": "queue-operation", "operation": "dequeue"}], "PreToolUse", "AskUserQuestion") is None)
+no_content = {"type": "queue-operation", "operation": "enqueue", "timestamp": "2026-11-12T14:17:15.307Z"}
+dequeue = {"type": "queue-operation", "operation": "dequeue"}
+check("an enqueue without content, matched by a remove, does not take the dequeue meant for a command",
+      run([no_content, q("remove", "a pasted log, recorded only on its remove record"), q("enqueue", "/x"), dequeue],
+          "PreToolUse", "AskUserQuestion") is None)
+check("a command-name entry after the dequeue also ends the wait",
+      run([no_content, q("enqueue", "/x"), dequeue,
+           {"type": "user", "message": {"role": "user", "content": "<command-name>/x</command-name>"}}],
+          "PreToolUse", "AskUserQuestion") is None)
+check("a command still queued behind an empty-content enqueue stays pending",
+      run([no_content, q("enqueue", "/x")], "PreToolUse", "AskUserQuestion") is not None)
 check("a plain-text queued message is not a command",
       run([q("enqueue", "also, how do I detach?")], "PreToolUse", "AskUserQuestion") is None)
 check("a queue pulled back into the prompt is not pending",
