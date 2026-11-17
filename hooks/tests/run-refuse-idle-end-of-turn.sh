@@ -165,6 +165,14 @@ check "nothing left line under a prose offer"        block false "$(prompt 'comm
 check "trigger phrase in double quotes"              pass  false "$(prompt 'why did the hook fire?')" "$(say $'It matched "tell me to" in my last answer.\n\nNothing left: that was all you asked.')"
 check "trigger phrase in backticks"                  pass  false "$(prompt 'why did the hook fire?')" "$(say $'It matched `want me to` in my last answer.\n\nNothing left: that was all you asked.')"
 check "offer beside a quoted phrase"                 block false "$(prompt 'why did the hook fire?')" "$(say $'It matched "tell me to". Want me to fix it?')"
+FENCED_MSG=$'Paste this into the new session:\n\n```\nCheck the hooks and tell me which of them fired so far. If you want more detail, say so.\n```'
+check "offer phrases inside a fenced block"          pass  false "$(prompt 'write the first message for the new session')" "$(say $FENCED_MSG)"
+check "offer phrases inside a tilde fence"           pass  false "$(prompt 'write the first message for the new session')" "$(say "${FENCED_MSG//\`\`\`/~~~}")"
+FENCED_UNCLOSED=$'Paste this:\n\n```\nTell me which of them fired so far.'
+check "offer phrases in an unclosed fence"           pass  false "$(prompt 'write the first message for the new session')" "$(say $FENCED_UNCLOSED)"
+check "the same words outside a fence"               block false "$(prompt 'write the first message for the new session')" "$(say 'Check the hooks and tell me which of them fired so far. If you want more detail, say so.')"
+check "fenced block, then an offer after it"         block false "$(prompt 'write the first message for the new session')" "$(say "$FENCED_MSG"$'\n\nWant me to send it?')"
+check "an offer before a fenced block"               block false "$(prompt 'write the first message for the new session')" "$(say $'If you want, I can adjust it.\n\n```\nhello\n```\n\nDone.')"
 check_last "nothing left in payload, transcript behind" pass "$DONE" "$(prompt 'commit it')" "$(bash_call 1)"
 check_last "offer in payload, transcript behind"        block "$DONE_OFFER" "$(prompt 'commit it')" "$(bash_call 1)" "$(say $DONE)"
 check "user said stop"                              pass  false "$(prompt 'stop')" "$(say 'Stopped. The branch is left as it was.')"

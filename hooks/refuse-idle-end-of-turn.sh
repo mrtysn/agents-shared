@@ -47,6 +47,8 @@
 #   - the turn made no tool call and the reply has text and no prose offer: a conversational answer ends with the
 #     answer, even a one-word one the user asked for (survey 2026-11-12, scripts/survey-stop-hook-refusals.py: of 66 idle refusals on such turns,
 #     45 ended in a bare "Nothing left" or text only, 9 forced questions were rejected, 12 were useful),
+#   - the reply's only offer or choice phrase sits inside a fenced block (``` or ~~~): a copy-ready message for the user
+#     to hand on ("Tell me which of the hooks fired") is quoted text, not a prose offer to the user (2026-11-17),
 #   - the transcript or the reader cannot be read: it never blocks on a read it could not make.
 # Background work is an Agent spawn not set to run in the foreground or a SendMessage that resumed a sub-agent,
 # both in any turn (a reviewer spawned two prompts back is still pending work); a Bash call with
@@ -107,7 +109,10 @@ VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" --arg show "$SHOW_PATT
     ($rows[$p].text // "" | (capture("<command-args>(?<a>[\\s\\S]*)</command-args>").a // .)) as $prompt
     | $rows[$p + 1:] as $turn
     | (if $last != "" then $last else [ $turn[] | select(.group == "assistant") | .text ] | last // "" end) as $text
-    | ($text | .[(length - 600 | if . < 0 then 0 else . end):] | gsub("\"[^\"]*\"|`[^`]*`|“[^”]*”"; " ")) as $tail
+    # Fenced blocks (``` or ~~~, an unclosed one runs to the end) are handed-over text, such as a first message for
+    # another session, not an offer the user is asked to answer: the offer patterns never see them.
+    | ($text | gsub("(^|\\n)[ \\t]*(?<m>```|~~~)[\\s\\S]*?(\\n[ \\t]*\\k<m>[^\\n]*|$)"; "\n")
+       | .[(length - 600 | if . < 0 then 0 else . end):] | gsub("\"[^\"]*\"|`[^`]*`|“[^”]*”"; " ")) as $tail
     | ([ $tail | match(offer; "gi") | .string ] | last // "") as $phrase
     | ([ range(0; $turn | length) as $i | select($turn[$i].label == "RESULT AskUserQuestion") | $i ] | max // -1) as $a
     | ([ $turn[$a + 1:][] | select(.group == "calls" or .label == "AGENT-SPAWN" or .label == "SENDMSG") ] | length) as $workAfterAsk
