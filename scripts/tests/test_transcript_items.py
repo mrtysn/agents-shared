@@ -96,6 +96,27 @@ class ItemsTest(unittest.TestCase):
         self.assertEqual([e["state"] for e in ti.replay_queue(str(slash))], ["dequeued", "queued"])
         self.assertEqual([c["content"] for c in ti.pending_queued_commands(str(slash))], ["/other"])
 
+    def test_a_lost_queue_record_does_not_keep_a_command_that_ran_queued(self):
+        def op(operation, content=None):
+            e = {"type": "queue-operation", "operation": operation, "timestamp": "2026-10-01T10:00:00Z"}
+            if content is not None:
+                e["content"] = content
+            return e
+        ran = {"type": "user", "timestamp": "2026-10-01T10:00:05Z", "message": {
+            "role": "user", "content": "<command-message>fix-it</command-message>\n<command-name>/fix-it</command-name>"}}
+        lost = write_session(self.tmp.name, "-q", "s4", [
+            op("enqueue", "<task-notification>done</task-notification>"),   # never removed or dequeued
+            op("enqueue", "/fix-it"), op("dequeue"),                          # pops the lost one, not /fix-it
+            ran,
+        ])
+        self.assertEqual(ti.pending_queued_commands(str(lost)), [])
+        still = write_session(self.tmp.name, "-q", "s5", [
+            op("enqueue", "<task-notification>done</task-notification>"), op("enqueue", "/fix-it"), op("dequeue"),
+        ])
+        self.assertEqual([c["content"] for c in ti.pending_queued_commands(str(still))], ["/fix-it"])
+        early = write_session(self.tmp.name, "-q", "s6", [ran, op("enqueue", "/fix-it")])
+        self.assertEqual([c["content"] for c in ti.pending_queued_commands(str(early))], ["/fix-it"])
+
     def test_call_carries_input_and_text_is_its_command(self):
         c = next(i for i in ti.items(str(self.path)) if i["group"] == "calls")
         self.assertEqual(c["text"], "ls ~/.claude/projects")

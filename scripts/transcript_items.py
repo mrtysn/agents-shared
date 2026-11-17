@@ -245,6 +245,9 @@ def _queue_key(content):
     return re.sub(r' hop-chain="[^"]*"', "", content.strip())
 
 
+_COMMAND_NAME = re.compile(r"<command-name>(/[^<\s]+)</command-name>")
+
+
 def replay_queue(path):
     """Replay the transcript's queue records into one entry per message the user queued.
 
@@ -252,6 +255,9 @@ def replay_queue(path):
     its `enqueue` within seconds), but holds a queued slash command until the turn ends (`dequeue`).
     `enqueue` appends, `remove` drops the entry with its content, `dequeue` (which carries no content)
     takes the head, and `popAll` (the user pulled the queue back into the prompt) empties it.
+    A `dequeue` carries no content, so one enqueue that never gets a `remove` or `dequeue` shifts
+    every later dequeue onto the wrong entry. A user entry carrying `<command-name>/NAME</command-name>`
+    after a queued command's enqueue shows that command ran, so it ends the wait whatever the replay says.
     Returns [{"line", "time", "content", "state"}] in enqueue order; line is the 0-based line of the
     enqueue record (the `line` of the reader's USER(queued) row) and state is "queued" (still
     waiting), "removed" (folded into the turn), "dequeued" (run at the turn's end) or "popped".
@@ -259,11 +265,19 @@ def replay_queue(path):
     entries, waiting = [], []
     with open(path, encoding="utf-8") as fh:
         for line_no, raw in enumerate(fh):
-            if '"queue-operation"' not in raw:
+            if '"queue-operation"' not in raw and "<command-name>" not in raw:
                 continue
             try:
                 d = json.loads(raw)
             except json.JSONDecodeError:
+                continue
+            if d.get("type") == "user":
+                ran = _COMMAND_NAME.search(json.dumps(d.get("message") or {}, ensure_ascii=False))
+                if ran:
+                    for i, e in enumerate(waiting):
+                        if e["content"].split(None, 1)[:1] == [ran.group(1)]:
+                            waiting.pop(i)["state"] = "dequeued"
+                            break
                 continue
             if d.get("type") != "queue-operation":
                 continue
