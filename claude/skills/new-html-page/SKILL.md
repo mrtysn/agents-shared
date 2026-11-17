@@ -147,8 +147,11 @@ When a decision turns on something seen, or on more context than a terminal prom
 
        project-lifecycle decision-wait <FORM>.html --json
 
-   It opens the form in the browser without taking focus and exits when the user submits. Tell
-   the user the form is open, with its absolute path on its own line, and stop.
+   It opens the form in the browser without taking focus, so the user may not see it, and exits
+   when the user submits. Read the address it prints first (`serving … at http://127.0.0.1:<port>/`)
+   and hand over both, each on its own line: that address first, saying it is the one that
+   submits answers back, then the form's absolute path, saying a copy opened from disk cannot
+   submit. Then stop.
 4. **On the completion notice**, read the answers from its output or `<FORM>.answers.json`:
    `{"choice": id}`, `{"choices": [ids]}` when several may be picked, `"other"` with `text` for
    free text, `text` beside a pick as a note, `{"skipped": true}`, `{"choice": null}` when
