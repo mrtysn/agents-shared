@@ -1,1 +1,1 @@
-(?i)\b(list|show|give|repeat|print|display)\s+(me|us)\b|\bwhere is\b|\b(my|the|a|in a|as a) table\b|\ball the\b|\b(repeat|reprint)\s+(the|them|it|those|these|that|only)\b
+(?i)\b(list|show|give|repeat|print|display)\s+(me|us)\b|\bwhere is\b(?![^.?!\n]*\b(send|sending|airdrop|localsend|upload|attach|share|forward|email)\b)|\b(my|the|a|in a|as a) table\b|\ball the\b|\b(repeat|reprint)\s+(the|them|it|those|these|that|only)\b

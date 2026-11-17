@@ -156,6 +156,10 @@ f=$(mk work-incident-edit "$(prompt 'ok, list me /outstanding and continue')" "$
 check 'show request + short announcement + Edit refuses' 2 Edit "$f" s-work-edit work
 f=$(mk work-write "$(prompt 'show me the plan')" "$(call t1 Write '{"file_path":"/x"}')")
 check 'show request + no text + Write refuses' 2 Write "$f" s-work-write work
+f=$(mk where-send "$(prompt 'where is your response to the session i wanna send it?')" "$(call t1 Write '{"file_path":"/x"}')")
+check '"where is" + send it: a file to hand over, Write allows' 0 Write "$f" s-where-send work
+f=$(mk where-show "$(prompt 'where is your response to the session?')" "$(call t1 Write '{"file_path":"/x"}')")
+check '"where is" alone still asks to see it, Write refuses' 2 Write "$f" s-where-show work
 f=$(mk work-readonly "$(prompt 'ok, list me /outstanding and continue')" "$(say "$ANNOUNCE")" "$(call t1 Bash '{"command":"git status"}')")
 check 'show request + read-only Bash (git status) allows' 0 Bash "$f" s-work-ro1 work 'git status --short'
 check 'read-only pipeline (git log | head, grep with a quoted pipe) allows' 0 Bash "$f" s-work-ro2 work "cd /tmp/x && git log --oneline | head -5; grep -n 'a|b' notes.md"
