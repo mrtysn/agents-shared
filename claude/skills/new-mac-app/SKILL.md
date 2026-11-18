@@ -1,6 +1,6 @@
 ---
 description: Start a new macOS app on the project-lifecycle pipeline — a Swift/AppKit app on the shared MacAppBase package that already builds, self-tests and reports — then create its GitHub repo. Use when the user asks for a new Mac app, menu bar app, or a native window over a local tool.
-argument-hint: [app name] [window|menu-bar] [--login-agent] [icon]
+argument-hint: [app name] [window|menu-bar|webview] [--login-agent] [icon]
 allowed-tools: Bash, Read, Write, Edit, AskUserQuestion, Skill
 ---
 
@@ -19,9 +19,11 @@ Ask with AskUserQuestion, in one call, only for what the user will see or type:
    The directory name, the tool slug (`memory-guard`), the bundle id (`local.memory-guard`)
    and the product name (`MemoryGuard`) all derive from it; say so in the question, and offer
    `--tool` only if the user wants a different slug.
-2. **Shape** — `window` (a windowed app the user opens and quits; no heartbeat) or `menu-bar`
-   (a menu bar item over a background job; heartbeat every five minutes). Recommend from what
-   the user described.
+2. **Shape** — `window` (a windowed app the user opens and quits; no heartbeat), `menu-bar`
+   (a menu bar item over a background job; heartbeat every five minutes), or `webview` (a
+   window over a web page, local or remote, with `--url`: title-bar Back, Forward, Home and
+   Reload, their menu keys, mouse side buttons and swipe come from MacAppStyle's `WebWindow`,
+   never hand-written). Recommend from what the user described.
 3. **Keep it running from login?** — adds a login agent `install` manages. Recommend yes for a
    menu-bar app that watches something, no for a windowed tool.
 
@@ -40,7 +42,7 @@ Do not ask about the repo here; `/new-repo` asks its own questions.
    way: stop and report, never delete.
 2. **Scaffold**:
 
-       project-lifecycle init mac-app --name "<App Name>" --shape <window|menu-bar> [--login-agent] [--tool <slug>] --icon-symbol <sf-symbol> --icon-color "#RRGGBB"
+       project-lifecycle init mac-app --name "<App Name>" --shape <window|menu-bar|webview> [--url <https://…>] [--login-agent] [--tool <slug>] --icon-symbol <sf-symbol> --icon-color "#RRGGBB"
 
    Relay the files it wrote.
 3. **Prove it**: `project-lifecycle test` must pass (it compiles the app against the shared
