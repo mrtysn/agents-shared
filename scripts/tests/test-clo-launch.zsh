@@ -150,8 +150,8 @@ print -r -- $'alt\t~/fastdir\nhome\t~/nowhere-at-all' > "$stub/xdg/agents-shared
 check "clo f launches in the account's fast folder" 0 \
     "tmux new-session * -c */fastdir *" -- \
     TERM_PROGRAM=Apple_Terminal XDG_CONFIG_HOME="$stub/xdg" -- -a alt f
-check "a fast folder that is not a folder exits 2" 2 -- \
-    TERM_PROGRAM=Apple_Terminal XDG_CONFIG_HOME="$stub/xdg" -- -a home f
+check "a missing fast folder falls through to the no-terminal refusal, not a crash" 1 -- \
+    TERM_PROGRAM=Apple_Terminal XDG_CONFIG_HOME="$stub/xdg" DEV_ROOT="$stub/no-dev-root" -- -a home f
 
 # Without -a, the folder you stand in picks the account (roots after the fast folder).
 mkdir -p "$stub/roots/one/deep" "$stub/roots/two"

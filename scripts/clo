@@ -500,7 +500,8 @@ case "${1:-}" in
                        break
                    done
                    if [[ -n "$fast_setting" && ! -d "$fast_setting" ]]; then
-                       print -u2 "clo: $fast_folders_file sends account '$fast_acct' to $fast_setting, which is not a folder"; exit 2
+                       print -u2 "clo: $fast_folders_file sends account '$fast_acct' to $fast_setting, which is not a folder here"
+                       fast_setting=""
                    fi
                    if [[ -n "$fast_setting" ]]; then
                        fast_dir="$fast_setting"
