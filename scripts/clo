@@ -19,7 +19,9 @@ Usage:
                           among the arguments exits 2.
   clo f [--prompt text]   Fast mode: no menus, launch in $DEV_ROOT/notebook with
                           Sonnet at medium effort; --prompt, if given, is sent
-                          as the first message. `fclo` is the same thing.
+                          as the first message. `fclo` is the same thing. On a
+                          machine with no notebook folder it asks which folder
+                          (one fzf list), then launches with the same settings.
   clo 1|2|3|4 [--prompt text]
                           Fast mode with a fixed model: 1 Haiku, 2 Sonnet, 3 Opus,
                           4 Fable. Same folder, medium effort and first message
@@ -460,9 +462,21 @@ case "${1:-}" in
                split_args "$@"; fast_prompt="$prompt"
                fast_dir="$PWD"
                if (( ! fast_here )); then
-                   [[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT/notebook" ]] \
-                       || { print -u2 "clo: fast mode launches in \$DEV_ROOT/notebook, but ${${DEV_ROOT:+$DEV_ROOT/notebook does not exist}:-DEV_ROOT is not set}. Run 'clo here' to launch fast mode in the current folder."; exit 1; }
-                   fast_dir="$DEV_ROOT/notebook"
+                   if [[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT/notebook" ]]; then
+                       fast_dir="$DEV_ROOT/notebook"
+                   else
+                       # No notebook on this machine: pick the folder, keep the fast-mode
+                       # model, effort and prompt. Folders only, no sessions menu.
+                       if [[ -t 0 && -t 1 ]] && command -v fzf >/dev/null; then
+                           fast_pick="$( { print -r -- "$PWD"$'\t'"here (${PWD/#$HOME/~})"
+                                           folder_rows | sort -t$'\t' -k1,1f | awk -F'\t' '{print $2"\t"$1}'
+                                         } | fzf --delimiter=$'\t' --with-nth=2 --nth=2 --reverse --cycle --info=hidden \
+                                                 --prompt="folder> " --header="clo f: $fast_model, medium effort. Pick the folder." )" || exit 130
+                           fast_dir="${fast_pick%%$'\t'*}"
+                       else
+                           print -u2 "clo: no \$DEV_ROOT/notebook on this machine (${${DEV_ROOT:+$DEV_ROOT/notebook missing}:-DEV_ROOT not set}). Run 'clo here' to launch fast mode in the current folder."; exit 1
+                       fi
+                   fi
                fi
                launch_claude "$fast_dir" "$fast_model" medium "$fast_prompt" "${rest[@]}" ;;
     launch)    shift; launch_cmd "$@" ;;
