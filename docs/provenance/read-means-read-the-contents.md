@@ -9,3 +9,10 @@ then asked what the user wanted from it. The user: "when I tell you to read some
 you must read it. but look at what you did instead", then, at the meta level, "fix your
 behavior". The file holds about 270k tokens as text; it was read in chunks only after
 the correction.
+
+Nov 2026: building a sourced reference page from two shared artifacts, the agent worked
+from the Artifact tool's summaries of them. One summary listed an "open questions and
+caveats" section the page does not have, and the agent wrote those into the reference as
+the page's own. The user: "while constructing such factual documents, never work from a
+summary. please re-do ALL the parts that came through a summary." The raw HTML the tool
+had saved was then read and the entries rebuilt from it.

@@ -9,6 +9,11 @@ and "what do you want from it?" is not an answer.
 - A file too large to read whole: say its size, say exactly which lines you read, and
   keep reading. Never present a sample as having read it.
 - A pasted image of a file in Finder is the file: resolve its path and read it.
+- **A summary is not the source.** A tool that hands back a summary (the Artifact tool on
+  another person's artifact, a web-fetch agent, a subagent's report) has not read it for you:
+  open the raw copy it saved, strip the markup, and read that before writing any fact from it
+  into a note, report or wiki. Never cite a summary as the page; a summary can invent
+  sections the page does not have.
 - Do not ask what the user wants from it before reading. Read, then report what it
   says; ask only about what the contents leave open.
 - A search or count is fine when the user asks for one, or after the read, to support a
