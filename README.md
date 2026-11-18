@@ -225,7 +225,10 @@ git config --global core.hooksPath "$AGENTS_SHARED/githooks"
 ```
 
 `init-global.sh` prints this line when it is not set and never sets it itself. A repo's own
-`core.hooksPath` still wins over the global one. On a **work** machine do not set it globally: it
+`core.hooksPath` still wins over the global one, so that repo's pushes are never scanned: when the
+global one is set, `init-global.sh` lists every public repo under `$DEV_ROOT` that has a hooks path of
+its own (`scripts/list-push-guard-bypasses.zsh`, which asks `gh` for visibility and shares the hook's
+cache), unless it is in the exempt list. On a **work** machine do not set it globally: it
 would run on the employer's repos. Opt in per repo (below), and write that machine's denylist by
 hand with only the employer's own names and internal terms, never a copy of the personal machine's list.
 

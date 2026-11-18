@@ -285,6 +285,16 @@ if [ -z "$GLOBAL_HOOKS" ]; then
     printf '      git config --global core.hooksPath "%s/githooks"\n' "$REPO_DIR"
 else
     printf '  Global git hooks: %s\n' "$GLOBAL_HOOKS"
+    # A repo with a core.hooksPath of its own never runs the global one, so its pushes skip the
+    # name guard without a word; scripts/list-push-guard-bypasses.zsh names the public ones.
+    BYPASSES="$(zsh "$REPO_DIR/scripts/list-push-guard-bypasses.zsh" "$DEV_ROOT" || true)"
+    if [ -n "$BYPASSES" ]; then
+        printf '  Push guard skipped: these repos set their own core.hooksPath, so their pushes are never scanned:\n'
+        printf '%s\n' "$BYPASSES" | sed 's/^/      /'
+        printf '    point each at %s/githooks (its own hooks then belong in .git/hooks, which githooks/ runs too),\n' "$REPO_DIR"
+        printf '    or list its OWNER/NAME in %s if it names denylisted entries on purpose\n' \
+            "${AGENTS_PUSH_DENYLIST_EXEMPT:-${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/push-denylist-exempt.txt}"
+    fi
 fi
 if [ ! -r "$DENYLIST" ]; then
     printf '  Push denylist missing: %s\n' "$DENYLIST"

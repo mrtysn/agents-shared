@@ -95,6 +95,12 @@
       ]
     },
     {
+      "name": "push guard bypasses",
+      "run": [
+        "scripts/tests/test-push-guard-bypasses.zsh"
+      ]
+    },
+    {
       "name": "external skill links",
       "run": [
         "bash",
