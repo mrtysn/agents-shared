@@ -461,7 +461,7 @@ case "${1:-}" in
                fast_dir="$PWD"
                if (( ! fast_here )); then
                    [[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT/notebook" ]] \
-                       || { print -u2 "clo: fast mode needs DEV_ROOT with a notebook folder inside it"; exit 1; }
+                       || { print -u2 "clo: fast mode launches in \$DEV_ROOT/notebook, but ${${DEV_ROOT:+$DEV_ROOT/notebook does not exist}:-DEV_ROOT is not set}. Run 'clo here' to launch fast mode in the current folder."; exit 1; }
                    fast_dir="$DEV_ROOT/notebook"
                fi
                launch_claude "$fast_dir" "$fast_model" medium "$fast_prompt" "${rest[@]}" ;;
