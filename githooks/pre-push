@@ -2,7 +2,14 @@
 # DESC: git pre-push hook — scan a public repo's push for denylisted names, skip private repos, then run the repo's own pre-push
 #
 # Safe to set globally (`git config --global core.hooksPath "$AGENTS_SHARED/githooks"`):
-#   1. Visibility first. For a github.com remote it asks `gh api repos/OWNER/NAME --jq .private`
+#   0. Exempt repos first. A public repo whose job is to name what the denylist holds (a CV that
+#      lists its owner's employers) is listed by OWNER/NAME, one per line, in the untracked file
+#      ${XDG_CONFIG_HOME:-~/.config}/agents-shared/push-denylist-exempt.txt ($AGENTS_PUSH_DENYLIST_EXEMPT
+#      overrides); blank lines and text after # are skipped, and a line matches the remote URL's last
+#      two path parts without regard to case, whatever the host or URL form. A listed repo is not
+#      scanned, and the hook says so in one line on every push: an exemption never passes silently.
+#      A missing or empty file exempts nothing.
+#   1. Visibility next. For a github.com remote it asks `gh api repos/OWNER/NAME --jq .private`
 #      and caches the answer (private or public) per repo for 7 days under
 #      ${XDG_CACHE_HOME:-~/.cache}/agents-shared/repo-visibility/. A private repo passes
 #      unscanned. A public one is scanned by githooks/scan-push-names (see its header for what
@@ -60,13 +67,36 @@ visibility() {
   print $out
 }
 
+# repo_of <url>: print the URL's OWNER/NAME (its last two path parts, .git dropped), or nothing.
+repo_of() {
+  local -a parts=(${(s:/:)${${${1%/}%.git}//:/\/}})
+  (( ${#parts} >= 2 )) && print -r -- "${parts[-2]}/${parts[-1]}"
+}
+
+# exempt <url>: succeed when the remote's OWNER/NAME is a line of the exempt list.
+exempt_list=${AGENTS_PUSH_DENYLIST_EXEMPT:-${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/push-denylist-exempt.txt}
+exempt() {
+  local repo=$(repo_of $1) line
+  [[ -n $repo && -r $exempt_list ]] || return 1
+  while IFS= read -r line || [[ -n $line ]]; do
+    line=${${line%%\#*}//[[:space:]]/}
+    [[ -n $line && ${(L)line} == ${(L)repo} ]] && return 0
+  done < $exempt_list
+  return 1
+}
+
 scan=1
-vis=$(visibility $url)
-case $vis in
-  private) scan=0 ;;
-  public) ;;
-  *) print -u2 -r -- "pre-push: visibility of ${url:-the remote} is unknown (not a github.com remote, or gh is missing, offline or refused), so the push is scanned." ;;
-esac
+if exempt $url; then
+  scan=0
+  print -u2 -r -- "pre-push: $(repo_of $url) is listed in ${exempt_list}, so its push is not scanned for denylisted names."
+else
+  vis=$(visibility $url)
+  case $vis in
+    private) scan=0 ;;
+    public) ;;
+    *) print -u2 -r -- "pre-push: visibility of ${url:-the remote} is unknown (not a github.com remote, or gh is missing, offline or refused), so the push is scanned." ;;
+  esac
+fi
 
 if (( scan )); then
   $dir/scan-push-names "$@" < $tmp/stdin || exit $?

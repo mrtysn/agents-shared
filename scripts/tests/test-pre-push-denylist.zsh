@@ -7,6 +7,7 @@ work=$(mktemp -d) || exit 1
 trap 'rm -rf -- "$work"' EXIT
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
+export AGENTS_PUSH_DENYLIST_EXEMPT=$work/no-exempt.txt   # the machine's own exempt list never leaks in
 
 git init -q --bare $work/remote.git
 git init -q -b main $work/repo
@@ -236,6 +237,23 @@ grep -q 'visibility .* is unknown' $work/err || { fail=$((fail+1)); print "FAIL 
 PATH=/usr/bin:/bin check refused "gh missing means unknown, which is scanned" https://github.com/gone-owner/gone-repo.git
 grep -q 'visibility .* is unknown' $work/err || { fail=$((fail+1)); print "FAIL missing gh printed no unknown line"; }
 [[ -e $cache/new-owner__new-repo ]] && { fail=$((fail+1)); print "FAIL an unknown answer was cached"; }
+reset_to_remote
+
+# ---- exempt repos: a listed OWNER/NAME is not scanned, and the hook says so ----
+export GH_STUB_ANSWER=false   # every remote below is public
+export AGENTS_PUSH_DENYLIST_EXEMPT=$work/exempt.txt
+print -r -- '# public repos that name denylisted entries on purpose' > $AGENTS_PUSH_DENYLIST_EXEMPT
+print -r -- '  cv-owner/CV   # a CV naming its owner'"'"'s employers' >> $AGENTS_PUSH_DENYLIST_EXEMPT
+commit e.txt 'built for acme' 'add e'
+check ok "exempt public repo passes a commit that names an entry" git@github.com:cv-owner/cv.git
+grep -q 'cv-owner/cv is listed in' $work/err || { fail=$((fail+1)); print "FAIL exempt push printed no line"; cat $work/err; }
+check ok "exemption matches another URL form and an ssh host alias" git@github-personal:CV-Owner/cv
+check ok "exemption matches an https remote" https://github.com/cv-owner/cv/
+check refused "a repo not listed is still scanned" https://github.com/cv-owner/other.git
+check refused "the same name under another owner is still scanned" https://github.com/other-owner/cv.git
+export AGENTS_PUSH_DENYLIST_EXEMPT=$work/absent-exempt.txt
+check refused "a missing exempt list exempts nothing" git@github.com:cv-owner/cv.git
+export AGENTS_PUSH_DENYLIST_EXEMPT=$work/no-exempt.txt
 reset_to_remote
 
 # ---- the repo's own hooks: a global core.hooksPath must not hide .git/hooks ----

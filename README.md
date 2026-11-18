@@ -203,6 +203,13 @@ shape is `githooks/push-denylist.txt.example`. A missing list refuses every push
 lets the push through but prints a loud warning (the hook on each push, `init-global.sh` on each
 run), since it checks nothing. When git cannot list the commits, the push is refused.
 
+**A public repo whose job is to name those entries** (a CV listing its owner's employers) is exempt
+when its `OWNER/NAME` is a line of the untracked
+`${XDG_CONFIG_HOME:-~/.config}/agents-shared/push-denylist-exempt.txt` (`$AGENTS_PUSH_DENYLIST_EXEMPT`
+overrides; text after `#` is skipped). The line matches the remote URL's last two path parts without
+regard to case, so every clone of that repo is covered, a deploy tool's own clone included. An exempt
+push is not scanned, and the hook prints one line saying so on every push.
+
 **The repo's own hooks still run.** A `core.hooksPath` makes git ignore `.git/hooks/`, where git-lfs
 installs `pre-push`, `post-checkout`, `post-commit` and `post-merge`. After a passing scan,
 `githooks/pre-push` runs the repo's own `<git-common-dir>/hooks/pre-push` (if executable) with the same
