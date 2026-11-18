@@ -144,5 +144,36 @@ check "an account at ~/.claude launches with CLAUDE_CONFIG_DIR unset" 0 \
 check "an unknown account exits 2" 2 -- XDG_CONFIG_HOME="$stub/xdg" -- -a nope --run-claude
 check "no accounts file exits 2" 2 -- XDG_CONFIG_HOME="$stub/none" -- -a alt --run-claude
 
+# Extra roots: folders outside DEV_ROOT, listed in the extra-roots file. A stand-in
+# local-repos-list reports each root's immediate subfolders.
+cat > "$stub/local-repos-list" <<'EOF'
+#!/bin/zsh
+root=""; while (( $# )); do [[ $1 == --root ]] && { root=$2; shift; }; shift; done
+print -n '['; sep=""
+for d in "$root"/*(N/); do print -n "$sep{\"name\":\"${d:t}\",\"path\":\"$d\",\"tags\":[\"my\"]}"; sep=","; done
+print ']'
+EOF
+chmod +x "$stub/local-repos-list"
+mkdir -p "$stub/dev/personal/notes" "$stub/dev/work/some-repo" "$stub/xdg2/agents-shared"
+print -r -- $'# extra roots\n  ~/dev/work  \n~/dev/missing\n~/dev/personal' > "$stub/xdg2/agents-shared/clo-extra-roots"
+roots_env=(HOME="$stub" PATH="$stub:$PATH" DEV_ROOT="$stub/dev/personal" XDG_CONFIG_HOME="$stub/xdg2")
+names="$(cd "$stub" && env "${roots_env[@]}" "$clo" --repo-names 2>/dev/null)"
+(( n++ ))
+[[ "$names" == $'notes\nsome-repo\nwork\nwork/some-repo' ]] \
+    || { (( fails++ )); print -r -- "FAIL --repo-names with an extra root: ${names//$'\n'/ | }"; }
+json="$(cd "$stub" && env "${roots_env[@]}" "$clo" --folders-json 2>/dev/null)"
+(( n++ ))
+[[ "$(jq -r '[.[] | .name + "=" + (.tags | join(","))] | join(" ")' <<< "$json")" \
+    == "personal=dev-root notes=my work=root work/some-repo=my" ]] \
+    || { (( fails++ )); print -r -- "FAIL --folders-json with an extra root: $json"; }
+err="$(cd "$stub" && env "${roots_env[@]}" "$clo" --folders-json 2>&1 >/dev/null)"
+(( n++ ))
+[[ "$err" == *"dev/missing, which is not a folder"* ]] \
+    || { (( fails++ )); print -r -- "FAIL a missing extra root is not reported: ${err:-nothing}"; }
+check "clo NAME finds a folder under an extra root" 0 \
+    "tmux new-session * -c ${stub:A}/dev/work/some-repo * claude --model sonnet --effort medium" -- \
+    TERM_PROGRAM=Apple_Terminal "${roots_env[@]}" -- some-repo 2
+check "an unknown NAME off a terminal still exits 2" 2 -- "${roots_env[@]}" -- no-such-folder 2
+
 print "clo launch tests: $n cases, $fails failed"
 (( fails == 0 ))

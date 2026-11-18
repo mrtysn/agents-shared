@@ -1,0 +1,8 @@
+# Extra folder roots for `clo`, scanned after $DEV_ROOT. Copy to
+#     ${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/clo-extra-roots
+# and keep it there, untracked.
+#
+# One folder per line (~ allowed). Blank lines and # comments are skipped. Each root is a
+# row in clo's folder menu, and every folder local-repos-list reports under it is a row
+# named <root name>/<folder> (work/some-repo), which `clo NAME` also matches.
+~/dev/work

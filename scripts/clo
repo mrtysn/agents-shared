@@ -77,6 +77,12 @@ the current folder (shown as its path, where the cursor starts), or any folder
 local-repos-list reports, with its tags. Folders you last used Claude in come
 first, with how long ago. Inside a folder under $DEV_ROOT it launches in the current folder.
 
+Folders outside $DEV_ROOT join the menu, `clo NAME` and --folders-json through extra roots:
+one folder per line (~ allowed, # comments) in
+${XDG_CONFIG_HOME:-~/.config}/agents-shared/clo-extra-roots, untracked; shape:
+scripts/clo-extra-roots.example. Each extra root is a row itself, and its folders are named
+under it (work/some-repo). Inside a folder under an extra root, clo launches there too.
+
 The model menu lists the models, each starting a new session, then the
 folder's sessions from cc-statusline (the list Agent Bar Hopping shows), each
 reopened with claude --resume <id>, then "resume a session" for Claude Code's
@@ -107,6 +113,55 @@ The model menu is the stable aliases (always the latest of each family) plus any
 extra models your account is offered, read from Claude Code's own cache in
 .claude.json. Claude Code has no command that prints the picker's list.
 EOF
+}
+
+# ── Folder roots: $DEV_ROOT, then each extra root from the extra-roots file ───
+extra_roots_file="${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/clo-extra-roots"
+
+# scan_roots — one folder per line: $DEV_ROOT (if set), then each extra root, resolved,
+# once each. A line naming no folder is reported and skipped.
+scan_roots() {
+    setopt local_options extended_glob
+    local -a seen
+    local line
+    if [[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT" ]]; then seen+=("${DEV_ROOT:A}"); print -r -- "$DEV_ROOT"; fi
+    [[ -r "$extra_roots_file" ]] || return 0
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%%\#*}"
+        line="${${line##[[:space:]]##}%%[[:space:]]##}"
+        [[ -n "$line" ]] || continue
+        line="${line/#\~/$HOME}"; line="${line/#\$HOME/$HOME}"
+        if [[ ! -d "$line" ]]; then
+            print -u2 "clo: $extra_roots_file names $line, which is not a folder; skipped"; continue
+        fi
+        (( ${seen[(Ie)${line:A}]} )) && continue
+        seen+=("${line:A}"); print -r -- "${line:A}"
+    done < "$extra_roots_file"
+}
+
+# folder_rows — NAME<TAB>PATH<TAB>TAGS for every folder local-repos-list reports under each
+# root (the root's immediate subfolders, untagged, when it is not installed). NAME is the path
+# under $DEV_ROOT; under an extra root it starts with that root's own name (work/some-repo), and
+# the extra root itself is a row too, tagged "root".
+folder_rows() {
+    local root prefix dir first=1
+    local -i have=0
+    command -v local-repos-list >/dev/null && command -v jq >/dev/null && have=1
+    for root in "${(@f)$(scan_roots)}"; do
+        [[ -n "$root" ]] || continue
+        prefix=""
+        if (( ! first )) || [[ -z "${DEV_ROOT:-}" || "${root:A}" != "${DEV_ROOT:A}" ]]; then
+            prefix="${root:t}/"
+            print -r -- "${root:t}"$'\t'"$root"$'\t'root
+        fi
+        first=0
+        if (( have )); then
+            local-repos-list --root "$root" --json 2>/dev/null \
+                | jq -r --arg p "$prefix" '.[] | [$p + .name, .path, (.tags | join(" "))] | @tsv'
+        else
+            for dir in "$root"/*(N/); do print -r -- "$prefix${dir:t}"$'\t'"$dir"$'\t'; done
+        fi
+    done
 }
 
 # ── Accounts: -a NAME / --account NAME picks the config folder ────────────────
@@ -415,11 +470,8 @@ case "${1:-}" in
     --run-claude) shift; run_claude "$@" ;;
     # One name per line for tab completion: each folder's own name and, for nested
     # ones, its path under $DEV_ROOT.
-    --repo-names) [[ -n "${DEV_ROOT:-}" ]] || exit 0
-               if command -v local-repos-list >/dev/null && command -v jq >/dev/null; then
-                   local-repos-list --root "$DEV_ROOT" --json 2>/dev/null | jq -r '.[].path' \
-                       | while IFS= read -r dir; do rel="${dir#$DEV_ROOT/}"; print -r -- "${rel:t}"; [[ "$rel" == */* ]] && print -r -- "$rel"; done | sort -u
-               fi
+    --repo-names) folder_rows 2>/dev/null | cut -f1 \
+                   | while IFS= read -r rel; do print -r -- "${rel:t}"; [[ "$rel" == */* ]] && print -r -- "$rel"; done | sort -u
                exit 0 ;;
     --list)    menu | cut -f2; exit 0 ;;
     --menu-json) menu_json; exit $? ;;
@@ -430,19 +482,16 @@ esac
 
 # A bare first word is a folder name under $DEV_ROOT (clo NAME [1-4] [--prompt text]).
 if [[ -n "${1:-}" && "$1" != -* ]]; then
-    [[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT" ]] || { print -u2 "clo: clo NAME needs DEV_ROOT set to an existing folder"; exit 2; }
+    [[ -n "$(scan_roots 2>/dev/null)" ]] || { print -u2 "clo: clo NAME needs DEV_ROOT set to an existing folder, or a folder in $extra_roots_file"; exit 2; }
     want="${(L)1}"
-    typeset -a cand_rel cand_abs exact prefix
-    if command -v local-repos-list >/dev/null && command -v jq >/dev/null; then
-        cand_abs=(${(f)"$(local-repos-list --root "$DEV_ROOT" --json 2>/dev/null | jq -r '.[].path')"})
-    else
-        cand_abs=("$DEV_ROOT"/*(N/))
-    fi
-    for dir in $cand_abs; do
-        rel="${dir#$DEV_ROOT/}"
+    typeset -a exact prefix
+    typeset -A rel_of
+    while IFS=$'\t' read -r rel dir _; do
+        [[ -n "$dir" ]] || continue
+        rel_of[$dir]="$rel"
         if [[ "${(L)rel}" == "$want" || "${(L)rel:t}" == "$want" ]]; then exact+=("$dir")
         elif [[ "${(L)rel:t}" == "$want"* ]]; then prefix+=("$dir"); fi
-    done
+    done < <(folder_rows)
     matches=($exact)
     (( $#matches )) || matches=($prefix)
     if (( $#matches != 1 )); then
@@ -451,8 +500,8 @@ if [[ -n "${1:-}" && "$1" != -* ]]; then
         if [[ -t 0 && -t 1 ]] && command -v fzf >/dev/null; then
             folder_query="$1"; shift
         else
-            if (( $#matches )); then print -u2 "clo: \"$1\" is ambiguous:"; printf '  %s\n' "${matches[@]#$DEV_ROOT/}" >&2
-            else print -u2 "clo: no folder called \"$1\" under $DEV_ROOT (a bare first word is read as a folder name; see clo --help)"; fi
+            if (( $#matches )); then print -u2 "clo: \"$1\" is ambiguous:"; for dir in $matches; do print -u2 "  ${rel_of[$dir]}"; done
+            else print -u2 "clo: no folder called \"$1\" under ${(j:, :)${(@f)$(scan_roots 2>/dev/null)}} (a bare first word is read as a folder name; see clo --help)"; fi
             exit 2
         fi
     else
@@ -505,16 +554,10 @@ ago() {
 collect_folders() {
     names=() paths=() tags=() when=() order=()
     local name dir tag i
-    if command -v local-repos-list >/dev/null && command -v jq >/dev/null; then
-        while IFS=$'\t' read -r name dir tag; do
-            names+=("$name") paths+=("$dir") tags+=("$tag")
-        done < <(local-repos-list --root "$DEV_ROOT" --json 2>/dev/null \
-            | jq -r 'sort_by(.name | ascii_downcase)[] | [.name, .path, (.tags | join(" "))] | @tsv')
-    else
-        for dir in "$DEV_ROOT"/*(N/); do
-            names+=("${dir:t}") paths+=("$dir") tags+=("")
-        done
-    fi
+    while IFS=$'\t' read -r name dir tag; do
+        [[ -n "$dir" ]] || continue
+        names+=("$name") paths+=("$dir") tags+=("$tag")
+    done < <(folder_rows | sort -t$'\t' -k1,1f)
     # A folder with no session makes last_session fail; that is an empty "when", not an error.
     for (( i = 1; i <= $#names; i++ )); do when[$i]="$(last_session "${paths[$i]}" || true)"; done
     order=(${(f)"$(for (( i = 1; i <= $#names; i++ )); do print -r -- "${when[$i]:-0}"$'\t'"$i"; done \
@@ -1029,9 +1072,12 @@ fi
 # quits from the first; Ctrl-C quits from any.
 run_set start "$PWD"
 run_set ask_folder 0
-if [[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT" ]]; then
-    dev="${DEV_ROOT:A}"
-    [[ "${PWD:A}" != "$dev"/* ]] && run_set ask_folder 1
+# Inside a folder under any root (not the root itself), launch here; elsewhere, ask.
+if [[ -n "$(scan_roots 2>/dev/null)" ]]; then
+    run_set ask_folder 1
+    for dev in "${(@f)$(scan_roots 2>/dev/null)}"; do
+        [[ "${PWD:A}" == "${dev:A}"/* ]] && { run_set ask_folder 0; break; }
+    done
 fi
 [[ -n "${folder_query:-}" ]] && run_set ask_folder 1
 if [[ "$(run_get ask_folder)" == 1 ]]; then
