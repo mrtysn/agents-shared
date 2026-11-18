@@ -19,6 +19,12 @@ confirmed with the tool before they run. Ask only for names the user will type o
 see; pick the rest without asking, and every name, picked or offered, says what
 the thing does (verb-object, never a metaphor noun).
 
+**A fact only the user holds is asked, never reported as unknowable.** What they changed,
+saw or did on their own screen or device (a setting they flipped, what a window did) cannot
+be read from the machine: ask it at once with this tool. "I can't tell whether you…" is the
+failure. Nov 18 2026, iTerm hotkey window: after "I can't tell whether it was already on or
+whether you just turned it on", the user: "WHY CAN YOU NOT JUST ASK ME".
+
 The question text is laid out in lines, never one paragraph: the topic on line 1, a blank
 line, one fact per line (numbered when they are items), a blank line, then the question
 alone on the last line. Line breaks render in the terminal. Options that are exact
