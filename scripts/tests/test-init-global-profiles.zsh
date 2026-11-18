@@ -6,7 +6,10 @@ repo=${0:A:h:h:h}
 work=$(mktemp -d) || exit 1
 trap 'rm -rf -- "$work"' EXIT
 export XDG_CONFIG_HOME=$work/xdg CLAUDE_CONFIG_DIR=$work/cfg
-mkdir -p $CLAUDE_CONFIG_DIR
+# An empty dev root: init-global.sh scans $DEV_ROOT for repos that skip the push guard, and on a
+# machine with such repos its summary says "denylist", which the denylist checks below read as a warning.
+export DEV_ROOT=$work/dev
+mkdir -p $CLAUDE_CONFIG_DIR $DEV_ROOT
 
 pskills=($repo/claude/skills/personal/*(N/))
 prules=($repo/claude/rules/personal/*.md(N))
