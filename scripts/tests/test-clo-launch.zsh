@@ -41,7 +41,7 @@ check() {  # check NAME EXPECTED-RC PATTERN... -- ENV... -- ARGS...
     while [[ "$1" != -- ]]; do envs+=("$1"); shift; done; shift
     args=("$@")
     : > "$calls"
-    (cd "$stub" && env -u TMUX -u CLAUDE_CONFIG_DIR -u ITERM_SESSION_ID HOME="$stub" PATH="$stub:$PATH" \
+    (cd "${check_cwd:-$stub}" && env -u TMUX -u CLAUDE_CONFIG_DIR -u ITERM_SESSION_ID HOME="$stub" PATH="$stub:$PATH" \
         "${envs[@]}" "$clo" "${args[@]}") >/dev/null 2>&1
     local rc=$?
     sleep 0.3  # the tab placer runs in the background
@@ -152,6 +152,22 @@ check "clo f launches in the account's fast folder" 0 \
     TERM_PROGRAM=Apple_Terminal XDG_CONFIG_HOME="$stub/xdg" -- -a alt f
 check "a fast folder that is not a folder exits 2" 2 -- \
     TERM_PROGRAM=Apple_Terminal XDG_CONFIG_HOME="$stub/xdg" -- -a home f
+
+# Without -a, the folder you stand in picks the account (roots after the fast folder).
+mkdir -p "$stub/roots/one/deep" "$stub/roots/two"
+print -r -- $'alt\t~/fastdir\t~/roots/one\nhome\t~/fastdir\t~/roots/two ~/roots/one/deep' > "$stub/xdg/agents-shared/clo-fast-folders"
+check_cwd="$stub/roots/one/sub"; mkdir -p "$check_cwd"
+check "clo f under an account's root uses that account" 0 \
+    "tmux new-session * -e CLAUDE_CONFIG_DIR=${stub:A}/cfg-alt claude *" -- \
+    TERM_PROGRAM=Apple_Terminal XDG_CONFIG_HOME="$stub/xdg" -- f
+check_cwd="$stub/roots/one/deep"
+check "the longest matching root wins" 0 "tmux new-session *" -- \
+    TERM_PROGRAM=Apple_Terminal XDG_CONFIG_HOME="$stub/xdg" -- f
+[[ "$(<"$calls")" != *CLAUDE_CONFIG_DIR* ]] || { (( fails++ )); print "FAIL longest root did not pick the default-folder account"; }
+check "-a beats the folder" 0 \
+    "tmux new-session * -e CLAUDE_CONFIG_DIR=${stub:A}/cfg-alt claude *" -- \
+    TERM_PROGRAM=Apple_Terminal XDG_CONFIG_HOME="$stub/xdg" -- -a alt f
+unset check_cwd
 
 # Extra roots: folders outside DEV_ROOT, listed in the extra-roots file. A stand-in
 # local-repos-list reports each root's immediate subfolders.

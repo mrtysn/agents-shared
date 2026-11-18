@@ -6,5 +6,10 @@
 # folder (~ allowed). An account with no line launches in $DEV_ROOT/notebook; with neither,
 # clo f asks which folder.
 #
-# account   fast-mode folder
-work        ~/dev/work/notebook
+# Optional extra columns: folders under which this account is the one `clo f`, `clo 1-4` and
+# `clo here` use when you give no -a (the longest matching folder wins; elsewhere the default
+# account is used). -a NAME always wins.
+#
+# account   fast-mode folder       use this account under
+work        ~/dev/work/notebook    ~/dev/work
+personal    ~/dev/personal/notebook  ~/dev/personal

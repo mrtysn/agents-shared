@@ -19,7 +19,9 @@ Usage:
                           among the arguments exits 2.
   clo f [--prompt text]   Fast mode: no menus, launch with Sonnet at medium effort;
                           --prompt, if given, is sent as the first message. `fclo`
-                          is the same thing. The folder is the account's line in
+                          is the same thing. Without -a, the folder you stand in picks
+                          the account (the roots after its fast folder in the file
+                          below). The folder is the account's line in
                           ~/.config/agents-shared/clo-fast-folders (shape:
                           clo-fast-folders.example), else $DEV_ROOT/notebook; with
                           neither it asks which folder (one fzf list).
@@ -211,8 +213,8 @@ use_account() {  # use_account NAME: export its folder as CLAUDE_CONFIG_DIR, or 
 case "${1:-}" in
     -a|--account)
         [[ -n "${2:-}" ]] || { print -u2 "clo: $1 needs an account name"; exit 2; }
-        use_account "$2"; shift 2 ;;
-    --account=*) use_account "${1#--account=}"; shift ;;
+        use_account "$2"; explicit_account=1; shift 2 ;;
+    --account=*) use_account "${1#--account=}"; explicit_account=1; shift ;;
     --account-names) account_lines | cut -f1; exit 0 ;;
 esac
 
@@ -458,6 +460,23 @@ case "${1:-}" in
     -h|--help) usage; exit 0 ;;
     here|f|1|2|3|4)
                fast_here=0
+               # No -a: the folder you stand in picks the account, by the roots listed after its
+               # fast folder in the fast-folders file; the longest matching root wins.
+               if (( ! ${explicit_account:-0} )) && [[ -r "$fast_folders_file" ]]; then
+                   fast_best="" fast_bestlen=0
+                   while IFS= read -r fast_line || [[ -n "$fast_line" ]]; do
+                       fast_line="${fast_line%%\#*}"
+                       fast_fields=(${=fast_line})
+                       (( $#fast_fields >= 3 )) || continue
+                       for fast_root in "${(@)fast_fields[3,-1]}"; do
+                           fast_root="${${fast_root/#\~/$HOME}:A}"
+                           if [[ "${PWD:A}" == "$fast_root" || "${PWD:A}" == "$fast_root"/* ]] && (( ${#fast_root} > fast_bestlen )); then
+                               fast_best="${fast_fields[1]}"; fast_bestlen=${#fast_root}
+                           fi
+                       done
+                   done < "$fast_folders_file"
+                   [[ -z "$fast_best" ]] || use_account "$fast_best"
+               fi
                if [[ "$1" == here ]]; then fast_here=1; shift; [[ "${1:-}" == [1-4] ]] || set -- f "$@"; fi
                fast_model=sonnet
                case "$1" in 1) fast_model=haiku ;; 3) fast_model=opus ;; 4) fast_model=fable ;; esac
