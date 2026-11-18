@@ -58,4 +58,6 @@ Lead with the verdict, one line, then only what the user needs:
 
 Then a short list: processes stopped (pid, what it was, how to bring it back) or "none"; agents (or "none"); changes committed; documents written or updated (absolute paths). No table. Items owned by someone else are not listed.
 
+After `Safe to close.`, end the reply with one closing line the Stop hook accepts: `Nothing left: safe to close; remaining work in <absolute path>.` (or `Nothing left: safe to close; nothing outstanding.`). Without it the hook refuses the turn as idle, because the list above ends the reply. With `Not yet:` there is no closing line: the blockers end the reply, and a blocker that needs a decision is asked with AskUserQuestion.
+
 Never close or stop the session yourself.
