@@ -288,6 +288,7 @@ warn_iterm_tmux_prefs() {
     [[ "$open" == 2 && "$bury" == 1 ]] && return
     print -u2 "clo: iTerm will open this session in a new window and keep this tab as tmux's client."
     print -u2 "clo: fix once in iTerm → Settings → General → tmux: open tmux windows as \"Tabs in the attaching window\", and tick \"Automatically bury the tmux client session after connecting\"."
+    print -u2 "clo: on a machine set up from the dev-env repo, quit iTerm and run its ./import.sh (step 9) instead; the keys OpenTmuxWindowsIn, AutoHideTmuxClientSession and TmuxUsesDedicatedProfile come from its iterm-settings.json."
 }
 
 # place_iterm_tmux_tab — iTerm appends the tmux tab at the end of the window; start
