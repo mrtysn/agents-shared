@@ -17,11 +17,12 @@ Usage:
                           --prompt, anywhere among them, is sent as the first message.
                           A first message is only ever given with --prompt; a bare word
                           among the arguments exits 2.
-  clo f [--prompt text]   Fast mode: no menus, launch in $DEV_ROOT/notebook with
-                          Sonnet at medium effort; --prompt, if given, is sent
-                          as the first message. `fclo` is the same thing. On a
-                          machine with no notebook folder it asks which folder
-                          (one fzf list), then launches with the same settings.
+  clo f [--prompt text]   Fast mode: no menus, launch with Sonnet at medium effort;
+                          --prompt, if given, is sent as the first message. `fclo`
+                          is the same thing. The folder is the account's line in
+                          ~/.config/agents-shared/clo-fast-folders (shape:
+                          clo-fast-folders.example), else $DEV_ROOT/notebook; with
+                          neither it asks which folder (one fzf list).
   clo 1|2|3|4 [--prompt text]
                           Fast mode with a fixed model: 1 Haiku, 2 Sonnet, 3 Opus,
                           4 Fable. Same folder, medium effort and first message
@@ -119,6 +120,8 @@ EOF
 
 # ── Folder roots: $DEV_ROOT, then each extra root from the extra-roots file ───
 extra_roots_file="${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/clo-extra-roots"
+# Where `clo f` launches for each account: lines of "ACCOUNT FOLDER" (shape: clo-fast-folders.example).
+fast_folders_file="${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/clo-fast-folders"
 
 # scan_roots — one folder per line: $DEV_ROOT (if set), then each extra root, resolved,
 # once each. A line naming no folder is reported and skipped.
@@ -462,7 +465,27 @@ case "${1:-}" in
                split_args "$@"; fast_prompt="$prompt"
                fast_dir="$PWD"
                if (( ! fast_here )); then
-                   if [[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT/notebook" ]]; then
+                   # The account's own fast folder from the fast-folders file, if it has one.
+                   fast_setting=""
+                   fast_cfg="${${CLAUDE_CONFIG_DIR:-$HOME/.claude}:A}"
+                   for fast_entry in "${(@f)$(account_lines)}"; do
+                       [[ -n "$fast_entry" && "${${fast_entry#*$'\t'}:A}" == "$fast_cfg" ]] || continue
+                       fast_acct="${fast_entry%%$'\t'*}"
+                       [[ -r "$fast_folders_file" ]] || break
+                       while IFS= read -r fast_line || [[ -n "$fast_line" ]]; do
+                           fast_line="${fast_line%%\#*}"
+                           read -r fast_name fast_val _ <<< "$fast_line" || true
+                           [[ "$fast_name" == "$fast_acct" && -n "$fast_val" ]] || continue
+                           fast_setting="${fast_val/#\~/$HOME}"
+                       done < "$fast_folders_file"
+                       break
+                   done
+                   if [[ -n "$fast_setting" && ! -d "$fast_setting" ]]; then
+                       print -u2 "clo: $fast_folders_file sends account '$fast_acct' to $fast_setting, which is not a folder"; exit 2
+                   fi
+                   if [[ -n "$fast_setting" ]]; then
+                       fast_dir="$fast_setting"
+                   elif [[ -n "${DEV_ROOT:-}" && -d "$DEV_ROOT/notebook" ]]; then
                        fast_dir="$DEV_ROOT/notebook"
                    else
                        # No notebook on this machine: pick the folder, keep the fast-mode

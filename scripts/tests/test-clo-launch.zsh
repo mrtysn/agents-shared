@@ -144,6 +144,15 @@ check "an account at ~/.claude launches with CLAUDE_CONFIG_DIR unset" 0 \
 check "an unknown account exits 2" 2 -- XDG_CONFIG_HOME="$stub/xdg" -- -a nope --run-claude
 check "no accounts file exits 2" 2 -- XDG_CONFIG_HOME="$stub/none" -- -a alt --run-claude
 
+# clo f: the account's line in the fast-folders file is where it launches.
+mkdir -p "$stub/fastdir"
+print -r -- $'alt\t~/fastdir\nhome\t~/nowhere-at-all' > "$stub/xdg/agents-shared/clo-fast-folders"
+check "clo f launches in the account's fast folder" 0 \
+    "tmux new-session * -c */fastdir *" -- \
+    TERM_PROGRAM=Apple_Terminal XDG_CONFIG_HOME="$stub/xdg" -- -a alt f
+check "a fast folder that is not a folder exits 2" 2 -- \
+    TERM_PROGRAM=Apple_Terminal XDG_CONFIG_HOME="$stub/xdg" -- -a home f
+
 # Extra roots: folders outside DEV_ROOT, listed in the extra-roots file. A stand-in
 # local-repos-list reports each root's immediate subfolders.
 cat > "$stub/local-repos-list" <<'EOF'
