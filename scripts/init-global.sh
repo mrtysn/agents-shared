@@ -226,6 +226,12 @@ export DEV_ROOT="$DEV_ROOT"
 EOF
 mv "$ENV_FILE.tmp" "$ENV_FILE"
 
+# Make this config folder selectable with `clo -a NAME`: nothing else creates the accounts
+# file, so a second config folder used to sit there with no `clo -a` for it.
+if [ "$UNLINK" -eq 0 ] && [ -d "$HOME/.claude" ]; then
+    "$SCRIPT_DIR/register-claude-account" "$CLAUDE_DIR" | sed 's/^/  accounts: /' || true
+fi
+
 # Claude Code's Bash tool does not read ~/.zshrc.base, so skills that run
 # "$AGENTS_SHARED/scripts/…" found it empty. Its settings.json env reaches every
 # tool call; the value goes there too, merged into what the file already holds.

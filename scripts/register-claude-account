@@ -1,0 +1,59 @@
+#!/bin/zsh
+# DESC: Add a Claude config folder to the accounts file that `clo -a NAME` reads, creating the file when missing
+#
+# init-global.sh calls this for every config folder it sets up, so a second account is
+# selectable with `clo -a NAME` without anyone copying scripts/claude-accounts.example by hand
+# (nothing created that file before, so a machine with two config folders had no `clo -a`).
+#
+# The file is ${XDG_CONFIG_HOME:-~/.config}/agents-shared/claude-accounts. When it is missing it
+# is created with the default account first: ~/.claude, named after the profile that folder
+# declares (work or personal), else "main". A folder other than ~/.claude is then appended,
+# named after its folder (~/.claude-personal -> personal). A folder already listed, or a name
+# already taken, is left alone, so running it again changes nothing.
+#
+# usage: register-claude-account [CONFIG_DIR]    (default: $CLAUDE_CONFIG_DIR, else ~/.claude)
+set -euo pipefail
+
+dir=${1:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}}
+dir=${dir:A}
+default=${HOME:A}/.claude
+file=${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/claude-accounts
+here=${0:A:h}
+
+tilde() { print -r -- "${1/#${HOME:A}/~}"; }
+
+if [[ ! -e $file ]]; then
+    [[ -d $default ]] || { print -u2 "register-claude-account: $default does not exist, so there is no default account to list first"; exit 1; }
+    name=$("$here/agent-profile" "$default" 2>/dev/null || true)
+    mkdir -p -- "${file:h}"
+    {
+        print -r -- "# Claude accounts for \`clo -a NAME\`. Written by scripts/register-claude-account (run by"
+        print -r -- "# init-global.sh); shape and rules: scripts/claude-accounts.example. First line is the default."
+        print -r -- "${name:-main}	~/.claude"
+    } > "$file"
+    print -r -- "created $file"
+fi
+
+[[ $dir != $default ]] || exit 0
+
+# Already listed: any line whose folder resolves to this one.
+while IFS= read -r line || [[ -n $line ]]; do
+    line=${line%%\#*}
+    set -- ${=line}
+    [[ $# -ge 2 ]] || continue
+    listed=${2/#\~/$HOME}
+    [[ ${listed:A} == $dir ]] && { print -r -- "already listed: $1 -> $(tilde $dir)"; exit 0; }
+done < "$file"
+
+name=${dir:t}
+name=${name#.claude-}
+name=${name#.claude}
+[[ -n $name ]] || name=$("$here/agent-profile" "$dir" 2>/dev/null || true)
+[[ -n $name ]] || { print -u2 "register-claude-account: cannot name $dir; rename the folder .claude-NAME or add it to $file by hand"; exit 1; }
+
+if grep -Eq "^[[:space:]]*${name}[[:space:]]" "$file"; then
+    print -u2 "register-claude-account: the name '$name' is taken in $file by another folder; add $(tilde $dir) under another name by hand"
+    exit 1
+fi
+print -r -- "$name	$(tilde $dir)" >> "$file"
+print -r -- "added $name -> $(tilde $dir) in $file"

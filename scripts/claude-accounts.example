@@ -1,6 +1,7 @@
 # Claude accounts for `clo -a NAME`. Copy to
 #     ${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/claude-accounts
-# and keep it there, untracked.
+# and keep it there, untracked. init-global.sh creates and extends it for you through
+# scripts/register-claude-account, so copying is only needed to rename an account.
 #
 # One line per account: a name, then its Claude config folder (~ allowed). The first
 # line is the default account, and its folder is ~/.claude, whatever profile that
