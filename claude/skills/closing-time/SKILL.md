@@ -2,7 +2,7 @@
 description: Decide whether this session is safe to close — background shells and the servers they started, running agents, uncommitted work, and whether the notes and handoff files let a fresh session pick up the remaining work. Stops what this session left running, fixes documentation gaps, then ends with one verdict line. Use when the user asks "is it safe to close", "can I close this session", "closing time", "did you leave handoffs", "can a fresh session pick this up", "why do you have N shells running", or says they are about to leave or go.
 argument-hint: [optional scope, e.g. "just the shells"]
 user-invocable: true
-allowed-tools: Bash, Read, Edit, Write, Glob, Grep, Agent, ListAgents, TaskStop
+allowed-tools: Bash, Read, Edit, Write, Glob, Grep, Agent, ListAgents, TaskStop, ScheduleWakeup
 ---
 
 The user is about to close this session. When you are done, nothing this session started is still running, nothing it did is lost, and the last line says so. "Closing time" means the machine is left as it was found, plus the work.
@@ -13,7 +13,7 @@ If that line is empty, run every check.
 
 ## What is ours
 
-Ours: the processes `list-session-background-shells.sh` prints for this session's id, every process this conversation started another way (`nohup`, `setsid`, `launchctl`, `open`, `docker run`, `tmux`; you know these from the conversation, the script cannot see them), the agents `ListAgents` shows as spawned by this session, and any `/loop`, `Monitor` or `/schedule` this session set up. A `Monitor` armed by a sub-agent of this session is ours too: it outlives the sub-agent that started it. A shell started before a `/clear` in this same window is ours too: it dies with the window, and the status line's shell count includes it. Nothing else is touched: other sessions' shells and agents, the user's own apps and terminals, services that were running before this session. The `ListAgents` rows for peer sessions are not ours.
+Ours: the processes `list-session-background-shells.sh` prints for this session's id, every process this conversation started another way (`nohup`, `setsid`, `launchctl`, `open`, `docker run`, `tmux`; you know these from the conversation, the script cannot see them), the agents `ListAgents` shows as spawned by this session, and any `/loop`, `Monitor`, `ScheduleWakeup` or `/schedule` this session set up. A `Monitor` armed by a sub-agent of this session is ours too: it outlives the sub-agent that started it. A shell started before a `/clear` in this same window is ours too: it dies with the window, and the status line's shell count includes it. Nothing else is touched: other sessions' shells and agents, the user's own apps and terminals, services that were running before this session. The `ListAgents` rows for peer sessions are not ours.
 
 ## Procedure
 
@@ -34,16 +34,16 @@ Ours: the processes `list-session-background-shells.sh` prints for this session'
 
 5. **Close the gaps.** For each gap, write it into the existing document where it belongs, with the Edit tool (never open a file for writing before reading it). If no document fits, write a handoff in the repo the work belongs to (Markdown, because its reader is a later session), using what `/handoff` would contain: the matter at hand, what was established, the current state, the next concrete step, the command that restarts anything stopped in step 1, anything that is not obvious from the code, and, when the work was a multi-step process, this session's id and the paths of its record (review logs, fix rounds), so a fresh session can run /learn-from-finished-process on it. Name files by absolute path. Commit and push it where the repo is tracked; a notebook file stays local.
 
-6. **Check that a fresh session can use it.** Spawn one `general-purpose` sub-agent, `model: haiku`, `effort: low`, briefed with only the paths of the documents and this question: "From these files alone, what is the next step of this work, what is already done, and what would you need that is not written down?" Report cap about 150 words, text only, no files written. Compare its answer with step 4. A mismatch or a missing piece is a gap: fix it and check once more. Skip this step when nothing remains outstanding.
+6. **Check that a fresh session can use it.** Spawn one `general-purpose` sub-agent, `model: haiku`, `effort: low`, briefed with only the paths of the documents and this question: "From these files alone, what is the next step of this work, what is already done, and what would you need that is not written down?" Report cap about 150 words, text only, no files written. Compare its answer with step 4. A mismatch or a missing piece is a gap: fix it and check once more. Skip this step when nothing remains outstanding. Wait for the sub-agent on its completion notice; arm no `ScheduleWakeup` for it.
 
-7. **Last look.** Run the listing from step 1 once more. It must print nothing.
+7. **Last look.** Run the listing from step 1 once more. It must print nothing. Then, after the last sub-agent has reported, cancel any `ScheduleWakeup` this session armed that has not fired (`ScheduleWakeup` with `stop: true`; it reports how many it cancelled). Do this even when step 6 was skipped: the exit dialog is the only other place a pending wakeup shows.
 
 ## Verdict
 
 The verdict is decided by these conditions, not by judgment. Every one true: `Safe to close.` Any one false: `Not yet:`.
 
 - The listing in step 7 printed nothing, and nothing this conversation started another way is alive (except a process the user asked to keep, named in the output).
-- No running agent, loop or monitor of this session is still needed.
+- No running agent, loop, monitor or pending wakeup of this session is still needed, and step 7 cancelled every wakeup left.
 - Own changes are committed and pushed, or named in the handoff as left on purpose.
 - Every outstanding item is written down somewhere a fresh session reads, and step 6 confirmed it (or nothing is outstanding).
 
