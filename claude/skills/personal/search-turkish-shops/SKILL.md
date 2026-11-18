@@ -84,3 +84,21 @@ rule format; `tests/test_retail_rules.py` checks it). When a shop answers differ
   `page-new` never overwrites: render to a scratch file and copy it over the old page.
 - **Before reporting, check the HTML**: every first-column cell and every price cell holds an
   `<a href`. A page that fails this has been sent back before.
+
+## After the page: file it in inventory
+
+Inventory is the shopping hub: one wanted thing per need, holding its research page, then its
+purchase and warranty. Run the `inventory` command from the folder the session started in.
+
+1. **File the need, once per topic.** `inventory find "<need>" --lifecycle wanted` first; a later
+   session on the same topic attaches to the thing that exists. Otherwise
+   `inventory add "<need, e.g. earbuds for calls>" --lifecycle wanted`. Name it for the need, not a
+   model: the page is the candidate list. It lands as a draft in the Inbox for the user to keep.
+2. **Attach the page as one file.** `project-lifecycle page-bundle PAGE.html --out <scratchpad>/PAGE.html`,
+   then `inventory attach THING <scratchpad>/PAGE.html --label research`. A raw notebook page links
+   `ws/` and local images and renders bare inside inventory. A re-rendered page goes up with
+   `--replace ATT` naming the old attachment (the `att#` number `inventory show THING` prints).
+3. **A price-watch** the user set up for it is stored with `inventory edit THING --link Watch=URL`.
+4. **When the user says it was bought:** `inventory purchase THING --shop S --price P --date
+   YYYY-MM-DD --url LISTING`, then `inventory edit THING --maker M --model M --lifecycle in_use`.
+   Attach the order mail as a PDF with `attach` when the user gives it.
