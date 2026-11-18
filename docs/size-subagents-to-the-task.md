@@ -20,7 +20,7 @@ explicit `model` on the call overrides it.
 
 | The sub-agent does | `model` | `effort` |
 |---|---|---|
-| Read-only work: a search or survey of more than about five tool calls, cataloguing, a report from files already named; a search or survey goes as `subagent_type: Explore`, which starts at ~19k context instead of ~52–60k | `haiku` | low |
+| Read-only work: a search or survey of more than about five tool calls, cataloguing, a report from files already named; a search or survey goes as `subagent_type: Explore`, which starts at ~19k context instead of ~52–60k. A survey that must save what it fetches in order to look at it (icons, images, PDFs) is not Explore, which refuses to write: it goes as `general-purpose` on `sonnet`, medium | `haiku` | low |
 | Ordinary implementation, mechanical edits, formatting, a page from a finished spec, a review of a diff under about 200 changed lines | `sonnet` | medium; high for a bug fix or where edge cases matter |
 | Design, review of a larger change, judgment across a codebase or between options | `opus` (`fable` only for the hardest cross-codebase judgment) | omit |
 
