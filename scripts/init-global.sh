@@ -122,6 +122,8 @@ if [ "$UNLINK" = 1 ]; then
     [ -f "$ENV_FILE" ] && rm "$ENV_FILE"
     [ "$(git -C "$REPO_DIR" config --local --get core.hooksPath 2>/dev/null)" = githooks ] &&
         git -C "$REPO_DIR" config --local --unset core.hooksPath
+    own_pre_commit="$(git -C "$REPO_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)/hooks/pre-commit"
+    [ "$(readlink "$own_pre_commit" 2>/dev/null)" = "$REPO_DIR/scripts/pre-commit-check.zsh" ] && rm "$own_pre_commit"
     printf '\n=== agents-shared global teardown ===\n'
     printf '  Target:           %s\n'   "$CLAUDE_DIR"
     printf '  Symlinks removed: %d\n\n' "$pruned"
@@ -280,6 +282,18 @@ elif [ "$current_hooks" = githooks ]; then
     HOOKS_NOTE="githooks"
 else
     HOOKS_NOTE="left at $current_hooks (not githooks): the push guard is off for this clone"
+fi
+# This repo's own pre-commit (run by githooks/pre-commit's dispatcher): conflict markers and
+# check-skills.zsh gate every commit, since skills are served live from this working tree.
+GIT_COMMON="$(git -C "$REPO_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+OWN_HOOKS="$GIT_COMMON/hooks"
+if [ -n "$GIT_COMMON" ] && mkdir -p "$OWN_HOOKS"; then
+    if [ ! -e "$OWN_HOOKS/pre-commit" ] || [ "$(readlink "$OWN_HOOKS/pre-commit")" = "$REPO_DIR/scripts/pre-commit-check.zsh" ]; then
+        ln -sfn "$REPO_DIR/scripts/pre-commit-check.zsh" "$OWN_HOOKS/pre-commit"
+        HOOKS_NOTE="$HOOKS_NOTE; pre-commit runs scripts/pre-commit-check.zsh"
+    else
+        HOOKS_NOTE="$HOOKS_NOTE; $OWN_HOOKS/pre-commit is someone else's, so scripts/pre-commit-check.zsh is not installed"
+    fi
 fi
 DENYLIST="${AGENTS_PUSH_DENYLIST:-${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/push-denylist.txt}"
 GLOBAL_HOOKS="$(git config --global --get core.hooksPath 2>/dev/null || true)"

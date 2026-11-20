@@ -59,7 +59,7 @@ Command instructions here. Use $ARGUMENTS for user-provided arguments.
 2. Add frontmatter with description
 3. Write clear, imperative instructions
 4. Optionally add supporting files (references, templates)
-5. Run `project-lifecycle test` before committing a skill: `scripts/check-skills.zsh` checks every skill's layout and frontmatter, the rules' links, and the `~/.claude` symlinks.
+5. Commits are gated: `scripts/init-global.sh` installs `scripts/pre-commit-check.zsh` as this repo's pre-commit, which refuses conflict markers and runs `check-skills.zsh` when `claude/` changes. Run `project-lifecycle test` before committing a skill: `scripts/check-skills.zsh` checks every skill's layout and frontmatter, the rules' links, and the `~/.claude` symlinks.
 
 **Naming:** Use lowercase kebab-case (e.g., `my-skill/SKILL.md` → `/my-skill`).
 
@@ -126,7 +126,11 @@ as conflict markers in the working file and reported — never silently lost.
 2. Create `source.json` with `repo`, `path`, the current `commit` SHA, and (if multi-file) `files`
 3. Establish the pristine base: `bash scripts/sync-external-skills.sh --establish-base <name>` — fetches the files at the pinned commit into `.upstream/` and captures any local edits as `override.patch`
 
-**Updating external skills:** run `/update-external-skills`, or by hand:
+**Updating external skills:** run `/update-external-skills`. `~/.claude/skills` links into this
+checkout, so a sync that writes here is live in every session at once: the skill runs it in a
+worktree through `scripts/sync-external-skills-reviewed.zsh` (`start`, `diff`, `land`, `abort`) and
+lands it after review. `--dry-run`, `--check-links` and `--establish-base` on a single skill may run
+here. The underlying script:
 ```bash
 bash scripts/sync-external-skills.sh --dry-run [<name>]  # preview only, writes nothing
 bash scripts/sync-external-skills.sh            # all → upstream HEAD

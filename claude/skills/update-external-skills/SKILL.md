@@ -41,9 +41,12 @@ refusals spread over several minutes end the run: stop and report.
    of them: point them at the **Upstream skills** button in Skill Tree rather than deciding or
    asking in bulk. A dangling link means the merge pulled in a link to a
    file we do not vendor: add that file to `files` and sync again.
-3. **Sync.** `bash scripts/sync-external-skills.sh $ARGUMENTS`. For a very large set, sync
-   by group so each commit stays reviewable.
-4. **Resolve conflicts.** A conflicted skill has markers (`<<<<<<< local`, `=======`,
+3. **Sync in a worktree.** `zsh scripts/sync-external-skills-reviewed.zsh start $ARGUMENTS`.
+   Never run `sync-external-skills.sh` itself in the checkout: `~/.claude/skills` links into it, so
+   every write would be live in every session before review. The wrapper prints the worktree path;
+   steps 4 and 5 work on files there. For a very large set, sync by group so each landing stays
+   reviewable.
+4. **Resolve conflicts**, in the worktree. A conflicted skill has markers (`<<<<<<< local`, `=======`,
    `>>>>>>> upstream@<short sha>`) in the working file and an un-advanced base. Read both
    sides and keep our `<!-- LOCAL -->` intent. When upstream rewrote the section so the
    markers cannot be merged line by line, fetch upstream's new file into the scratchpad,
@@ -63,13 +66,16 @@ refusals spread over several minutes end the run: stop and report.
    to today, then `bash scripts/sync-external-skills.sh --establish-base <name>`. That
    refetches the files at the new pin into `.upstream/` and regenerates `override.patch`
    from the resolved working files.
-5. **Check.** Read the diff of each updated skill that carries an `override.patch`:
+5. **Check.** `zsh scripts/sync-external-skills-reviewed.zsh diff`, then read the diff of each
+   updated skill that carries an `override.patch`:
    the local change must still be present and still make sense against the new text.
    If upstream renamed or removed a file, `source.json`'s `files` list needs the matching edit.
 6. **Wire.** If a skill directory was added or removed upstream-driven, run
    `bash scripts/init-global.sh`. A pure content edit needs nothing.
-7. **Commit atomically** per skill or group, in the repo's style, and push. Message e.g.
-   `update caveman skill from upstream`. Stage only paths you changed.
+7. **Land and push.** `zsh scripts/sync-external-skills-reviewed.zsh land "update caveman skill from upstream"`
+   commits in the worktree, merges into the checkout (the first moment it is live) and removes the
+   worktree; it refuses while conflict markers remain. Then push. One landing per skill or group.
+   `abort` drops a sync that should not land.
 
 ## Report
 

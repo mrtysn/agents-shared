@@ -95,6 +95,12 @@
       ]
     },
     {
+      "name": "reviewed sync and pre-commit",
+      "run": [
+        "scripts/tests/test-reviewed-sync-and-pre-commit.zsh"
+      ]
+    },
+    {
       "name": "pre-push denylist",
       "run": [
         "scripts/tests/test-pre-push-denylist.zsh"
