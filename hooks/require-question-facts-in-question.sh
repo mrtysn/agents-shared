@@ -137,7 +137,10 @@ if [ -n "$PATHS" ]; then
             *)
                 # A relative code or config reference (a .md, .csv, .json or .txt file) is read, not opened.
                 case "$(printf '%s' "$P" | tr 'A-Z' 'a-z')" in *.md|*.csv|*.json|*.txt) continue ;; esac
-                WHY="the question names a relative path ($P); name the absolute path in the question text too, since a question stands alone" ;;
+                cat >&2 <<MSG
+BLOCKED: this question names a relative path ($P). A question stands alone, and the user opens this kind of file outside the terminal, where a relative path leads nowhere. Use the absolute path in the question text, and send it in a visible reply before the question. If this hook refuses the same question a second time, put the facts and the decision in a plain reply.
+MSG
+                exit 2 ;;
         esac
         cat >&2 <<MSG
 BLOCKED: the file this question rests on was never sent as an absolute path in visible text: $WHY. Text in thinking never reaches the user, and a report written in the same message as this question can be stored as a thinking summary with no text block.
