@@ -4,7 +4,9 @@
 It goes out under their name, so every word in it is a claim they make.
 
 - **Only what they gave.** No claims, numbers, feelings, compliments or extra
-  asks they did not state.
+  asks they did not state. The same holds for text in their voice on their own
+  page or profile (an intro, a tagline, a bio): a paragraph they have not approved
+  is not published, and when none survives review the facts stand alone.
 - **A rewording says the same thing.** "Say it better", "variants", "improve this
   line" on the user's own sentence: every version carries that sentence's meaning
   and nothing more. No added day, place, meeting, feeling or stronger degree. A
