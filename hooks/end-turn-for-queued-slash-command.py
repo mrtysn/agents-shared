@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
 from transcript_items import pending_queued_commands  # noqa: E402
 
 
-ASKS_TO_TYPE_SLASH = re.compile(r"\b(?:type|run|enter)s?\s+`?(/[a-z][\w:-]*)", re.I)
+ASKS_TO_TYPE_SLASH = re.compile(r"\b(?:type|run|enter)s?\s+`?(/[a-z][\w:-]*)(?![\w:-]|[/.][\w~])", re.I)
 
 
 def slash_asked_for(tool_input):
@@ -67,7 +67,8 @@ def main():
             reason = (f"Not as a question: this asks the user to type `{cmd}`. Their answer reaches you before "
                       f"the command runs, because Claude Code runs a typed slash command only once your turn ends. "
                       f"End the turn in text asking them to type `{cmd}`, and continue when its output appears "
-                      f"in the conversation.")
+                      f"in the conversation. If `{cmd}` is a file path and not a command, reword the question so the "
+                      f"path does not follow type, run or enter.")
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse",
                                                      "permissionDecision": "deny",
                                                      "permissionDecisionReason": reason}}))

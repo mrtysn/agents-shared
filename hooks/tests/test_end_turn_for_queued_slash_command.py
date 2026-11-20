@@ -87,6 +87,12 @@ check("an option asking for a slash command is refused too", r and r["permission
 check("a question that only names a path is let through",
       run([], "PreToolUse", "AskUserQuestion",
           {"questions": [{"question": "Edit /etc/hosts or run the tests?", "options": []}]}) is None)
+check("a question that asks to run a script by absolute path is let through",
+      run([], "PreToolUse", "AskUserQuestion",
+          {"questions": [{"question": "It rebuilds when you run /Users/x/dev/make-brand-kit.zsh by hand.\n\nGo on?", "options": []}]}) is None)
+r = run([], "PreToolUse", "AskUserQuestion",
+        {"questions": [{"question": "Pick one", "options": [{"label": "A", "description": "then type /compact."}]}]})
+check("a slash command followed by a full stop is still refused", r and r["permissionDecision"] == "deny")
 check("an unreadable transcript fails open",
       subprocess.run([sys.executable, "-I", HOOK], input="{", text=True, capture_output=True).returncode == 0)
 
