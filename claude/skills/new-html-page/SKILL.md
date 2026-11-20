@@ -1,5 +1,5 @@
 ---
-description: Start a new HTML page — a report, document, diagram wrapper or write-up — on the house style, with a sticky contents column on the left built from its section headings. Use whenever the agent writes anything for the user to read (a report, survey, comparison, plan or write-up), whenever the user asks for an HTML page or visual output, for slides, a deck or a presentation (deck mode), and to turn a skill's Markdown report into a page (--from-markdown). Also the decision form — questions put to the user on a page, with screenshots and long context, answered back to the agent — for decisions AskUserQuestion would show badly.
+description: Start a new HTML page — a report, document, diagram wrapper or write-up — on the house style, with a sticky contents column on the left built from its section headings. Use whenever the agent writes anything for the user to read (a report, survey, comparison, plan or write-up), whenever the user asks for an HTML page or visual output, for slides, a deck or a presentation (deck mode), and to turn a skill's Markdown report into a page (--from-markdown). Also the decision form — questions put to the user on a page, with screenshots and long context, answered back to the agent — for decisions AskUserQuestion would show badly. Also the live progress page, bars served on 127.0.0.1 that move while work runs (a copy, a render, an agent run of many steps), when the user asks for a progress page or bar, or what the progress is of work still running.
 argument-hint: [title] [section headings…]
 allowed-tools: Bash, Read, Write, Edit, Skill
 ---
@@ -29,12 +29,12 @@ network imports, headings for sections, a contents list of anchor links at the t
    | `card-board` | items grouped by category or interval |
    | `schedule` | events by day, filterable by track |
    | `gallery` | images or videos to browse |
-   | `status-board` | where work stands: waiting, active, done, blocked |
+   | `status-board` | where work stands when nothing is running, as a snapshot; running work is `progress` |
    | `link-collection` | links worth keeping, grouped |
    | `status-grid` | where things are and how many copies or owners each has |
    | `tool` | a calculator: inputs, live results |
    | `deck` | a talk to present: one slide per section, speaker notes, keyboard and touch |
-   | `progress` | long work to watch live: a transfer, a copy, a render; see "Progress page" below |
+   | `progress` | work still running that the user will watch: a transfer, a render, or an agent run of many steps (units, builds, reviews, gates); see "Progress page" below. A "progress page" means this mode |
 
    Each mode has default sections; give `--section` to name your own (`schedule`,
    `link-collection` and `deck` always need them: the days, the groups, the slides).
@@ -106,6 +106,9 @@ render), give them a page that moves instead of answering "what's the progress" 
      Homebrew's or the server's, not macOS's openrsync), `ffmpeg -progress pipe:1` with
      `--total` as the input's seconds, or plain `done [total]` lines. A job on another machine
      pipes through its ssh session: `ssh host rsync --info=progress2 … | progress-write --from rsync …`.
+   - An agent run: one item per unit, `--unit steps --total <steps>`, moved at each step change,
+     `--note` naming what runs now, stall and stale limits longer than the longest gate. A
+     subagent's brief carries its own `progress-write` line.
    No total known yet: leave it out. `--state failed` on a failure, `--note` for one line under
    the bar. A step that is silent for minutes by design gets `--stall-after`/`--stale-after`.
    An item made of titled parts gets a list the page opens on a click: `--step TITLE` repeated sets it, `--step-state TITLE running|done|failed` moves one. An item counted in `--unit steps` shows no rate or time left.
