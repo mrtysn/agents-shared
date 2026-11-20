@@ -187,6 +187,8 @@ if (( ${#tasks_dirs} )); then
     (( ${seen[$p]:-0} )) && continue
     (( ${ancestor[$p]:-0} )) && continue
     [[ -n ${par[$p]:-} ]] || continue
+    # A claude process holds its own task files open: it is the session, not a leftover.
+    (( ${isclaude[$p]:-0} )) && continue
     has_claude_ancestor $p && continue
     # The age limit holds here too: a subagent's shell is reparented to pid 1
     # while it runs, so without it a minute-old test run reads as stale.
