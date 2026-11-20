@@ -34,6 +34,12 @@ check "unset: personal skill not linked" test ! -e $CLAUDE_CONFIG_DIR/skills/$on
 check "unset: personal rule not linked" test ! -e $CLAUDE_CONFIG_DIR/rules/$one_rule
 check "unset: personal/ folder itself not linked" test ! -e $CLAUDE_CONFIG_DIR/skills/personal
 check "unset: shared rule linked" test -L $CLAUDE_CONFIG_DIR/rules/question-handling.md
+check "skill groups: a fresh config folder gets every committed default" test \
+  "$(jq '.enabledPlugins | with_entries(select(.key | endswith("@skills-dir"))) | length' $CLAUDE_CONFIG_DIR/settings.json)" \
+  = "$(jq '.defaults | length' $repo/claude/skill-groups.json)"
+jq '.enabledPlugins["art@skills-dir"] = true' $CLAUDE_CONFIG_DIR/settings.json > $work/s && mv $work/s $CLAUDE_CONFIG_DIR/settings.json
+install >/dev/null
+check "skill groups: a group switched on by hand stays on" test "$(jq '.enabledPlugins["art@skills-dir"]' $CLAUDE_CONFIG_DIR/settings.json)" = true
 
 check "missing denylist is reported" grep -q 'Push denylist missing' $work/out
 mkdir -p $XDG_CONFIG_HOME/agents-shared

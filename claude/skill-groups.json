@@ -1,0 +1,28 @@
+{
+  "defaults": {
+    "art": false,
+    "gamedev": false,
+    "gamedev-genres": false,
+    "gamedev-publish": false,
+    "gsap": false,
+    "hyperframes": false,
+    "interface": false,
+    "interface-imagegen": false,
+    "interface-styles": false,
+    "interface-tools": false,
+    "motion": false,
+    "react": false,
+    "threejs": false,
+    "tooling": false,
+    "video": false,
+    "video-analysis": false,
+    "video-films": false,
+    "web-animation": false
+  },
+  "splits": {
+    "gamedev": ["gamedev-genres", "gamedev-publish", "threejs"],
+    "interface": ["interface-imagegen", "interface-styles", "interface-tools"],
+    "motion": ["gsap", "web-animation"],
+    "video": ["video-analysis", "video-films"]
+  }
+}

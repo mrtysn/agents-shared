@@ -263,7 +263,14 @@ claude plugin details gamedev@skills-dir                  # what it costs in con
 ```
 
 A disabled group costs nothing; an enabled one loads its skill descriptions like
-any other skill. Skills the machine's owner wrote stay flat under
+any other skill.
+
+**Defaults are committed.** Claude Code loads a group nobody names, so `claude/skill-groups.json`
+names every group under `defaults` (off, unless a group should load everywhere), and
+`scripts/init-global.sh` writes any missing one into the config folder's `settings.json` through
+`scripts/sync-skill-group-settings.py`; a group switched on or off by hand keeps that choice.
+`check-skills.zsh` fails when a group has no default or a default names no group, so a new group
+is added there in the same commit. `splits` records each group split (old group: new groups). Skills the machine's owner wrote stay flat under
 `claude/skills/<name>/` and keep their bare `/<name>`.
 
 **Sizing a group.** A group is one toolchain or task and holds about 20 skills or fewer: a

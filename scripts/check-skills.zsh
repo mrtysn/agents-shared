@@ -91,6 +91,23 @@ for d in $skill_dirs; do
   fi
 done
 
+# --- group defaults: claude/skill-groups.json names every group, and only real groups ---
+local groups_file=$ROOT/claude/skill-groups.json
+if [[ ! -r $groups_file ]]; then
+  fail $groups_file "missing: every skill group needs a committed default there"
+else
+  local -a packs named
+  packs=(${ROOT}/claude/skills/*/.claude-plugin/plugin.json(N:h:h:t))
+  named=(${(f)"$(jq -r '.defaults | keys[]' $groups_file)"})
+  for g in $packs; do
+    (( ${named[(Ie)$g]} )) || fail $groups_file "group '$g' has no entry under defaults (add \"$g\": false)"
+  done
+  for g in $named ${(f)"$(jq -r '.splits | to_entries[] | .key, .value[]' $groups_file)"}; do
+    [[ -n $g ]] || continue
+    (( ${packs[(Ie)$g]} )) || fail $groups_file "'$g' is not a group under claude/skills/"
+  done
+fi
+
 # --- rule links ---
 for r in $ROOT/claude/rules/*.md(N) $ROOT/claude/rules/personal/*.md(N); do
   nrules=$((nrules+1))

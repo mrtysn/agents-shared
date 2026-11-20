@@ -256,6 +256,15 @@ if env.get("AGENTS_SHARED") != repo:
 PY
 fi
 
+# ── Skill groups: the committed default for every group ──────────────────────
+# Claude Code loads a group nobody names. claude/skill-groups.json names each one, so a new
+# machine or config folder starts with the groups off, as this one is; a key already set is kept.
+GROUP_NOTE=""
+if command -v python3 >/dev/null; then
+    GROUP_NOTE="$(python3 "$SCRIPT_DIR/sync-skill-group-settings.py" --config "$CLAUDE_DIR" --quiet)" ||
+        GROUP_NOTE="sync-skill-group-settings.py failed: the group defaults were not written"
+fi
+
 # ── Push guard: this public repo's pushes go through githooks/pre-push ────────
 # The hook refuses a push whose diffs or messages name an entry of the untracked
 # denylist (see its header); another repo opts in with
@@ -285,6 +294,7 @@ printf '  Skills:   %d linked\n'                "$skill_total"
 printf '  Rules:    %d linked\n'                "$rule_total"
 printf '  Hooks:    %d linked\n'                "$hook_total"
 printf '  Git hooks: %s\n'                      "$HOOKS_NOTE"
+[ -n "$GROUP_NOTE" ] && printf '  %s\n'         "$GROUP_NOTE"
 if [ -z "$GLOBAL_HOOKS" ]; then
     printf '  Global git hooks: not set. On a personal machine the name guard is safe to enable for every repo (it skips private\n'
     printf '    repos and runs each repo'"'"'s own hooks); on a work machine do not, it would run on the employer'"'"'s repos:\n'
