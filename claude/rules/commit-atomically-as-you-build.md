@@ -31,8 +31,12 @@ and many parallel sessions, that ask is repeated all day.
   commit without a pathspec.
 - **Message** in the `/stg-msg-cmt` style: one short lowercase clause starting with
   a verb, no trailing period.
-- **Push after each commit.** A rejected push is reported, never forced; do not
-  rebase or merge other work in to make it go through.
+- **Push after each commit.** A rejected push is never forced and no other work is
+  merged in. When your own unpushed commits are all that is behind, replay them with
+  `git pull --rebase` and push if it applies with no conflict and the repo's tests pass
+  after it. A conflict, a branch others share, or a failing test is reported to the
+  owner. `hooks/require-fetch-before-commit.sh` (PreToolUse) fetches before a
+  `git commit` and refuses it once when the branch is behind its upstream.
 - **Commit on the branch the repo is on**, `main` included. No branch or worktree
   made only in order to commit.
 - **The repo's own gate comes first.** If its `CLAUDE.md` says tests must pass
