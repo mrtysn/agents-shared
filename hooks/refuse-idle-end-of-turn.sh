@@ -156,7 +156,7 @@ VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" --arg show "$SHOW_PATT
     | ([ $text | split("\n")[] | select(test("\\S")) ] | last // "") as $lastLine
     | ([ $turn[] | select(.label == "USER(queued)" and ((.text // "") | test("^\\s*/[A-Za-z]"))) ] | length > 0) as $slashQueued
     | if $slashQueued then "pass"
-      elif ($text | .[(length - 600 | if . < 0 then 0 else . end):] | test("\\b(type|run|enter)s?\\s+`?/[a-z]"; "i")) then "pass"
+      elif ($text | .[(length - 600 | if . < 0 then 0 else . end):] | test("\\b(type|run|enter)s?\\s+`?/[a-z][\\w:-]*(?![\\w:-]|[/.][\\w~])"; "i")) then "pass"
       elif $phrase != "" then
         # An answered question with no work after it: a line that only says the turn waits on the user ("waits for
         # your go") restates the answer and passes; any other prose choice reopens a decision the user just made.
