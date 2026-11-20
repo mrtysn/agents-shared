@@ -108,6 +108,7 @@ render), give them a page that moves instead of answering "what's the progress" 
      pipes through its ssh session: `ssh host rsync --info=progress2 … | progress-write --from rsync …`.
    No total known yet: leave it out. `--state failed` on a failure, `--note` for one line under
    the bar. A step that is silent for minutes by design gets `--stall-after`/`--stale-after`.
+   An item made of titled parts gets a list the page opens on a click: `--step TITLE` repeated sets it, `--step-state TITLE running|done|failed` moves one. An item counted in `--unit steps` shows no rate or time left.
 3. **Serve** with `project-lifecycle progress-serve <DIR>/<NAME>.html --until-finished` as a
    background command. It opens the page without taking focus and exits 0 when every item is
    done, 1 when one failed, 2 on `--timeout`. Give the user the `http://127.0.0.1:<port>/` address its first
