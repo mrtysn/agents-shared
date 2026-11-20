@@ -27,6 +27,13 @@ report page is not a tool: only the first and last rule apply to it.
    item that cannot be shown still gets a card that says why.
 9. **Nothing moves unless the user moved it:** a state changes colour, never size, and the
    controls keep their place when the view changes.
+10. **What lights up is what a press acts on.** A row whose highlight spans its width acts
+    on a press anywhere in that width, not only on its label.
+11. **A thing that can be touched answers every ordinary gesture the way the hand expects**
+    (drag, throw, tap, scroll past it) and turns none of them into a side effect such as a
+    selection.
+12. **Kept state comes back before it is drawn.** A position or mode remembered across a
+    reload is in place on the first frame; it never shows the default and then jumps.
 
 ## Where the measurable ones are checked
 
