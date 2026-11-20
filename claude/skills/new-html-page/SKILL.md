@@ -63,6 +63,9 @@ network imports, headings for sections, a contents list of anchor links at the t
    `page-new --from-markdown <FILE>.md --mode <mode> … --out <FILE>.html` takes the title from
    its `#` heading and the sections from its `##` headings; then finish it as in step 4 with
    the mode's components (a verdict callout, tiles, tags) that Markdown has no syntax for.
+   A checklist or tracker the user works through gets `--tickable`: its `- [ ]` boxes can then
+   be ticked on the page, the ticks stay in the user's browser (a session cannot read them), and
+   the contents column counts them. Without the flag the boxes are read-only.
 
    It prints the file's absolute path and refuses to overwrite. Two or more sections get the
    contents column, one section is plain. `--palette` recolours: web-shared's `warm` (cream,
