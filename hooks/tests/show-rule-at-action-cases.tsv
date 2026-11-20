@@ -103,3 +103,17 @@ block	Bash	{"command":"hooks/tests/run-x.sh 2>&1 | tail -1 && git commit -q -m \
 block	Bash	{"command":"npm test | grep -c passed && git -C /p/app commit -m x -- src/a.ts"}
 pass	Bash	{"command":"hooks/tests/run-x.sh 2>&1 | tail -1"}
 pass	Bash	{"command":"git log --oneline | head -3 && git status --short"}
+# --- interface-behaviour: a screen file in any kind of project
+note	Write	{"file_path":"/x/scenes/menu.gd","content":"extends Control\n"}
+note	Edit	{"file_path":"/x/web/cards.html","old_string":"a","new_string":"b"}
+note	Bash	{"command":"sed -i '' s/a/b/ src/menu.gd"}
+pass	Edit	{"file_path":"/x/notes.txt","old_string":"a","new_string":"b"}
+# --- tools-that-change-the-owners-data: a new tool, a delete call, a port kill
+note	Bash	{"command":"project-lifecycle init mac-app"}
+note	Write	{"file_path":"/x/clean.py","content":"import os\nos.remove(path)\n"}
+note	Write	{"file_path":"/x/Clean.swift","content":"try FileManager.default.removeItem(at: url)\n"}
+pass	Write	{"file_path":"/x/clean.py","content":"print('ok')\n"}
+block	Bash	{"command":"lsof -ti:8765 | xargs kill"}
+block	Bash	{"command":"kill $(lsof -ti :8765)"}
+pass	Bash	{"command":"lsof -tiTCP:8765 -sTCP:LISTEN | xargs kill"}
+pass	Bash	{"command":"lsof -i :8765"}

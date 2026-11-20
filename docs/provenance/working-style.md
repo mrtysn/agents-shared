@@ -13,3 +13,7 @@ photos. The user: "mac already has built in ocr and I had set up a rule in claud
 that instead of more expensive things" and "the intention was to use built in tools
 whenever possible". No such rule had been written and no OCR tool existed; `ocr-image`
 was then built.
+
+Nov 20 2026, a review tool for a private library: asked to build it, the agent was
+told not to load any of the files and to hand over paths for the owner to open; tests ran on
+synthetic fixtures. The line is now in the rule.

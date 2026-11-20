@@ -39,3 +39,8 @@ drive-mac-ui-through-agent-ui-clicker	Bash	command	osascript.*System Events|(^|[
 sign-a-script-app-for-permission-grants	Bash	command	(^|[;&|(`])[[:space:]]*osacompile[[:space:]]|codesign[^;&|]*[[:space:]]-s[[:space:]]+-([[:space:]]|$)	-	note-once
 sign-a-script-app-for-permission-grants	Bash	command	x-apple\.systempreferences:[^ "']*Privacy_	-	note-once
 sign-a-script-app-for-permission-grants	Bash	command	Library/(Safari|Messages|Mail)([/ '"]|$)|com\.apple\.TCC	-	note-once
+interface-behaviour	Write|Edit	file_path	\.(css|scss|tsx|vue|swift|tscn|xib|gd|html)$	-	note-once
+interface-behaviour	Bash	command	\.(css|scss|tsx|vue|swift|tscn|xib|gd|html)([^A-Za-z0-9]|$)	-	note-once
+tools-that-change-the-owners-data	Bash	command	project-lifecycle[[:space:]].*init	-	note-once
+tools-that-change-the-owners-data	Write|Edit	content	os\.remove\(|\.unlink\(|shutil\.rmtree|\brmtree\(|removeItem\(|DirAccess\.remove|fs\.rm(Sync)?\(	-	note-once
+tools-that-change-the-owners-data	Bash	command	lsof[^;&]*\|[[:space:]]*(xargs[[:space:]]+([^|;&[:space:]]+[[:space:]]+)*)?kill|kill[^;&|]*(\$\(|`)[[:space:]]*lsof	sTCP:LISTEN	deny-once

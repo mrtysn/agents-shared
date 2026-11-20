@@ -36,4 +36,11 @@ the machine already have. Text in an image or PDF: `ocr-image FILE...` (Vision, 
 network), not a vision-model read, tesseract or an OCR API. When no built-in can do the
 job, say what was checked, then name the cost.
 
+## Private content
+
+When the owner says content is private (a photo or video library, documents, downloads),
+judge a tool through its structure: tests on made-up fixtures, counts, file names the owner
+has not called private, and paths handed over for them to open. Never open the content itself to
+check that the tool works; a UI bug that shows only on the real content is reported by them.
+
 Provenance: [docs/provenance/working-style.md](../../docs/provenance/working-style.md).
