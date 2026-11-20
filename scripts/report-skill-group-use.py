@@ -59,8 +59,26 @@ def enabled(settings_files):
     return state
 
 
+def skill_homes():
+    """{skill name: [groups holding it now]}, so a run recorded under a group's old name
+    (/motion:gsap-core before motion was split) counts for the group that holds the skill today."""
+    homes = collections.defaultdict(list)
+    for manifest in sorted(SKILLS.glob("*/.claude-plugin/plugin.json")):
+        g = manifest.parent.parent
+        for s in g.glob("skills/*/SKILL.md"):
+            homes[s.parent.name].append(g.name)
+    return homes
+
+
+def home_group(name, homes):
+    group, _, skill = name.partition(":")
+    now = homes.get(skill, [])
+    return group if group in now or not now else now[0]
+
+
 def uses(days):
-    """{group: Counter(folder)} of skill runs in the last `days` days."""
+    """{group: Counter(folder)} of skill runs in the last `days` days, by the group holding each skill now."""
+    homes = skill_homes()
     rows = subprocess.run(
         [sys.executable, str(HERE / "extract-session-text.py"), "--all", "--days", str(days), "--subagents",
          "--kinds", "user,calls", "--json", "--max-chars", "160",
@@ -76,7 +94,7 @@ def uses(days):
             names = re.findall(r"<command-name>/?([\w-]+:[\w-]+)</command-name>", r.get("text") or "")
         folder = r.get("cwd") or r.get("project") or "?"
         for n in names:
-            found[n.split(":")[0]][folder] += 1
+            found[home_group(n, homes)][folder] += 1
     return found
 
 

@@ -279,7 +279,11 @@ repo that enables it loads every description in it, so a pack mixing several too
 with the groups it routes to. A flat skill that is rarely used is set to name-only in Skill
 Tree rather than moved into a group, because a move renames it and rules and repos name it
 bare. When a group is split, the repos that enable it and use the moved skills enable the
-new groups too.
+new groups too: record the split under `splits` in `claude/skill-groups.json` (and the new groups
+under `defaults`), and `init-global.sh` runs `sync-skill-group-settings.py --migrate-splits`, which
+switches a new group on in each repo whose gitignored `settings.local.json` has the old group on and
+whose sessions ran the moved skills (the usage report counts a run under the old name for the
+group holding the skill now). A new group a repo never used gets no entry; its default keeps it off.
 
 **Agents switch groups through one script.** `scripts/enable-skill-group.zsh <group> --reason "…"`
 (or `--off`) runs `claude plugin enable|disable <group>@skills-dir --scope local` in the repo root,

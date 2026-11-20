@@ -101,6 +101,12 @@
       ]
     },
     {
+      "name": "skill-group splits",
+      "run": [
+        "scripts/tests/test-skill-group-splits.zsh"
+      ]
+    },
+    {
       "name": "pre-push denylist",
       "run": [
         "scripts/tests/test-pre-push-denylist.zsh"

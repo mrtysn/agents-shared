@@ -265,6 +265,11 @@ GROUP_NOTE=""
 if command -v python3 >/dev/null; then
     GROUP_NOTE="$(python3 "$SCRIPT_DIR/sync-skill-group-settings.py" --config "$CLAUDE_DIR" --quiet)" ||
         GROUP_NOTE="sync-skill-group-settings.py failed: the group defaults were not written"
+    # A split group's repos that used the moved skills get the new group switched on.
+    SPLIT_NOTE="$(DEV_ROOT="$DEV_ROOT" python3 "$SCRIPT_DIR/sync-skill-group-settings.py" --migrate-splits --quiet)" ||
+        SPLIT_NOTE="sync-skill-group-settings.py --migrate-splits failed"
+    [ -n "$SPLIT_NOTE" ] && GROUP_NOTE="${GROUP_NOTE:+$GROUP_NOTE
+  }$SPLIT_NOTE"
 fi
 
 # ── Push guard: this public repo's pushes go through githooks/pre-push ────────
