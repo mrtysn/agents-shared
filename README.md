@@ -279,7 +279,14 @@ repo that enables it loads every description in it, so a pack mixing several too
 with the groups it routes to. A flat skill that is rarely used is set to name-only in Skill
 Tree rather than moved into a group, because a move renames it and rules and repos name it
 bare. When a group is split, the repos that enable it and use the moved skills enable the
-new groups too (`claude plugin enable <group>@skills-dir --scope local`).
+new groups too.
+
+**Agents switch groups through one script.** `scripts/enable-skill-group.zsh <group> --reason "…"`
+(or `--off`) runs `claude plugin enable|disable <group>@skills-dir --scope local` in the repo root,
+refuses where the repo commits `.claude/settings.local.json`, and appends the switch and its reason
+to `~/.local/state/agents-shared/skill-group-switches.tsv`. The SessionStart hook
+`note-skill-groups-used-here.sh` names a group an agent switched on over 30 days ago that has gone
+unused, so it gets switched off again.
 
 Skill Tree draws all of this as one page, and lives in the `dev-repos-skills` repo (its `skills`
 skin): every group with its skills, the description cost, and the switches: a group per scope for

@@ -196,8 +196,8 @@ Every session ends with one assignment the user can start today, never "go build
   target audience, and watch whether they ask when they can play.
 - Level 2: a paper prototype of the core loop, or a 48 to 72 hour greybox. A digital greybox can
   start from `/gamedev:prototype-fast`, which exists only where the gamedev group is enabled
-  (`claude plugin enable gamedev@skills-dir --scope project` turns it on for one repo); where it
-  is off, describe the greybox in plain words.
+  (`$AGENTS_SHARED/scripts/enable-skill-group.zsh gamedev --reason "greybox prototype"` turns it on
+  for the repo); where it is off and the work does not need it, describe the greybox in plain words.
 - Level 3: a blind playtest: hand over the controls, say nothing, write down where they stall,
   quit or replay.
 

@@ -8,7 +8,7 @@
 # that was used inside this repo in the cache's window and that the repo has not decided on.
 # A repo decides by listing <group>@skills-dir, true or false, under enabledPlugins in
 # .claude/settings.json or .claude/settings.local.json.
-# The note tells the agent to switch a needed group on itself (claude plugin enable), never to
+# The note tells the agent to switch a needed group on itself (scripts/enable-skill-group.zsh), never to
 # hand that step to the user; docs/on-demand/enable-skill-groups.md says the same at the action.
 #
 # Silent when: the session is resumed, cleared or compacted; the folder is not in a git repo;
@@ -51,10 +51,35 @@ USED=$(jq -r --arg root "$ROOT" --argjson decided "$DECIDED" '
        | select(.n > 0)
        | "\(.group) (\(.n) use\(if .n == 1 then "" else "s" end))"]
     | if length == 0 then empty else "\(join(", "))|\($doc.days)" end' "$CACHE" 2>/dev/null)
-[ -n "$USED" ] || exit 0
 
-LIST=${USED%|*}
-DAYS=${USED##*|}
-NOTE="Skill groups used in this repo in the last $DAYS days but off: $LIST. They are off globally to keep every session's skill list short, and this repo has not recorded a choice. If this session's work needs one, switch it on yourself: claude plugin enable <group>@skills-dir --scope local in the repo root, then end the turn in text asking the user to type /reload-plugins. Never hand the user that command or Skill Tree's switch. A group the user says this repo should not load is recorded as false under enabledPlugins (key <group>@skills-dir) in .claude/settings.local.json; a recorded choice for every listed group stops this note. agents-shared/scripts/report-skill-group-use.py --repo . shows every group."
+# Groups an agent switched on here (scripts/enable-skill-group.zsh's log) more than 30 days ago that
+# are still on here and had no use in the cache's window: candidates to switch off again.
+LOG=${SKILL_GROUP_LOG:-${XDG_STATE_HOME:-$HOME/.local/state}/agents-shared/skill-group-switches.tsv}
+STALE=""
+if [ -r "$LOG" ]; then
+    CUTOFF=$(date -v-30d +%Y-%m-%dT%H:%M:%S 2>/dev/null || date -d '30 days ago' +%Y-%m-%dT%H:%M:%S)
+    ON_HERE=$(cat "$ROOT/.claude/settings.json" "$ROOT/.claude/settings.local.json" 2>/dev/null \
+        | jq -rs 'reduce (.[] | .enabledPlugins // {}) as $p ({}; . + $p) | to_entries[]
+                  | select(.value == true and (.key | endswith("@skills-dir"))) | .key | rtrimstr("@skills-dir")' 2>/dev/null)
+    for g in $(awk -F'\t' -v r="$ROOT" '$2 == r {last[$3] = $1 "\t" $4} END {for (g in last) {split(last[g], a, "\t"); if (a[2] == "on") print g "\t" a[1]}}' "$LOG" \
+               | awk -F'\t' -v c="$CUTOFF" '$2 < c {print $1}' | sort); do
+        printf '%s\n' "$ON_HERE" | grep -qx -- "$g" || continue
+        n=$(jq -r --arg root "$ROOT" --arg g "$g" '[.groups[] | select(.group == $g) | .folders | to_entries[]
+              | select(.key == $root or (.key | startswith($root + "/"))) | .value] | add // 0' "$CACHE" 2>/dev/null)
+        [ "${n:-0}" = 0 ] && STALE="${STALE:+$STALE, }$g"
+    done
+fi
+
+[ -n "$USED" ] || [ -n "$STALE" ] || exit 0
+
+NOTE=""
+if [ -n "$USED" ]; then
+    LIST=${USED%|*}
+    DAYS=${USED##*|}
+    NOTE="Skill groups used in this repo in the last $DAYS days but off: $LIST. They are off globally to keep every session's skill list short, and this repo has not recorded a choice. If this session's work needs one, switch it on yourself: agents-shared/scripts/enable-skill-group.zsh <group> --reason \"<what this work needs it for>\" from the repo, then end the turn in text asking the user to type /reload-plugins. Never hand the user that command or Skill Tree's switch. A group the user says this repo should not load is recorded as false under enabledPlugins (key <group>@skills-dir) in .claude/settings.local.json; a recorded choice for every listed group stops this note. agents-shared/scripts/report-skill-group-use.py --repo . shows every group."
+fi
+if [ -n "$STALE" ]; then
+    NOTE="${NOTE:+$NOTE }Switched on here by an agent over 30 days ago and unused since: $STALE. Unless this session needs one, switch it off: agents-shared/scripts/enable-skill-group.zsh <group> --off --reason \"unused for 30 days\"."
+fi
 
 jq -n --arg c "$NOTE" '{hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: $c}}'

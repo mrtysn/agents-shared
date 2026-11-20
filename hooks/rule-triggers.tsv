@@ -20,7 +20,7 @@ persist-useful-tooling	Write	file_path	(/tmp/|/scratchpad/|/var/folders/).*\.(sh
 memory-hygiene	Write|Edit	file_path	/memory/	-	note-once
 choose-the-fix-for-a-pattern	Write	file_path	(claude/rules/|/skills/[^/]+/SKILL\.md$|docs/on-demand/|/hooks/[^/]+\.(sh|py)$|/CLAUDE\.md$)	-	note-once
 choose-the-fix-for-a-pattern	Edit	file_path	(hooks/rule-triggers\.tsv$|/CLAUDE\.md$|claude/rules/)	-	note-once
-enable-skill-groups	Bash	command	(^|[;&|(`])[[:space:]]*claude[[:space:]]+plugin[[:space:]]|report-skill-group-use|find-local-skills|(cat|head|sed|less)[[:space:]][^;&|]*/skills/[^/[:space:]]+/skills/[^/[:space:]]+/SKILL\.md	-	note-once	main
+enable-skill-groups	Bash	command	(^|[;&|(`])[[:space:]]*claude[[:space:]]+plugin[[:space:]]|report-skill-group-use|find-local-skills|enable-skill-group|(cat|head|sed|less)[[:space:]][^;&|]*/skills/[^/[:space:]]+/skills/[^/[:space:]]+/SKILL\.md	-	note-once	main
 verify-visual-ui-against-the-request	Bash	command	project-lifecycle[[:space:]].*page-new	-	note-once
 verify-visual-ui-against-the-request	Write|Edit	file_path	\.(css|scss|tsx|vue|swift|tscn|xib)$	-	note-once
 verify-visual-ui-against-the-request	Bash	command	\.(css|scss|tsx|vue|swift|tscn|xib)([^A-Za-z0-9]|$)	-	note-once

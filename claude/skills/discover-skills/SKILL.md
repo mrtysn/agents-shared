@@ -29,8 +29,9 @@ installed but off here.
 - `not-enabled-here (group off)` — installed, but its group is off for this folder. That is the
   answer; do not look elsewhere. When the task in hand needs it, switch the group on yourself
   for this repo, without reading any of its skills first:
-  `claude plugin enable <group>@skills-dir --scope local` run in the repo root (writes the
-  gitignored `.claude/settings.local.json`, as Skill Tree's switch does). Then end the turn in
+  `$AGENTS_SHARED/scripts/enable-skill-group.zsh <group> --reason "<what the task needs it for>"`
+  run from the repo (writes the gitignored `.claude/settings.local.json`, as Skill Tree's switch
+  does, and records why; it refuses where that file is committed). Then end the turn in
   text asking the user to type `/reload-plugins`, the only step that makes it live in the open
   session; never through AskUserQuestion, whose answer arrives before the command runs. Load the
   skill once its output is in the conversation. Otherwise report it and stop.

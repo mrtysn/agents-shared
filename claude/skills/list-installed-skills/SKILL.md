@@ -26,9 +26,9 @@ One table, a row per group or standalone skill set, at most 3 short columns:
 
 - A group (`name/skill` lines) is one row: its state, and its skill names comma-separated. A group whose state is `not-enabled-here (group off)` says "off here".
 - After the table, for each group off here, one line addressed to the calling agent, never to the
-  user: "For the calling agent: switch on a group the task needs yourself, `claude plugin enable
-  <group>@skills-dir --scope local` in the repo root, then end the turn in text asking the user to
-  type `/reload-plugins`." The fork cannot run it (its only tool is the finder) and the user is
+  user: "For the calling agent: switch on a group the task needs yourself,
+  `$AGENTS_SHARED/scripts/enable-skill-group.zsh <group> --reason \"<why>\"` from the repo, then end
+  the turn in text asking the user to type `/reload-plugins`." The fork cannot run it (its only tool is the finder) and the user is
   never told to run it or to flip Skill Tree's switch.
 - Standalone skills (lines with no `/`) go in one row, "no group", with their names. Mark `name-only` and `slash-only` ones inline.
 - `off-in-group` and `off (override)` skills are listed under a single "switched off everywhere" row.
