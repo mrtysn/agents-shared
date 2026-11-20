@@ -1,0 +1,22 @@
+# Cases for require-fetch-before-commit.sh — one per line: <verdict><TAB><scenario><TAB><command>
+#
+# verdict:  pass   the hook exits 0
+#           block  the hook exits 2 on the first call and 0 on the same call repeated
+# scenario: uptodate | behind | behind-ahead | no-upstream | offline | notgit | detached
+#           (built by run-require-fetch-before-commit.sh). @REPO@ in a command is the repo folder.
+
+pass	uptodate	git commit -m "x"
+pass	uptodate	git status
+pass	behind	git log --oneline
+pass	behind	git commit-tree HEAD^{tree}
+pass	behind	echo "git commit is how you save"
+pass	no-upstream	git commit -m "x"
+pass	offline	git commit -m "x"
+pass	notgit	git commit -m "x"
+pass	detached	git commit -m "x"
+block	behind	git commit -m "x"
+block	behind	git commit -am "x" -- a.txt
+block	behind	cd @REPO@ && git add a.txt && git commit -m "x"
+block	behind	git -C @REPO@ commit -m "x"
+block	behind	git -c user.name=a -C @REPO@ commit -m "x"
+block	behind-ahead	git commit -m "x"
