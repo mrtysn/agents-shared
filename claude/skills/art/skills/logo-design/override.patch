@@ -1,0 +1,16 @@
+--- a/SKILL.md
++++ b/SKILL.md
+@@ -52,6 +52,13 @@
+ | `export_variants.py` | Black, white, brand-mono, square, favicon and app-icon SVGs; `--png` sizes; `--web-icons` = favicon.ico + PNG icon set + webmanifest + `<head>` snippet; `--favicon-source` for a simplified small-size drawing |
+ | `build_catalog.py` | Maintainers only: rebuild the library catalog |
+ 
++<!-- LOCAL: library not vendored -->
++**The reference library is not installed here.** `assets/library/` (1,400+ third-party logos) is left out of this
++copy on purpose, so `search_library.py`, `preview_sheet.py --refs-industry/--refs`, the shelf test and the peer test
++have no references. Skip those steps and say so; lean on your own knowledge of the category instead. Audit, preview
++sheets without references, concept sheets, boards and exports all work.
++<!-- LOCAL END -->
++
+ **Look at your work.** Drawing in SVG code is drawing blind. After writing or changing a logo, render it and look:
+ `python3 scripts/render_png.py concept-a.svg concept-b.svg --out-dir renders --size 512`, then open the PNGs with
+ your image or file-reading tool and actually look at them (it

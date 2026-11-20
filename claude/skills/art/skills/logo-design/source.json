@@ -1,0 +1,37 @@
+{
+  "repo": "kaankiziltug/logo-design-skill",
+  "path": "skills/logo-design/SKILL.md",
+  "files": [
+    "SKILL.md",
+    "references/color.md",
+    "references/critique.md",
+    "references/discovery-brief.md",
+    "references/identity-system.md",
+    "references/library-guide.md",
+    "references/mark-types.md",
+    "references/presentation-delivery.md",
+    "references/principles.md",
+    "references/process.md",
+    "references/redesign.md",
+    "references/svg-construction.md",
+    "references/testing-checklist.md",
+    "references/typography.md",
+    "references/visual-techniques.md",
+    "scripts/build_catalog.py",
+    "scripts/concept_sheet.py",
+    "scripts/export_variants.py",
+    "scripts/presentation_board.py",
+    "scripts/preview_sheet.py",
+    "scripts/render_png.py",
+    "scripts/search_library.py",
+    "scripts/svg_audit.py",
+    "scripts/svglib.py",
+    "templates/brand-guidelines-template.md",
+    "templates/presentation-spec.example.json"
+  ],
+  "commit": "e9eaddc07895575253d6663320354a708f53e955",
+  "updated": "2026-11-20",
+  "ignore": [
+    "assets/library/*"
+  ]
+}
