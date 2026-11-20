@@ -15,7 +15,10 @@ An instruction covers the conversation with the peer it was first quoted to, not
 a later send to that same peer may quote the same words again, however many messages the
 exchange takes. Allowing one message per instruction made the user re-authorise every reply of
 a two-session exchange ("what if the convo needs to take 20 turns??", 2026-10-28). Another peer
-still needs a fresh quote.
+still needs a fresh quote, unless the quoted prompt names it: one instruction naming three sessions
+("message the other 3 sessions ... site-work-28 site-work-50 notebook-61") is three sends, and the
+third was refused as stale after the first went out (2026-11-20). A prompt that holds the quote and
+the recipient's name covers that recipient however many sends came between.
 
   summary: User said "let that session know of what they are causing"
 
@@ -58,6 +61,7 @@ sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
 from transcript_items import is_reply_boundary, is_typed_prompt, items  # noqa: E402
 
 MIN_QUOTE = 8
+MIN_NAME = 4  # a recipient name shorter than this is too easily part of the prompt by accident
 # Wordings that hand coordination to the agents for good, not for one message.
 STANDING_STEMS = ("collab", "coordinat", "work together", "among each other", "between each other",
                   "among yourselves", "between yourselves", "work it out", "sort it out",
@@ -96,6 +100,8 @@ def refuse(reason, stale=None):
             '    summary: User said (standing) "' + stale + '"\n\n'
             "A `(standing)` quote passes for a peer this session has already messaged, and for a reply\n"
             "to a peer that messaged this session first (its `from` address or `from-name`).\n"
+            "If the user's prompt named this recipient, quote words from that same prompt: a prompt\n"
+            "that holds the quote and the recipient's name covers it, with no `(standing)` mark.\n"
             "Docs: docs/on-demand/messages-between-sessions.md and send-message-gate.md.",
             file=sys.stderr,
         )
@@ -197,6 +203,15 @@ def main():
     for q in quotes:
         if any(q in s for s in said_ever) and any(t == to and q in sm for t, sm in sent):
             return
+    # An instruction that names several peers covers each peer it names, whatever was sent since.
+    name = norm(re.sub(r"\s*\[[0-9a-f]+\]\s*$", "", to))
+    # A name that is a plain word ("other", "peer") is in prompts by accident; one with a digit,
+    # hyphen or underscore (site-work-28) is there because the user named the session.
+    if len(name) >= MIN_NAME and re.search(r"[\d_-]", name):
+        named = re.compile(r"(?<![\w-])" + re.escape(name) + r"(?![\w-])")
+        for q in quotes:
+            if any(q in s and named.search(s) for s in said_ever):
+                return
     # A standing grant covers a reply to a peer that wrote first, marked or not, however old it is.
     if to in inbound:
         for q in quotes:

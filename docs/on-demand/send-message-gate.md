@@ -20,7 +20,10 @@ user with AskUserQuestion; their answer is then the quotation.
 
 An instruction covers the conversation with its peer, not one message. Once a send to a
 peer went out quoting the user, every later send to that same peer may quote the same
-words again, however long the exchange runs. A different peer needs its own quote.
+words again, however long the exchange runs. A different peer needs its own quote, unless the
+user's prompt names it: an instruction that names several sessions covers a send to each, quoted
+from that same prompt, in any order (2026-11-20: one prompt named three sessions and the third
+send was refused as stale).
 
 A standing grant reaches further. When the user hands coordination to the
 sessions for good ("you guys collaborate among each other", "no need to ask me"), every
