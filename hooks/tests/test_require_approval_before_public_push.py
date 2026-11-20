@@ -12,7 +12,7 @@ HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "require-a
 TMP = tempfile.mkdtemp()
 CACHE = os.path.join(TMP, "cache")
 os.makedirs(os.path.join(CACHE, "agents-shared", "repo-visibility"))
-for slug, vis in (("t__pub", "PUBLIC"), ("t__priv", "PRIVATE")):
+for slug, vis in (("t__pub", "PUBLIC"), ("t__priv", "PRIVATE"), ("t__site-kit", "PUBLIC")):
     with open(os.path.join(CACHE, "agents-shared", "repo-visibility", slug), "w") as fh:
         fh.write(vis + "\n")
 
@@ -43,6 +43,7 @@ PRIV = repo("priv", "git@github.com:t/priv.git", ["a.ts"])
 SAME = repo("same", "git@github.com:t/pub.git", [])
 OTHER = repo("other", "git@gitlab.com:t/pub.git", ["a.ts"])
 PRIV_SAME = repo("privsame", "git@github.com:t/priv.git", [])
+KIT = repo("kit", "git@github.com:t/site-kit.git", ["b.ts"])
 SAME_IMG = repo("sameimg", "git@github.com:t/pub.git", [])
 with open(os.path.join(SAME_IMG, "new.png"), "w") as fh:
     fh.write("png")
@@ -66,6 +67,14 @@ ASK = [call("q1", "AskUserQuestion", {"questions": []}),
        result("q1", 'User has answered your questions: "Push these two items?"="yes push those two items"')]
 APPROVED_PUSH = [call("b1", "Bash", {"command": 'git push  # public-push: user approved "yes push those two items"'}),
                  result("b1", "pushed")]
+APPROVED_PUSH[0]["cwd"] = PUB
+# One answer to a question that names two repos, already used for the push to the first.
+ASK_BOTH = [call("q2", "AskUserQuestion", {"questions": []}),
+            result("q2", 'User has answered your questions: "Push to pub and site-kit?"="Push both repos now"')]
+ASK_ONE = [call("q3", "AskUserQuestion", {"questions": []}),
+           result("q3", 'User has answered your questions: "Push to pub?"="Push both repos now"')]
+PUSHED_PUB = [dict(call("b3", "Bash", {"command": 'git push  # public-push: user approved "Push both repos now"'}), cwd=PUB),
+              result("b3", "pushed")]
 
 
 FORM = os.path.join(TMP, "form.html")
@@ -105,6 +114,14 @@ CASES = [
     ("short quote", 'git push  # public-push: user approved "yes"', PUB, [user("yes")], 2),
     ("an approval covers one push", 'git push  # public-push: user approved "yes push those two items"', PUB,
      ASK + APPROVED_PUSH, 2),
+    ("one answer whose question names both repos covers the second",
+     'git push  # public-push: user approved "Push both repos now"', KIT, ASK_BOTH + PUSHED_PUB, 0),
+    ("an answer already used elsewhere does not cover a repo its question did not name",
+     'git push  # public-push: user approved "Push both repos now"', KIT, ASK_ONE + PUSHED_PUB, 2),
+    ("an answer used for one repo does not cover a second push to that repo",
+     'git push  # public-push: user approved "Push both repos now"', PUB, ASK_BOTH + PUSHED_PUB, 2),
+    ("an unused answer covers any repo, as before",
+     'git push  # public-push: user approved "Push both repos now"', KIT, ASK_ONE, 0),
     ("a refused push does not use up the approval", 'git push  # public-push: user approved "yes push those two items"',
      PUB, ASK + [APPROVED_PUSH[0], result("b1", "PreToolUse:Bash hook error: BLOCKED")], 0),
     ("a decision-form note passes", 'git push  # public-push: user approved "no names in the images as well"', PUB, FORM_CALL, 0),

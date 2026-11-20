@@ -19,7 +19,9 @@ A push to a public repo passes when the command carries one of two markers, in a
       user typed, an answer they gave to an AskUserQuestion, or an answer they submitted on a
       decision form (`project-lifecycle decision-wait FORM`, read from FORM.answers.json: each
       note's text, and each pick as "<question id>: <option id>"), later than this session's
-      previous approved public push.
+      previous approved push to the same repo. One answer can approve pushes to several repos:
+      once it has approved a push to one repo, it approves a push to another only if the
+      question it answered (or the prompt that holds it) names that repo.
 
 A push that sends no new commits (a rewind, a branch delete, an up-to-date push) passes with
 no marker. The hook runs before the command, so when a commit is made earlier in the same
@@ -188,28 +190,55 @@ def form_answers(command, cwd):
     return words
 
 
-def user_words_since_last_approved_push(path):
+def push_repo(command, cwd):
+    """The owner/name a past push command went to, or None when it cannot be told."""
+    scan = HEREDOC.sub(lambda h: h.group(0).split("\n", 1)[0] + "\n", command)
+    m = PUSH.search(scan)
+    if not m:
+        return None
+    d = repo_dir(scan, m.start(1), m.group(1), cwd or "")
+    words = m.group(2).split()
+    pos = [w for w in words if not w.startswith("-") and not re.match(r"\d*[<>]", w)]
+    url = git(d, "remote", "get-url", "--push", pos[0] if pos else "origin") if d and os.path.isdir(d) else None
+    slug = github_slug(url) if url else None
+    return f"{slug[0]}/{slug[1]}".lower() if slug else None
+
+
+def user_words_since_last_approved_push(path, repo):
+    """What the user said that may approve a push to repo, as (words, context, reused) triples.
+
+    The window opens after the last approved push to this same repo, so one answer can approve
+    pushes to several repos. An answer that already approved a push to another repo is marked
+    reused: it then counts for this repo only if its context (the question asked, or the prompt
+    typed) names this repo."""
     from transcript_items import is_reply_boundary, is_typed_prompt, items  # noqa: E402
     rows = list(items(path, want={"user", "agents", "calls", "tools"}))
     # Only a push that ran counts: a refused one never did, and the call being checked now is
     # already in the transcript with no result yet.
     ran = {it.get("tool_use_id") for it in rows
            if it["label"].startswith("TOOL-RESULT") and not it["text"].lstrip().startswith("PreToolUse:")}
-    last = -1
-    for n, it in enumerate(rows):
-        if it["label"] == "CALL Bash" and approved_push(it["text"]) and it.get("tool_use_id") in ran:
-            last = n
+    pushes = [n for n, it in enumerate(rows)
+              if it["label"] == "CALL Bash" and approved_push(it["text"]) and it.get("tool_use_id") in ran]
+    # A past push whose repo cannot be told is taken as a push to this repo, the strict reading.
+    same = [n for n in pushes if push_repo(rows[n]["text"], rows[n].get("cwd")) in (repo.lower(), None)]
+    last = same[-1] if same else -1
     said = []
     for n, it in enumerate(rows):
         if n <= last:
             continue
+        reused = any(p > n for p in pushes)
         if it["label"] == "CALL Bash" and "decision-wait" in it["text"]:
-            said.extend(form_answers(it["text"], it.get("cwd") or ""))
+            said.extend((w, "", reused) for w in form_answers(it["text"], it.get("cwd") or ""))
         elif is_typed_prompt(it):
-            said.append(norm(it["text"]))
+            said.append((norm(it["text"]), norm(it["text"]), reused))
         elif is_reply_boundary(it):
-            said.extend(norm(p.split('"', 1)[0]) for p in it["text"].split('"="')[1:])
+            said.extend((norm(p.split('"', 1)[0]), norm(it["text"]), reused) for p in it["text"].split('"="')[1:])
     return said
+
+
+def approves(said, quote, repo):
+    name = repo.split("/", 1)[1].lower()
+    return any(quote in w and (not reused or name in ctx) for w, ctx, reused in said)
 
 
 def main():
@@ -249,10 +278,12 @@ def main():
         path = data.get("transcript_path") or ""
         if not path or not os.path.isfile(path):
             refuse("the hook cannot read this session's transcript to check the approval.")
-        if any(q in s for s in user_words_since_last_approved_push(path)):
+        if approves(user_words_since_last_approved_push(path, repo), q, repo):
             return
-        refuse(f"the quote {mu.group(1)!r} is not in anything the user typed or answered since "
-               f"this session's previous approved public push.")
+        refuse(f"the quote {mu.group(1)!r} does not approve this push to {repo}: it is not in anything "
+               f"the user typed or answered since this session's previous approved push to {repo}, or it "
+               f"already approved a push to another repo and the question it answered did not name "
+               f"{repo.split('/', 1)[1]}. One answer covers every repo its question names.")
     if MARK_CODE.search(command):
         media = ""
         if commits:
