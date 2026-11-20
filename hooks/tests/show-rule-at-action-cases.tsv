@@ -53,6 +53,13 @@ note	Edit	{"file_path":"/Users/someone/.claude/projects/-x/memory/MEMORY.md","ol
 # --- tools no row covers
 pass	Read	{"file_path":"/tmp/x"}
 pass	Edit	{"file_path":"/Users/someone/dev/repo/a.txt","old_string":"a","new_string":"b"}
+# --- enable-skill-groups: an agent checking or reading skill-group state, main conversation only
+note	Bash	{"command":"claude plugin enable art@skills-dir --scope local"}
+note	Bash	{"command":"python3 $AGENTS_SHARED/scripts/report-skill-group-use.py --repo ."}
+note	Bash	{"command":"$AGENTS_SHARED/scripts/find-local-skills.zsh --all /p/repo"}
+note	Bash	{"command":"cat ~/.claude/skills/art/skills/brandkit/SKILL.md"}
+pass	Bash	{"command":"cat ~/.claude/skills/handoff/SKILL.md"}
+pass	Bash	{"command":"$AGENTS_SHARED/scripts/find-local-skills.zsh --all /p/repo"}	sub-agent-1
 # --- choose-the-fix-for-a-pattern: a session writing a place where an instruction or fix can go
 note	Write	{"file_path":"/p/agents-shared/claude/rules/new-rule.md","content":"x"}
 note	Write	{"file_path":"/p/agents-shared/claude/skills/new-skill/SKILL.md","content":"x"}

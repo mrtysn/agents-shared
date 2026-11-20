@@ -8,6 +8,8 @@
 # that was used inside this repo in the cache's window and that the repo has not decided on.
 # A repo decides by listing <group>@skills-dir, true or false, under enabledPlugins in
 # .claude/settings.json or .claude/settings.local.json.
+# The note tells the agent to switch a needed group on itself (claude plugin enable), never to
+# hand that step to the user; docs/on-demand/enable-skill-groups.md says the same at the action.
 #
 # Silent when: the session is resumed, cleared or compacted; the folder is not in a git repo;
 # the cache is missing or older than 7 days; nothing off was used here; every such group is
@@ -53,6 +55,6 @@ USED=$(jq -r --arg root "$ROOT" --argjson decided "$DECIDED" '
 
 LIST=${USED%|*}
 DAYS=${USED##*|}
-NOTE="Skill groups used in this repo in the last $DAYS days but off: $LIST. They are off globally to keep every session's skill list short, and this repo has not recorded a choice. If this session's work needs one, ask the user whether this repo should load it, and write the answer for each group listed as true or false under enabledPlugins (key <group>@skills-dir) in .claude/settings.local.json; a recorded answer stops this note. agents-shared/scripts/report-skill-group-use.py --repo . shows every group."
+NOTE="Skill groups used in this repo in the last $DAYS days but off: $LIST. They are off globally to keep every session's skill list short, and this repo has not recorded a choice. If this session's work needs one, switch it on yourself: claude plugin enable <group>@skills-dir --scope local in the repo root, then end the turn in text asking the user to type /reload-plugins. Never hand the user that command or Skill Tree's switch. A group the user says this repo should not load is recorded as false under enabledPlugins (key <group>@skills-dir) in .claude/settings.local.json; a recorded choice for every listed group stops this note. agents-shared/scripts/report-skill-group-use.py --repo . shows every group."
 
 jq -n --arg c "$NOTE" '{hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: $c}}'

@@ -36,6 +36,7 @@ check() {  # name, source, cwd, expected substring or "" for silence
 check "fresh start names used off groups" startup "$REPO" "motion (2 uses), tooling (1 use)"
 check "subfolder session counts for its repo" startup "$REPO/sub" "motion (2 uses)"
 check "groups used elsewhere and groups on are left out" startup "$REPO" "tooling (1 use). They are off"
+check "the note has the agent switch a group on itself" startup "$REPO" "switch it on yourself: claude plugin enable <group>@skills-dir --scope local"
 check "resume is silent" resume "$REPO" ""
 check "outside a git repo is silent" startup "$TMP" ""
 
