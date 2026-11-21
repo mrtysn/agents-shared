@@ -43,4 +43,13 @@ judge a tool through its structure: tests on made-up fixtures, counts, file name
 has not called private, and paths handed over for them to open. Never open the content itself to
 check that the tool works; a UI bug that shows only on the real content is reported by them.
 
+**A secret you read by accident is exposed.** When a command or file read shows you a password,
+token or key you did not set out to read, tell the user in your next reply, once, where it came
+from and that it is now in the session transcript and went to the model provider. Repeat nothing
+of it, there or in summaries, compact messages, memory, handoffs or subagent briefs; do not open
+its source again or use it. A subagent says it in its report; a compaction that comes first
+carries, without the secret, that it is still to be reported. To find one fact in a personal file,
+search for it (`grep -n`) rather than printing the file. `hooks/note-secret-in-tool-output.py`
+adds this note when output looks like a credential; one it misses is still yours to report.
+
 Provenance: [docs/provenance/working-style.md](../../docs/provenance/working-style.md).
