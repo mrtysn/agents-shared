@@ -33,7 +33,7 @@ Four surveys already exist; when the question is one of them, run it first:
 `find-listed-unasked-decisions.py` (decisions listed in prose instead of asked),
 `find-invisible-output-claims.py` ("as shown above" about output the user never saw).
 `find-why-question-answers.py` pairs each "why did you…" prompt with the agent's reply, for
-classifying whether agents named the cause (communication-style.md's "Honest in error, by cause").
+classifying whether agents named the cause (communication-style.md's "Answering "why", by cause").
 
 ## 2. State the window
 
