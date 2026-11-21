@@ -99,6 +99,12 @@ f=$(mk plain "$(prompt 'fix the build')" "$(say "$CONTENT")" "$(ask q1)")
 check 'prompt that asks for no content allows' 0 AskUserQuestion "$f"
 f=$(mk where "$(prompt 'where is the config file?')" "$(say "$CONTENT")" "$(ask q1)")
 check '"where is" prompt refuses' 2 AskUserQuestion "$f"
+f=$(mk why "$(prompt 'why would web-fetch get an exemption')" "$(say "$CONTENT")" "$(ask q1)")
+check '"why" prompt refuses a question after the answer' 2 AskUserQuestion "$f"
+f=$(mk explain "$(prompt 'explain the third item')" "$(say "$CONTENT")" "$(ask q1)")
+check '"explain" prompt refuses a question after the answer' 2 AskUserQuestion "$f"
+f=$(mk midwhy "$(prompt 'fix the build, and why not')" "$(say "$CONTENT")" "$(ask q1)")
+check '"why" mid-prompt allows' 0 AskUserQuestion "$f"
 f=$(mk allthe "$(prompt 'check all the logs')" "$(say "$CONTENT")" "$(ask q1)")
 check '"all the" prompt refuses' 2 AskUserQuestion "$f"
 f=$(mk word-boundary "$(prompt 'the playlist is listed in a spreadsheet')" "$(say "$CONTENT")" "$(ask q1)")

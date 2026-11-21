@@ -29,9 +29,9 @@ The question text is laid out in lines, never one paragraph: the topic on line 1
 line, one fact per line (numbered when they are items), a blank line, then the question
 alone on the last line. Line breaks render in the terminal. Options that are exact
 wording, a diff or a layout go in `preview` (single-choice questions only). An answer the
-user types into a question's answer box that asks something is answered inside the re-asked
-question ("You asked: …", the answer one fact per line, then the decision), with no text
-before the call.
+user types into a question's answer box that asks something (explain, why, list, show) is
+answered in plain text as the last text of a turn with no tool call; the decision is asked
+again in a later turn, never in the same one.
 
 **An agent adds no timer of its own to a prompt, dialog or wait it opens** (`giving up after N`,
 `--timeout`): the user answers when they return. A prompt that needs something from them (a

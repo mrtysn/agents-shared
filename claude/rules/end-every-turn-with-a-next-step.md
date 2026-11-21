@@ -34,7 +34,8 @@ The Stop hook passes any `Nothing left` line without judging it, so this check i
 **A demo, comparison or preview is delivered when it is open on the user's screen and you have looked at it there**: the live link opened for them, not a file path or a scratch copy. That turn ends `Nothing left: <what, the link, opened>`. Which of two options to keep is not asked in the turn that hands the comparison over; the user looks first and answers in their own message.
 
 **Content the user asked to see is the last text of a turn with no tool call.** List, show,
-give me, repeat, where is, table mean the content itself, not a summary or a decision. Text
+give me, repeat, where is, table mean the content itself, not a summary or a decision; a prompt
+that opens with explain, why or how come asks for the explanation the same way. Text
 written before a tool call (AskUserQuestion, Skill, Agent or any other) can be collapsed on
 the user's screen to one summary line, so deliver it in a turn that ends in text only; that
 turn needs no proceed question, which comes in the next turn.

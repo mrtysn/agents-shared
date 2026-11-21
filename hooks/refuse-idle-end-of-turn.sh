@@ -36,7 +36,7 @@
 #   - an away stretch is open (hooks/refuse-stop-while-away.sh owns those turns, and they ask nothing),
 #   - the user's last prompt tells it to stop ("stop", "that's all", "pause"),
 #   - the user's last prompt asked to see content (hooks/show-request-pattern.txt: "list me", "show me", "where is",
-#     "table") and the turn ends in 40+ characters of text with no prose offer: content is delivered as the last text
+#     "table", or a prompt opening with "explain", "why" or "how come") and the turn ends in 40+ characters of text with no prose offer: content is delivered as the last text
 #     of a turn with no tool call, and the proceed question comes in the next turn (hooks/refuse-requested-content-
 #     before-tool-call.sh refuses the same content written before a tool call). Unless the prompt also says to
 #     continue ("list me X and continue", hooks/continue-request-pattern.txt): then the text-only end passes only

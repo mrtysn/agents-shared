@@ -138,3 +138,10 @@ and "Nothing left: ... only the opening of the browser is undone" passed because
 The rule now says a comparison is delivered when it is open on the user's screen; the hook has a rejected-question message and
 refuses a "Nothing left" line that names something undone. `hooks/refuse-requested-content-before-tool-call.sh` also
 re-reads the transcript before refusing a call after a question, and treats GET-only curl as read-only.
+
+2026-11-21, notebook. The user asked "why would web-fetch get an exemption" and "explain …" about an agent's
+proposal. The agent withdrew the proposal unchecked, then answered the "explain" typed in a question's answer box
+inside a re-asked question, as `asking-for-decisions.md` then said to. The user rejected it: "I said EXPLAIN. not
+ask". A prompt opening with explain, why or how come now counts as a request to see content
+(`hooks/show-request-pattern.txt`), so the answer is the last text of a turn with no tool call; a typed answer that
+asks something gets a plain reply, and the decision is asked again in a later turn.

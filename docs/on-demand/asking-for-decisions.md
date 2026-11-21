@@ -125,3 +125,8 @@ Nov 12 2026: asked which host name a landing page should get, the user answered 
 own candidates ("subdomains? or sub."). The agent wrote "I'm taking subdomains" and offered a
 build question built on it. The user: "wdym I'm taking? when I ask you options you dont get to
 choose on your own".
+
+Nov 21 2026: the user typed "explain. the rule was already in place and you did not follow. how does this edit
+address that issue" into a question's answer box. The agent answered inside a re-asked question, as the launch
+rule then said, and the user rejected it: "I said EXPLAIN. not ask". The launch rule now matches the provenance
+above: a typed answer that asks something gets a plain reply, and the decision waits for a later turn.
