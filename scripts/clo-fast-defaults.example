@@ -1,0 +1,12 @@
+# Local override of fast mode's model and effort (`clo f`, `clo here`, `clo 1-4`). Copy to
+#     ${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/clo-fast-defaults
+# and keep it there, untracked. Without this file, or a matching line: Sonnet at medium effort.
+#
+# One line per account: the account name from the claude-accounts file, or * for every
+# account, then a model (haiku, sonnet, opus, fable or a full id) and optionally an effort
+# (low, medium, high, xhigh, max). An account's own line wins over *. A model number
+# (`clo 3`) fixes the model, so only the effort is taken from here.
+#
+# account   model   effort
+*           sonnet  medium
+work        opus    high

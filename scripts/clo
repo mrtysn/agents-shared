@@ -24,7 +24,9 @@ Usage:
                           below). The folder is the account's line in
                           ~/.config/agents-shared/clo-fast-folders (shape:
                           clo-fast-folders.example), else $DEV_ROOT/notebook; with
-                          neither it asks which folder (one fzf list).
+                          neither it asks which folder (one fzf list). The model and effort
+                          can be overridden per account in ~/.config/agents-shared/
+                          clo-fast-defaults (shape: clo-fast-defaults.example).
   clo 1|2|3|4 [--prompt text]
                           Fast mode with a fixed model: 1 Haiku, 2 Sonnet, 3 Opus,
                           4 Fable. Same folder, medium effort and first message
@@ -124,6 +126,8 @@ EOF
 extra_roots_file="${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/clo-extra-roots"
 # Where `clo f` launches for each account: lines of "ACCOUNT FOLDER" (shape: clo-fast-folders.example).
 fast_folders_file="${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/clo-fast-folders"
+# Local override of fast mode's model and effort: lines of "ACCOUNT|* MODEL [EFFORT]" (shape: clo-fast-defaults.example).
+fast_defaults_file="${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/clo-fast-defaults"
 
 # scan_roots — one folder per line: $DEV_ROOT (if set), then each extra root, resolved,
 # once each. A line naming no folder is reported and skipped.
@@ -456,6 +460,30 @@ _clo() {
 EOF
 }
 
+# fast_override MODEL_PINNED: set fast_model and fast_effort from the fast-defaults file, for the
+# current account (its line wins over a "*" line). A model number given (1-4) pins the model;
+# only the effort is taken then.
+fast_override() {
+    [[ -r "$fast_defaults_file" ]] || return 0
+    local cfg="${${CLAUDE_CONFIG_DIR:-$HOME/.claude}:A}" entry acct="" line name m e _x
+    for entry in "${(@f)$(account_lines)}"; do
+        [[ -n "$entry" && "${${entry#*$'\t'}:A}" == "$cfg" ]] && { acct="${entry%%$'\t'*}"; break; }
+    done
+    local star_m="" star_e="" acct_m="" acct_e=""
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%%\#*}"
+        name="" m="" e="" _x=""
+        read -r name m e _x <<< "$line" || true
+        [[ -n "$name" && -n "$m" ]] || continue
+        if [[ "$name" == "*" ]]; then star_m="$m" star_e="$e"
+        elif [[ -n "$acct" && "$name" == "$acct" ]]; then acct_m="$m" acct_e="$e"; fi
+    done < "$fast_defaults_file"
+    local pick_m="${acct_m:-$star_m}" pick_e
+    if [[ -n "$acct_m" ]]; then pick_e="$acct_e"; else pick_e="$star_e"; fi
+    [[ "$1" == 1 ]] || fast_model="${pick_m:-$fast_model}"
+    fast_effort="${pick_e:-$fast_effort}"
+}
+
 case "${1:-}" in
     -h|--help) usage; exit 0 ;;
     here|f|1|2|3|4)
@@ -479,7 +507,10 @@ case "${1:-}" in
                fi
                if [[ "$1" == here ]]; then fast_here=1; shift; [[ "${1:-}" == [1-4] ]] || set -- f "$@"; fi
                fast_model=sonnet
+               fast_effort=medium fast_pinned=0
                case "$1" in 1) fast_model=haiku ;; 3) fast_model=opus ;; 4) fast_model=fable ;; esac
+               case "$1" in 1|2|3|4) fast_pinned=1 ;; esac
+               fast_override "$fast_pinned"
                shift
                split_args "$@"; fast_prompt="$prompt"
                fast_dir="$PWD"
@@ -514,14 +545,14 @@ case "${1:-}" in
                            fast_pick="$( { print -r -- "$PWD"$'\t'"here (${PWD/#$HOME/~})"
                                            folder_rows | sort -t$'\t' -k1,1f | awk -F'\t' '{print $2"\t"$1}'
                                          } | fzf --delimiter=$'\t' --with-nth=2 --nth=2 --reverse --cycle --info=hidden \
-                                                 --prompt="folder> " --header="clo f: $fast_model, medium effort. Pick the folder." )" || exit 130
+                                                 --prompt="folder> " --header="clo f: $fast_model, $fast_effort effort. Pick the folder." )" || exit 130
                            fast_dir="${fast_pick%%$'\t'*}"
                        else
                            print -u2 "clo: no \$DEV_ROOT/notebook on this machine (${${DEV_ROOT:+$DEV_ROOT/notebook missing}:-DEV_ROOT not set}). Run 'clo here' to launch fast mode in the current folder."; exit 1
                        fi
                    fi
                fi
-               launch_claude "$fast_dir" "$fast_model" medium "$fast_prompt" "${rest[@]}" ;;
+               launch_claude "$fast_dir" "$fast_model" "$fast_effort" "$fast_prompt" "${rest[@]}" ;;
     launch)    shift; launch_cmd "$@" ;;
     # --run-claude ARGS: run claude in this folder the way every launch does (inside tmux).
     # recent-sessions.py resumes through it.
