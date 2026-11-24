@@ -1,0 +1,36 @@
+#!/bin/zsh
+# DESC: Open an app for the user the way the Dock does: in the background, without the caller's environment
+set -euo pipefail
+
+usage() {
+    cat <<'EOF'
+open-app-for-user — open an app the user will work in, without handing it this shell's environment.
+
+Usage:
+  open-app-for-user <open arguments...>
+  open-app-for-user -a iTerm
+  open-app-for-user /Applications/Some.app
+  open-app-for-user -a "Google Chrome" page.html
+  open-app-for-user --env NAME=VALUE -a Some     a variable the app really needs
+
+`open` hands the app it launches the caller's whole environment, and the app passes it to
+everything it starts later. Launched from an agent's shell, a terminal app then gives every
+new tab that agent's CLAUDE_* session variables (a new Claude Code session there believes it
+is the agent's child and stops saving its transcript) and its TMUX pane.
+
+This runs /usr/bin/open -g under `env -i` with only HOME, USER, LOGNAME, SHELL, TMPDIR, LANG
+and a system PATH, which is what an app opened from the Dock gets. -g keeps the app from
+taking focus at launch. The arguments are open's own; see `man open`.
+
+For a window only an agent looks at (a screenshot, a test run), use quiet-open instead.
+EOF
+}
+
+(( $# )) || { usage >&2; exit 2; }
+[[ "$1" == -h || "$1" == --help ]] && { usage; exit 0; }
+
+user="${USER:-$(id -un)}"
+exec /usr/bin/env -i \
+    HOME="$HOME" USER="$user" LOGNAME="${LOGNAME:-$user}" SHELL="${SHELL:-/bin/zsh}" \
+    TMPDIR="${TMPDIR:-/tmp}" LANG="${LANG:-en_US.UTF-8}" PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+    /usr/bin/open -g "$@"

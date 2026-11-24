@@ -1,0 +1,27 @@
+# Cases for require-clean-env-for-app-launch.sh — one per line: <verdict><TAB><command>
+#
+# verdict is `pass` (hook exits 0) or `block` (hook exits 2).
+#
+block	open -g -a iTerm
+block	open -a "Google Chrome" page.html
+block	open -ga Safari
+block	open -b com.googlecode.iterm2
+block	/usr/bin/open -g /Applications/iTerm.app
+block	open -g "/Applications/Some App.app"
+block	open /Applications/Lunar.app/
+block	sleep 2; open -g -a iTerm
+block	pkill -x iTerm2 && open -a iTerm
+block	FOO=1 open -a iTerm
+block	cd /tmp && open -n -W ./Build/Tool.app
+pass	open-app-for-user -a iTerm
+pass	open-app-for-user /Applications/iTerm.app
+pass	quiet-open /Applications/Godot.app --path game
+pass	env -i HOME=$HOME PATH=/usr/bin:/bin /usr/bin/open -g -a iTerm
+pass	open page.html
+pass	open -R /Users/example/project/out.zip
+pass	open https://example.com
+pass	open .
+pass	grep -n "open -a" notes.md
+pass	echo "use open -g -a iTerm"
+pass	git commit -m "stop agents passing their env through open -a"
+pass	ls /Applications/iTerm.app

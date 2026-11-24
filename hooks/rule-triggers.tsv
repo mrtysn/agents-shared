@@ -4,7 +4,7 @@
 #
 # deny-once is for an action that cannot be taken back (a window that takes focus, a request to a
 # third party, a message sent to another session); every other row is note-once.
-window-focus	Bash	command	(^|[;&|(`])[[:space:]]*(open|quiet-open|osascript|firefox|screencapture)[[:space:]]|\.app/Contents/MacOS/|(^|[;&|(`/])[[:space:]]*(\./)?godot[[:space:]]|playwright[^;&|]*--headed|(^|[;&|(`])[[:space:]]*swift[[:space:]]+run	--headless	deny-once
+window-focus	Bash	command	(^|[;&|(`])[[:space:]]*(open|open-app-for-user|quiet-open|osascript|firefox|screencapture)[[:space:]]|\.app/Contents/MacOS/|(^|[;&|(`/])[[:space:]]*(\./)?godot[[:space:]]|playwright[^;&|]*--headed|(^|[;&|(`])[[:space:]]*swift[[:space:]]+run	--headless	deny-once
 no-unprompted-account-traffic	Bash	command	(^|[;&|(`])[[:space:]]*(curl|wget|ssh|scp|rsync|nc)[[:space:]]	localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0|^curl -fsSL https://(claude\.ai/install\.sh|raw\.githubusercontent\.com/Homebrew/install/HEAD/install\.sh)[[:space:]]*\|[[:space:]]*(ba)?sh$	deny-once
 no-unprompted-account-traffic	Bash	command	(^|[;&|(`])[[:space:]]*(python[0-9.]*|node|deno|bun|ruby|perl)[[:space:]].*(requests\.(get|post|put|delete|head|Session)|urllib|httpx|aiohttp|urlopen|fetch\(|http\.client|XMLHttpRequest)	localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0	deny-once
 no-unprompted-account-traffic	WebFetch|WebSearch|mcp__exa__.*	none	.	-	note-once

@@ -2,11 +2,14 @@
 
 **Never open a window that becomes the active app unless it went through
 `quiet-open`, is an app launched for the user to use, or the user said yes to that
-batch.** An app launched for the user goes through plain `open -g`, never
-`quiet-open`, which leaves it with no Dock icon and no way to bring it forward.
+batch.** An app launched for the user goes through `open-app-for-user` (`open -g` with the
+environment the Dock gives an app), never `quiet-open`, which leaves it with no Dock icon and no
+way to bring it forward, and never a plain `open`, which hands the app this session's
+environment: a terminal reopened that way gives every new tab this session's `CLAUDE_*`
+variables, and new Claude Code sessions there stop saving transcripts.
 Reach for a headless mode first; almost nothing an agent runs needs pixels. Where `quiet-open`
-is not installed, open a window only with `open -g` (it does not activate the app), on the
-non-main display, and only for an app the user is meant to use or after the batch is approved.
+is not installed, open a window only with `open-app-for-user` (it does not activate the app), on
+the non-main display, and only for an app the user is meant to use or after the batch is approved.
 
 **A subagent's brief carries this rule.** A subagent sees no hook line and no
 memory of the parent's: a brief for any run that opens, clicks or screenshots a

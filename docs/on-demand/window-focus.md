@@ -31,11 +31,21 @@ Prohibited, so the app gets **no Dock icon and can never be brought forward**:
 an app the user is meant to look at or work in is unusable under it.
 
 When the launch is for the user — a rebuilt tool they are iterating on, an app
-they asked to see — start it with plain `open -g <App.app>`. It appears in the
-Dock and the app switcher and does not take focus at launch (an app that
-activates itself may still take it once; that is the price of handing over a
-usable window). Then check it is a normal app: System Events reports
-`background only` false for its process.
+they asked to see — start it with `open-app-for-user <App.app>` (any `open`
+arguments). It runs `open -g` under `env -i`, so the app gets the environment the
+Dock would give it. It appears in the Dock and the app switcher and does not take
+focus at launch (an app that activates itself may still take it once; that is the
+price of handing over a usable window). Then check it is a normal app: System
+Events reports `background only` false for its process.
+
+**Never a plain `open` for it.** `open` hands the app the caller's whole
+environment, and the app passes it to everything it starts. Nov 2026: an agent
+reopened the terminal app with `open -g -a iTerm` after editing its preferences;
+every tab opened afterwards carried that agent's `CLAUDE_*` and `TMUX` variables,
+each new Claude Code session there believed it was the agent's child and saved no
+transcript, and five other apps launched the same way carried the same variables.
+`hooks/require-clean-env-for-app-launch.sh` refuses `open` with `-a`, `-b` or a
+`.app` argument.
 
 Oct 2026: after a launcher rebuild the agent relaunched it through quiet-open
 for the user; it ran with no Dock icon and could not be reached: "if you opened
@@ -46,7 +56,7 @@ you were misguided".
 
 A windowed launch of a program that only the agent looks at goes through `quiet-open <App.app> [args…]`
 (the owner's `tools` repo, symlinked into `~/bin`; the hook line says whether it
-is installed; where it is not, use plain `open -g` on the non-main display and ask per batch, as
+is installed; where it is not, use `open-app-for-user` on the non-main display and ask per batch, as
 for an app `quiet-open` cannot quiet). It launches through `open -g` with an AppKit shim injected into
 an ad-hoc re-signed copy of the app, so the app never becomes active. Read the
 result, not the feeling:
