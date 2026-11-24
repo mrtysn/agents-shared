@@ -81,9 +81,13 @@ def extract(pdf: Path) -> dict:
     pymupdf.TOOLS.mupdf_display_errors(False)
 
     reader = PdfReader(str(pdf))
+    page_texts = {
+        "pdfminer.six": [extract_text(str(pdf), page_numbers=[i]) for i in range(len(reader.pages))],
+        "pypdf": [page.extract_text() or "" for page in reader.pages],
+    }
     texts = {
         "pdfminer.six": extract_text(str(pdf)),
-        "pypdf": "\n".join(page.extract_text() or "" for page in reader.pages),
+        "pypdf": "\n".join(page_texts["pypdf"]),
     }
 
     links: list[str] = []
@@ -95,7 +99,8 @@ def extract(pdf: Path) -> dict:
 
     hidden: list[dict] = []
     with pymupdf.open(str(pdf)) as doc:
-        texts["pymupdf"] = "\n".join(page.get_text() for page in doc)
+        page_texts["pymupdf"] = [page.get_text() for page in doc]
+        texts["pymupdf"] = "\n".join(page_texts["pymupdf"])
         pages = doc.page_count
         meta = {k: (doc.metadata or {}).get(k) or "" for k in ("title", "author", "subject")}
         for number, page in enumerate(doc, 1):
@@ -120,7 +125,22 @@ def extract(pdf: Path) -> dict:
                 if reasons:
                     hidden.append({"page": number, "text": text[:80], "why": reasons})
 
-    return {"texts": texts, "links": links, "pages": pages, "meta": meta, "hidden": hidden}
+    return {"texts": texts, "page_texts": page_texts, "links": links, "pages": pages,
+            "meta": meta, "hidden": hidden}
+
+
+def render_pages(pdf: Path, out: Path) -> list[str]:
+    """PNG of every page, what a person (and a model shown page images) sees."""
+    import pymupdf
+
+    out.mkdir(parents=True, exist_ok=True)
+    paths = []
+    with pymupdf.open(str(pdf)) as doc:
+        for number, page in enumerate(doc, 1):
+            path = out / f"page-{number}.png"
+            page.get_pixmap(dpi=110).save(str(path))
+            paths.append(str(path.resolve()))
+    return paths
 
 
 # --------------------------------------------------------------------------
@@ -493,6 +513,243 @@ def compare(expected: dict, reads: dict[str, dict]) -> dict:
 
 
 # --------------------------------------------------------------------------
+# the page: what different agents see
+
+READER_ORDER = ("native", "pypdf", "pdfminer.six", "pymupdf")
+READER_INPUT = {
+    "native": "the PDF itself, opened with the reader's own file tool. A model API given a PDF "
+              "receives its text layer and an image of each page: the images are the page "
+              "sections below; the text layer it was given is not known.",
+    "pypdf": "the plain text pypdf recovered, shown in the page sections. pypdf is the default "
+             "PDF reader behind LlamaIndex's SimpleDirectoryReader, the likeliest string for a "
+             "company that feeds uploads to an agent through a framework.",
+    "pdfminer.six": "the plain text pdfminer.six recovered: layout-aware, it rebuilds reading "
+                    "order from glyph positions.",
+    "pymupdf": "the plain text pymupdf (the MuPDF engine) recovered.",
+}
+STRAY = re.compile(r"^\s*(?:[A-Za-z]{1,3}\s*){1,3}$")
+
+
+def mark_line(line: str) -> str:
+    """Escape a line of extracted text and mark what the checks would flag in it."""
+    import html
+
+    if line.strip() and (STRAY.match(line) or CAPS_WITH_SPACES.fullmatch(line)):
+        why = "letter-spaced heading" if CAPS_WITH_SPACES.fullmatch(line) else "stray fragment"
+        return f'<mark title="{why}">{html.escape(line)}</mark>'
+    out = []
+    for ch in line:
+        if LIGATURES.match(ch) or icon_glyphs(ch):
+            out.append(f'<mark title="glyph">{html.escape(ch)}</mark>')
+        else:
+            out.append(html.escape(ch))
+    text = "".join(out)
+    return re.sub(r"\(cid:\d+\)", lambda m: f'<mark title="unmapped glyph">{m.group(0)}</mark>', text)
+
+
+def heading_order(text: str) -> list[str]:
+    names = {n for group in STANDARD_HEADINGS.values() for n in group}
+    order = []
+    for line in text.splitlines():
+        clean = re.sub(r"\s+", " ", re.sub(r"[^\w& ]", "", line)).strip()
+        if clean.lower() in names:
+            order.append(clean)
+    return order
+
+
+def page_sections(run: Path) -> tuple[str, list[tuple[str, str]]]:
+    import base64
+    import html
+
+    esc = html.escape
+    ext = json.loads((run / "extract.json").read_text(encoding="utf-8"))
+    cmp_path = run / "compare.json"
+    cmp = json.loads(cmp_path.read_text(encoding="utf-8")) if cmp_path.exists() else {"rows": [], "reads": {}}
+    reads = {}
+    for name, path in cmp.get("reads", {}).items():
+        try:
+            reads[name] = json.loads(Path(path).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            reads[name] = None
+    order = [r for r in READER_ORDER if r in reads] + sorted(r for r in reads if r not in READER_ORDER)
+    rows = cmp.get("rows", [])
+    title = Path(ext["pdf"]).name
+    sections: list[tuple[str, str]] = []
+
+    tiles = []
+    for name in order:
+        mine = [r for r in rows if r["reader"] == name]
+        right = sum(r["status"] == PASS for r in mine)
+        tiles.append(f'<div class="ws-stat"><span class="ws-stat__value">{right}/{len(mine)}</span>'
+                     f'<span class="ws-stat__label">{esc(name)}: fields right</span></div>')
+    results = ext.get("results", [])
+    fails = sum(r["status"] == FAIL for r in results)
+    warns = sum(r["status"] == WARN for r in results)
+    tiles.append(f'<div class="ws-stat"><span class="ws-stat__value">{fails} / {warns}</span>'
+                 f'<span class="ws-stat__label">text checks failed / warned</span></div>')
+    sections.append(("Summary", (
+        f"<p>What four blind AI readers understood from <code>{esc(title)}</code>, "
+        f"{ext.get('pages')} pages, against the CV's own record.</p>"
+        f'<div class="ws-stats ws-stats--tiles">{"".join(tiles)}</div>'
+        '<div class="ws-callout"><p>These are stand-ins. Commercial ATS parsers (Workday, '
+        "Greenhouse and the like) are closed and cannot be run here. Each view is what an agent "
+        "fed by that reader sees, not what a named vendor sees.</p></div>")))
+
+    issues = [r for r in results if r["status"] in (FAIL, WARN)]
+    body = "<p>No text check failed or warned.</p>"
+    if issues:
+        body = ("<table class=\"ws-table--wrap\"><thead><tr><th>Check</th><th>Status</th><th>Found, and why it matters</th>"
+                "</tr></thead><tbody>" + "".join(
+                    f"<tr><td>{esc(r['check'])}</td><td>{r['status']}</td><td>{esc(r['detail'])}"
+                    f"<br><small>{esc(r['why'])}</small></td></tr>" for r in issues) + "</tbody></table>")
+    sections.append(("Issues found", body))
+
+    cards = []
+    for name in order:
+        wrong = [r for r in rows if r["reader"] == name and r["status"] != PASS]
+        if reads.get(name) is None:
+            inner = "<p>No valid read was recorded.</p>"
+        elif not wrong:
+            inner = "<p>Every scored field right.</p>"
+        else:
+            inner = ("<table class=\"ws-table--wrap\"><thead><tr><th>Field</th><th>Expected</th><th>Got</th></tr></thead><tbody>"
+                     + "".join(f"<tr><td>{esc(r['field'])}</td><td>{esc(str(r['expected']))}</td>"
+                               f"<td>{esc(str(r['got']))}</td></tr>" for r in wrong) + "</tbody></table>")
+        cards.append(f'<div class="ws-card"><h3>{esc(name)}</h3>'
+                     f'<p class="ws-card__desc">Input: {esc(READER_INPUT.get(name, "unknown"))}</p>{inner}</div>')
+    sections.append(("What each reader got wrong", "".join(cards) or "<p>No reads were compared.</p>"))
+
+    quotes = []
+    for name in order:
+        rec = reads.get(name) or {}
+        failed = any(r["reader"] == name and r["status"] == FAIL for r in rows)
+        quotes.append(f"<details{' open' if failed else ''}><summary>{esc(name)}"
+                      f"{' (has wrong fields)' if failed else ''}: {rec.get('years_of_experience', '?')} "
+                      f"years of experience</summary><blockquote><p>{esc(rec.get('recruiter_summary') or '')}"
+                      "</p></blockquote></details>")
+    sections.append(("Recruiter summaries", (
+        "<p>What each reader would show a recruiter instead of the CV. Open by default only "
+        "where the reader got a field wrong.</p>" + "".join(quotes))))
+
+    images = ext.get("page_images", [])
+    texts = ext.get("page_texts", {})
+    for i in range(ext.get("pages", 0)):
+        img = ""
+        if i < len(images) and Path(images[i]).exists():
+            data = base64.b64encode(Path(images[i]).read_bytes()).decode()
+            img = f'<img src="data:image/png;base64,{data}" alt="Page {i + 1} as rendered">'
+
+        def pre(name: str) -> str:
+            lines = (texts.get(name) or [""] * (i + 1))[i].splitlines()
+            # Capped near the page image's height so the two sit side by side.
+            return ('<pre style="max-height:48rem;overflow:auto"><code>'
+                    + "\n".join(mark_line(ln) for ln in lines) + "</code></pre>")
+
+        heads = "".join(f"<li><strong>{esc(n)}</strong>: {esc(' → '.join(heading_order(texts[n][i])) or 'none')}</li>"
+                        for n in ("pypdf", "pdfminer.six", "pymupdf") if n in texts)
+        body = (
+            '<div class="ws-compare">'
+            f'<div class="ws-compare__side"><p class="ws-compare__label">Rendered page</p>{img}</div>'
+            f'<div class="ws-compare__side" data-side="proposed"><p class="ws-compare__label">pypdf text</p>{pre("pypdf")}</div>'
+            "</div>"
+            f"<p>Section headings in the order each extractor emits them:</p><ul>{heads}</ul>"
+            + "".join(f"<details><summary>{esc(n)} text</summary>{pre(n)}</details>"
+                      for n in ("pdfminer.six", "pymupdf") if n in texts))
+        sections.append((f"Page {i + 1}", body))
+
+    problems = []
+    for name in order:
+        items = (reads.get(name) or {}).get("problems") or []
+        seen = (reads.get(name) or {}).get("instructions_seen") or []
+        lis = "".join(f"<li>{esc(p)}</li>" for p in items)
+        extra = f"<p>Text addressed to an AI: {esc('; '.join(seen))}</p>" if seen else ""
+        problems.append(f"<details><summary>{esc(name)}: {len(items)}</summary><ul>{lis}</ul>{extra}</details>")
+    sections.append(("Problems the readers raised", "".join(problems)))
+    return title, sections
+
+
+def fallback_page(title: str, headings: list[str]) -> str:
+    """A plain page when project-lifecycle is not installed."""
+    import html
+
+    slug = lambda h: re.sub(r"[^a-z0-9]+", "-", h.lower()).strip("-")
+    toc = "".join(f'<li><a href="#{slug(h)}">{html.escape(h)}</a></li>' for h in headings)
+    secs = "".join(f'<section id="{slug(h)}">\n<h2>{html.escape(h)}</h2>\n<p></p>\n</section>\n' for h in headings)
+    return ("<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" "
+            "content=\"width=device-width,initial-scale=1\"><title>" + html.escape(title) + "</title><style>"
+            ":root{color-scheme:light dark}body{font:16px/1.5 system-ui,sans-serif;max-width:72rem;margin:2rem auto;padding:0 1rem}"
+            "pre{white-space:pre-wrap;font-size:.8rem}img{max-width:100%;border:1px solid #8884}"
+            "mark{background:#fd04;color:inherit}table{border-collapse:collapse}td,th{border:1px solid #8884;padding:.3rem;vertical-align:top}"
+            ".ws-compare{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}"
+            "@media(max-width:44rem){.ws-compare{grid-template-columns:1fr}}.ws-stats{display:flex;gap:1rem;flex-wrap:wrap}"
+            ".ws-stat{display:flex;flex-direction:column;border:1px solid #8884;padding:.5rem}.ws-stat__value{font-size:1.5rem}"
+            ".ws-card,.ws-callout{border:1px solid #8884;padding:.5rem 1rem;margin:1rem 0}"
+            "</style></head><body><h1>" + html.escape(title) + "</h1><nav><ul>" + toc + "</ul></nav><main>"
+            + secs + "</main></body></html>")
+
+
+def git_unignored(path: Path) -> str | None:
+    """The repo root when `path` sits inside a git repo and git does not ignore it."""
+    import subprocess
+
+    parent = path.resolve().parent
+    parent.mkdir(parents=True, exist_ok=True)
+    top = subprocess.run(["git", "-C", str(parent), "rev-parse", "--show-toplevel"],
+                         capture_output=True, text=True)
+    if top.returncode != 0:
+        return None
+    ignored = subprocess.run(["git", "-C", str(parent), "check-ignore", "-q", str(path.resolve())])
+    return None if ignored.returncode == 0 else top.stdout.strip()
+
+
+def cmd_page(args) -> int:
+    import shutil
+    import subprocess
+
+    run, out = Path(args.run), Path(args.out)
+    if not (run / "extract.json").exists():
+        print(f"read-cv-pdf: {run}/extract.json missing; run extract first", file=sys.stderr)
+        return 2
+    if not (run / "compare.json").exists():
+        print(f"read-cv-pdf: {run}/compare.json missing; run compare first (the page shows its result)",
+              file=sys.stderr)
+        return 2
+    repo = git_unignored(out)
+    if repo:
+        print(f"read-cv-pdf: {out} is inside the git repo {repo} and not ignored. The page carries the "
+              "CV's contact details: write it to a folder that repo ignores, or ask before adding one "
+              "to its .gitignore.", file=sys.stderr)
+        return 2
+    title, sections = page_sections(run)
+    heading = f"How agents read {title}"
+    headings = [h for h, _ in sections]
+    if shutil.which("project-lifecycle"):
+        cmd = ["project-lifecycle", "page-new", "--title", "Agent views of a CV", "--inline",
+               "--description", heading, "--out", str(out)]
+        for h in headings:
+            cmd += ["--section", h]
+        if args.session:
+            cmd += ["--session", args.session]
+        if out.exists():
+            out.unlink()
+        made = subprocess.run(cmd, capture_output=True, text=True)
+        if made.returncode != 0:
+            print(f"read-cv-pdf: page-new failed: {made.stderr.strip()}", file=sys.stderr)
+            return 2
+        page = out.read_text(encoding="utf-8")
+    else:
+        page = fallback_page(heading, headings)
+    for h, body in sections:
+        page, n = re.subn(rf"(<h2>{re.escape(h)}</h2>\s*)<p></p>", lambda m: m.group(1) + body, page, count=1)
+        if not n:
+            print(f"read-cv-pdf: no empty section {h!r} to fill in the page skeleton", file=sys.stderr)
+            return 2
+    out.write_text(page, encoding="utf-8")
+    print(out.resolve())
+    return 0
+
+
+# --------------------------------------------------------------------------
 # output
 
 
@@ -518,6 +775,8 @@ def cmd_extract(args) -> int:
     summary = {"pdf": str(pdf.resolve()), "pages": data["pages"], "meta": data["meta"],
                "links": data["links"], "hidden": data["hidden"][:20],
                "texts": {n: str((out / f"{n}.txt").resolve()) for n in data["texts"]},
+               "page_texts": data["page_texts"],
+               "page_images": render_pages(pdf, out / "pages"),
                "results": [asdict(r) for r in report.results], "failed": report.failed}
     (out / "extract.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     if args.json:
@@ -540,6 +799,9 @@ def cmd_compare(args) -> int:
             print(f"read-cv-pdf: {path} is not JSON ({exc})", file=sys.stderr)
             return 2
     result = compare(expected, reads)
+    result["reads"] = {name: str(Path(p).resolve()) for name, p in zip(reads, args.reads)}
+    saved = Path(args.expected).resolve().parent / "compare.json"
+    saved.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 1 if result["failed"] else 0
@@ -569,6 +831,11 @@ def main() -> int:
     c.add_argument("reads", nargs="+", help="one JSON per extractor, named <extractor>.json")
     c.add_argument("--json", action="store_true")
     c.set_defaults(func=cmd_compare)
+    g = sub.add_parser("page", help="write the HTML page of what each agent saw")
+    g.add_argument("--run", required=True, help="the folder extract and compare wrote to")
+    g.add_argument("--out", required=True, help="the .html to write; refused inside a repo unless git ignores it")
+    g.add_argument("--session", help="session id, for the page's provenance stamp")
+    g.set_defaults(func=cmd_page)
     args = parser.parse_args()
     return args.func(args)
 

@@ -100,6 +100,27 @@ To the user, in the reply:
 A known and accepted warning (the repo's docs say so) is named as accepted, not re-raised.
 Never edit the CV from here: the report is the deliverable, and a CV is the user's own words.
 
+## 7. The page: what each agent saw
+
+When the user asks for a page, or the run found something wrong, write the HTML page:
+
+    "$S/scripts/read-cv-pdf.py" page --run "$W" --out <FILE>.html --session <this session's id>
+
+It reads `extract.json` and the `compare.json` step 5 saved, and shows, in order: the counts
+and the stand-in caveat; the issues found; one card per reader with only the fields it got
+wrong; the recruiter summaries, open where a reader got a field wrong; then each page as
+rendered beside pypdf's text with the check findings marked, the other two extractors below
+it; and the problems the readers raised. Images are embedded, so the file stands alone.
+Without `project-lifecycle` it writes a plain page with the same sections.
+
+**Where it goes.** The page carries the CV's contact details. Inside a repo it goes in a
+folder that repo's `.gitignore` already ignores (`git check-ignore -q <path>` exits 0); if
+there is none, ask the user before adding one. Outside a repo, beside the PDF. The script
+refuses an `--out` inside a repo that git does not ignore. Never publish it.
+
+Then `project-lifecycle page-check <FILE>.html --shots <dir>`, fix what it finds, look at the
+desktop shot, and open the page for the user with `open-app-for-user` or the browser.
+
 ## Lessons
 
 | Date | What happened | What now prevents it |
@@ -107,3 +128,4 @@ Never edit the CV from here: the report is the deliverable, and a CV is the user
 | 2026-11-24 | First run: the link check flagged 45 of 48 links as unreadable, all inline company and repo links. | Only account roots (`github.com/<user>`, `linkedin.com/in/<user>`) count as profile links. |
 | 2026-11-24 | Readers replied with their JSON, which had to be copied into files by hand. | The brief has each reader write `{READ_FILE}` itself. |
 | 2026-11-24 | The brief said `title` is "the job title alone", so every reader dropped Intern and Freelance with nowhere to put them. | Readers fill `employment_type`; a qualifier is flagged only when lost from both. |
+| 2026-11-24 | The first page render cut the issues table off at the right edge, and the text column ran far past its page image. | Tables carry `ws-table--wrap`; page text sits in a box capped near the image's height. |
