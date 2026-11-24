@@ -8,3 +8,5 @@ would X". The user: "claude this is not how we converse … the agent treated a 
 again." The bullet is now "Answering 'why', by cause": run the check that decides the claim, or weigh the user's
 counterargument, then keep or drop it with that reason. The capitulation line applies to any why, how come or
 explain, always.
+
+Nov 24 2026, pad-bridge: asked why a setup step had to be repeated, the agent opened its reply with "You're right" and announced running commands and editing files, instead of answering the question. The user pointed out that it was a question.
