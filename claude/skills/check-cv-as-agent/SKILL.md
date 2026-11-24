@@ -31,7 +31,11 @@ newer than the PDF.
 ## 2. Extract and check
 
     W=$(mktemp -d)/cv-as-agent
-    "$S/scripts/read-cv-pdf.py" extract <PDF> --out "$W"
+    "$S/scripts/read-cv-pdf.py" extract <PDF> --out "$W" [--source <the CV's source folder>]
+
+With `--source` (the data files, a `.docx`, the Markdown it is built from) it refuses a PDF
+older than any source file: rebuild it through the repo's own step first, writing the new
+PDF where the repo keeps generated copies rather than over a committed one.
 
 It writes `$W/<extractor>.txt` for pdfminer.six, pypdf and pymupdf, and prints each check
 with PASS, WARN, FAIL or INFO. uv installs the three libraries on first run; nothing else is
@@ -59,8 +63,9 @@ Four readers, all in one message, each given `references/blind-read-brief.md` ve
 with `{TEXT_FILE}`, `{EXTRACTOR}` and `{READ_FILE}` (`$W/reads/<reader>.json`) filled in:
 
 - **One per extractor's text.** pypdf matters most: it is the default PDF reader behind
-  LlamaIndex's `SimpleDirectoryReader` and LangChain's `PyPDFLoader`, so a company that
-  feeds uploads to an agent through a framework most likely hands it pypdf's string.
+  LlamaIndex's `SimpleDirectoryReader` (LangChain's `PyPDFLoader` is named for it; not
+  verified), so a company that feeds uploads to an agent through a framework most likely
+  hands it pypdf's string.
 - **native**: the PDF itself, opened with the reader's own Read tool, as an agent is when
   the upload is dumped on it directly. Model APIs given a PDF send the extracted text and an
   image of each page (Claude's do), so this reader can see what the text alone loses.
@@ -96,7 +101,9 @@ To the user, in the reply:
 3. The recruiter summaries, quoted, when they misstate the candidate (wrong seniority,
    wrong current employer, wrong school, wrong dates or years of experience). Check every
    summary against the expected record sentence by sentence: a summary can misstate what
-   its own reader parsed correctly, and `compare` does not score summaries.
+   its own reader parsed correctly, and `compare` does not score summaries. Write each
+   misstatement to `$W/summary-notes.json` as `{"<reader>": ["what it says, and what the CV
+   says"]}`: the page marks them and lists them with the issues.
 4. WARNs from step 2 that no reader tripped over, in one line each: real but unproven.
 
 A known and accepted warning (the repo's docs say so) is named as accepted, not re-raised.
@@ -109,8 +116,10 @@ When the user asks for a page, or the run found something wrong, write the HTML 
     "$S/scripts/read-cv-pdf.py" page --run "$W" --out <FILE>.html --session <this session's id>
 
 It reads `extract.json` and the `compare.json` step 5 saved, and shows, in order: the counts
-and the stand-in caveat; the issues found; one card per reader with only the fields it got
-wrong; every recruiter summary in full; then each page as
+and the stand-in caveat; every issue (text checks, fields no reader found, fields grouped
+with how many readers got them wrong, the summary notes); one card per reader with its
+wrong fields and the whole record it parsed; every recruiter summary, marked where it
+misstates; then each page as
 rendered beside pypdf's text with the check findings marked, the other two extractors below
 it; and the problems the readers raised. Images are embedded, so the file stands alone.
 Without `project-lifecycle` it writes a plain page with the same sections.
@@ -133,3 +142,4 @@ desktop shot, and open the page for the user with `open-app-for-user` or the bro
 | 2026-11-24 | The first page render cut the issues table off at the right edge, and the text column ran far past its page image. | Tables carry `ws-table--wrap`; page text sits in a box capped near the image's height. |
 | 2026-11-24 | A second CV scored 15/15 in every reader, yet one summary gave a B.A. to the wrong university and another moved an end date by a year; the page hid both, opening summaries only where a field was wrong. | Every summary is shown and checked against the record; education is matched as degree plus institution. |
 | 2026-11-24 | Small-caps employers extract as `NIŞANTAŞI`, which lowercases to a dotted i and would not have matched `Nişantaşı`. | `norm` folds accents and dotless ı before comparing. |
+| 2026-11-24 | A Fable review of both runs: the CV run had checked a v3.8 PDF against v3.9 data; an empty SKILLS heading, lost superscripts and an author of "Jane" all passed; a company stored with its department and city passed by substring; the page showed no reader's parsed record. | `extract --source` refuses a stale PDF; checks for empty headings, stray ordinals and an author unlike the name; company must match exactly (else WARN); headline, location, education dates and years scored when expected; fields every reader left empty become notes; cards show each parsed record. |

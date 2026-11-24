@@ -161,6 +161,7 @@ PHONE = re.compile(r"\+?\d[\d ()./-]{7,}\d")
 PROFILE_HOSTS = re.compile(r"(?:[\w-]+\.)?(?:linkedin\.com/in/[^/]+|(?:github\.com|gitlab\.com|"
                            r"behance\.net|dribbble\.com|x\.com|twitter\.com)/[^/]+|"
                            r"stackoverflow\.com/users/\d+(?:/[^/]+)?)$")
+STRAY_ORDINAL = re.compile(r"^\s*(?:st|nd|rd|th)(?:\s+(?:st|nd|rd|th))*\s*$", re.M)
 LIGATURES = re.compile("[ﬀ-ﬆ]")
 INJECTION = re.compile(
     r"ignore (?:all |any )?(?:previous|prior|above) instructions|system prompt|"
@@ -354,7 +355,33 @@ def run_checks(data: dict) -> Report:
     report.add("standard section headings", WARN if core_missing else PASS,
                f"found: {', '.join(sorted(present)) or 'none'}"
                + (f"; not found: {', '.join(core_missing)}" if core_missing else ""),
-               "a creative heading ('What I've Built') is a section the parser cannot scope")
+               "no " + " or ".join(core_missing) + " heading: a parser fills that field from "
+               "nothing, so a recruiter's search over it never finds this CV; if the section "
+               "exists under another name, use the standard one" if core_missing else "")
+
+    # A heading with nothing under it: the next non-blank line is another
+    # heading, or the text ends. The content was emitted somewhere else.
+    names = {n for group in STANDARD_HEADINGS.values() for n in group}
+    empty_heads = {}
+    for n, t in texts.items():
+        lines = [re.sub(r"\s+", " ", re.sub(r"[^\w& ]", "", ln)).strip().lower()
+                 for ln in t.splitlines() if ln.strip()]
+        lines = [ln for ln in lines if ln]
+        for i, ln in enumerate(lines):
+            if ln in names and (i + 1 == len(lines) or lines[i + 1] in names):
+                empty_heads.setdefault(n, []).append(ln.upper())
+    report.add("every heading has content under it", WARN if empty_heads else PASS,
+               "; ".join(f"{n}: {', '.join(v)}" for n, v in empty_heads.items())
+               if empty_heads else "none empty",
+               "the section's content comes out elsewhere in reading order (side-by-side or "
+               "floated blocks), so a parser files it under the wrong heading or none")
+
+    ordinals = {n: len(STRAY_ORDINAL.findall(t)) for n, t in texts.items()}
+    ordinals = {n: c for n, c in ordinals.items() if c}
+    report.add("ordinals stay attached", WARN if ordinals else PASS,
+               "; ".join(f"{n}: {c} stray st/nd/rd/th lines" for n, c in ordinals.items())
+               if ordinals else "none stray",
+               "superscript ordinals extract as separate runs: '1st' reads as '1' and a lone 'st'")
 
     if data["hidden"]:
         sample = data["hidden"][0]
@@ -373,10 +400,18 @@ def run_checks(data: dict) -> Report:
 
     meta = data["meta"]
     empty = [k for k in ("title", "author") if not meta.get(k)]
-    report.add("PDF metadata set", INFO if empty else PASS,
-               f"empty: {', '.join(empty)}" if empty
-               else f"title {meta['title']!r}, author {meta['author']!r}",
-               "browser exports leave Author empty; some parsers read the name from it")
+    # The name is usually the first line of the text; an author that shares no
+    # word with it is someone else's (a template's, an editor's account).
+    first = next((ln for ln in texts["pymupdf"].splitlines() if ln.strip()), "")
+    author = meta.get("author") or ""
+    stranger = author and not (set(norm(author).split()) & set(norm(first).split()))
+    report.add("PDF metadata names the candidate", WARN if stranger else INFO if empty else PASS,
+               f"author {author!r} does not match the first line {first.strip()[:40]!r}" if stranger
+               else f"empty: {', '.join(empty)}" if empty
+               else f"title {meta['title']!r}, author {author!r}",
+               "some parsers read the candidate's name from Author; a stranger's name there "
+               "can land in the name field" if stranger
+               else "browser exports leave Author empty; some parsers read the name from it")
 
     layout, naive = texts["pdfminer.six"], texts["pypdf"]
     layout_tokens = set(re.findall(r"[a-z]{4,}", layout.lower()))
@@ -466,6 +501,11 @@ def compare(expected: dict, reads: dict[str, dict]) -> dict:
                 match = by_title
             got_roles.remove(match)
             wrong = False
+            if norm(match.get("company")) != norm(role.get("company")):
+                # Matched by containment: the field also holds a department, a
+                # city or a country, and that is what a parser stores as employer.
+                row(reader, f"{label} company", role.get("company"), match.get("company"), WARN)
+                wrong = True
             if role.get("title"):
                 if not same(match.get("title"), role.get("title")):
                     row(reader, f"{label} title", role.get("title"), match.get("title"), FAIL)
@@ -506,6 +546,22 @@ def compare(expected: dict, reads: dict[str, dict]) -> dict:
             row(reader, label, f"{edu.get('degree')} at {edu.get('institution')}",
                 f"{match.get('degree')} at {match.get('institution')}" if match else None,
                 PASS if ok else FAIL)
+            for d in ("start", "end"):
+                if ok and edu.get(d) and norm_date(match.get(d)) != norm_date(edu.get(d)):
+                    row(reader, f"{label} {d}", edu.get(d), match.get(d), FAIL)
+
+        for key in ("location", "headline"):
+            if expected.get(key):
+                hit = same(got.get(key), expected[key])
+                row(reader, key, expected[key], got.get(key), PASS if hit else WARN)
+
+        if expected.get("years_of_experience"):
+            try:
+                off = abs(float(got.get("years_of_experience") or 0) - float(expected["years_of_experience"]))
+            except (TypeError, ValueError):
+                off = 99
+            row(reader, "years of experience", expected["years_of_experience"],
+                got.get("years_of_experience"), PASS if off <= 1 else WARN)
 
         want_skills = [norm(s) for s in expected.get("skills") or []]
         if want_skills:
@@ -520,7 +576,15 @@ def compare(expected: dict, reads: dict[str, dict]) -> dict:
         by_field.setdefault(r["field"], set()).add((r["reader"], r["status"]))
     split = sorted(f for f, s in by_field.items()
                    if len({st for _, st in s}) > 1 and len({rd for rd, _ in s}) > 1)
-    return {"rows": rows, "extractor_dependent": split,
+
+    # Facts about the CV rather than about one reader: a field every reader
+    # left empty is one the CV never gives them.
+    notes = []
+    for key, what in (("location", "a candidate location"), ("skills", "any skills"),
+                      ("headline", "a headline")):
+        if reads and all(not (r or {}).get(key) for r in reads.values()):
+            notes.append(f"No reader found {what}: every {key} field came back empty.")
+    return {"rows": rows, "extractor_dependent": split, "notes": notes,
             "failed": any(r["status"] == FAIL for r in rows)}
 
 
@@ -607,37 +671,80 @@ def page_sections(run: Path) -> tuple[str, list[tuple[str, str]]]:
         "Greenhouse and the like) are closed and cannot be run here. Each view is what an agent "
         "fed by that reader sees, not what a named vendor sees.</p></div>")))
 
-    issues = [r for r in results if r["status"] in (FAIL, WARN)]
-    body = "<p>No text check failed or warned.</p>"
-    if issues:
-        body = ("<table class=\"ws-table--wrap\"><thead><tr><th>Check</th><th>Status</th><th>Found, and why it matters</th>"
-                "</tr></thead><tbody>" + "".join(
-                    f"<tr><td>{esc(r['check'])}</td><td>{r['status']}</td><td>{esc(r['detail'])}"
-                    f"<br><small>{esc(r['why'])}</small></td></tr>" for r in issues) + "</tbody></table>")
+    # Errors in the recruiter summaries, written by the agent in step 6: the
+    # summaries are free text, so no script can score them.
+    notes_path = run / "summary-notes.json"
+    summary_notes = json.loads(notes_path.read_text(encoding="utf-8")) if notes_path.exists() else {}
+
+    issue_rows = [(r["check"], r["status"], r["detail"], r["why"])
+                  for r in results if r["status"] in (FAIL, WARN)]
+    issue_rows += [("all readers", WARN, note, "every reader came back empty, so this is "
+                    "the CV, not the extractor") for note in cmp.get("notes", [])]
+    grouped: dict[str, list[dict]] = {}
+    for r in rows:
+        if r["status"] != PASS:
+            grouped.setdefault(r["field"], []).append(r)
+    for fld, hits in grouped.items():
+        status = FAIL if any(h["status"] == FAIL for h in hits) else WARN
+        issue_rows.append((fld, status, f"{len(hits)} of {len(order)} readers: expected "
+                           f"{hits[0]['expected']!r}, got {hits[0]['got']!r}",
+                           "the extractor's text is the cause" if len(hits) < len(order)
+                           else "every reader, so the layout or wording is the cause"))
+    for name, items in summary_notes.items():
+        for note in items:
+            issue_rows.append((f"{name} recruiter summary", WARN, note,
+                               "the summary is what a recruiter reads instead of the CV"))
+    body = "<p>Nothing failed or warned.</p>"
+    if issue_rows:
+        issue_rows.sort(key=lambda x: x[1] != FAIL)
+        body = ("<table class=\"ws-table--wrap\"><thead><tr><th>Where</th><th>Status</th>"
+                "<th>Found, and why it matters</th></tr></thead><tbody>" + "".join(
+                    f"<tr><td>{esc(a)}</td><td>{s}</td><td>{esc(str(d))}<br><small>{esc(w)}</small></td></tr>"
+                    for a, s, d, w in issue_rows) + "</tbody></table>")
     sections.append(("Issues found", body))
+
+    def record_html(rec: dict) -> str:
+        top = "".join(f"<li><strong>{k}</strong>: {esc(str(rec.get(k) or '(empty)'))}</li>"
+                      for k in ("name", "headline", "location", "years_of_experience"))
+        roles = "".join(f"<tr><td>{esc(str(r.get('title') or ''))}"
+                        f"{' (' + esc(r['employment_type']) + ')' if r.get('employment_type') else ''}</td>"
+                        f"<td>{esc(str(r.get('company') or ''))}</td>"
+                        f"<td>{esc(str(r.get('start') or ''))} – {esc(str(r.get('end') or ''))}</td></tr>"
+                        for r in rec.get("roles") or [])
+        edu = "".join(f"<li>{esc(str(e.get('degree') or ''))}, {esc(str(e.get('institution') or ''))} "
+                      f"({esc(str(e.get('start') or ''))} – {esc(str(e.get('end') or ''))})</li>"
+                      for e in rec.get("education") or [])
+        skills = rec.get("skills") or []
+        return (f"<ul>{top}</ul><table class=\"ws-table--wrap\"><thead><tr><th>Title</th><th>Employer"
+                f"</th><th>Dates</th></tr></thead><tbody>{roles}</tbody></table><ul>{edu}</ul>"
+                f"<p><strong>skills</strong>: {len(skills)}"
+                f"{': ' + esc(', '.join(map(str, skills[:30]))) + (' …' if len(skills) > 30 else '') if skills else ''}</p>")
 
     cards = []
     for name in order:
         wrong = [r for r in rows if r["reader"] == name and r["status"] != PASS]
+        right = sum(r["reader"] == name and r["status"] == PASS for r in rows)
         if reads.get(name) is None:
             inner = "<p>No valid read was recorded.</p>"
-        elif not wrong:
-            inner = "<p>Every scored field right.</p>"
         else:
-            inner = ("<table class=\"ws-table--wrap\"><thead><tr><th>Field</th><th>Expected</th><th>Got</th></tr></thead><tbody>"
-                     + "".join(f"<tr><td>{esc(r['field'])}</td><td>{esc(str(r['expected']))}</td>"
-                               f"<td>{esc(str(r['got']))}</td></tr>" for r in wrong) + "</tbody></table>")
+            inner = (f"<p>{right} scored fields right, {len(wrong)} wrong or partial.</p>" + (
+                "<table class=\"ws-table--wrap\"><thead><tr><th>Field</th><th>Expected</th><th>Got</th>"
+                "</tr></thead><tbody>" + "".join(
+                    f"<tr><td>{esc(r['field'])}</td><td>{esc(str(r['expected']))}</td>"
+                    f"<td>{esc(str(r['got']))}</td></tr>" for r in wrong) + "</tbody></table>" if wrong else "")
+                + f"<details><summary>What it understood</summary>{record_html(reads[name])}</details>")
         cards.append(f'<div class="ws-card"><h3>{esc(name)}</h3>'
                      f'<p class="ws-card__desc">Input: {esc(READER_INPUT.get(name, "unknown"))}</p>{inner}</div>')
-    sections.append(("What each reader got wrong", "".join(cards) or "<p>No reads were compared.</p>"))
+    sections.append(("What each reader understood", "".join(cards) or "<p>No reads were compared.</p>"))
 
     quotes = []
     for name in order:
         rec = reads.get(name) or {}
-        failed = any(r["reader"] == name and r["status"] == FAIL for r in rows)
-        quotes.append(f"<h3>{esc(name)}{' (has wrong fields)' if failed else ''}: "
+        notes = summary_notes.get(name) or []
+        flag = "".join(f'<div class="ws-callout ws-callout--warn"><p>{esc(n)}</p></div>' for n in notes)
+        quotes.append(f"<h3>{esc(name)}{' (misstates the CV)' if notes else ''}: "
                       f"{rec.get('years_of_experience', '?')} years of experience</h3>"
-                      f"<blockquote><p>{esc(rec.get('recruiter_summary') or '')}</p></blockquote>")
+                      f"<blockquote><p>{esc(rec.get('recruiter_summary') or '')}</p></blockquote>{flag}")
     sections.append(("Recruiter summaries", (
         "<p>What each reader would show a recruiter instead of the CV. A summary can misstate "
         "facts its reader parsed correctly, so read each against the CV: the scores above do "
@@ -778,6 +885,19 @@ def cmd_extract(args) -> int:
     if not pdf.is_file():
         print(f"read-cv-pdf: no such file {pdf}", file=sys.stderr)
         return 2
+    if args.source and not args.allow_stale:
+        src = Path(args.source)
+        # Hidden files (.DS_Store) change when a folder is opened, not when the CV does.
+        files = [src] if src.is_file() else [
+            p for p in src.rglob("*")
+            if p.is_file() and not any(part.startswith(".") for part in p.relative_to(src).parts)]
+        newer = sorted((p for p in files if p.stat().st_mtime > pdf.stat().st_mtime),
+                       key=lambda p: -p.stat().st_mtime)
+        if newer:
+            print(f"read-cv-pdf: {pdf.name} is older than its source ({newer[0]} and "
+                  f"{len(newer) - 1} more changed since). Rebuild the PDF first, or pass "
+                  "--allow-stale to check the old one on purpose.", file=sys.stderr)
+            return 2
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     data = extract(pdf)
@@ -824,6 +944,8 @@ def cmd_compare(args) -> int:
         print(f"  {rd}: {total[rd] - wrong}/{total[rd]} fields right")
     for r in bad:
         print(f"  {r['status']:<4}  {r['reader']:<14} {r['field']}: expected {r['expected']!r}, got {r['got']!r}")
+    for note in result.get("notes", []):
+        print(f"  NOTE  {note}")
     if result["extractor_dependent"]:
         print(f"\nright in one reader, wrong in another: {', '.join(result['extractor_dependent'])}")
         print("  the difference is the extractor's text, not the reader: look at those .txt files")
@@ -837,6 +959,8 @@ def main() -> int:
     p.add_argument("pdf")
     p.add_argument("--out", required=True, help="folder for <extractor>.txt and extract.json")
     p.add_argument("--json", action="store_true")
+    p.add_argument("--source", help="file or folder the PDF is built from; refuse if any of it is newer")
+    p.add_argument("--allow-stale", action="store_true", help="check a PDF older than --source anyway")
     p.set_defaults(func=cmd_extract)
     c = sub.add_parser("compare", help="diff blind reads against the expected record")
     c.add_argument("--expected", required=True)
