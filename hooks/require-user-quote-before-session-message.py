@@ -145,7 +145,14 @@ def main():
     if data.get("agent_id"):
         refuse("a sub-agent does not message other sessions; hand back to `main`.")
     if not path or not os.path.isfile(path):
-        refuse("the hook cannot read this session's transcript (%r)." % path)
+        refuse("the hook cannot read this session's transcript (%r): no file exists there.\n"
+               "Claude Code saves no transcript for a session it takes for another session's child, which\n"
+               "it does when the session starts with CLAUDE_CODE_CHILD_SESSION=1 inherited, as from a terminal\n"
+               "an agent reopened with a plain `open` (the startup banner then says \"Transcript saving is\n"
+               "off\"). Without the transcript this hook can tell neither the user's words nor this session's\n"
+               "own sub-agents, so every send from this session is refused. Tell the user the message could\n"
+               "not be sent and why; a session started with clo from a fresh terminal saves its transcript."
+               % path)
 
     try:
         rows = list(items(path, want={"user", "agents"}))

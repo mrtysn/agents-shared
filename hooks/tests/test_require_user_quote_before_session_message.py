@@ -188,16 +188,21 @@ def main():
     # An unreadable transcript fails closed.
     payload = json.dumps({"tool_name": "SendMessage", "transcript_path": "/nonexistent.jsonl",
                           "tool_input": {"to": "x", "summary": 'User said "abcdefgh"'}})
-    if subprocess.run([sys.executable, "-I", HOOK], input=payload, text=True, capture_output=True).returncode != 2:
+    missing = subprocess.run([sys.executable, "-I", HOOK], input=payload, text=True, capture_output=True)
+    if missing.returncode != 2:
         failed += 1
         print("FAIL  unreadable transcript must be refused")
+    # ...and its refusal names the likely cause, transcript saving turned off by an inherited marker.
+    if "CLAUDE_CODE_CHILD_SESSION" not in missing.stderr:
+        failed += 1
+        print("FAIL  missing-transcript refusal does not name the cause: %r" % missing.stderr)
     # A stale quote's refusal says to mark it (standing), and does not tell the agent to ask the user.
     stale = [user(ANSWER), send("r1", "peer-a"), result("r1", "ok"), user("carry on")]
     err = run_err(stale, SOCK, QUOTE)
     if '(standing) "you can answer"' not in err or "AskUserQuestion" in err:
         failed += 1
         print("FAIL  stale-quote refusal text: %r" % err)
-    print("\n%d cases, %d failed" % (len(CASES) + 2, failed))
+    print("\n%d cases, %d failed" % (len(CASES) + 3, failed))
     sys.exit(1 if failed else 0)
 
 
