@@ -10,6 +10,10 @@ HOOK="$HERE/../subagent-guard.sh"
 CFG=$(mktemp -d)
 SID="subagent-guard-test-$$"
 trap 'rm -rf "$CFG"; rm -f "/tmp/claude-spawn-count-$SID" "/tmp/claude-spawn-asked-$SID"' EXIT
+# The machine's own budget file never reaches the cases: they read an empty config folder.
+export XDG_CONFIG_HOME="$CFG/xdg"
+LOCAL="$XDG_CONFIG_HOME/agents-shared"
+mkdir -p "$LOCAL"
 
 total=0 fail=0
 # check WANT TRANSCRIPT: one spawn, its verdict (pass = no output) against the expected one
@@ -45,6 +49,29 @@ unset CLAUDE_SUBAGENT_GUARD_BYPASS
 # unset again, a fresh session asks past its budget
 rm -f "/tmp/claude-spawn-count-$SID" "/tmp/claude-spawn-asked-$SID"
 for _ in 1 2 3 4 5 6 7 8; do check pass /p/x.jsonl; done
+check ask /p/x.jsonl
+
+fresh() { rm -f "/tmp/claude-spawn-count-$SID" "/tmp/claude-spawn-asked-$SID"; }
+printf 'acct %s\n' "$CFG" > "$LOCAL/claude-accounts"
+# a * line sets the budget for every account
+fresh; printf '* 3\n' > "$LOCAL/subagent-spawn-budget"
+for _ in 1 2 3; do check pass /p/x.jsonl; done
+check ask /p/x.jsonl
+# the account's own line wins over *
+fresh; printf '* 3\nacct 5\n' > "$LOCAL/subagent-spawn-budget"
+for _ in 1 2 3 4 5; do check pass /p/x.jsonl; done
+check ask /p/x.jsonl
+# unlimited never asks; nesting is still refused
+fresh; printf '* 3\nacct unlimited\n' > "$LOCAL/subagent-spawn-budget"
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do check pass /p/x.jsonl; done
+check deny /p/x/subagents/agent-1.jsonl
+# another account's line does not apply
+fresh; printf 'other unlimited\n' > "$LOCAL/subagent-spawn-budget"
+for _ in 1 2 3 4 5 6 7 8; do check pass /p/x.jsonl; done
+check ask /p/x.jsonl
+# a bad line asks on every spawn instead of falling back
+fresh; printf '* lots\n' > "$LOCAL/subagent-spawn-budget"
+check ask /p/x.jsonl
 check ask /p/x.jsonl
 
 echo "$((total - fail))/$total passed"

@@ -89,6 +89,12 @@
       ]
     },
     {
+      "name": "subagent-spawn-budget tests",
+      "run": [
+        "scripts/tests/test-subagent-spawn-budget.zsh"
+      ]
+    },
+    {
       "name": "personal split",
       "run": [
         "scripts/check-personal-split.zsh"

@@ -1,0 +1,51 @@
+#!/bin/zsh
+# subagent-spawn-budget [CONFIG_DIR] — print the subagent spawn budget for the Claude account whose
+# config folder is CONFIG_DIR (default: ${CLAUDE_CONFIG_DIR:-~/.claude}): a number, or "unlimited".
+# Prints nothing when the override file is missing or has no line for that account, so the caller
+# keeps its default. hooks/subagent-guard.sh is the caller.
+#
+# Reads ${XDG_CONFIG_HOME:-~/.config}/agents-shared/subagent-spawn-budget (shape:
+# scripts/subagent-spawn-budget.example). The account name comes from the claude-accounts file
+# beside it, matched by config folder; a folder in no account line is covered by * alone.
+# Exit 0 either way; exit 2 on a bad line, with the file and line on stderr.
+emulate -L zsh
+
+dir="${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared"
+file="$dir/subagent-spawn-budget"
+accounts="$dir/claude-accounts"
+config="${1:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}}"
+config="${config:A}"
+[[ -r "$file" ]] || exit 0
+
+typeset account="" line name folder rest
+if [[ -r "$accounts" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%%\#*}"
+        read -r name folder rest <<< "$line" || true
+        [[ -n "$name" && -n "$folder" ]] || continue
+        folder="${folder/#\~/$HOME}"; folder="${folder/#\$HOME/$HOME}"
+        [[ "${folder:A}" == "$config" ]] && { account="$name"; break; }
+    done < "$accounts"
+fi
+
+typeset star="" own="" key value
+typeset -i n=0
+typeset -a fields
+while IFS= read -r line || [[ -n "$line" ]]; do
+    (( n++ ))
+    line="${line%%\#*}"
+    fields=(${=line})
+    (( ${#fields} )) || continue
+    key="${fields[1]}" value="${fields[2]:-}"
+    if (( ${#fields} != 2 )) || [[ "$value" != (<->|unlimited) ]]; then
+        print -u2 "subagent-spawn-budget: $file line $n needs an account name or *, then a whole number or unlimited: $line"
+        exit 2
+    fi
+    if [[ "$key" == "*" ]]; then star="$value"
+    elif [[ -n "$account" && "$key" == "$account" ]]; then own="$value"
+    fi
+done < "$file"
+
+value="${own:-$star}"
+[[ -n "$value" ]] && print -r -- "$value"
+exit 0

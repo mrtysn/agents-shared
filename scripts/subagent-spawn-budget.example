@@ -1,0 +1,12 @@
+# Local override of how many subagents a session spawns before hooks/subagent-guard.sh asks once
+# (then it allows the rest of that session). Copy to
+#     ${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/subagent-spawn-budget
+# and keep it there, untracked. Without this file, or a matching line: 8.
+#
+# One line per account: the account name from the claude-accounts file, or * for every
+# account, then a whole number or unlimited (never asks). An account's own line wins over *.
+# A spawn from inside a subagent is refused whatever the budget.
+#
+# account   budget
+*           20
+personal    unlimited
