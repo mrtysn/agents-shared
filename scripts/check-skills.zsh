@@ -1,5 +1,5 @@
 #!/bin/zsh
-# DESC: Offline structural check of claude/skills, rules and commands (frontmatter, links, installed symlinks)
+# DESC: Offline structural check of claude/skills, rules and commands (frontmatter, links, installed symlinks, hook links)
 set -euo pipefail
 setopt extendedglob
 
@@ -13,7 +13,7 @@ Hard failures (exit 1), printed as `!! <path>: <what>`:
   - non-kebab-case skill name, or frontmatter `name:` differing from the dir (own skills only)
   - frontmatter missing, unterminated, or without a non-empty description
   - claude/rules link `](x.md)` that does not resolve, or a [[wiki]] link
-  - skill, rule or command not linked into ~/.claude (honours $CLAUDE_CONFIG_DIR),
+  - skill, rule, command or hook script not linked into ~/.claude (honours $CLAUDE_CONFIG_DIR),
     or a link there into this checkout that dangles
   - claude/{rules,skills}/personal/ entries not linked when the config folder's
     profile is personal, linked when it is not, or sharing a name with a shared entry
@@ -129,6 +129,8 @@ check_links() {  # <kind> <entries...>
 check_links skills ${skill_dirs:#$ROOT/claude/skills/personal/*}
 check_links rules $ROOT/claude/rules/*.md(N)
 check_links commands $ROOT/claude/commands/*.md(N)
+# hooks: the executable top-level scripts init-global.sh links (settings.json names them by that link)
+check_links hooks $ROOT/hooks/*.(sh|py|zsh)(N.*)
 # personal/ entries: linked exactly when the profile is personal, never shadowing a shared name
 local p k l
 for p in $ROOT/claude/skills/personal/*(N/) $ROOT/claude/rules/personal/*.md(N); do
@@ -140,7 +142,7 @@ for p in $ROOT/claude/skills/personal/*(N/) $ROOT/claude/rules/personal/*.md(N);
     [[ $(readlink $CFG/$k/${p:t} 2>/dev/null) == $p ]] && fail $CFG/$k/${p:t} "linked, but the profile is ${PROFILE:-unset}"
   fi
 done
-for k in skills rules commands; do
+for k in skills rules commands hooks; do
   for l in $CFG/$k/*(N@); do
     [[ $(readlink $l) == $ROOT/* && ! -e $l ]] && fail $l "dangling link into this checkout"
   done

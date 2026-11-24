@@ -24,7 +24,7 @@ print -r -- '#!/usr/bin/env bash
 if [ "${1:-}" = conflict ]; then printf "<<<<<<< local\na\n=======\nb\n>>>>>>> upstream@1\n" > claude/skills/demo/SKILL.md
 else echo "upstream line" >> claude/skills/demo/SKILL.md; fi' > $r/scripts/sync-external-skills.sh
 print -r -- '#!/bin/zsh
-[[ -e ${0:A:h:h}/FAIL ]] && { print "!! claude/skills/demo: broken"; exit 1; }; exit 0' > $r/scripts/check-skills.zsh
+[[ -e ${0:A:h:h}/FAIL ]] && { print -r -- "-- claude/skills/other: a warning"; print "!! claude/skills/demo: broken"; print "checked 1 skills: 1 problems"; exit 1; }; exit 0' > $r/scripts/check-skills.zsh
 print 'base' > $r/claude/skills/demo/SKILL.md
 git -C $r add -A && git -C $r commit -q -m init
 precommit() { (cd $r && zsh scripts/pre-commit-check.zsh) > $work/out 2>&1 }
@@ -36,6 +36,11 @@ check "a clean skill change passes" precommit
 touch $r/FAIL
 check "check-skills problems refuse a skill change" eval '! precommit'
 check "the refusal shows the problem" grep -q '!! claude/skills/demo: broken' $work/out
+check "the refusal leaves out warnings" eval '! grep -q "^-- " $work/out'
+check "the refusal leaves out the summary" eval '! grep -q "^checked " $work/out'
+git -C $r reset -q && mkdir -p $r/hooks && print 'x' > $r/hooks/demo.sh && git -C $r add hooks
+check "check-skills problems refuse a hook change" eval '! precommit'
+git -C $r rm -q --cached hooks/demo.sh && rm -r $r/hooks && git -C $r add -A
 rm $r/FAIL
 printf '<<<<<<< local\nx\n=======\ny\n>>>>>>> upstream@1\n' > $r/claude/skills/demo/SKILL.md && git -C $r add -A
 check "staged conflict markers refuse the commit" eval '! precommit'

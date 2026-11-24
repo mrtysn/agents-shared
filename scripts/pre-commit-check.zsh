@@ -6,7 +6,7 @@
 # the gate before other machines pull them:
 #   - a staged text file holding both a `<<<<<<< ` and a `>>>>>>> ` line (an unresolved merge,
 #     such as a sync conflict) is refused;
-#   - a commit touching claude/, scripts/check-skills.zsh or claude/skill-groups.json runs
+#   - a commit touching claude/, hooks/, scripts/check-skills.zsh or claude/skill-groups.json runs
 #     scripts/check-skills.zsh, and its problems refuse the commit.
 # Bypass for one commit only when the user says so: git commit --no-verify.
 set -uo pipefail
@@ -28,10 +28,11 @@ if (( ${#conflicted} )); then
   exit 1
 fi
 
-if (( ${staged[(I)claude/*]} || ${staged[(I)scripts/check-skills.zsh]} )); then
+if (( ${staged[(I)claude/*]} || ${staged[(I)hooks/*]} || ${staged[(I)scripts/check-skills.zsh]} )); then
   if ! out=$(zsh $root/scripts/check-skills.zsh 2>&1); then
-    print -u2 -r -- "$out" | grep -E '^!!' >&2
-    print -u2 "pre-commit: scripts/check-skills.zsh found problems (above); fix them, or run scripts/init-global.sh if a skill is not linked yet."
+    # Only the !! problem lines: warnings and the summary do not refuse a commit.
+    print -r -- "$out" | grep -E '^!!' >&2
+    print -u2 "pre-commit: scripts/check-skills.zsh found problems (above); fix them, or run scripts/init-global.sh if a skill or hook is not linked yet."
     exit 1
   fi
 fi
