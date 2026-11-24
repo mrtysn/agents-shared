@@ -130,4 +130,5 @@ Fan out subagents and ultracode.
 - **The builder judging its own work.** The critic must be a separate agent with fresh context. It should not know how hard the builder tried.
 - **A soft critic.** Say "harsh" in the prompt and give it a binary job: which one is better, A or B. Scores out of 10 drift upward every round.
 - **Named exit after N rounds.** The exit is winning the comparison, or the user stopping the run. Never a round count.
+- **A bar shaped unlike the subject.** When the subject is many parts (a row of blocks, a crowd, a grid) and the bar is one thing, the critic rewards whatever looks most like one thing, and the builder collapses the subject into one to win. Compare one part with the bar, and have a second critic check the whole against the subject's own structure.
 - **Over-specifying.** Every extra instruction is one fewer decision the agent makes with its own judgment. Minimal wins.
