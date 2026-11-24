@@ -38,7 +38,7 @@ external-drive-mount-points	Bash	command	(^|[;&|(`])[[:space:]]*(ls|diskutil|df)
 drive-mac-ui-through-agent-ui-clicker	Bash	command	osascript.*System Events|(^|[;&|(`])[[:space:]]*(cliclick|screencapture)[[:space:]]	agent-ui-clicker	note-once
 sign-a-script-app-for-permission-grants	Bash	command	(^|[;&|(`])[[:space:]]*osacompile[[:space:]]|codesign[^;&|]*[[:space:]]-s[[:space:]]+-([[:space:]]|$)	-	note-once
 sign-a-script-app-for-permission-grants	Bash	command	x-apple\.systempreferences:[^ "']*Privacy_	-	note-once
-sign-a-script-app-for-permission-grants	Bash	command	Library/(Safari|Messages|Mail)([/ '"]|$)|com\.apple\.TCC	-	note-once
+sign-a-script-app-for-permission-grants	Bash	command	Library/(Safari|Messages|Mail|Accounts|Calendars|Reminders|Cookies|HomeKit|Group Containers|Containers/[^/ ]+)([/ '"]|$)|Application Support/(Google/Chrome|Firefox|BraveSoftware|AddressBook|CallHistoryDB)|\.photoslibrary|chat\.db|com\.apple\.TCC	-	deny-once
 interface-behaviour	Write|Edit	file_path	\.(css|scss|tsx|vue|swift|tscn|xib|gd|html)$	-	note-once
 interface-behaviour	Bash	command	\.(css|scss|tsx|vue|swift|tscn|xib|gd|html)([^A-Za-z0-9]|$)	-	note-once
 tools-that-change-the-owners-data	Bash	command	project-lifecycle[[:space:]].*init	-	note-once

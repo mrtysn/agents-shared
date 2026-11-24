@@ -117,3 +117,15 @@ block	Bash	{"command":"lsof -ti:8765 | xargs kill"}
 block	Bash	{"command":"kill $(lsof -ti :8765)"}
 pass	Bash	{"command":"lsof -tiTCP:8765 -sTCP:LISTEN | xargs kill"}
 pass	Bash	{"command":"lsof -i :8765"}
+# --- sign-a-script-app-for-permission-grants: reads of another app's protected data, refused before they run
+block	Bash	{"command":"sqlite3 -readonly \"$HOME/Library/Application Support/com.apple.TCC/TCC.db\" 'select 1'"}
+block	Bash	{"command":"ls ~/Library/Application Support/Google/Chrome/NativeMessagingHosts"}
+block	Bash	{"command":"cat ~/Library/Application Support/Firefox/profiles.ini"}
+block	Bash	{"command":"sqlite3 -readonly ~/Library/Accounts/Accounts4.sqlite 'select 1'"}
+block	Bash	{"command":"ls ~/Library/Containers/com.dwarvesv.minimalbar"}
+block	Bash	{"command":"ls ~/Library/Group Containers/group.com.example"}
+block	Bash	{"command":"sqlite3 ~/Library/Messages/chat.db .tables"}
+block	Bash	{"command":"ls ~/Pictures/Photos\\ Library.photoslibrary"}
+pass	Bash	{"command":"ls ~/Library/Logs"}
+pass	Bash	{"command":"ls ~/Library/Application Support/Code"}
+pass	Bash	{"command":"tccutil reset Accessibility com.example.app"}

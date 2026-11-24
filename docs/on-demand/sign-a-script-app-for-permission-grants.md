@@ -34,6 +34,11 @@ Messages, Mail, the privacy database). Run such a read under the granted host (`
 for launchd jobs, the terminal otherwise), never from a bare `sqlite3`, `node` or `uv` in a
 job with no grant.
 
+**Another app's data is not read from a shell to check something.** A read of a privacy database,
+a browser profile, a mail or message store, or another app's container is refused unless the shell
+holds Full Disk Access, and the refusal itself adds a switched-off row to the user's privacy list.
+To learn what a privacy list holds, ask the user; to remove a row, use `tccutil reset <Service> <bundle id>`.
+
 When the task ends, remove what it added: `tccutil reset <Service> <bundle id>` for a signed
 app; for a bare binary, name the row in the closing line so the user can delete it. A task
 is not done while a grant it added for testing is still there.
@@ -44,3 +49,6 @@ did this step already". See also the memory `adhoc-signing-voids-tcc-grants`.
 Nov 14 2026, clo-remote: the Full Disk Access list held two `2.1` (Claude Code's own versioned
 binary), three `applet` and one `sqlite3` row, all off or unused; how each got there is unproven. The user: "the agent is adding random entries on my computer for
 its testing purposes ... why are they kept after we are done with it".
+Nov 24 2026, hiddenbar-mirror: a `sqlite3` read of TCC.db and an `ls` of Chrome's folder ran
+after this text had been shown as a note beside the first of them; the trigger became
+deny-once. The user: "this should not re-happen in future sessions".
