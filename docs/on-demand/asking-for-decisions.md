@@ -139,3 +139,11 @@ reply earlier, the question text called the same thing "a gentler path", and its
 "Change it, run the tests". The user: "what is the quick path. what kind of question asking is
 this". A hook check for coined phrases was weighed and dropped: on 927 real option labels it
 matched two, one of them a false refusal.
+
+Nov 24 2026, swipe-sort: the user cancelled a layout question to reply in their own words. The next message
+to arrive was a queued one on another topic; the agent took the question as settled, built its own
+(Recommended) option, and the user's real reply arrived after work had begun. The user: "I cancelled the
+question to respond / then you read my queued message that is on anotehr topic / and then you decided to
+decide on your own about the question that was EXITED / HELLO???". The rule then read "rejected or answered
+your last question: do not ask it again", which lumped a cancel with an answer; it now says a rejected
+question's decision stays open.

@@ -42,6 +42,12 @@ or Claude Code sets are not the agent's to remove.
 choice open: ask again with exactly those candidates as the options, and never choose
 among them yourself or announce "I'm taking X". Only the user's explicit selection settles it.
 
+**A question the user cancelled is still open.** When the tool result says the tool use was rejected or the
+request was interrupted, no option was picked: build none of them, not even the recommended one. The user
+cancelled to reply in their own words, and that reply is the next message that speaks to the decision. A
+message on another topic that arrives first is answered on its own topic, and the open decision is carried in
+one line, never settled by the agent.
+
 The user's keywords (LOCO, ETA, SIMPLER) are typed as answers and replies; each is
 defined in [user abbreviations](user-abbreviations.md), and a reply that is one follows its
 row.
