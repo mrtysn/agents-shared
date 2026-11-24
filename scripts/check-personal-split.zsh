@@ -35,12 +35,17 @@ files=(
   $ROOT/docs/on-demand/**/*(N.)
   $ROOT/hooks/**/*(N.)
 )
-files=(${files:#*/personal/*})
+# Matched below $ROOT only: a checkout that itself sits under a folder named personal
+# (~/dev/personal/agents-shared) would otherwise lose every file to this filter.
+files=(${files:#$ROOT/*/personal/*})
 files=(${files:#$ROOT/hooks/tests/*})
 files=(${files:#*/__pycache__/*})
 files=(${files:#*/.upstream/*})
 files=(${files:#*/override.patch})
 files=(${files:#*/source.json})
+
+# An empty list would pass by checking nothing, and grep with no files reads stdin and hangs.
+(( ${#files} )) || { print -u2 "check-personal-split: found no files to check under $ROOT"; exit 1; }
 
 problems=0
 local hit
