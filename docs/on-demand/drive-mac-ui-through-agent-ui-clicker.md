@@ -6,7 +6,8 @@ charges Accessibility and Screen Recording to that chain: the grants are missing
 that the next upgrade breaks. Agent UI Clicker is a menu bar app signed with the local certificate that
 holds both grants once; the CLI starts it on demand and hands it the request.
 
-    agent-ui-clicker trusted                                  # both grants on?
+    agent-ui-clicker trusted                                  # both grants on? exit 3 names the one that is off
+    agent-ui-clicker relaunch                                 # after the owner turns a grant on: restart, then trusted
     agent-ui-clicker tree "<App>" --depth 8                   # the app's elements, to pick a locator
     agent-ui-clicker click "<App>" "More actions for Emulator" "Open with window"
     agent-ui-clicker key "<App>" escape
