@@ -8,10 +8,21 @@ stub="$(mktemp -d "${TMPDIR:-/tmp}/clo-test.XXXXXX")"
 trap 'rm -rf -- "$stub"' EXIT
 calls="$stub/calls"
 
+export CLO_SESSION_RECORDS="$stub/rec"
+# has-session finds a session only while $stub/alive-NAME exists. new-session and attach-session
+# play a session that ends (or, with STUB_DETACH, a client that detaches and leaves it alive);
+# STUB_RECORD is what record-clo-session.zsh would have written; STUB_RC is tmux's exit code.
 cat > "$stub/tmux" <<EOF
 #!/bin/zsh
 print -r -- "tmux \$*" >> "$calls"
-[[ \$1 == has-session ]] && exit 1
+a=("\$@"); [[ \$a[1] == -CC ]] && shift a
+[[ \$a[1] == has-session ]] && { [[ -e "$stub/alive-\${a[3]#=}" ]] && exit 0; exit 1; }
+if [[ \$a[1] == (new|attach)-session ]]; then
+    n="\${a[3]#=}"
+    [[ -n "\${STUB_RECORD:-}" ]] && { mkdir -p "\$CLO_SESSION_RECORDS"; print -r -- "\$STUB_RECORD" > "\$CLO_SESSION_RECORDS/\$n"; }
+    if [[ -n "\${STUB_DETACH:-}" ]]; then : > "$stub/alive-\$n"; else rm -f -- "$stub/alive-\$n"; fi
+    exit \${STUB_RC:-0}
+fi
 # Real tmux prints nothing for "-t %41" passed as one word.
 for x in "\$@"; do [[ \$x == "-t "* ]] && exit 0; done
 # A pane clo is running in: its shell is the test script, an ancestor of clo.
@@ -46,7 +57,7 @@ check() {  # check NAME EXPECTED-RC PATTERN... -- ENV... -- ARGS...
     args=("$@")
     : > "$calls"
     (cd "${check_cwd:-$stub}" && env -u TMUX -u CLAUDE_CONFIG_DIR -u ITERM_SESSION_ID HOME="$stub" PATH="$stub:$PATH" \
-        "${envs[@]}" "$clo" "${args[@]}") >/dev/null 2>&1
+        "${envs[@]}" "$clo" "${args[@]}") >"$stub/out" 2>&1
     local rc=$?
     sleep 0.3  # the tab placer runs in the background
     local got="$(<"$calls")" p ok=1
@@ -109,7 +120,8 @@ mkdir -p "$stub/.claude/sessions"
 for h in {0..255}; do printf '{"name": "%s-%02x"}\n' "$base" $h; done > "$stub/.claude/sessions/1.json"
 check "a name a running session already has as its peer name is skipped" 0 \
     "tmux new-session*" -- TERM_PROGRAM=Apple_Terminal -- --run-claude
-[[ "$(grep -c 'tmux has-session' "$calls")" == 20 ]] || { (( fails++ )); print "FAIL taken peer names were not skipped"; }
+# 20 names tried, then one has-session after tmux returns.
+[[ "$(grep -c 'tmux has-session' "$calls")" == 21 ]] || { (( fails++ )); print "FAIL taken peer names were not skipped"; }
 rm -f -- "$stub/.claude/sessions/1.json"
 check "alone in a tmux session, claude takes the session's name" 0 \
     "claude --model z name=work-7f" -- TMUX=/tmp/s,1,0 -- --run-claude --model z
@@ -145,13 +157,42 @@ check "inside tmux the marker goes on the current session" 0 \
     "tmux set-option @launched_by orch-3c" "claude --model z" -- \
     TMUX=/tmp/s,1,0 CLO_LAUNCHED_BY=orch-3c -- --run-claude --model z
 : > "$stub/cd"
-check "tmux mode marks the client tab for closing" 0 \
+check "tmux mode leaves the client tab open: no close marker" 0 \
     "tmux -CC new-session*" -- TERM_PROGRAM=iTerm.app CLO_CD_FILE="$stub/cd" -- --run-claude
-[[ -e "$stub/cd.close" ]] || { (( fails++ )); print "FAIL no close marker in tmux mode"; }
-rm -f -- "$stub/cd.close"
-check "no close marker outside tmux mode" 0 \
-    "tmux new-session*" -- TERM_PROGRAM=Apple_Terminal CLO_CD_FILE="$stub/cd" -- --run-claude
-[[ ! -e "$stub/cd.close" ]] || { (( fails++ )); print "FAIL close marker outside tmux mode"; }
+[[ ! -e "$stub/cd.close" ]] || { (( fails++ )); print "FAIL close marker written"; }
+
+# When the session ends, clo prints the Claude session it held.
+check "an ended session prints its tmux name, id and folder" 0 \
+    "tmux -CC new-session -s $base-?? *" -- TERM_PROGRAM=iTerm.app STUB_RECORD=$'sid-1\t'"$stub/x" -- --run-claude
+[[ "$(<"$stub/out")" =~ "closed $base-[0-9a-f]{2} · sid-1 · ~/x" ]] \
+    || { (( fails++ )); print -r -- "FAIL closed line: $(<"$stub/out")"; }
+[[ -z "$(ls "$stub/rec" 2>/dev/null)" ]] || { (( fails++ )); print "FAIL record kept after printing"; }
+check "a detached client prints nothing and keeps the record" 0 \
+    "tmux -CC new-session*" -- TERM_PROGRAM=iTerm.app STUB_DETACH=1 STUB_RECORD=$'sid-2\t/y' -- --run-claude
+[[ "$(<"$stub/out")" != *closed* && -n "$(ls "$stub/rec" 2>/dev/null)" ]] \
+    || { (( fails++ )); print -r -- "FAIL detach: $(<"$stub/out")"; }
+rm -rf -- "$stub/rec" "$stub"/alive-*(N)
+mkdir -p "$stub/rec"
+for h in {0..255}; do printf 'stale\t/old\n' > "$stub/rec/$(printf '%s-%02x' "$base" $h)"; done
+check "a record left by an earlier session of the same name is not printed" 0 \
+    "tmux new-session*" -- TERM_PROGRAM=Apple_Terminal -- --run-claude
+[[ "$(<"$stub/out")" == *"no Claude session id was recorded"* && "$(<"$stub/out")" != *stale* ]] \
+    || { (( fails++ )); print -r -- "FAIL stale record: $(<"$stub/out")"; }
+rm -rf -- "$stub/rec"
+check "tmux's exit code passes through, after the line" 3 \
+    "tmux new-session*" -- TERM_PROGRAM=Apple_Terminal STUB_RC=3 STUB_RECORD=$'sid-3\t/z' -- --run-claude
+[[ "$(<"$stub/out")" == *"· sid-3 · /z"* ]] || { (( fails++ )); print -r -- "FAIL line after a tmux error: $(<"$stub/out")"; }
+
+# --attach NAME: CC Sessions' attach and restore tabs.
+: > "$stub/alive-work-1"
+check "--attach attaches in control mode and prints the ended session" 0 \
+    "tmux has-session -t =work-1" "tmux -CC attach-session -t =work-1" -- \
+    TERM_PROGRAM=iTerm.app STUB_RECORD=$'sid-4\t'"$stub/y" -- --attach work-1
+[[ "$(<"$stub/out")" == *"closed work-1 · sid-4 · ~/y"* ]] || { (( fails++ )); print -r -- "FAIL attach line: $(<"$stub/out")"; }
+check "--attach to a missing session exits 1 without attaching" 1 -- TERM_PROGRAM=iTerm.app -- --attach gone-1
+[[ "$(<"$calls")" != *attach-session* ]] || { (( fails++ )); print "FAIL attached to a missing session"; }
+check "--attach with no name exits 2" 2 -- -- --attach
+rm -rf -- "$stub/rec" "$stub"/alive-*(N)
 
 # -a NAME: the accounts file maps a name to a config folder.
 mkdir -p "$stub/xdg/agents-shared" "$stub/cfg-alt" "$stub/.claude"

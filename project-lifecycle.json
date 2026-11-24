@@ -77,6 +77,12 @@
       ]
     },
     {
+      "name": "record-clo-session hook tests",
+      "run": [
+        "hooks/tests/run-record-clo-session.sh"
+      ]
+    },
+    {
       "name": "open-app-for-user tests",
       "run": [
         "scripts/tests/test-open-app-for-user.zsh"

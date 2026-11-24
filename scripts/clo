@@ -59,6 +59,8 @@ Usage:
   clo --menu-json         Print the model menu, your last model and each model's
                           remembered effort as one JSON object and exit:
                           {"models":[{"value","label"}...],"last":"","effort":{"model":"effort"}}
+  clo --attach NAME       Attach to the tmux session NAME (control mode in iTerm); once it
+                          ends, print the Claude session it held, as a launch does
   clo --init zsh         Print the shell function that leaves your terminal in
                           the launched folder; add to .zshrc: eval "$(clo --init zsh)"
   clo -h | --help         Show this help
@@ -78,6 +80,11 @@ and drawn as a tab in the window clo ran in, with this tab buried, once iTerm �
 General → tmux opens tmux windows as "Tabs in the attaching window" and buries the client
 session (clo prints this when they are not set). Inside
 tmux already, or with CLO_TMUX=0, or without tmux installed, claude runs in this terminal.
+
+When the tmux session ends, the tab clo ran in shows again and keeps one line naming what
+closed: "closed notebook-7f · <session id> · ~/dev/notebook", then a shell (ctrl+d closes
+the tab). The id and folder come from hooks/record-clo-session.zsh, a SessionStart and
+SessionEnd hook; a client that only detached prints nothing.
 
 Launched outside $DEV_ROOT, or from $DEV_ROOT itself, clo first asks where to launch: $DEV_ROOT itself,
 the current folder (shown as its path, where the cursor starts), or any folder
@@ -378,16 +385,19 @@ run_claude() {
         # name CC Sessions shows; Claude Code's generated title is unaffected.
         local -a env=(-e "CLAUDE_CODE_SESSION_NAME=$name")
         [[ -n "${CLAUDE_CONFIG_DIR:-}" ]] && env+=(-e "CLAUDE_CONFIG_DIR=$CLAUDE_CONFIG_DIR")
-        # In tmux mode this tab is iTerm's hidden tmux client, and it shows again as a bare
-        # shell once tmux ends; the marker tells the shell function (clo --init zsh) to close it.
-        (( ${#cc} )) && [[ -n "${CLO_CD_FILE:-}" ]] && : > "$CLO_CD_FILE.close"
         # CLO_LAUNCHED_BY (clo launch --launched-by) marks a session another agent started:
         # the tmux option @launched_by holds that agent's peer name, set in the same command
         # as the session so no reader sees it unmarked. CC Sessions and clo-remote list such
         # sessions in their own group.
         local -a mark=()
         [[ -n "${CLO_LAUNCHED_BY:-}" ]] && mark=(";" set-option -t "=$name:" @launched_by "$CLO_LAUNCHED_BY")
-        exec "${t[@]}" "${cc[@]}" new-session -s "$name" -c "$PWD" "${env[@]}" "$cmd" "${mark[@]}"
+        # Not exec: once tmux returns, clo prints the Claude session it held, and the tab
+        # (in tmux mode iTerm's hidden client) stays open on that line and a shell.
+        rm -f -- "$(clo_record_dir)/$name"  # left by an earlier session of the same name
+        local rc=0
+        "${t[@]}" "${cc[@]}" new-session -s "$name" -c "$PWD" "${env[@]}" "$cmd" "${mark[@]}" || rc=$?
+        print_closed_session "$name" "${t[@]}"
+        exit $rc
     fi
     # Already inside tmux: the marker goes on the tmux session this pane is in.
     if [[ -n "${TMUX:-}" && -n "${CLO_LAUNCHED_BY:-}" ]] && command -v tmux >/dev/null; then
@@ -400,6 +410,43 @@ run_claude() {
         [[ "$one" == "11 "* ]] && export CLAUDE_CODE_SESSION_NAME="${one#11 }"
     fi
     exec claude "$@"
+}
+
+# clo_record_dir — where hooks/record-clo-session.zsh (SessionStart, SessionEnd) keeps, per tmux
+# session name, the Claude session id and folder that session last reported.
+clo_record_dir() {
+    print -r -- "${CLO_SESSION_RECORDS:-${XDG_STATE_HOME:-$HOME/.local/state}/agents-shared/clo-sessions}"
+}
+
+# print_closed_session NAME TMUX... — after a tmux client returns: when the tmux session NAME has
+# ended, print the Claude session it held, "closed NAME · <id> · <folder>", and drop the record.
+# A client that only detached leaves the session alive, and prints nothing.
+print_closed_session() {
+    local name="$1"; shift
+    "$@" has-session -t "=$name" 2>/dev/null && return 0
+    local f="$(clo_record_dir)/${name//\//_}" id="" dir=""
+    if [[ -r "$f" ]]; then
+        IFS=$'\t' read -r id dir < "$f" || true
+        rm -f -- "$f"
+    fi
+    if [[ -n "$id" ]]; then
+        print -r -- "closed $name · $id · ${dir/#$HOME/~}"
+    else
+        print -r -- "closed $name (no Claude session id was recorded: is hooks/record-clo-session.zsh in settings.json?)"
+    fi
+}
+
+# attach_session NAME — attach this terminal to the tmux session NAME (control mode in iTerm), and
+# print the Claude session it held once it ends. CC Sessions' attach and restore tabs run it.
+attach_session() {
+    local name="$1" rc=0
+    local -a t=(tmux) cc=()
+    [[ -n "${CLO_TMUX_SOCKET:-}" ]] && t+=(-L "$CLO_TMUX_SOCKET")
+    [[ "${TERM_PROGRAM:-}" == iTerm.app && -z "${CLO_TMUX_SOCKET:-}" ]] && cc=(-CC)
+    "${t[@]}" has-session -t "=$name" 2>/dev/null || { print -u2 "clo --attach: no tmux session named $name"; exit 1; }
+    "${t[@]}" "${cc[@]}" attach-session -t "=$name" || rc=$?
+    print_closed_session "$name" "${t[@]}"
+    exit $rc
 }
 
 # peer_name_taken NAME — whether a running Claude Code session already has NAME as its peer
@@ -463,13 +510,6 @@ clo() {
     CLO_CD_FILE="$f" command clo "$@"
     rc=$?
     d="$(cat -- "$f" 2>/dev/null)"
-    # "$f.close": the session ran in iTerm's tmux mode, this tab was the hidden tmux client,
-    # and after tmux ends it is only a stray shell.
-    if [[ -e "$f.close" ]]; then
-        command rm -f -- "$f" "$f.close"
-        (( rc == 0 )) && exit 0
-        return $rc
-    fi
     command rm -f -- "$f"
     [[ -n "$d" && -d "$d" && "$d" != "$PWD" ]] && cd -- "$d"
     return $rc
@@ -589,6 +629,10 @@ case "${1:-}" in
     # --run-claude ARGS: run claude in this folder the way every launch does (inside tmux).
     # recent-sessions.py resumes through it.
     --run-claude) shift; run_claude "$@" ;;
+    # --attach NAME: attach to the tmux session NAME and print the Claude session it held once it
+    # ends. CC Sessions' attach and restore tabs go through it.
+    --attach)  [[ -n "${2:-}" ]] || { print -u2 "clo --attach: needs a tmux session name"; exit 2; }
+               attach_session "$2" ;;
     # One name per line for tab completion: each folder's own name and, for nested
     # ones, its path under $DEV_ROOT.
     --repo-names) folder_rows 2>/dev/null | cut -f1 \
