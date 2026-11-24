@@ -170,12 +170,19 @@ if [ "$WORK" = true ]; then
         sleep "${REFUSE_REREAD_SLEEP:-1}"
     done
     if [ -n "$Q4_MSG" ]; then
+        # Only a message that starts with / is held as a slash command until the turn ends. A /name inside a
+        # sentence reaches the agent now: told to end the turn for it, an agent stopped mid-task (2026-11-24).
+        if printf '%s\n' "$Q4_MSG" | grep -Eq '^[[:space:]]*/'; then
+            SLASH_NOTE="A line above that starts with / is a slash command: Claude Code runs it only when this turn ends, so say you have seen it, finish the current step, and end the turn in text."
+        else
+            SLASH_NOTE="A /name inside the message is not a slash command and will not run by itself: after the reply, invoke it with the Skill tool."
+        fi
         cat >&2 <<MSG
 BLOCKED: the user sent a message while you were working, and you have not replied to it:
 
   ${Q4_MSG}
 
-Reply to it in text first. Text written in the same message as a tool call is not seen until that call is made, so write the reply, then repeat this call. A question in it gets an answer, not an action (claude/rules/question-handling.md); an order in it, and the work already ordered, carry on after the reply. A line above that starts with / is a slash command: Claude Code runs it only when this turn ends, so say you have seen it, finish the current step, and end the turn in text.
+Reply to it in text first. Text written in the same message as a tool call is not seen until that call is made, so write the reply, then repeat this call. A question in it gets an answer, not an action (claude/rules/question-handling.md); an order in it, and the work already ordered, carry on after the reply. ${SLASH_NOTE}
 MSG
         exit 2
     fi

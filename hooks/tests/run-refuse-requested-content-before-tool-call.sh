@@ -282,6 +282,11 @@ says 'the slash refusal says to end the turn' has Edit "$f" s-q-slash-says 'end 
 says 'the slash refusal quotes the command' has Edit "$f" s-q-slash-quote '/fix-it-at-its-source'
 f=$(mk q-slash-replied "$(prompt 'tidy that')" "$(waiting '/fix-it-at-its-source')" "$(say 'Seen /fix-it-at-its-source; it runs when this turn ends.')" "$(call t1 Edit '{"file_path":"/x"}')")
 check 'a queued slash command, a reply, then Edit allows' 0 Edit "$f" s-q-slash-replied
+# A /name inside a sentence is delivered now, not held: the refusal says to start it with the Skill tool, never to end the turn.
+f=$(mk q-inline-slash "$(prompt 'tidy that')" "$(queued 'dont make it trip more agents. weigh the need /vet-fable')" "$(call t1 Edit '{"file_path":"/x"}')")
+check 'a delivered message ending in /name then Edit refuses' 2 Edit "$f" s-q-inline-slash question
+says 'an inline /name is not called a slash command' lacks Edit "$f" s-q-inline-slash-not 'end the turn in text'
+says 'an inline /name goes to the Skill tool' has Edit "$f" s-q-inline-slash-skill 'Skill tool'
 # Two messages queued together: every one that is owed a reply is quoted, not only the latest.
 f=$(mk q-two "$(prompt 'tidy that')" "$(queued 'which one is correct?' 2026-11-10T10:00:10.000Z)" "$(waiting '/fix-it-at-its-source' 2026-11-10T10:00:12.000Z)" "$(call t1 Edit '{"file_path":"/x"}')")
 check 'a question and a slash command queued together refuse' 2 Edit "$f" s-q-two question
