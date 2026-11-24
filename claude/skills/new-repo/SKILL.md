@@ -1,5 +1,5 @@
 ---
-description: Create a new GitHub repository under the active `gh` account, scaffolding standard files and pushing an initial commit. Use when the user asks to create a new repo for an existing or empty local directory.
+description: Create a new GitHub repository under the active `gh` account (or the one a local override file names), scaffolding standard files and pushing an initial commit. Use when the user asks to create a new repo for an existing or empty local directory.
 argument-hint: [repo-name] [one-line description]
 allowed-tools: Bash, Read, Write, Edit, AskUserQuestion
 ---
@@ -11,7 +11,8 @@ Create a fresh GitHub repository for the current working directory (or a new dir
 ## Required inputs (ask if missing)
 
 Every question below goes through AskUserQuestion, recommended option first, one call per batch
-(the `gh` account question in step 0 comes first and alone). Each carries its own facts: the
+(the `gh` account question in step 0 comes first and alone, and is skipped when a local
+override names the account). Each carries its own facts: the
 account, the repo name, the description and the visibility.
 
 1. **Repo name** — defaults to the basename of the current working directory if not given. Confirm.
@@ -22,7 +23,27 @@ account, the repo name, the description and the visibility.
 
 ### 0. Confirm and lock in the `gh` account
 
-This is the first action of the skill. Do not run any other `gh` command before the user confirms.
+This is the first action of the skill. Do not run any other `gh` command before the account is settled.
+
+First look for a local override, for the folder the repo will live in:
+
+```bash
+"$AGENTS_SHARED/scripts/new-repo-gh-account" <repo folder>
+```
+
+It reads `${XDG_CONFIG_HOME:-~/.config}/agents-shared/new-repo-gh-account` (shape:
+`scripts/new-repo-gh-account.example`): `*` or a folder, then an account; the longest matching
+folder wins. It prints the account, or nothing when no line matches.
+
+**An account printed: use it without asking.** Check it is logged in with
+`gh auth token --user <account> >/dev/null`; if that fails, stop and tell the user to run
+`gh auth login` for it (interactive, do not run it). Run every `gh` command from here on with
+`GH_TOKEN="$(gh auth token --user <account>)"` in front, so the repo lands on that account
+whatever account is active, and the active account is never switched. Confirm with
+`GH_TOKEN=… gh api user -q .login`, which must print the account, and say in one line which
+account is used and that it came from the override file.
+
+**Nothing printed: ask, as below.**
 
 ```bash
 gh auth status
@@ -32,10 +53,10 @@ Capture the account name on the line marked `Active account: true`. Ask with Ask
 
 Wait for an explicit yes. If the user names a different account, stop and instruct them to run `gh auth switch` themselves (it is interactive — do not run it). Re-run `gh auth status` after they switch, then ask the question again.
 
-Once confirmed, **lock in the account** for the rest of the operation:
+Once settled, **lock in the account** for the rest of the operation:
 
-- Record the confirmed account as `LOCKED_ACCOUNT`.
-- Immediately before step 5 (`gh repo create`), re-run `gh auth status` and verify the active account still matches `LOCKED_ACCOUNT`. If it drifted, abort and tell the user — do not auto-switch.
+- Record the account as `LOCKED_ACCOUNT`.
+- Immediately before step 5 (`gh repo create`), check the account again: `GH_TOKEN=… gh api user -q .login` with an override, `gh auth status`'s active account without one. If it no longer matches `LOCKED_ACCOUNT`, abort and tell the user — do not auto-switch.
 - Use `LOCKED_ACCOUNT` wherever the account name appears in user-facing echoes and in any post-push instructions (e.g., the SSH remote URL in the pitfalls section).
 
 Git author is inherited from global config. If relevant (e.g., the user asks about attribution), read it with `git config user.name` and `git config user.email` — never hardcode.
@@ -142,6 +163,7 @@ never for a clone of someone else's.
 Re-confirm with AskUserQuestion, in one question that states account, repo name, description and visibility, and wait for the pick. A public repo is its own option, never the default.
 
 ```bash
+# With an override: GH_TOKEN="$(gh auth token --user <account>)" gh repo create …
 gh repo create <repo-name> \
   --private \
   --description "<one-line description>" \

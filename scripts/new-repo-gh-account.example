@@ -1,0 +1,12 @@
+# Local override of the GitHub account /new-repo creates repos under. Copy to
+#     ${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/new-repo-gh-account
+# and keep it there, untracked. With no file, or no line matching the folder, /new-repo
+# asks which account to use, as it always has.
+#
+# One line per rule: * or a folder (~ allowed), then a gh account name, which must already
+# be logged in (`gh auth status` lists them). A folder line covers that folder and everything
+# under it; the longest matching folder wins, and * covers every other folder.
+#
+# folder           gh account
+*                  your-handle
+~/dev/work         your-work-handle

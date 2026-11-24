@@ -1,0 +1,40 @@
+#!/bin/zsh
+# new-repo-gh-account [FOLDER] — print the gh account /new-repo should use for FOLDER (default:
+# the current folder), read from the local override file; print nothing when no line matches.
+# File shape: scripts/new-repo-gh-account.example. Exit 0 either way; exit 2 on a bad line.
+emulate -L zsh
+setopt extended_glob
+
+file="${NEW_REPO_GH_ACCOUNT_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/new-repo-gh-account}"
+target="${1:-$PWD}"
+[[ -d "$target" ]] || { print -u2 "new-repo-gh-account: $target is not a folder"; exit 2; }
+target="${target:A}"
+[[ -r "$file" ]] || exit 0
+
+typeset best="" line folder account
+typeset -i best_len=-1 n=0
+typeset -a fields
+while IFS= read -r line || [[ -n "$line" ]]; do
+    (( n++ ))
+    line="${line%%\#*}"
+    line="${${line##[[:space:]]##}%%[[:space:]]##}"
+    [[ -n "$line" ]] || continue
+    fields=(${=line})
+    if (( ${#fields} != 2 )); then
+        print -u2 "new-repo-gh-account: $file line $n needs two columns, a folder or * and an account: $line"
+        exit 2
+    fi
+    folder="${fields[1]}" account="${fields[2]}"
+    if [[ "$folder" == "*" ]]; then
+        (( best_len < 0 )) && { best="$account"; best_len=0; }
+        continue
+    fi
+    folder="${folder/#\~/$HOME}"
+    folder="${folder:A}"
+    if [[ "$target" == "$folder" || "$target" == "$folder"/* ]] && (( ${#folder} > best_len )); then
+        best="$account"; best_len=${#folder}
+    fi
+done < "$file"
+
+[[ -n "$best" ]] && print -r -- "$best"
+exit 0
