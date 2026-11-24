@@ -12,6 +12,8 @@ cat > "$stub/tmux" <<EOF
 #!/bin/zsh
 print -r -- "tmux \$*" >> "$calls"
 [[ \$1 == has-session ]] && exit 1
+# Real tmux prints nothing for "-t %41" passed as one word.
+for x in "\$@"; do [[ \$x == "-t "* ]] && exit 0; done
 # A pane clo is running in: its shell is the test script, an ancestor of clo.
 [[ \$1 == display && \$* == *pane_pid* ]] && { print -r -- "\${STUB_PANE_PID-$$}"; exit 0; }
 [[ \$1 == display ]] && { print -r -- "\${STUB_PANES:-11} work-7f"; exit 0; }
@@ -85,6 +87,8 @@ check "a marker with no CLAUDE_PID is dropped" 0 \
 # A leaked TMUX names a pane this terminal is not in: clo then starts its own tmux session.
 check "TMUX from a pane clo is not in is dropped" 0 \
     "tmux new-session -s *" -- TERM_PROGRAM=Apple_Terminal TMUX=/tmp/s,1,0 TMUX_PANE=%41 STUB_PANE_PID=999999 -- --run-claude
+check "in its own pane, named by TMUX_PANE, clo keeps TMUX and runs claude there" 0 \
+    "tmux display -p -t %41 *" "claude --model p * tmux=/tmp/s,1,0" -- TMUX=/tmp/s,1,0 TMUX_PANE=%41 -- --run-claude --model p
 check "TMUX naming a dead server is dropped" 0 \
     "tmux new-session -s *" -- TERM_PROGRAM=Apple_Terminal TMUX=/tmp/s,1,0 STUB_PANE_PID= -- --run-claude
 

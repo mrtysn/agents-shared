@@ -339,7 +339,10 @@ drop_inherited_session_env() {
         done
     fi
     if [[ -n "${TMUX:-}" ]]; then
-        local pane; pane="$(tmux display -p ${TMUX_PANE:+-t "$TMUX_PANE"} '#{pane_pid}' 2>/dev/null || true)"
+        # An array: zsh keeps ${TMUX_PANE:+-t "$TMUX_PANE"} as the one word "-t %5", and tmux
+        # then prints nothing, which dropped TMUX even in clo's own pane.
+        local -a target=(); [[ -n "${TMUX_PANE:-}" ]] && target=(-t "$TMUX_PANE")
+        local pane; pane="$(tmux display -p "${target[@]}" '#{pane_pid}' 2>/dev/null || true)"
         [[ -n "$pane" ]] && (( ${up[(Ie)$pane]} )) || unset TMUX TMUX_PANE
     fi
 }
