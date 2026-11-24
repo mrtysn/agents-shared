@@ -45,7 +45,9 @@ every tab opened afterwards carried that agent's `CLAUDE_*` and `TMUX` variables
 each new Claude Code session there believed it was the agent's child and saved no
 transcript, and five other apps launched the same way carried the same variables.
 `hooks/require-clean-env-for-app-launch.sh` refuses `open` with `-a`, `-b` or a
-`.app` argument.
+`.app` argument, in a Bash command and in a script an agent writes, edits or runs:
+the same day a dev-env session reopened iTerm from a scratch script that waited for it
+to quit, and the Bash-only check never saw that line.
 
 Oct 2026: after a launcher rebuild the agent relaunched it through quiet-open
 for the user; it ran with no Dock icon and could not be reached: "if you opened

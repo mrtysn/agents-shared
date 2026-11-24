@@ -2,6 +2,12 @@
 #
 # verdict is `pass` (hook exits 0) or `block` (hook exits 2).
 #
+# Script cases have a third column, the script text (\\n for a newline), and a second column of:
+#   Write:<file_path>          a Write of that text
+#   Edit:<file_path>           an Edit whose new_string is that text
+#   Run:<name>|<command>       the text saved as <name> in a temp folder, which is also the cwd and
+#                              which {} names; then a Bash call of the command
+#
 block	open -g -a iTerm
 block	open -a "Google Chrome" page.html
 block	open -ga Safari
@@ -25,3 +31,18 @@ pass	grep -n "open -a" notes.md
 pass	echo "use open -g -a iTerm"
 pass	git commit -m "stop agents passing their env through open -a"
 pass	ls /Applications/iTerm.app
+block	Write:/tmp/s/relaunch.zsh	#!/bin/zsh\nwhile pgrep -x iTerm2; do sleep 3; done\nopen -g -a iTerm
+block	Write:/tmp/s/noext	#!/bin/bash\n./import.sh && open -g -a iTerm
+block	Edit:/tmp/s/step.sh	print reopened\nopen -g -a iTerm
+pass	Write:/tmp/s/notes.md	Never run `open -g -a iTerm`; it leaks the environment.
+pass	Write:/tmp/s/ok.zsh	#!/bin/zsh\nopen-app-for-user -a iTerm
+pass	Write:/tmp/s/comment.zsh	#!/bin/zsh\n# not open -g -a iTerm\nopen-app-for-user -a iTerm
+pass	Write:/tmp/s/page.zsh	#!/bin/zsh\nopen report.html
+block	Run:a.zsh|zsh {}/a.zsh	#!/bin/zsh\nopen -g -a iTerm
+block	Run:b.zsh|cd /tmp && ./b.zsh	#!/bin/zsh\nopen -g -a iTerm
+block	Run:c.sh|nohup bash -x c.sh > log 2>&1	#!/bin/bash\nopen -g -a iTerm
+block	Run:d.zsh|sleep 1; {}/d.zsh	#!/bin/zsh\nopen -g -a iTerm
+block	Run:e.zsh|source e.zsh	open -g -a iTerm
+pass	Run:f.zsh|zsh f.zsh	#!/bin/zsh\nopen-app-for-user -a iTerm
+pass	Run:g.zsh|cat g.zsh	#!/bin/zsh\nopen -g -a iTerm
+pass	Run:h.zsh|grep -n open h.zsh	#!/bin/zsh\nopen -g -a iTerm

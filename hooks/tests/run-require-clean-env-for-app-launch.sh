@@ -15,7 +15,8 @@ usage() {
     cat <<'USAGE'
 usage: run-require-clean-env-for-app-launch.sh [-v] [case-file]
 
-Feeds each case to the hook as a PreToolUse payload and compares the exit
+Feeds each case to the hook as a PreToolUse payload (Bash, or Write, Edit
+and a Bash run of a script, by the case's second column) and compares the exit
 status against the expected verdict (pass = 0, block = 2).
 
   -v   print every case, not just failures
@@ -41,7 +42,10 @@ done
 total=0
 failed=0
 
-while IFS=$'\t' read -r verdict command; do
+SCRIPTS=$(mktemp -d)
+trap 'rm -rf "$SCRIPTS"' EXIT
+
+while IFS=$'\t' read -r verdict command text; do
     case "${verdict-}" in
         ''|'#'*) continue ;;
     esac
@@ -55,9 +59,27 @@ while IFS=$'\t' read -r verdict command; do
         *) echo "unknown verdict '$verdict'" >&2; exit 1 ;;
     esac
 
-    decoded=$(printf '%b' "$command")
-    payload=$(jq -Rn --arg c "$decoded" --arg cwd "$CWD_FIXTURE" \
-        '{tool_name: "Bash", cwd: $cwd, tool_input: {command: $c}}')
+    body=$(printf '%b' "${text-}")
+    case "$command" in
+        Write:*)
+            payload=$(jq -n --arg f "${command#Write:}" --arg t "$body" --arg cwd "$CWD_FIXTURE" \
+                '{tool_name: "Write", cwd: $cwd, tool_input: {file_path: $f, content: $t}}') ;;
+        Edit:*)
+            payload=$(jq -n --arg f "${command#Edit:}" --arg t "$body" --arg cwd "$CWD_FIXTURE" \
+                '{tool_name: "Edit", cwd: $cwd, tool_input: {file_path: $f, old_string: "x", new_string: $t}}') ;;
+        Run:*)
+            # The script text goes into a file named by the case; {} in the command is its folder.
+            spec=${command#Run:}
+            name=${spec%%|*}
+            printf '%s\n' "$body" > "$SCRIPTS/$name"
+            decoded=$(printf '%s' "${spec#*|}" | sed "s|{}|$SCRIPTS|g")
+            payload=$(jq -n --arg c "$decoded" --arg cwd "$SCRIPTS" \
+                '{tool_name: "Bash", cwd: $cwd, tool_input: {command: $c}}') ;;
+        *)
+            decoded=$(printf '%b' "$command")
+            payload=$(jq -Rn --arg c "$decoded" --arg cwd "$CWD_FIXTURE" \
+                '{tool_name: "Bash", cwd: $cwd, tool_input: {command: $c}}') ;;
+    esac
 
     got=0
     reason=$(printf '%s' "$payload" | "$HOOK" 2>&1 >/dev/null) || got=$?
