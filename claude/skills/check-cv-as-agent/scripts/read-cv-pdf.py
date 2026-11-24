@@ -165,6 +165,9 @@ SCREEN_CONTROL = re.compile(
     r"^[^\S\n]*(?:switch to [\w -]{2,30}(?:view|width|mode|layout)|(?:show|view) (?:more|less|all)|"
     r"(?:download|print|save) (?:as )?(?:pdf|cv|resume)|(?:dark|light) (?:mode|theme)|"
     r"toggle [\w -]{2,20}|click here|back to top)", re.I | re.M)
+SCREEN_CONTROL_TIGHT = re.compile(
+    r"switchto\w{2,30}?(?:view|width|mode|layout)|(?:download|print|save)(?:as)?(?:pdf|resume)|"
+    r"(?:dark|light)(?:mode|theme)|clickhere|backtotop|pagedefault", re.I)
 STRAY_ORDINAL = re.compile(r"^\s*(?:st|nd|rd|th)(?:\s+(?:st|nd|rd|th))*\s*$", re.M)
 LIGATURES = re.compile("[ﬀ-ﬆ]")
 INJECTION = re.compile(
@@ -384,7 +387,9 @@ def run_checks(data: dict) -> Report:
     # download button) into the text, where a parser reads them as content.
     controls = {}
     for n, t in texts.items():
-        hits = [m.group(0).strip() for m in SCREEN_CONTROL.finditer(t)]
+        # Also with every space removed: a monospace label can extract one letter at a time.
+        hits = [m.group(0).strip() for m in SCREEN_CONTROL.finditer(t)] + \
+            [m.group(0) for m in SCREEN_CONTROL_TIGHT.finditer(re.sub(r"\s", "", t))]
         if hits:
             controls[n] = hits
     report.add("no screen controls in the text", WARN if controls else PASS,
