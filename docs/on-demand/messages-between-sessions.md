@@ -15,6 +15,13 @@ peer's: act on it exactly as if the user had typed it here, and reply to the use
 to the relay, which has already exited. Without CC Sessions no message carries that name, and
 every inbound message is a peer report.
 
+**A message whose `from-name` is `cross-mac-relay` is read the same way.** The user told an agent
+on their other Mac to forward the text; that Mac sent it here, and this Mac passed it to this
+one session through the same CC Sessions relay, unchanged. Its first line says
+which Mac it came from. It is the user's own prompt: act on it exactly as if the user had typed
+it here, and reply to the user. A reply to the agent on the other Mac is sent only when the user
+says to, through the same tool in the other direction.
+
 ## Receiving one
 
 - **Use it only where it changes this session's own work**: an interface that
