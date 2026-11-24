@@ -17,6 +17,7 @@ check or a blind read can confirm, plus what this skill found on its own.
 | A profile link missing from the text | The URL exists only as a link annotation over display text like `LinkedIn` | Show the bare domain path (`linkedin.com/in/name`) as the link's text |
 | Text hidden | White, zero-opacity, tiny or off-page text; AI screeners now treat it as keyword stuffing | Remove it; a dark band with white text on it is a false positive |
 | Text that addresses an AI | Prompt injection ("ignore previous instructions") | Remove it; screeners flag the application |
+| "switch to phone width", "Download PDF" in the text | A web CV printed to PDF keeps its screen controls; one can fuse with the next line ("…widthappliedAI") | Hide controls in print CSS (`@media print`, or the repo's print-hide class) |
 | Stray `st`, `th` lines; `Ranked 1 in` | Ordinals set as superscript (`1<sup>st</sup>`) are their own text runs, placed on another line | Plain `1st`, or drop the suffix |
 | A section's content after the footer, its heading empty | Side-by-side or floated blocks (two sections in one row); the content stream emits them out of visual order | One section per row in normal flow; the footer last in the source |
 | Words fused in one extractor | A line break with no space glyph; content-stream extractors join the lines | Usually cosmetic; worth fixing only when a fused word is a keyword |

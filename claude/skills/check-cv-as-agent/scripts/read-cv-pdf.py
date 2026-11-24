@@ -161,6 +161,10 @@ PHONE = re.compile(r"\+?\d[\d ()./-]{7,}\d")
 PROFILE_HOSTS = re.compile(r"(?:[\w-]+\.)?(?:linkedin\.com/in/[^/]+|(?:github\.com|gitlab\.com|"
                            r"behance\.net|dribbble\.com|x\.com|twitter\.com)/[^/]+|"
                            r"stackoverflow\.com/users/\d+(?:/[^/]+)?)$")
+SCREEN_CONTROL = re.compile(
+    r"^[^\S\n]*(?:switch to [\w -]{2,30}(?:view|width|mode|layout)|(?:show|view) (?:more|less|all)|"
+    r"(?:download|print|save) (?:as )?(?:pdf|cv|resume)|(?:dark|light) (?:mode|theme)|"
+    r"toggle [\w -]{2,20}|click here|back to top)", re.I | re.M)
 STRAY_ORDINAL = re.compile(r"^\s*(?:st|nd|rd|th)(?:\s+(?:st|nd|rd|th))*\s*$", re.M)
 LIGATURES = re.compile("[ﬀ-ﬆ]")
 INJECTION = re.compile(
@@ -376,6 +380,19 @@ def run_checks(data: dict) -> Report:
                "the section's content comes out elsewhere in reading order (side-by-side or "
                "floated blocks), so a parser files it under the wrong heading or none")
 
+    # A web CV printed to PDF can carry its screen controls (a view toggle, a
+    # download button) into the text, where a parser reads them as content.
+    controls = {}
+    for n, t in texts.items():
+        hits = [m.group(0).strip() for m in SCREEN_CONTROL.finditer(t)]
+        if hits:
+            controls[n] = hits
+    report.add("no screen controls in the text", WARN if controls else PASS,
+               "; ".join(f"{n}: {', '.join(sorted(set(v)))[:80]!r}" for n, v in controls.items())
+               if controls else "none",
+               "a button or toggle label printed into the PDF is read as CV content, and can fuse "
+               "with the next line (an employer name); hide it in print CSS")
+
     ordinals = {n: len(STRAY_ORDINAL.findall(t)) for n, t in texts.items()}
     ordinals = {n: c for n, c in ordinals.items() if c}
     report.add("ordinals stay attached", WARN if ordinals else PASS,
@@ -546,6 +563,14 @@ def compare(expected: dict, reads: dict[str, dict]) -> dict:
             row(reader, label, f"{edu.get('degree')} at {edu.get('institution')}",
                 f"{match.get('degree')} at {match.get('institution')}" if match else None,
                 PASS if ok else FAIL)
+            # A one-date entry (a summer school) shows its date once, and a reader
+            # may file it as start or end: either is right.
+            dates = {norm_date(edu.get(k)) for k in ("start", "end") if edu.get(k)}
+            if ok and len(dates) == 1:
+                got_dates = {norm_date(match.get(k)) for k in ("start", "end") if match.get(k)}
+                if not dates & got_dates:
+                    row(reader, f"{label} date", next(iter(dates)), sorted(got_dates), FAIL)
+                continue
             for d in ("start", "end"):
                 if ok and edu.get(d) and norm_date(match.get(d)) != norm_date(edu.get(d)):
                     row(reader, f"{label} {d}", edu.get(d), match.get(d), FAIL)
