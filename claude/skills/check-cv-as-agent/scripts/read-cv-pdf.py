@@ -395,7 +395,10 @@ def run_checks(data: dict) -> Report:
 
 
 def norm(s) -> str:
-    s = unicodedata.normalize("NFC", str(s or "")).casefold()
+    # Fold case and accents both: small caps extract as capitals, and Turkish
+    # NIŞANTAŞI lowercases to "nişantaşi" while the record says "Nişantaşı".
+    s = unicodedata.normalize("NFKD", str(s or "").replace("ı", "i")).casefold()
+    s = "".join(ch for ch in s if not unicodedata.combining(ch))
     return re.sub(r"\s+", " ", re.sub(r"[^\w@+.# ]", " ", s)).strip()
 
 
@@ -490,10 +493,19 @@ def compare(expected: dict, reads: dict[str, dict]) -> dict:
         for extra in got_roles:
             row(reader, "extra role", None, f"{extra.get('title')} at {extra.get('company')}", WARN)
 
+        # Degree and institution as a pair: two degrees from different schools
+        # swapped between them would pass a check on institutions alone.
         for i, edu in enumerate(expected.get("education") or []):
-            hit = any(same(e.get("institution"), edu.get("institution")) for e in got.get("education") or [])
-            row(reader, f"education {i + 1}", edu.get("institution"), "found" if hit else None,
-                PASS if hit else FAIL)
+            label = f"education {i + 1}: {edu.get('degree') or edu.get('institution')}"
+            entries = got.get("education") or []
+            match = next((e for e in entries if same(e.get("degree"), edu.get("degree"))), None) \
+                if edu.get("degree") else None
+            if match is None:
+                match = next((e for e in entries if same(e.get("institution"), edu.get("institution"))), None)
+            ok = match is not None and same(match.get("institution"), edu.get("institution"))
+            row(reader, label, f"{edu.get('degree')} at {edu.get('institution')}",
+                f"{match.get('degree')} at {match.get('institution')}" if match else None,
+                PASS if ok else FAIL)
 
         want_skills = [norm(s) for s in expected.get("skills") or []]
         if want_skills:
@@ -623,13 +635,13 @@ def page_sections(run: Path) -> tuple[str, list[tuple[str, str]]]:
     for name in order:
         rec = reads.get(name) or {}
         failed = any(r["reader"] == name and r["status"] == FAIL for r in rows)
-        quotes.append(f"<details{' open' if failed else ''}><summary>{esc(name)}"
-                      f"{' (has wrong fields)' if failed else ''}: {rec.get('years_of_experience', '?')} "
-                      f"years of experience</summary><blockquote><p>{esc(rec.get('recruiter_summary') or '')}"
-                      "</p></blockquote></details>")
+        quotes.append(f"<h3>{esc(name)}{' (has wrong fields)' if failed else ''}: "
+                      f"{rec.get('years_of_experience', '?')} years of experience</h3>"
+                      f"<blockquote><p>{esc(rec.get('recruiter_summary') or '')}</p></blockquote>")
     sections.append(("Recruiter summaries", (
-        "<p>What each reader would show a recruiter instead of the CV. Open by default only "
-        "where the reader got a field wrong.</p>" + "".join(quotes))))
+        "<p>What each reader would show a recruiter instead of the CV. A summary can misstate "
+        "facts its reader parsed correctly, so read each against the CV: the scores above do "
+        "not cover them.</p>" + "".join(quotes))))
 
     images = ext.get("page_images", [])
     texts = ext.get("page_texts", {})

@@ -94,7 +94,9 @@ To the user, in the reply:
    (the step 2 check or the text that explains it), and the fix. Take fixes from
    `references/what-breaks-a-parse.md`; a fix not there is stated as a hypothesis.
 3. The recruiter summaries, quoted, when they misstate the candidate (wrong seniority,
-   wrong current employer, wrong years of experience).
+   wrong current employer, wrong school, wrong dates or years of experience). Check every
+   summary against the expected record sentence by sentence: a summary can misstate what
+   its own reader parsed correctly, and `compare` does not score summaries.
 4. WARNs from step 2 that no reader tripped over, in one line each: real but unproven.
 
 A known and accepted warning (the repo's docs say so) is named as accepted, not re-raised.
@@ -108,7 +110,7 @@ When the user asks for a page, or the run found something wrong, write the HTML 
 
 It reads `extract.json` and the `compare.json` step 5 saved, and shows, in order: the counts
 and the stand-in caveat; the issues found; one card per reader with only the fields it got
-wrong; the recruiter summaries, open where a reader got a field wrong; then each page as
+wrong; every recruiter summary in full; then each page as
 rendered beside pypdf's text with the check findings marked, the other two extractors below
 it; and the problems the readers raised. Images are embedded, so the file stands alone.
 Without `project-lifecycle` it writes a plain page with the same sections.
@@ -129,3 +131,5 @@ desktop shot, and open the page for the user with `open-app-for-user` or the bro
 | 2026-11-24 | Readers replied with their JSON, which had to be copied into files by hand. | The brief has each reader write `{READ_FILE}` itself. |
 | 2026-11-24 | The brief said `title` is "the job title alone", so every reader dropped Intern and Freelance with nowhere to put them. | Readers fill `employment_type`; a qualifier is flagged only when lost from both. |
 | 2026-11-24 | The first page render cut the issues table off at the right edge, and the text column ran far past its page image. | Tables carry `ws-table--wrap`; page text sits in a box capped near the image's height. |
+| 2026-11-24 | A second CV scored 15/15 in every reader, yet one summary gave a B.A. to the wrong university and another moved an end date by a year; the page hid both, opening summaries only where a field was wrong. | Every summary is shown and checked against the record; education is matched as degree plus institution. |
+| 2026-11-24 | Small-caps employers extract as `NIŞANTAŞI`, which lowercases to a dotted i and would not have matched `Nişantaşı`. | `norm` folds accents and dotless ı before comparing. |
