@@ -115,6 +115,7 @@ render), give them a page that moves instead of answering "what's the progress" 
    No total known yet: leave it out. `--state failed` on a failure, `--note` for one line under
    the bar. A step that is silent for minutes by design gets `--stall-after`/`--stale-after`.
    An item made of titled parts gets a list the page opens on a click: `--step TITLE` repeated sets it, `--step-state TITLE running|done|failed` moves one. An item counted in `--unit steps` shows no rate or time left.
+   Scope grows: when a wave of work is added (new items, or more steps on one), pass `--stage "<what this wave is>"` on its writes. The page then shows the overall bar as done of the work known so far, split and coloured by stage, with a legend of what each stage added and when, so a larger total never reads as lost progress. A server started before this feature needs a restart to show it, and the repo's `ws/` a `page-vendor` refresh for the colours.
 3. **Serve** with `project-lifecycle progress-serve <DIR>/<NAME>.html --until-finished` as a
    background command. It opens the page without taking focus and exits 0 when every item is
    done, 1 when one failed, 2 on `--timeout`. Give the user the `http://127.0.0.1:<port>/` address its first
