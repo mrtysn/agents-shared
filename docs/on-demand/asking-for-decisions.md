@@ -29,9 +29,12 @@ has not been communicated.
   side-by-side panel the user compares at a glance; it works for single-choice questions
   only, so a multi-select shows the artifact in the text above the question instead.
 - **Name things, never their session labels.** A letter given on a form or in
-  earlier prose ("pair A", "B or C", "option B") means nothing in the prompt. Say
-  "the bear and bunny pair", or define the label where it is used ("B (bear and
-  bunny)"). `hooks/require-question-facts-in-question.sh` refuses an undefined letter.
+  earlier prose ("pair A", "B or C", "option B") means nothing in the prompt, and
+  neither does a phrase coined earlier in this conversation ("the quick path", "the
+  second approach"). Say what the thing does, or define the label where it is used
+  ("B (bear and bunny)"). One thing keeps one name across the question text and its
+  options, and a description says what changes, never "change it".
+  `hooks/require-question-facts-in-question.sh` refuses an undefined letter.
 - **Put the recommended option first** and mark it `(Recommended)`.
 - **Batch related decisions** into one call rather than asking serially.
 - **One concern per question.** A question whose text explains two unrelated things is two
@@ -130,3 +133,9 @@ Nov 21 2026: the user typed "explain. the rule was already in place and you did 
 address that issue" into a question's answer box. The agent answered inside a re-asked question, as the launch
 rule then said, and the user rejected it: "I said EXPLAIN. not ask". The launch rule now matches the provenance
 above: a typed answer that asks something gets a plain reply, and the decision waits for a later turn.
+
+Nov 24 2026, hiddenbar-mirror: an option labelled "Try the quick path" named a phrase coined one
+reply earlier, the question text called the same thing "a gentler path", and its description read
+"Change it, run the tests". The user: "what is the quick path. what kind of question asking is
+this". A hook check for coined phrases was weighed and dropped: on 927 real option labels it
+matched two, one of them a false refusal.
