@@ -12,12 +12,14 @@ cat > "$stub/tmux" <<EOF
 #!/bin/zsh
 print -r -- "tmux \$*" >> "$calls"
 [[ \$1 == has-session ]] && exit 1
+# A pane clo is running in: its shell is the test script, an ancestor of clo.
+[[ \$1 == display && \$* == *pane_pid* ]] && { print -r -- "\${STUB_PANE_PID-$$}"; exit 0; }
 [[ \$1 == display ]] && { print -r -- "\${STUB_PANES:-11} work-7f"; exit 0; }
 exit 0
 EOF
 cat > "$stub/claude" <<EOF
 #!/bin/zsh
-print -r -- "claude \$* name=\${CLAUDE_CODE_SESSION_NAME:-}" >> "$calls"
+print -r -- "claude \$* name=\${CLAUDE_CODE_SESSION_NAME:-} child=\${CLAUDE_CODE_CHILD_SESSION:-} cc=\${CLAUDECODE:-} cfg=\${CLAUDE_CONFIG_DIR:-} tmux=\${TMUX:-} run=\${CLO_RUN:-}" >> "$calls"
 EOF
 # STUB_OPEN sets OpenTmuxWindowsIn; every other key reads as missing (defaults fails).
 cat > "$stub/defaults" <<EOF
@@ -69,6 +71,22 @@ check "config dir is handed to the tmux session" 0 \
     TERM_PROGRAM=Apple_Terminal CLAUDE_CONFIG_DIR=/cfg/x -- --run-claude
 check "CLO_TMUX=0 runs claude directly" 0 \
     "claude --model y" -- CLO_TMUX=0 -- --run-claude --model y
+
+# A terminal an agent reopened carries that agent's session: CLAUDE_PID names a process that is
+# not an ancestor of clo, so its variables are dropped; CLAUDE_CONFIG_DIR is clo's own and stays.
+stale=(CLO_TMUX=0 CLAUDE_PID=999999 CLAUDECODE=1 CLAUDE_CODE_CHILD_SESSION=1 CLAUDE_CODE_SESSION_ID=old
+       CLAUDE_CONFIG_DIR=/cfg/k CLO_RUN=/tmp/old-run)
+check "another session's variables are dropped" 0 \
+    "claude --model s name= child= cc= cfg=/cfg/k tmux= run=" -- "${stale[@]}" -- --run-claude --model s
+check "the variables of the claude clo runs under are kept" 0 \
+    "claude --model s * child=1 cc=1 *" -- "${stale[@]/CLAUDE_PID=999999/CLAUDE_PID=$$}" -- --run-claude --model s
+check "a marker with no CLAUDE_PID is dropped" 0 \
+    "claude --model s * child= cc= *" -- CLO_TMUX=0 CLAUDE_PID= CLAUDECODE=1 CLAUDE_CODE_CHILD_SESSION=1 -- --run-claude --model s
+# A leaked TMUX names a pane this terminal is not in: clo then starts its own tmux session.
+check "TMUX from a pane clo is not in is dropped" 0 \
+    "tmux new-session -s *" -- TERM_PROGRAM=Apple_Terminal TMUX=/tmp/s,1,0 TMUX_PANE=%41 STUB_PANE_PID=999999 -- --run-claude
+check "TMUX naming a dead server is dropped" 0 \
+    "tmux new-session -s *" -- TERM_PROGRAM=Apple_Terminal TMUX=/tmp/s,1,0 STUB_PANE_PID= -- --run-claude
 
 check "tab placer starts when tmux tabs open in the attaching window" 0 \
     "uv run --quiet --script */iterm-place-tmux-tab.py --gateway ABC-1 --ready *" -- \

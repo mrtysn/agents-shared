@@ -318,6 +318,32 @@ place_iterm_tmux_tab() {
     rm -f -- "$ready"
 }
 
+# drop_inherited_session_env — remove what an earlier Claude session or tmux pane left in this
+# environment. An app an agent reopens with `open` (iTerm, say) takes that agent's environment,
+# and every tab it opens later starts with it: CLAUDE_CODE_CHILD_SESSION=1 then makes the new
+# session think it is the agent's child and stop saving its transcript, and a leaked TMUX makes
+# run_claude skip tmux. Each is dropped only when the process it names is not an ancestor of
+# clo, so a clo an agent runs from its own shell, or one run in a tmux pane, keeps them.
+drop_inherited_session_env() {
+    local -a up=() v
+    local p=$$
+    while (( p > 1 )); do
+        up+=($p)
+        p="$(ps -o ppid= -p $p 2>/dev/null)" || break
+        p="${p//[^0-9]/}"; [[ -n "$p" ]] || break
+    done
+    if [[ -n "${CLAUDECODE:-}${CLAUDE_PID:-}${CLAUDE_CODE_CHILD_SESSION:-}" ]] \
+        && ! (( ${up[(Ie)${CLAUDE_PID:-x}]} )); then
+        for v in CLAUDECODE CLAUDE_PID CLAUDE_EFFORT ${(k)parameters[(I)CLAUDE_CODE_*]}; do
+            unset "$v"
+        done
+    fi
+    if [[ -n "${TMUX:-}" ]]; then
+        local pane; pane="$(tmux display -p ${TMUX_PANE:+-t "$TMUX_PANE"} '#{pane_pid}' 2>/dev/null || true)"
+        [[ -n "$pane" ]] && (( ${up[(Ie)$pane]} )) || unset TMUX TMUX_PANE
+    fi
+}
+
 # run_claude [claude args...] — replace this process with claude, inside a tmux session named
 # after the folder, so the session can be reached from another terminal later (clo-web's phone
 # page, `tmux attach`, iTerm's tmux -CC). Inside iTerm the session is attached in control mode,
@@ -325,6 +351,9 @@ place_iterm_tmux_tab() {
 # without tmux, claude runs in this terminal as before. CLO_TMUX_SOCKET names a tmux server
 # (`tmux -L`) for tests, and skips control mode.
 run_claude() {
+    drop_inherited_session_env
+    # clo's own menu state stops here: the session and everything it starts would inherit it.
+    unset CLO_RUN CLO_SNAPSHOT
     if [[ -z "${TMUX:-}" && "${CLO_TMUX:-1}" != 0 ]] && command -v tmux >/dev/null; then
         # -CC goes on new-session only: on any other command iTerm also enters tmux mode,
         # and has-session's expected "can't find session" shows as a failed attach.
@@ -1145,7 +1174,7 @@ command -v claude >/dev/null || { print -u2 "clo: claude is not on PATH"; exit 1
 split_args "$@"
 CLO_RUN="$(mktemp -d "${TMPDIR:-/tmp}/clo.XXXXXX")"
 export CLO_RUN CLO_SNAPSHOT="$CLO_RUN/snapshot"
-trap 'rm -rf -- "$CLO_RUN"' EXIT
+trap '[[ -n "${CLO_RUN:-}" ]] && rm -rf -- "$CLO_RUN"' EXIT  # run_claude unsets it
 
 # One snapshot of every session cc-statusline knows, taken now and read by the
 # menus and the side pane. It is the command Agent Bar Hopping itself runs.
