@@ -55,9 +55,13 @@ while IFS=$'\t' read -r verdict scenario command; do
     n=$((n + 1))
     dir="$WORK/case$n/repo"
     mkdir -p "$WORK/case$n"
+    # A scenario ending in /elsewhere runs with the session folder outside the repo, as a
+    # session started in another repo that cds into this one does.
+    cwd=$dir
+    case "$scenario" in */elsewhere) scenario=${scenario%/elsewhere}; cwd="$WORK/case$n" ;; esac
     build "$scenario" "$dir"
     cmd=${command//@REPO@/$dir}
-    payload=$(jq -cn --arg c "$cmd" --arg cwd "$dir" --arg s "case$n" '{tool_name: "Bash", session_id: $s, cwd: $cwd, tool_input: {command: $c}}')
+    payload=$(jq -cn --arg c "$cmd" --arg cwd "$cwd" --arg s "case$n" '{tool_name: "Bash", session_id: $s, cwd: $cwd, tool_input: {command: $c}}')
     first=0; reason=$(printf '%s' "$payload" | "$HOOK" 2>&1 >/dev/null) || first=$?
     second=0; printf '%s' "$payload" | "$HOOK" >/dev/null 2>&1 || second=$?
     case "$verdict" in

@@ -4,6 +4,7 @@
 #           block  the hook exits 2 on the first call and 0 on the same call repeated
 # scenario: uptodate | behind | behind-ahead | no-upstream | offline | notgit | detached
 #           (built by run-require-fetch-before-commit.sh). @REPO@ in a command is the repo folder.
+#           A scenario ending in /elsewhere runs with the session folder outside the repo.
 
 pass	uptodate	git commit -m "x"
 pass	uptodate	git status
@@ -18,5 +19,10 @@ block	behind	git commit -m "x"
 block	behind	git commit -am "x" -- a.txt
 block	behind	cd @REPO@ && git add a.txt && git commit -m "x"
 block	behind	git -C @REPO@ commit -m "x"
+block	behind/elsewhere	cd @REPO@ && git commit -m "x"
+block	behind/elsewhere	cd @REPO@ && zsh tests.sh; git commit -q -m "x" -- a.txt
+block	behind/elsewhere	cd "@REPO@"; git commit -m "x"
+pass	uptodate/elsewhere	cd @REPO@ && git commit -m "x"
+pass	behind/elsewhere	git commit -m "x"
 block	behind	git -c user.name=a -C @REPO@ commit -m "x"
 block	behind-ahead	git commit -m "x"

@@ -7,7 +7,7 @@
 # lacks, refuses the commit once and names them.
 #
 # Matches `git commit` and `git -C DIR commit` (also with -c options) anywhere in the
-# command; the repo is DIR, else the call's cwd.
+# command; the repo is DIR, else the folder of a leading `cd DIR`, else the call's cwd.
 #
 # Refused (exit 2), once per session, repo and upstream tip:
 #   - the branch has an upstream and `HEAD..@{u}` is not empty after the fetch.
@@ -42,8 +42,18 @@ esac
 CWD=$(printf '%s' "$INPUT" | jq -r '.cwd // empty')
 DIR=$CWD
 C_RE='git([[:space:]]+-c[[:space:]]+[^[:space:]]+)*[[:space:]]+-C[[:space:]]+([^[:space:]]+)'
+# A command that starts with `cd DIR` commits in DIR: a session started in one repo that cds
+# into another was checked against its start folder (Nov 2026, a dev-env commit refused for
+# agents-shared being behind).
+CD_RE='^[[:space:]]*cd[[:space:]]+("[^"]+"|'"'"'[^'"'"']+'"'"'|[^[:space:];&|]+)'
+FOUND=
 if [[ "$COMMAND" =~ $C_RE ]]; then
-    DIR=${BASH_REMATCH[2]}
+    FOUND=${BASH_REMATCH[2]}
+elif [[ "$COMMAND" =~ $CD_RE ]]; then
+    FOUND=${BASH_REMATCH[1]}
+fi
+if [ -n "$FOUND" ]; then
+    DIR=$FOUND
     DIR=${DIR#[\"\']}; DIR=${DIR%[\"\']}
     case "$DIR" in "~"/*) DIR="$HOME/${DIR#\~/}" ;; esac
     [ "${DIR#/}" = "$DIR" ] && DIR="${CWD:-.}/$DIR"
