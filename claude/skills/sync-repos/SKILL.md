@@ -11,9 +11,18 @@ user's to decide.
 
 ## 1. Pull what moves safely
 
+`repo-survey` is a link into its own repo, so a pull can bring a newer one than the copy on disk
+(Nov 2026: this skill shipped a step before the `--pull` it calls reached the checkout, and the old
+tool read `--pull` as a folder). Fast-forward that repo first, then run it:
+
 ```bash
+git -C "$(dirname "$(dirname "$(readlink -f "$(command -v repo-survey)")")")" pull --ff-only -q
 repo-survey --pull --json "${ARGUMENTS:-$DEV_ROOT}"
 ```
+
+A refused fast-forward there (diverged, a conflict) is settled per step 2 before the survey runs.
+If `repo-survey` then answers `unknown option --pull`, the tool is older than this skill: report
+it and stop.
 
 With no argument and no `$DEV_ROOT`, ask which folder holds the repos. One JSON object per repo:
 `name`, `path`, `branch`, `upstream`, `ahead`, `behind`, `state` (`clean`, `dirty`, `staged`,
