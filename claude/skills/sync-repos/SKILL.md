@@ -1,5 +1,5 @@
 ---
-description: Bring every repo under the dev root up to date with its remote. Runs `repo-survey --pull`, which fast-forwards each repo that can move with no conflict, then settles the repos it held back (diverged, uncommitted files in the way, a rebase in progress) and asks which installed tools to rebuild and which apps to relaunch. Use when the user says "sync with git", "pull everything", "sync my repos", "update all repos", or invokes /sync-repos.
+description: Bring every repo under the dev root up to date with its remote. Runs `repo-survey --pull`, which fast-forwards each repo that can move with no conflict, then settles the repos it held back (diverged, uncommitted files in the way, a rebase in progress), asks which installed tools to rebuild and which apps to relaunch, and wires hooks a pull of agents-shared brought into the settings they are built from. Use when the user says "sync with git", "pull everything", "sync my repos", "update all repos", or invokes /sync-repos.
 argument-hint: "[root folder, default $DEV_ROOT]"
 allowed-tools: Bash, Read, AskUserQuestion
 ---
@@ -62,7 +62,37 @@ background agent or menu bar app itself; a windowed app the user is not working 
 running and named once ("rebuilt; quit and reopen X"); a repo whose `CLAUDE.md` reserves
 relaunching to the user wins. Never relaunch with a plain `open`.
 
-## 4. Report
+## 4. Hooks a pull brought
+
+A hook runs only once a `settings.json` names it, and an install does not add the entry. When
+agents-shared was pulled or settled, check the live settings against its README's hooks table:
+
+```bash
+"$AGENTS_SHARED/scripts/check-hooks-wired.py"
+```
+
+Exit 0 is silent. On exit 1, each line is one gap: `not wired: hooks/<name> under <event>`, or
+`missing script: <event> runs hooks/<name>` for a hook the pull removed or renamed. Settle them
+in the file the live settings are built from, never in the live file alone, which the next build
+overwrites. On the owner's machines that is dev-env's `agents/claude/settings.json` (or a
+profile overlay under `agents/claude/overlays/`; the README row says "personal profile only"
+when the hook belongs in the personal one):
+
+1. Read dev-env's README section on `settings.json` before editing it.
+2. Add one entry per gap in the form the neighbouring entries use: the same
+   `paths.local.sh` / `$AGENTS_SHARED_DIR` guard, `exec` of the script, `exit 0`, a 5 s
+   timeout. Remove the entry of a missing script.
+3. Rebuild the live file from it with dev-env's own step, `./import.sh --steps 12
+   --non-interactive` from the dev-env folder (it backs up and rewrites each config folder's
+   `settings.json` as base plus that folder's profile overlays). Then confirm
+   `agents/claude/settings-profile.sh check "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"` exits 0
+   and `check-hooks-wired.py` exits 0.
+4. Commit and push dev-env per the commit rule.
+
+Where no such source exists (`settings-profile.sh` is absent), the live file is the source:
+edit it, and say so in the report. The new entry takes effect in sessions started afterwards.
+
+## 5. Report
 
 One line per repo that changed or needs something: pulled (`from..to`, commit count), settled
 (how), held (why, and what was asked), installed. Repos that were already current and clean get

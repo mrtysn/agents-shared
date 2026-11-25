@@ -83,6 +83,18 @@
       ]
     },
     {
+      "name": "check-hooks-wired tests",
+      "run": [
+        "scripts/tests/test-check-hooks-wired.zsh"
+      ]
+    },
+    {
+      "name": "documented hooks wired in settings",
+      "run": [
+        "scripts/check-hooks-wired.py"
+      ]
+    },
+    {
       "name": "open-app-for-user tests",
       "run": [
         "scripts/tests/test-open-app-for-user.zsh"

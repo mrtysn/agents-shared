@@ -78,6 +78,13 @@ script in `hooks/` into `<config dir>/hooks/`,
 so a settings entry can name `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/<name>` and no repo
 location; a script finds its siblings from its own folder, symlink resolved.
 
+This table is also what `scripts/check-hooks-wired.py` checks the settings against: each
+row's Event column lists the events the hook must be wired under, and a settings entry
+that runs a hook script this checkout lacks is reported too. `project-lifecycle test` runs
+it on the live settings, and `/sync-repos` runs it after a pull. A new hook therefore
+gets its row here and its entry in the file the live `settings.json` is built from, in
+the same piece of work.
+
 | Hook | Event | Description |
 |------|-------|-------------|
 | `hooks/block-tree-discard.sh` | PreToolUse | Refuses git commands that discard uncommitted work; only `git checkout -- <one tracked file>` passes, plus `git switch`/`git checkout <branch>` from a clean tree to an existing local branch with no flags |
