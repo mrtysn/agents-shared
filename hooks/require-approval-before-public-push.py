@@ -82,20 +82,42 @@ def git(cwd, *args):
     return r.stdout if r.returncode == 0 else None
 
 
+def expand(target, assigned):
+    """A cd or -C target as the shell would see it: $VAR expanded unless single-quoted, from
+    the command's own assignments first (D=/repo; git -C $D push), then the environment."""
+    if target.startswith("'"):
+        return os.path.expanduser(target.strip("'"))
+    def sub(m):
+        name = m.group(1) or m.group(2)
+        return assigned.get(name, os.environ.get(name, m.group(0)))
+    t = re.sub(r"\$\{(\w+)\}|\$(\w+)", sub, target)
+    return os.path.expanduser(t.strip("'\""))
+
+
+def unresolved(d):
+    if "$" in d:
+        refuse(f"could not tell which repo this push is from: {d!r} holds a variable this hook cannot "
+               "resolve. Write the repo's path out in full (git -C /full/path push), then push again.")
+    return d
+
+
 def repo_dir(command, start, git_opts, cwd):
+    before = command[:start]
+    assigned = {}
+    for name, value in re.findall(r"(?:^|[;&|]\s*)([A-Za-z_]\w*)=(\"[^\"]*\"|'[^']*'|[^\s;&|]+)", before):
+        assigned[name] = expand(value, assigned) if not value.startswith("'") else value.strip("'")
     m = re.findall(r"-C\s+(\S+)", git_opts)
     if m:
-        return os.path.expanduser(m[-1].strip("'\""))
-    cds = re.findall(r"(?:^|[;&|]\s*)cd\s+(\"[^\"]+\"|'[^']+'|\S+)\s*(?:&&|;)", command[:start])
+        d = expand(m[-1], assigned)
+        return unresolved(os.path.normpath(d if os.path.isabs(d) else os.path.join(cwd, d)))
+    cds = re.findall(r"(?:^|[;&|]\s*)cd\s+(\"[^\"]+\"|'[^']+'|\S+)\s*(?:&&|;)", before)
     # Each cd moves from where the one before it left the shell, so a relative cd after an
     # absolute one resolves against that, not against the session's cwd.
     d = cwd
     for target in cds:
-        # The shell expands $VAR in a cd target unless it is single-quoted (cd "$AGENTS_SHARED").
-        t = target if target.startswith("'") else os.path.expandvars(target)
-        t = os.path.expanduser(t.strip("'\""))
+        t = expand(target, assigned)
         d = os.path.normpath(t if os.path.isabs(t) else os.path.join(d, t))
-    return d
+    return unresolved(d)
 
 
 def github_slug(url):
