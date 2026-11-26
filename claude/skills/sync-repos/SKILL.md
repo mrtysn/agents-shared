@@ -36,8 +36,9 @@ the survey runs. If `repo-survey` answers `unknown option`, the tool is older th
 report it and stop. If `local-repos-list` is missing or its snapshot fails, stop and say so;
 never fall back to pulling every folder.
 
-Rows whose `action` is `skipped` are third-party clones: list how many in the report, by name
-only, with no state and no next step.
+Rows whose `action` is `skipped` are folders with neither tag: third-party clones, and repos with
+no remote (which have nothing to pull). List them in the report by name only, with no state and
+no next step.
 
 With no argument and no `$DEV_ROOT`, ask which folder holds the repos. One JSON object per repo:
 `name`, `path`, `branch`, `upstream`, `ahead`, `behind`, `state` (`clean`, `dirty`, `staged`,
