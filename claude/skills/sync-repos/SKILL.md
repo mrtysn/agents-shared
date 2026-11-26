@@ -1,5 +1,5 @@
 ---
-description: Bring every repo under the dev root up to date with its remote. Runs `repo-survey --pull`, which fast-forwards each repo that can move with no conflict, then settles the repos it held back (diverged, uncommitted files in the way, a rebase in progress), asks which installed tools to rebuild and which apps to relaunch, and wires hooks a pull of agents-shared brought into the settings they are built from. Use when the user says "sync with git", "pull everything", "sync my repos", "update all repos", or invokes /sync-repos.
+description: Bring the owner's repos under the dev root (tagged my or fork by local-repos-list; third-party clones are left alone) up to date with their remotes. Runs `repo-survey --pull`, which fast-forwards each repo that can move with no conflict, then settles the repos it held back (diverged, uncommitted files in the way, a rebase in progress), asks which installed tools to rebuild and which apps to relaunch, and wires hooks a pull of agents-shared brought into the settings they are built from. Use when the user says "sync with git", "pull everything", "sync my repos", "update all repos", or invokes /sync-repos.
 argument-hint: "[root folder, default $DEV_ROOT]"
 allowed-tools: Bash, Read, AskUserQuestion
 ---
@@ -13,20 +13,35 @@ user's to decide.
 
 `repo-survey` is a link into its own repo, so a pull can bring a newer one than the copy on disk
 (Nov 2026: this skill shipped a step before the `--pull` it calls reached the checkout, and the old
-tool read `--pull` as a folder). Fast-forward that repo first, then run it:
+tool read `--pull` as a folder). Fast-forward that repo first.
+
+Only the owner's repos are pulled: those `local-repos-list` (dev-repos-skills, the engine of
+local-repo-skill-tool-job.app) tags `my` or `fork`. A third-party clone is never fetched or
+moved: a pull there changes code that a local environment was built for (Nov 2026: a sync moved
+ComfyUI 677 commits past the packages in its `.venv`, and it was rolled back), and the owner
+updates those by hand. The tags come from each folder's `origin`, plus any the owner set in the app.
 
 ```bash
 git -C "$(dirname "$(dirname "$(readlink -f "$(command -v repo-survey)")")")" pull --ff-only -q
-repo-survey --pull --json "${ARGUMENTS:-$DEV_ROOT}"
+root="${ARGUMENTS:-$DEV_ROOT}"
+owned="$(mktemp)"
+snapshot="$(local-repos-list api snapshot --root "$root")" &&
+  jq -r '.folders[] | select(.tags | any(. == "my" or . == "fork")) | .path' <<< "$snapshot" > "$owned" &&
+  [ -s "$owned" ] &&
+  repo-survey --pull --pull-only "$owned" --json "$root"
 ```
 
-A refused fast-forward there (diverged, a conflict) is settled per step 2 before the survey runs.
-If `repo-survey` then answers `unknown option --pull`, the tool is older than this skill: report
-it and stop.
+A refused fast-forward of `repo-survey`'s repo (diverged, a conflict) is settled per step 2 before
+the survey runs. If `repo-survey` answers `unknown option`, the tool is older than this skill:
+report it and stop. If `local-repos-list` is missing or its snapshot fails, stop and say so;
+never fall back to pulling every folder.
+
+Rows whose `action` is `skipped` are third-party clones: list how many in the report, by name
+only, with no state and no next step.
 
 With no argument and no `$DEV_ROOT`, ask which folder holds the repos. One JSON object per repo:
 `name`, `path`, `branch`, `upstream`, `ahead`, `behind`, `state` (`clean`, `dirty`, `staged`,
-`untracked`, `NO REMOTE`, an operation marker), `action` (`pulled`, `held`, `none`), `reason`
+`untracked`, `NO REMOTE`, an operation marker), `action` (`pulled`, `held`, `none`, `skipped`), `reason`
 for a held repo, `pulled.from`/`pulled.to` for a moved one. The script fast-forwards only a repo
 that is only behind, on a branch, with no operation in progress, whose incoming commits touch none
 of its uncommitted or untracked files. It never merges, rebases, stashes or resets.
