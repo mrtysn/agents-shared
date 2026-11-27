@@ -102,6 +102,11 @@ check "announced next step, then ended"              block false "$(prompt 'rend
 check "permission asked in prose for settled work"   block false "$(prompt 'improve the skill')" "$(say $GOAHEAD)"
 check "user-steps list, no tool call"                pass  false "$(prompt 'apply for her')" "$(say $STEPS)"
 check "user-steps list after work"                   block false "$(prompt 'apply for her')" "$(bash_call 1)" "$(say $STEPS)"
+HAND_STEPS=$'The old driver is out of the way; the rest needs your hands.\n\nYour steps:\n1. Open System Settings, then Keyboard.\n2. Click Modifier Keys and set Caps Lock to Escape.\n3. Restart the Mac.\n\nReply when done or stuck.'
+check "numbered steps for the user under Your steps, after work" pass false "$(prompt 'walk me through removing it')" "$(bash_call 1)" "$(say $HAND_STEPS)"
+check "numbered steps under a bold Your steps heading"   pass  false "$(prompt 'walk me through removing it')" "$(bash_call 1)" "$(say $'Removed what I could.\n\n**Your steps:**\n\n1. Restart the Mac.\n2. Enter your password at the prompt.')"
+check "numbered steps for the user, then a prose offer"  block false "$(prompt 'walk me through removing it')" "$(bash_call 1)" "$(say "$HAND_STEPS"$'\n\nLet me know when you are done.')"
+check "numbered list after work, no Your steps line"     block false "$(prompt 'fix the build')" "$(bash_call 1)" "$(say $'Fixed three things:\n1. The linker flag.\n2. The stale cache.\n3. The test path.')"
 check "slash-command answer, no tool call"           pass  false "$(prompt $'<command-message>be-literal</command-message>\n<command-name>/be-literal</command-name>\n<command-args>why had you stopped?</command-args>')" "$(say 'I stopped because the answer was the whole task as I read it.')"
 check "ends asking the user to type a slash command" pass  false "$(prompt 'go')" "$(bash_call 1)" "$(say $'The skills are on for this repo.\n\nType `/reload-plugins`, and I will load them once its output is here.')"
 check "ends asking to type a slash command, full stop"  pass  false "$(prompt 'go')" "$(bash_call 1)" "$(say $'The skills are on for this repo.\n\nType /reload-plugins.')"

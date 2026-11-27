@@ -44,6 +44,10 @@
 #     since the prompt, or an earlier launch still unreported); otherwise it is refused once, with a message to arm a
 #     wakeup (2026-11-13, session 4218922c-be05-4fef-8b66-67738a973da4: the list was delivered, the turn ended idle,
 #     and the work the user said to continue never resumed),
+#   - the reply lays out steps only the user can take: a line starting "Your steps" followed by a numbered list
+#     ("1."), with no prose offer after it. Such steps are text on the user's screen, never a question
+#     (claude/rules/asking-for-decisions.md; 2026-11-27: a refusal here turned a walk-through into "Where are you?"
+#     questions with the steps folded inside). A bulleted report under the same heading is still judged,
 #   - the turn made no tool call and the reply has text and no prose offer: a conversational answer ends with the
 #     answer, even a one-word one the user asked for (survey 2026-11-12, scripts/survey-stop-hook-refusals.py: of 66 idle refusals on such turns,
 #     45 ended in a bare "Nothing left" or text only, 9 forced questions were rejected, 12 were useful),
@@ -168,6 +172,7 @@ VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" --arg show "$SHOW_PATT
       elif ($prompt | length) < 60 and ($prompt | test("^\\s*(stop|stop here|that.?s (all|it)|enough|nothing else|pause|hold on|wait|no more|done for (now|today))\\b"; "i")) then "pass"
       elif $rejected then "pass"
       elif $a >= 0 and $workAfterAsk == 0 then "pass"
+      elif ($text | test("(^|\\n)[ \\t*_>#-]*your steps\\b[^\\n]*\\n(\\s*\\n)*[ \\t]*1[.)][ \\t]+\\S"; "i")) then "pass"
       elif $show != "" and ($prompt | test($show)) and ($text | length) >= 40 then
         # "list me X and continue": the content is delivered, but the work the user said to continue needs something
         # armed that resumes it, or the session sits idle with authorized work left.
@@ -192,7 +197,7 @@ if [[ $VERDICT == idle && -n $SESSION && -x $SHELLS ]]; then
   [[ -n $("$SHELLS" --session "$SESSION" 2>/dev/null) ]] && exit 0
 fi
 
-ASK="Call AskUserQuestion now: first any open decision, then the proceed question (multiSelect): one option per unfinished part of what the user asked for that you could do next, recommended first and marked (Recommended), and last \"Stop here\". A step only the user can take is an option only when your own remaining work waits on it (a login, a reboot before a test). What the user does with a finished deliverable (upload, paste, send, deploy) is never an option, and neither is work nobody asked for. A step of the user's with a later date is never an option: record it and name it on the Nothing left line. The ask-open-decisions skill, step 5, has the format. Answering a question still authorizes no edits: offering the follow-up in the question is what replaces stopping."
+ASK="Call AskUserQuestion now: first any open decision, then the proceed question (multiSelect): one option per unfinished part of what the user asked for that you could do next, recommended first and marked (Recommended), and last \"Stop here\". A step only the user can take is never an option and is never asked about: when your own remaining work waits on such steps (a login, a reboot before a test), write all of them, numbered from 1, under a line 'Your steps:' as the last text, and end the turn there with no question. What the user does with a finished deliverable (upload, paste, send, deploy) is never an option, and neither is work nobody asked for. A step of the user's with a later date is never an option: record it and name it on the Nothing left line. The ask-open-decisions skill, step 5, has the format. Answering a question still authorizes no edits: offering the follow-up in the question is what replaces stopping."
 if [[ $VERDICT == continue ]]; then
   REASON="The content is delivered, but the user also told you to continue, and nothing is armed that resumes that work (claude/rules/end-every-turn-with-a-next-step.md). Arm a ScheduleWakeup (or start the remaining work in the background: a background Agent or Bash call) so the work the user said to continue resumes; then end the turn."
 elif [[ $VERDICT == closed* ]]; then
