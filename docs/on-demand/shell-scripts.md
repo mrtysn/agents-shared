@@ -22,6 +22,8 @@ Say which one applies rather than defaulting to bash out of habit.
 
 - `set -euo pipefail` at the top of anything non-trivial
 - Quote expansions; `"$var"`, not `$var`
+- In zsh, text that may start with a dash is printed with `print -r -- "$text"`: a bare
+  `print "- item"` reads the leading dash as an option and fails or prints nothing.
 - A list of background pids is an array: `pids=(); … & pids+=($!); kill $pids`, or `kill $(jobs -p)`.
   zsh does not word-split an unquoted string, so `pids="$pids $!"` then `kill $pids` passes the
   whole string as one bad argument and kills nothing. On 2026-10-20 a load test left 12 busy loops
