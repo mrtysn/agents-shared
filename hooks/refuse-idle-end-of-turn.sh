@@ -110,7 +110,9 @@ VERDICT=$(print -r -- "$ROWS" | jq -rs --arg last "$LAST" --arg show "$SHOW_PATT
   | ([ $rows[$prevPrompt + 1:(if $p < 0 then 0 else $p end)][] | select(.label == "RESULT AskUserQuestion"
        and ((.text // "") | test("doesn.t want to proceed"))) ] | length > 0) as $rejected
   | if $p < 0 then "pass" else
-    ($rows[$p].text // "" | (capture("<command-args>(?<a>[\\s\\S]*)</command-args>").a // .)) as $prompt
+    # A pasted image arrives as a leading "[Image #5]": strip it, as refuse-requested-content-before-tool-call.sh does.
+    ($rows[$p].text // "" | (capture("<command-args>(?<a>[\\s\\S]*)</command-args>").a // .)
+     | sub("^(\\s*\\[Image #[0-9]+\\])+"; "")) as $prompt
     | $rows[$p + 1:] as $turn
     | (if $last != "" then $last else [ $turn[] | select(.group == "assistant") | .text ] | last // "" end) as $text
     # Fenced blocks (``` or ~~~, an unclosed one runs to the end) are handed-over text, such as a first message for

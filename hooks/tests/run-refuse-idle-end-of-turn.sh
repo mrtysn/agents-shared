@@ -198,6 +198,7 @@ check "asked to see content, only a short line"       block false "$(prompt 'lis
 check "no request for content, same text after work"  block false "$(prompt 'rename the project')" "$(bash_call 1)" "$(say $NAMES)"
 check "why question answered after reads"             pass  false "$(prompt 'why would web-fetch get an exemption')" "$(bash_call 1)" "$(say $NAMES)"
 check "explain prompt answered after reads"           pass  false "$(prompt 'explain the third item')" "$(bash_call 1)" "$(say $NAMES)"
+check "why after pasted images, answered after reads" pass  false "$(prompt $'[Image #5] [Image #6]\nwhy is that window red')" "$(bash_call 1)" "$(say $NAMES)"
 check "why mid-prompt is no explain request"          block false "$(prompt 'rename the project, why not')" "$(bash_call 1)" "$(say $NAMES)"
 
 # "Show X and continue": the content is delivered, but the work to continue needs something armed.
