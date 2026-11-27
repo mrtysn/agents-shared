@@ -44,3 +44,5 @@ interface-behaviour	Bash	command	\.(css|scss|tsx|vue|swift|tscn|xib|gd|html)([^A
 tools-that-change-the-owners-data	Bash	command	project-lifecycle[[:space:]].*init	-	note-once
 tools-that-change-the-owners-data	Write|Edit	content	os\.remove\(|\.unlink\(|shutil\.rmtree|\brmtree\(|removeItem\(|DirAccess\.remove|fs\.rm(Sync)?\(	-	note-once
 tools-that-change-the-owners-data	Bash	command	lsof[^;&]*\|[[:space:]]*(xargs[[:space:]]+([^|;&[:space:]]+[[:space:]]+)*)?kill|kill[^;&|]*(\$\(|`)[[:space:]]*lsof	sTCP:LISTEN	deny-once
+spotlight-runs-in-siri-ai	Bash	command	(pgrep|pkill|killall|launchctl|grep)[^;&]*[Ss]potlight	-	note-once
+zsh-log-builtin	Bash	command	(^|[;&|(`])[[:space:]]*log[[:space:]]+(show|stream|collect|stats|config)([[:space:]]|$)	-	note-once

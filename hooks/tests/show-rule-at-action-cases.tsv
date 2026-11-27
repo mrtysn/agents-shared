@@ -129,3 +129,11 @@ block	Bash	{"command":"ls ~/Pictures/Photos\\ Library.photoslibrary"}
 pass	Bash	{"command":"ls ~/Library/Logs"}
 pass	Bash	{"command":"ls ~/Library/Application Support/Code"}
 pass	Bash	{"command":"tccutil reset Accessibility com.example.app"}
+# --- spotlight-runs-in-siri-ai: process checks on Spotlight
+note	Bash	{"command":"pgrep -lx Spotlight Dock"}
+note	Bash	{"command":"ps -axo pid,comm | grep -E \"Dock|Spotlight\""}
+pass	Bash	{"command":"mdutil -s /"}
+# --- zsh-log-builtin: bare log show hits the zsh builtin
+note	Bash	{"command":"log show --last 5m --predicate \"process == 1\" 2>/dev/null | head"}
+pass	Bash	{"command":"/usr/bin/log show --last 5m"}
+pass	Bash	{"command":"git log --oneline -3"}
