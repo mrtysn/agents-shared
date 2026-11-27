@@ -211,7 +211,9 @@ verdict() {
            | select(.group == "user" and .label == "USER" and .origin == "human" and (.meta | not)
                     and ((.text // "") | test("^\\s*<(bash-|local-command)") | not)) | $i ] | max // -1) as $p
       | if $p < 0 then "skip" else
-        ($rows[$p].text // "" | (capture("<command-args>(?<a>[\\s\\S]*)</command-args>").a // .)) as $prompt
+        # A pasted image arrives as a leading "[Image #5]": strip it so "^why" and the like still anchor.
+        ($rows[$p].text // "" | (capture("<command-args>(?<a>[\\s\\S]*)</command-args>").a // .)
+         | sub("^(\\s*\\[Image #[0-9]+\\])+"; "")) as $prompt
         | ($rows[$p].time // "x") as $time
         | $rows[$p + 1:] as $turn
         | (if $work and ($prompt | test($pat)) then

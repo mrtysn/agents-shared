@@ -103,6 +103,8 @@ f=$(mk why "$(prompt 'why would web-fetch get an exemption')" "$(say "$CONTENT")
 check '"why" prompt refuses a question after the answer' 2 AskUserQuestion "$f"
 f=$(mk explain "$(prompt 'explain the third item')" "$(say "$CONTENT")" "$(ask q1)")
 check '"explain" prompt refuses a question after the answer' 2 AskUserQuestion "$f"
+f=$(mk imagewhy "$(prompt $'[Image #5] [Image #6]\nwhy is that window red')" "$(say "$CONTENT")" "$(ask q1)")
+check '"why" after pasted images refuses a question after the answer' 2 AskUserQuestion "$f"
 f=$(mk midwhy "$(prompt 'fix the build, and why not')" "$(say "$CONTENT")" "$(ask q1)")
 check '"why" mid-prompt allows' 0 AskUserQuestion "$f"
 f=$(mk allthe "$(prompt 'check all the logs')" "$(say "$CONTENT")" "$(ask q1)")
