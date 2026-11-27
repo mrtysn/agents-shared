@@ -4,7 +4,9 @@
 # and keep it there, untracked. Without this file, or a matching line: 8.
 #
 # One line per account: the account name from the claude-accounts file, or * for every
-# account, then a whole number or unlimited (never asks). An account's own line wins over *.
+# account, then a whole number of up to 9 digits (base 10, so 08 is 8) or unlimited (never
+# asks). An account's own line wins over *. A bad line makes every spawn ask, with the line,
+# except in a session that bypasses the guard.
 # A spawn from inside a subagent is refused whatever the budget.
 #
 # account   budget

@@ -9,6 +9,7 @@
 # beside it, matched by config folder; a folder in no account line is covered by * alone.
 # Exit 0 either way; exit 2 on a bad line, with the file and line on stderr.
 emulate -L zsh
+setopt extended_glob
 
 dir="${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared"
 file="$dir/subagent-spawn-budget"
@@ -33,13 +34,22 @@ typeset -i n=0
 typeset -a fields
 while IFS= read -r line || [[ -n "$line" ]]; do
     (( n++ ))
-    line="${line%%\#*}"
+    line="${${line%%\#*}//$'\r'/}"
     fields=(${=line})
     (( ${#fields} )) || continue
     key="${fields[1]}" value="${fields[2]:-}"
     if (( ${#fields} != 2 )) || [[ "$value" != (<->|unlimited) ]]; then
         print -u2 "subagent-spawn-budget: $file line $n needs an account name or *, then a whole number or unlimited: $line"
         exit 2
+    fi
+    # Base 10 whatever was typed: 08 is 8, never octal. Past 9 digits it is a typo for unlimited.
+    if [[ "$value" == <-> ]]; then
+        value="${value##0##}"
+        if (( ${#value} > 9 )); then
+            print -u2 "subagent-spawn-budget: $file line $n has more than 9 digits; write unlimited instead: $line"
+            exit 2
+        fi
+        value="${value:-0}"
     fi
     if [[ "$key" == "*" ]]; then star="$value"
     elif [[ -n "$account" && "$key" == "$account" ]]; then own="$value"

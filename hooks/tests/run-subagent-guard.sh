@@ -73,6 +73,21 @@ check ask /p/x.jsonl
 fresh; printf '* lots\n' > "$LOCAL/subagent-spawn-budget"
 check ask /p/x.jsonl
 check ask /p/x.jsonl
+# a bad line does not stop a session launched with the bypass env var, or with bypass-all on
+fresh; export CLAUDE_SUBAGENT_GUARD_BYPASS=1
+for _ in 1 2 3; do check pass /p/x.jsonl; done
+unset CLAUDE_SUBAGENT_GUARD_BYPASS
+fresh; touch "$CFG/subagent-guard/bypass-all-sessions"
+for _ in 1 2 3; do check pass /p/x.jsonl; done
+rm -f "$CFG/subagent-guard/bypass-all-sessions"
+# a leading zero is base 10: 08 lets eight spawns pass, then asks (bash would read 08 as bad octal)
+fresh; printf '* 08\n' > "$LOCAL/subagent-spawn-budget"
+for _ in 1 2 3 4 5 6 7 8; do check pass /p/x.jsonl; done
+check ask /p/x.jsonl
+# 010 is ten, not octal eight
+fresh; printf '* 010\n' > "$LOCAL/subagent-spawn-budget"
+for _ in 1 2 3 4 5 6 7 8 9 10; do check pass /p/x.jsonl; done
+check ask /p/x.jsonl
 
 echo "$((total - fail))/$total passed"
 [ "$fail" = 0 ]
