@@ -53,7 +53,7 @@ A process that is alive and ours is never left out of the verdict: it was stoppe
 
 Lead with the verdict, one line, then only what the user needs:
 
-- `Safe to close.` followed by one line naming where the remaining work is written down, as an absolute path (or "nothing outstanding").
+- `Safe to close.` followed by one line naming where the remaining work is written down, as an absolute path (or "nothing outstanding"). Under it, one line per outstanding item from step 4: what it is, its state now, and its next concrete step (or what it waits on, such as a decision the user deferred), so the user sees what remains without opening the file. The file path stays: the lines summarize it, they do not replace it.
 - `Not yet:` and the blockers, each one line with its next step (a tree that would not die, with its pids; an agent to wait for; a process the user must decide about).
 
 Then a short list: processes stopped (pid, what it was, how to bring it back) or "none"; agents (or "none"); changes committed; documents written or updated (absolute paths). No table. Items owned by someone else are not listed.
