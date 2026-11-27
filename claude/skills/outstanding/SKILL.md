@@ -141,7 +141,8 @@ Direct and plain. No hedging, no padding, no "you might also consider" — only 
 The list records every item, Blocked ones included. Stop there and the user has to parse a
 list and answer its decisions by hand. So once the report is written, invoke the `ask-open-decisions` skill with the Skill tool,
 every time the list has any row. It puts each decision to the user through AskUserQuestion,
-self-contained, with your recommendation first, and ends with the proceed question, whose
-options include the Yours rows. A list of only Yours rows, or with nothing needing a
-decision, still gets the proceed question: never skip this step. Only an empty list ends
+self-contained, with your recommendation first, and ends with the proceed question. Yours rows
+are not options in it: their steps are laid out as text under `Your steps:`, as that skill's
+step 5 says. A list with nothing needing a decision still gets the proceed question: never
+skip this step. Only an empty list ends
 with the one line `Nothing left: <what was delivered>.`

@@ -3,8 +3,7 @@
 **When a decision is genuinely the user's, ask with the AskUserQuestion tool.**
 Never bury the ask in prose ("say the word", "let me know if you'd like me to",
 "the choice is…"). Every turn that does not continue working ends with this tool,
-carrying the open decisions and the proceed question; steps only the user can take
-are options in it, not a reason to skip it
+carrying the open decisions and the proceed question
 ([end every turn with a next step](end-every-turn-with-a-next-step.md)).
 A question never stands in for content the user asked to see: the content comes first, as the
 last text of a turn with no tool call.
@@ -19,9 +18,15 @@ confirmed with the tool before they run. Ask only for names the user will type o
 see; pick the rest without asking, and every name, picked or offered, says what
 the thing does (verb-object, never a metaphor noun).
 
+**Steps only the user can take are laid out, never asked about.** A password, a reinstall, a
+restart, a click: all of them, numbered under a line `Your steps:`, are the last text of the
+turn, with no tool call after them, and the turn ends there. No question carries them and none
+asks which step the user has reached; they reply when done or stuck.
+
 **A fact only the user holds is asked, never reported as unknowable.** What they changed,
 saw or did on their own screen or device (a setting they flipped, what a window did) cannot
-be read from the machine: ask it at once with this tool. "I can't tell whether you…" is the
+be read from the machine: ask it at once with this tool. That is what they did or saw before
+now, never their progress through steps just handed to them. "I can't tell whether you…" is the
 failure. Nov 18 2026, iTerm hotkey window: after "I can't tell whether it was already on or
 whether you just turned it on", the user: "WHY CAN YOU NOT JUST ASK ME".
 

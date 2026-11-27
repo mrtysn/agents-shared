@@ -18,7 +18,9 @@ finished deliverable (upload it, paste it, send it, deploy it, tell someone) is 
 point of the task, never an item: do not list it, offer it, or walk through it. A step
 only the user can take counts only when your own remaining work waits on it (a login,
 a device in hand, a reboot before a test), and only after checking you cannot do it
-yourself. A step of the user's with a later date is not an item: write it where the repo
+yourself. It is never an option in a question: all such steps, numbered under a line
+`Your steps:`, are the last text of the turn, which ends there with nothing asked
+([asking for decisions](asking-for-decisions.md)). A step of the user's with a later date is not an item: write it where the repo
 keeps open items, and name it on the closing line: `Nothing left: <delivered>. Yours by
 <date>: <step>, recorded in <file>.` Never ask whether a step is done in the turn that
 introduced it; ask when the user raises it or a later session reads the record. Work nobody asked for (restyling something to match, a related cleanup) is
@@ -28,7 +30,8 @@ either, unless your own remaining work waits on it.
 **The deliverable is the end state the request names.** "A button in my Finder toolbar" is
 delivered when it is in the toolbar, not when the app exists. While that state is not reached,
 the last line is never `Nothing left`: the unreached step is the item, and a step only the
-user can take (a drag, a login) stays in it once you have checked you cannot do it yourself.
+user can take (a drag, a login) is laid out under `Your steps:` once you have checked you cannot
+do it yourself.
 The Stop hook passes any `Nothing left` line without judging it, so this check is yours.
 
 **A demo, comparison or preview is delivered when it is open on the user's screen and you have looked at it there**: the live link opened for them, not a file path or a scratch copy. That turn ends `Nothing left: <what, the link, opened>`. Which of two options to keep is not asked in the turn that hands the comparison over; the user looks first and answers in their own message.
@@ -54,7 +57,8 @@ the user can type, end the turn in text naming it and continue once its output a
 ask for it through AskUserQuestion, whose answer arrives first. The user rejected or answered your last question: do not ask
 it again, reworded or not, even when a Stop hook refuses the turn; say in one line what is unfinished and end in text (the hook passes such a turn). A rejected question is not an answer: its decision stays open ([asking for decisions](asking-for-decisions.md)).
 
-`hooks/refuse-idle-end-of-turn.sh` (Stop) refuses, once, a turn that ends otherwise, and lets
+`hooks/refuse-idle-end-of-turn.sh` (Stop) refuses, once, a turn that ends otherwise, lets a turn
+through that ends on numbered steps under `Your steps:`, and lets
 a text-only turn through when the user asked to see content, unless the prompt said "and continue" ("show X and continue"): then the turn must also arm a ScheduleWakeup or start the remaining work in the background, so the work resumes;
 `hooks/refuse-requested-content-before-tool-call.sh` (PreToolUse) refuses, once, that content
 written ahead of a question, skill or agent call, and a copy-ready draft (a fenced block) written ahead of any tool call; it also refuses, once, the first Edit, Write or state-changing Bash call of a turn whose prompt asked to see content that is not delivered yet (a one-line announcement is not delivery; reads that gather the data are fine); `hooks/end-turn-for-queued-slash-command.py`

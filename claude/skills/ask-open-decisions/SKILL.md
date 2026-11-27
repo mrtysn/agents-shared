@@ -72,9 +72,10 @@ accurate it is.
    - **Items** are the unfinished parts of what the user asked for in this session: tasks
      listed as not started or unfinished, next steps already agreed, and Blocked or Yours
      items. A Yours item is a step only the user can take that your own remaining work
-     waits on (a login, a device in hand); its option is "I'll do it now, walk me through
-     it", "Done, check the result" only after the user says they went to do it, or, where an agent path
-     exists, "Do it yourself". What the user does with a finished deliverable (upload,
+     waits on (a login, a device in hand). It is an option only where an agent path exists
+     ("Do it yourself"); otherwise it is never an option and never asked about: its steps,
+     numbered under a line `Your steps:`, are the last text of a turn that ends there with no
+     question (the asking-for-decisions rule). What the user does with a finished deliverable (upload,
      paste, send, deploy) is never an item, and neither is work nobody asked for. Work
      handed to another session is not an item unless your own remaining work waits on it. Take
      them in the order the session's own list shows; that order is the execution order,

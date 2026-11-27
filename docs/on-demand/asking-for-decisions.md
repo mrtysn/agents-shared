@@ -72,6 +72,19 @@ Routine judgment calls, conventional defaults, and anything answerable by readin
 the code — decide those and say what was decided. Asking is for cases where
 different answers produce materially different work.
 
+## Steps for the user are text, not a question
+
+Steps only the user can take (a password, a reinstall, a restart, a click in an app) are never
+put in a question, and no question asks how far the user has got with them. Write all of them,
+numbered, under a line `Your steps:` as the last text of the turn, with no tool call after them,
+and end the turn; the user replies when done or stuck. Text written before a tool call can be
+collapsed to one line on the user's screen, and a question box shows its options, not a
+procedure, so steps placed in or before a question are not readable as steps.
+`hooks/refuse-idle-end-of-turn.sh` passes a turn that ends this way.
+
+"A fact only the user holds is asked" covers what the user did or saw before now. It does not
+cover their progress through steps just handed to them.
+
 ## The one required ask
 
 Outward-facing or hard-to-reverse actions still need confirmation before running:
@@ -147,3 +160,12 @@ question to respond / then you read my queued message that is on anotehr topic /
 decide on your own about the question that was EXITED / HELLO???". The rule then read "rejected or answered
 your last question: do not ask it again", which lumped a cancel with an answer; it now says a rejected
 question's decision stays open.
+
+Nov 27 2026: twice in one session an agent folded steps for the user's hands into a question: a keyboard
+test with System Settings clicks in the question text ("What happened?"), then an uninstall walk-through
+ending "Where are you?" with options such as "Reinstalled, click the uninstaller". The launch rule then said
+"steps only the user can take are options in it", and the Stop hook had refused a turn that ended on the
+steps as plain text. The user typed into the answer boxes: "can you please clarify the steps i need to take
+rn", then "I am nowhere. I hate these kinds of questions. when i say walk me through, I expect to see the
+steps laid out on the SAME SCREEN". Such steps are now the last text of the turn under `Your steps:`, the
+hook passes that turn, and "a fact only the user holds" no longer reaches progress through steps just given.
