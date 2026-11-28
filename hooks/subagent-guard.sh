@@ -17,8 +17,16 @@ if [[ "$transcript" == */subagents/* ]]; then
 fi
 
 sid=$(echo "$input" | jq -r '.session_id // "unknown"')
-count_file="/tmp/claude-spawn-count-$sid"
-asked_file="/tmp/claude-spawn-asked-$sid"
+# The count and the "asked" mark live beside the config, not in /tmp: a session outlives a reboot
+# (it is resumed), and a /tmp wiped by the reboot made the guard ask a session again that had
+# already been approved, holding an unattended orchestrated run at the prompt for hours.
+state_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/subagent-guard/sessions"
+mkdir -p "$state_dir"
+count_file="$state_dir/$sid.count"
+asked_file="$state_dir/$sid.asked"
+# A session whose state is still in /tmp from before this change carries it over once.
+[[ ! -e "$count_file" && -e "/tmp/claude-spawn-count-$sid" ]] && cp "/tmp/claude-spawn-count-$sid" "$count_file"
+[[ ! -e "$asked_file" && -e "/tmp/claude-spawn-asked-$sid" ]] && : > "$asked_file"
 n=$(cat "$count_file" 2>/dev/null || echo 0)
 n=$((n + 1))
 echo "$n" > "$count_file"

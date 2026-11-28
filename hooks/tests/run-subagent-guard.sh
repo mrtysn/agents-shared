@@ -10,6 +10,7 @@ HOOK="$HERE/../subagent-guard.sh"
 CFG=$(mktemp -d)
 SID="subagent-guard-test-$$"
 trap 'rm -rf "$CFG"; rm -f "/tmp/claude-spawn-count-$SID" "/tmp/claude-spawn-asked-$SID"' EXIT
+STATE="$CFG/subagent-guard/sessions"
 # The machine's own budget file never reaches the cases: they read an empty config folder.
 export XDG_CONFIG_HOME="$CFG/xdg"
 LOCAL="$XDG_CONFIG_HOME/agents-shared"
@@ -27,13 +28,13 @@ check() {
 
 # a spawn from inside a subagent is refused whatever the budget or bypass
 check deny /p/x/subagents/agent-1.jsonl
-rm -f "/tmp/claude-spawn-count-$SID"
+rm -f "$STATE/$SID.count"
 # the budget passes, the first spawn past it asks, the rest of the session passes
 for _ in 1 2 3 4 5 6 7 8; do check pass /p/x.jsonl; done
 check ask /p/x.jsonl
 check pass /p/x.jsonl
 # with bypass-all-sessions, a fresh session past its budget passes; nesting is still refused
-rm -f "/tmp/claude-spawn-count-$SID" "/tmp/claude-spawn-asked-$SID"
+rm -f "$STATE/$SID.count" "$STATE/$SID.asked"
 mkdir -p "$CFG/subagent-guard" && touch "$CFG/subagent-guard/bypass-all-sessions"
 for _ in 1 2 3 4 5 6 7 8 9 10; do check pass /p/x.jsonl; done
 check deny /p/x/subagents/agent-1.jsonl
@@ -41,17 +42,29 @@ check deny /p/x/subagents/agent-1.jsonl
 rm -f "$CFG/subagent-guard/bypass-all-sessions"
 check ask /p/x.jsonl
 # launched with CLAUDE_SUBAGENT_GUARD_BYPASS=1, a fresh session past its budget passes; nesting is still refused
-rm -f "/tmp/claude-spawn-count-$SID" "/tmp/claude-spawn-asked-$SID"
+rm -f "$STATE/$SID.count" "$STATE/$SID.asked"
 export CLAUDE_SUBAGENT_GUARD_BYPASS=1
 for _ in 1 2 3 4 5 6 7 8 9 10; do check pass /p/x.jsonl; done
 check deny /p/x/subagents/agent-1.jsonl
 unset CLAUDE_SUBAGENT_GUARD_BYPASS
 # unset again, a fresh session asks past its budget
-rm -f "/tmp/claude-spawn-count-$SID" "/tmp/claude-spawn-asked-$SID"
+rm -f "$STATE/$SID.count" "$STATE/$SID.asked"
 for _ in 1 2 3 4 5 6 7 8; do check pass /p/x.jsonl; done
 check ask /p/x.jsonl
 
-fresh() { rm -f "/tmp/claude-spawn-count-$SID" "/tmp/claude-spawn-asked-$SID"; }
+# the count and the asked mark survive a reboot: a wiped /tmp neither restarts the count nor asks again
+rm -f "$STATE/$SID.count" "$STATE/$SID.asked"
+for _ in 1 2 3 4 5 6 7 8; do check pass /p/x.jsonl; done
+check ask /p/x.jsonl
+rm -f "/tmp/claude-spawn-count-$SID" "/tmp/claude-spawn-asked-$SID"
+for _ in 1 2 3 4 5 6 7 8 9 10; do check pass /p/x.jsonl; done
+# a session whose state is still in /tmp from before is carried over: an approved session is not asked again
+rm -f "$STATE/$SID.count" "$STATE/$SID.asked"
+printf '9\n' > "/tmp/claude-spawn-count-$SID"; : > "/tmp/claude-spawn-asked-$SID"
+check pass /p/x.jsonl
+rm -f "/tmp/claude-spawn-count-$SID" "/tmp/claude-spawn-asked-$SID"
+
+fresh() { rm -f "$STATE/$SID.count" "$STATE/$SID.asked"; }
 printf 'acct %s\n' "$CFG" > "$LOCAL/claude-accounts"
 # a * line sets the budget for every account
 fresh; printf '* 3\n' > "$LOCAL/subagent-spawn-budget"
