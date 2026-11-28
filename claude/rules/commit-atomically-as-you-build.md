@@ -46,6 +46,9 @@ and many parallel sessions, that ask is repeated all day.
 
 - A repo whose `CLAUDE.md` says to ask before committing: ask, as it says.
 - Work the user has said is exploratory, or told you not to commit.
+- A change being tried out (a layout, wording or UI adjustment the user is iterating
+  on, "lets try X") is finished when the user settles on it, not at each try: commit
+  the settled version.
 - Anything that should never be in git — secrets, local config, generated output
   the repo ignores — stays out regardless.
 
